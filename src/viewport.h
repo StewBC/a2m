@@ -1,0 +1,49 @@
+// Apple ][+ emulator
+// Stefan Wessels, 2024
+// This is free and unencumbered software released into the public domain.
+
+#pragma once
+
+typedef struct VIEWPORT {
+    SDL_Window      *window;
+    SDL_Renderer    *renderer;
+    SDL_Surface     *surface;
+    SDL_Texture     *texture;
+    SDL_Rect        target_rect;
+    SDL_Rect        full_window_rect;
+
+    struct nk_context   *ctx;
+    struct nk_font      *font;
+    int             font_height;
+    int             font_width;
+
+    DEBUGGER        debugger;
+    MEMSHOW         memshow;
+    VIEWCPU         viewcpu;
+    VIEWMISC        viewmisc;
+
+    // Shadow of machine states 
+    int             screen_mode_shadow;
+
+    // Flags    
+    int             active_page_shadow:1;   // shadow flag
+    int             debug_view:1;
+    int             viewcpu_show:1;
+    int             viewdbg_show:1;
+    int             viewmem_show:1;
+    int             viewmisc_show:1;
+    int             viewdlg_modal:1;
+    int             dlg_dissassembler_go:1;
+    int             dlg_filebrowser:1;
+    int             dlg_memory_go:1;
+    int             dlg_memory_find:1;
+} VIEWPORT;
+
+int  viewdlg_hex_address(struct nk_context *ctx, struct nk_rect r, char *address, int *address_length);
+int  viewport_init(VIEWPORT *v, int w, int h);
+void viewport_init_nuklear(VIEWPORT *v);
+void viewport_show(APPLE2 *m);
+void viewport_shutdown(VIEWPORT *v);
+void viewport_toggle_debug(APPLE2 *m);
+void viewport_update(APPLE2 *m);
+int  viewport_process_events(APPLE2 *m);
