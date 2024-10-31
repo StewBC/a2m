@@ -2,6 +2,8 @@
 This is an Apple ][+ emulator written in "C" using SDL and the Nuklear immediate mode GUI.  The emulator has a cycle correct 6502 CPU (does not support undocumented opcodes), a Language Card and a SmartPort block device.  No Disk II support.  
   
 This configuration makes it possible to boot and run Total Replay or other ProDOS disk volumes.  
+
+![15 FPS Animated Gif of the emulator in action](assets/a2m-15.gif)
   
 ## Starting the emulator  
 All that's needed is the apple2 executable.  There are a few optional files.  The first is apple2.ini.  The ini file is used to specify which slots contain a SmartPort interface, and what disks are mounted as devices 0 & 1 on the interface.  Optionally, a boot parameter can also be given, which will boot the disk0 image.  Here's an example ini file.  
@@ -41,7 +43,7 @@ When the emulator starts, it starts as a 1120 x 840 window that shows the Apple 
 
 The function keys all go to the emulator (or maybe call it the debugger) rather than to the Apple ][+ machine.  All other keys go to the Apple ][+ machine, while the machine is not stopped.  This is what the function keys do:  
 ```
-F1 - Help
+F1 - Help (coming soon! ;)
 F2 - Toggle debugger display ON/OFF
 F3 - Toggle Speed Limiter (Run at 1MHZ vs as fast as possible) 
 These keys only work when the Apple ][+ is stopped:
