@@ -62,8 +62,8 @@ int main(int argc, char* argv[]) {
         // Force an update of the current page at the desired frame rate
         if(++m.screen_updated >= TARGET_FPS || m.stopped) {
             // Assume hrdware drives the display
-            v.screen_mode_shadow = m.screen_mode;
-            v.active_page_shadow = m.active_page;
+            v.shadow_screen_mode = m.screen_mode;
+            v.shadow_active_page = m.active_page;
             if(v.debug_view) {
                 // The display can be overridden in here
                 viewport_show(&m);

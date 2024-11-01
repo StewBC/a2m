@@ -32,7 +32,7 @@ enum {
 typedef struct SPEAKER {
     float   speaker_state;
     float   sample_rate;
-    float   current_rate;    
+    float   current_rate;
     float   samples[NUM_SAMPLES];
 } SPEAKER;
 

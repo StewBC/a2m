@@ -148,7 +148,7 @@ int viewmem_init(MEMSHOW *ms, int num_lines) {
         // null terminate the text and set up the address this line will show
         *memline->line_text = 0;
         memline->address = i * MEMSHOW_BYTES_PER_ROW;
-        memline->last_line = num_lines - 1; 
+        memline->last_line = num_lines - 1;
     }
     ms->find_string = (char *)malloc(MAX_FIND_STRING_LENGTH + 1);
     if(!ms->find_string) {
@@ -162,11 +162,11 @@ void viewmem_join_range(APPLE2 *m, int direction) {
     int line = ms->cursor_y;
     MEMLINE *memline = ARRAY_GET(ms->lines, MEMLINE, line);
     if(direction < 0) {
-        // Join with the block before 
+        // Join with the block before
         if(memline->first_line != 0) {
             // Only if this block isn't already the 1st block (block 0)
             MEMLINE *block = ARRAY_GET(ms->lines, MEMLINE, memline->first_line - 1);
-            uint16_t id = block->id; 
+            uint16_t id = block->id;
             uint16_t address = ARRAY_GET(ms->lines, MEMLINE, memline->first_line)->address;
             uint16_t last_line = memline->last_line;
             line = block->first_line;
@@ -191,7 +191,7 @@ void viewmem_join_range(APPLE2 *m, int direction) {
     } else {
         if(memline->last_line < ms->num_lines - 1) {
             MEMLINE *block = ARRAY_GET(ms->lines, MEMLINE, memline->last_line + 1);
-            uint16_t id = memline->id; 
+            uint16_t id = memline->id;
             uint16_t address = ARRAY_GET(ms->lines, MEMLINE, memline->first_line)->address;
             uint16_t first_line = memline->first_line;
             uint16_t last_line = block->last_line;
@@ -280,7 +280,7 @@ int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window) {
             write_to_memory(m, ms->cursor_address, e->text.text[0]);
             viewmem_cursor_right(m);
         } else if(!(mod & (KMOD_CTRL | KMOD_ALT)) && e->key.keysym.sym >= 32 && e->key.keysym.sym < 127) {
-            // SDL_TEXTINPUT also has SDL_KEYDOWN for same key, so filter out keys that were already 
+            // SDL_TEXTINPUT also has SDL_KEYDOWN for same key, so filter out keys that were already
             // processed, but keep keys that want/need processing - like ENTER or cursor, or CTRL/ALT mod, etc.
             return 0;
         }
@@ -308,7 +308,7 @@ int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window) {
                     v->dlg_memory_find = 1;
                 }
                 break;
-                
+
             case SDLK_g:    // CTRL G - Goto address
                 if(!v->viewdlg_modal) {
                     v->viewdlg_modal = 1;

@@ -160,25 +160,25 @@ void viewapl2_process_event(APPLE2 *m, SDL_Event *e) {
                         m->RAM_MAIN[KBD] = 0x80 | e->key.keysym.sym;
                     }
                     break;
-                
+
                 case SDLK_RETURN:
                 case SDLK_ESCAPE:
                 case SDLK_TAB:
                     m->RAM_MAIN[KBD] = 0x80 | e->key.keysym.sym;
                     break;
-                
+
                 case SDLK_UP:
                     m->RAM_MAIN[KBD] = 0x8B;         // UP arrow
                     break;
-                
+
                 case SDLK_DOWN:
                     m->RAM_MAIN[KBD] = 0x8A;         // DOWN arrow
                     break;
-                
+
                 case SDLK_LEFT:
                     m->RAM_MAIN[KBD] = 0x88;         // LEFT arrow
                     break;
-                
+
                 case SDLK_RIGHT:
                     m->RAM_MAIN[KBD] = 0x95;         // RIGHT arrow
                     break;
@@ -202,7 +202,7 @@ void viewapl2_process_event(APPLE2 *m, SDL_Event *e) {
 
 // Select which screen to display based on what mode is active
 void viewapl2_screen_apple2(APPLE2 *m) {
-    switch(m->viewport->screen_mode_shadow) {
+    switch(m->viewport->shadow_screen_mode) {
         case 0b001: // lores
             viewapl2_screen_lores(m, 0, 24);
         break;
@@ -216,7 +216,7 @@ void viewapl2_screen_apple2(APPLE2 *m) {
             viewapl2_screen_hgr(m, 0, 192);
         break;
 
-        case 0b111: // hgr, mixed graphics 
+        case 0b111: // hgr, mixed graphics
             viewapl2_screen_hgr(m, 0, 160);
             viewapl2_screen_txt(m, 20, 24);
         break;
@@ -239,12 +239,12 @@ void viewapl2_screen_lores(APPLE2 *m, int start, int end) {
     if(m->monitor_type) {
         viewapl2_screen_lores_mono(m, start, end);
         return;
-    } 
+    }
 
     int x, y;
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *)surface->pixels;
-    int page = m->viewport->active_page_shadow ? 0x0800 : 0x0400;
+    int page = m->viewport->shadow_active_page ? 0x0800 : 0x0400;
 
     // Loop through each row
     for (y = start; y < end; y++) {
@@ -282,7 +282,7 @@ void viewapl2_screen_lores_mono(APPLE2 *m, int start, int end) {
     int x, y;
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *)surface->pixels;
-    int page = m->viewport->active_page_shadow ? 0x0800 : 0x0400;
+    int page = m->viewport->shadow_active_page ? 0x0800 : 0x0400;
 
     // Loop through each row
     for (y = start; y < end; y++) {
@@ -325,7 +325,7 @@ void viewapl2_screen_hgr(APPLE2 *m, int start, int end) {
     int y;
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *)surface->pixels;
-    uint16_t page = m->viewport->active_page_shadow ? 0x4000 : 0x2000;
+    uint16_t page = m->viewport->shadow_active_page ? 0x4000 : 0x2000;
     int surface_width = surface->w;
 
     for(y = start; y < end; y++) {
@@ -345,7 +345,7 @@ void viewapl2_screen_hgr(APPLE2 *m, int start, int end) {
                 next_byte = m->RAM_MAIN[address + column + 1];
             }
 
-            // Prepare the current stream as the next byte (for lsb), the current byte and the last 
+            // Prepare the current stream as the next byte (for lsb), the current byte and the last
             // current bit (now prev bit)
             current_stream = ((next_byte & 0x01) << 8) | ((byte & 0x7F) << 1) | (current_stream & 1);
 
@@ -373,7 +373,7 @@ void viewapl2_screen_hgr_mono(APPLE2 *m, int start, int end) {
     int x, y;
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *)surface->pixels;
-    int page = m->viewport->active_page_shadow ? 0x4000 : 0x2000;
+    int page = m->viewport->shadow_active_page ? 0x4000 : 0x2000;
     uint32_t c[2];
     c[0] = color_table[0][0][0];
     c[1] = color_table[7][0][0];
@@ -405,7 +405,7 @@ void viewapl2_screen_txt(APPLE2 *m, int start, int end) {
     int x, y;
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *)surface->pixels;
-    int page = m->viewport->active_page_shadow ? 0x0800 : 0x0400;
+    int page = m->viewport->shadow_active_page ? 0x0800 : 0x0400;
     uint32_t c[2];
     c[0] = color_table[0][0][0];
     c[1] = color_table[7][0][0];

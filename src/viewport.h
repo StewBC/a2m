@@ -22,28 +22,31 @@ typedef struct VIEWPORT {
     VIEWCPU         viewcpu;
     VIEWMISC        viewmisc;
 
-    // Shadow of machine states 
-    int             screen_mode_shadow;
+    // Shadow of machine states
+    int             shadow_screen_mode;
 
-    // Flags    
-    int             active_page_shadow:1;   // shadow flag
+    // Flags
     int             debug_view:1;
-    int             viewcpu_show:1;
-    int             viewdbg_show:1;
-    int             viewmem_show:1;
-    int             viewmisc_show:1;
-    int             viewdlg_modal:1;
     int             dlg_dissassembler_go:1;
     int             dlg_filebrowser:1;
-    int             dlg_memory_go:1;
     int             dlg_memory_find:1;
+    int             dlg_memory_go:1;
+    int             shadow_active_page:1;   // Flags that shadow machine states
+    int             shadow_stopped:1;
+    int             show_help:1;
+    int             viewcpu_show:1;
+    int             viewdbg_show:1;
+    int             viewdlg_modal:1;
+    int             viewmem_show:1;
+    int             viewmisc_show:1;
 } VIEWPORT;
 
 int  viewdlg_hex_address(struct nk_context *ctx, struct nk_rect r, char *address, int *address_length);
 int  viewport_init(VIEWPORT *v, int w, int h);
 void viewport_init_nuklear(VIEWPORT *v);
+int  viewport_process_events(APPLE2 *m);
 void viewport_show(APPLE2 *m);
+void viewport_show_help(APPLE2 *m);
 void viewport_shutdown(VIEWPORT *v);
 void viewport_toggle_debug(APPLE2 *m);
 void viewport_update(APPLE2 *m);
-int  viewport_process_events(APPLE2 *m);

@@ -43,7 +43,7 @@ When the emulator starts, it starts as a 1120 x 840 window that shows the Apple 
 
 The function keys all go to the emulator (or maybe call it the debugger) rather than to the Apple ][+ machine.  All other keys go to the Apple ][+ machine, while the machine is not stopped.  This is what the function keys do:  
 ```
-F1 - Help (coming soon! ;)
+F1 - Help
 F2 - Toggle debugger display ON/OFF
 F3 - Toggle Speed Limiter (Run at 1MHZ vs as fast as possible) 
 These keys only work when the Apple ][+ is stopped:

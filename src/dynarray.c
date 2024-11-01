@@ -21,7 +21,7 @@ int array_add(DYNARRAY *array, void *element) {
     return A2_OK;
 }
 
-// Copy element in array from old to new index  
+// Copy element in array from old to new index
 int array_copy_items(DYNARRAY *array, size_t start_index, size_t end_index, size_t to_index){
     size_t num_items = end_index - start_index;
     size_t next_index = to_index + num_items;

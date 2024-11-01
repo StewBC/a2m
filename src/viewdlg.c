@@ -8,12 +8,12 @@ int viewdlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
     int ret = -1;
     // The current folder is not loaded, so load it
     if(!fb->dir_contents.items) {
-        // fb->file_selected.name_length = strlen(fb->file_selected.name); 
+        // fb->file_selected.name_length = strlen(fb->file_selected.name);
         // Get the full path to the active folder
         if(A2_OK != util_dir_get_current(fb->dir_selected.name, PATH_MAX)) {
             return 0;
         }
-        fb->dir_selected.name_length = strlen(fb->dir_selected.name); 
+        fb->dir_selected.name_length = strlen(fb->dir_selected.name);
         if(A2_OK != util_dir_load_contents(&fb->dir_contents)) {
             return 0;
         }
@@ -24,7 +24,7 @@ int viewdlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
         NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER | NK_WINDOW_MOVABLE)) {
         nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 2);
         nk_layout_row_push(ctx, 0.10f);
-        nk_label(ctx, "Path", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE);            
+        nk_label(ctx, "Path", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE);
         nk_layout_row_push(ctx, 0.90f);
         if(NK_EDIT_COMMITED & nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, fb->dir_selected.name, &fb->dir_selected.name_length, PATH_MAX-1, nk_filter_default)) {
             UTIL_FILE file;
@@ -71,7 +71,7 @@ int viewdlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
                 nk_layout_row_push(ctx, 0.09f);
                 nk_label(ctx, fi->is_directory ? "Dir" : "File", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_CENTERED);
                 nk_layout_row_end(ctx);
-            }        
+            }
             nk_group_end(ctx);
         }
         nk_layout_row_dynamic(ctx, 20, 1);
@@ -93,7 +93,7 @@ int viewdlg_find(struct nk_context *ctx, struct nk_rect r, char *data, int *data
     if(nk_popup_begin(ctx, NK_POPUP_STATIC, "Find", 0, r)) {
         nk_layout_row_dynamic(ctx, 20, 2);
         find_mode_setting = nk_option_label(ctx, "String", find_mode == 0) ? 0 : find_mode;
-        find_mode_setting = nk_option_label(ctx, "Hex", find_mode_setting == 1) ? 1 : find_mode_setting; 
+        find_mode_setting = nk_option_label(ctx, "Hex", find_mode_setting == 1) ? 1 : find_mode_setting;
         if(find_mode_setting != find_mode) {
             *data_length = 0;
             find_mode = find_mode_setting;
@@ -126,7 +126,7 @@ int viewdlg_find(struct nk_context *ctx, struct nk_rect r, char *data, int *data
     }
     nk_popup_end(ctx);
     if(ret) {
-        error_status = 0;;        
+        error_status = 0;;
     }
     return ret;
 }

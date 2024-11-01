@@ -80,7 +80,7 @@ void viewcpu_show(APPLE2* m)  {
             nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 10);
             // nk_layout_row_dynamic(ctx, 13, 1);
             for(int i=0; i < 8; i++) {
-                nk_layout_row_push(ctx, 0.025f);        
+                nk_layout_row_push(ctx, 0.025f);
                 nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, "%c", (i)["NVEBDIZC"]);
                 nk_layout_row_push(ctx, 0.075f);
                 if(NK_EDIT_COMMITED & nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->flags[i], &vcpu->flag_lengths[i], 2, nk_filter_binary)) {
@@ -89,15 +89,15 @@ void viewcpu_show(APPLE2* m)  {
                     sscanf(vcpu->flags[i], "%d", &value);
                     m->cpu.flags &= ~(1 << (7-i));
                     m->cpu.flags |= (value << (7-i));
-                }            
+                }
             }
         } else {
             nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 1);
             nk_layout_row_push(ctx, 1.0f);
-            nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, 
+            nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE,
                 "PC %04X   SP %04X   A %02X   X %02X   Y %02X",
                 m->cpu.pc, m->cpu.sp, m->cpu.A, m->cpu.X, m->cpu.Y);
-            nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, 
+            nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE,
                 "N %d  V %d  E %d  B %d  D %d  I %d  Z %d  C %d ",
                 (m->cpu.flags & 0x80) >> 7,
                 (m->cpu.flags & 0x40) >> 6,

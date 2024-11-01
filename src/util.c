@@ -206,7 +206,7 @@ int util_file_load(UTIL_FILE *f, const char *file_name, const char *file_mode) {
         return A2_ERR;
     }
 
-    // Read the file into the buffer 
+    // Read the file into the buffer
     f->file_size = fread(f->file_data, 1, f->file_size, f->fp);
     f->is_file_loaded = 1;
     fclose(f->fp);
@@ -334,7 +334,7 @@ int util_ini_load_file(char *filename, ini_pair_callback callback, void *user_da
                 if(*line) {
                     key = util_ini_find_character(&line, '=');
                     if(!key) {
-                        continue; 
+                        continue;
                     }
                     util_ini_next_token(&line);
                     value = util_ini_find_character(&line, '\0');

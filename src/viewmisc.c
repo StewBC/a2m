@@ -120,7 +120,7 @@ void viewmisc_show(APPLE2* m) {
             // nk_spacing(ctx, 1);
 
             // Now a list of active breakpoints
-            
+
             if(fm->breakpoints.items) {
                 // nk_layout_row_dynamic(ctx, 29*(fm->breakpoints.items + 1), 2);
                 nk_layout_row_begin(ctx, NK_DYNAMIC, 29*(fm->breakpoints.items + 1), 2);
@@ -129,7 +129,7 @@ void viewmisc_show(APPLE2* m) {
                     for(int i=0; i < fm->breakpoints.items; i++) {
                         char label[32];
                         BREAKPOINT *bp = ARRAY_GET(&fm->breakpoints, BREAKPOINT, i);
-                        if(bp->condition == CONDITION_PC) { 
+                        if(bp->condition == CONDITION_PC) {
                             nk_layout_row_begin(ctx, NK_DYNAMIC, 25, 4);
                             nk_layout_row_push(ctx, 0.10f);
                             nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%04X", bp->pc);
@@ -171,18 +171,18 @@ void viewmisc_show(APPLE2* m) {
             nk_layout_row_push(ctx, 0.40f);
             if (nk_group_begin(ctx, "", 0)) {
                 nk_layout_row_static(ctx, 13, 100, 1);
-                nk_label(ctx, "Display Mode", NK_TEXT_LEFT);            
+                nk_label(ctx, "Display Mode", NK_TEXT_LEFT);
                 nk_layout_row_static(ctx, 13, 60, 3);
                 display_mode_setting = nk_option_label(ctx, "Text", display_mode == 0) ? 0 : display_mode;
                 display_mode_setting = nk_option_label(ctx, "Lores", display_mode_setting == 1) ? 1 : display_mode_setting;
-                display_mode_setting = nk_option_label(ctx, "HGR", display_mode_setting == 2) ? 2 : display_mode_setting; 
+                display_mode_setting = nk_option_label(ctx, "HGR", display_mode_setting == 2) ? 2 : display_mode_setting;
                 nk_group_end(ctx);
             }
 
             nk_layout_row_push(ctx, 0.30f);
             if (nk_group_begin(ctx, "", 0)) {
                 nk_layout_row_static(ctx, 13, 80, 1);
-                nk_label(ctx, "Mixed Mode", NK_TEXT_LEFT);            
+                nk_label(ctx, "Mixed Mode", NK_TEXT_LEFT);
                 nk_layout_row_static(ctx, 13, 60, 2);
                 display_mixed_setting = nk_option_label(ctx, "Off", display_mixed == 0) ? 0 : display_mixed;
                 display_mixed_setting = nk_option_label(ctx, "On", display_mixed_setting == 1) ? 1 : display_mixed_setting;
@@ -192,7 +192,7 @@ void viewmisc_show(APPLE2* m) {
             nk_layout_row_push(ctx, 0.30f);
             if (nk_group_begin(ctx, "", 0)) {
                 nk_layout_row_static(ctx, 13, 100, 1);
-                nk_label(ctx, "Display Page", NK_TEXT_LEFT);            
+                nk_label(ctx, "Display Page", NK_TEXT_LEFT);
                 nk_layout_row_static(ctx, 13, 60, 2);
                 display_active_page_setting = nk_option_label(ctx, "Page 0", display_active_page == 0) ? 0 : display_active_page;
                 display_active_page_setting = nk_option_label(ctx, "Page 1", display_active_page_setting == 1) ? 1 : display_active_page_setting;
@@ -201,7 +201,7 @@ void viewmisc_show(APPLE2* m) {
             nk_layout_row_end(ctx);
 
             nk_layout_row_static(ctx, 13, 100, 1);
-            nk_label(ctx, "Override", NK_TEXT_LEFT);            
+            nk_label(ctx, "Override", NK_TEXT_LEFT);
             nk_layout_row_static(ctx, 13, 60, 2);
             display_override = nk_option_label(ctx, "No", display_override == 0) ? 0 : display_override;
             display_override = nk_option_label(ctx, "Yes", display_override == 1) ? 1 : display_override;
@@ -219,7 +219,7 @@ void viewmisc_show(APPLE2* m) {
                 }
             } else {
                 // Get the settings from the "hardware"
-                display_mode = m->screen_mode & 1 ? m->screen_mode & 4 ? 2 : 1 : 0; 
+                display_mode = m->screen_mode & 1 ? m->screen_mode & 4 ? 2 : 1 : 0;
                 display_active_page = m->active_page != 0;
                 display_mixed = display_mode && m->screen_mode & 2;
                 if(display_undo_change) {
@@ -231,8 +231,8 @@ void viewmisc_show(APPLE2* m) {
                 }
             }
             // Set the view draw settings based on whatever is active
-            v->screen_mode_shadow = screen_mode[display_mode] | (display_mixed << 1);
-            v->active_page_shadow = display_active_page;
+            v->shadow_screen_mode = screen_mode[display_mode] | (display_mixed << 1);
+            v->shadow_active_page = display_active_page;
             if(force_redraw) {
                 // stopped and a change was made, so update the Apple II display
                 viewapl2_screen_apple2(m);
@@ -243,7 +243,7 @@ void viewmisc_show(APPLE2* m) {
     nk_end(ctx);
     ctx->style.window.background = ob;
     if(v->dlg_filebrowser) {
-        int ret = viewdlg_file_browser(ctx, &v->viewmisc.file_browser); 
+        int ret = viewdlg_file_browser(ctx, &v->viewmisc.file_browser);
         if(ret >= 0) {
             v->dlg_filebrowser = 0;
             v->viewdlg_modal = 0;

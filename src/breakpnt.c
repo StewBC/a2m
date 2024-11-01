@@ -15,7 +15,7 @@ BREAKPOINT *get_breakpoint_at(FLOWMANAGER *b, uint16_t pc) {
     int items = b->breakpoints.items;
     for(int i = 0; i < items; i++) {
         BREAKPOINT *bp = ARRAY_GET(&b->breakpoints, BREAKPOINT, i);
-        if(bp->condition & CONDITION_PC && pc == bp->pc) {
+        if(!bp->disabled && bp->condition & CONDITION_PC && pc == bp->pc) {
             return bp;
         }
     }

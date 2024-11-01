@@ -81,7 +81,7 @@ int viewdbg_disassemble_line(APPLE2 *m, uint16_t pc, CODE_LINE *line) {
             text += 4;
             // Decode the class to decide if a symbol lookup is needed
             switch(instruction & 0x0f) {
-                case 0x00:  // Branches, adjusted (destination) lookup 
+                case 0x00:  // Branches, adjusted (destination) lookup
                     symbol = d->symbol_view ? 0 : viewdbg_find_symbols(d, pc + 2 + (int8_t)address);
                     break;
                 case 0x09:  // Immediate - no lookup
@@ -149,7 +149,7 @@ int viewdbg_init(DEBUGGER *d, int num_lines) {
         return A2_ERR;
     }
 
-    // Set all entries to 0 
+    // Set all entries to 0
     memset(d->code_lines->data, 0, sizeof(CODE_LINE)*num_lines);
     // Allocate the buffer for the text of each line
     for(int i=0; i < num_lines; i++) {
@@ -162,7 +162,7 @@ int viewdbg_init(DEBUGGER *d, int num_lines) {
     }
     // Mark all the entries as being items (so 0..31 means 32 items)
     d->code_lines->items = num_lines;
-    
+
     // Finally, set that this is the height that is being displayed
     d->num_lines = num_lines;
 
@@ -175,7 +175,7 @@ int viewdbg_init(DEBUGGER *d, int num_lines) {
         DYNARRAY *s = &d->symbols[i];
         ARRAY_INIT(s, SYMBOL);
     }
-    
+
     // Load the symbols (no error if not loaded)
     UTIL_FILE fl;
     memset(&fl, 0, sizeof(fl));
@@ -286,8 +286,14 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
             d->cursor_pc += ARRAY_GET(d->code_lines, CODE_LINE, d->num_lines-1)->pc - ARRAY_GET(d->code_lines, CODE_LINE, 0)->pc;
             return 1;
 
-        case SDLK_F1:   
-            // Show Help
+        case SDLK_F1:
+            if(v->show_help) {
+                m->stopped = v->shadow_stopped;
+            } else {
+                v->shadow_stopped = m->stopped;
+                m->stopped = 1;
+            }
+            v->show_help ^= 1;
             return 1;
 
         case SDLK_F2:
@@ -310,7 +316,7 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
             }
             break;
 
-        case SDLK_F9: 
+        case SDLK_F9:
             if(m->stopped) {
                 BREAKPOINT *b = get_breakpoint_at(&d->flowmanager, d->cursor_pc);
                 if(!b) {
@@ -463,7 +469,7 @@ void viewdbg_update(APPLE2 *m) {
     if(!v) {
         return;
     }
-    
+
     DEBUGGER *d = &v->debugger;
     // after a step, the pc the debugger will want to show should be the cpu pc
     d->cursor_pc = m->cpu.pc;
@@ -486,7 +492,7 @@ void viewdbg_update(APPLE2 *m) {
                     }
                     break;
             }
-        } 
+        }
         if(get_breakpoint_at(&d->flowmanager, m->cpu.pc)) {
             m->stopped = 1;
         }

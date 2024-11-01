@@ -105,7 +105,7 @@ void apple2_ini_load_callback(void *user_data, char *section, char *key, char *v
                 sp_mount(m, slot_number, 1, value);
             } else if(0 == stricmp(key, "boot")) {
                 if(0 != strcmp(value, "0") && m->sp_device[slot_number].sp_files[0].is_file_open) {
-                    // The rom doesn't get a chance to run but fortunately ProDOS does just fine 
+                    // The rom doesn't get a chance to run but fortunately ProDOS does just fine
                     m->cpu.pc = 0xc000 + slot_number * 0x100;
                     m->cpu.instruction_cycle = -1;
                 }
@@ -128,8 +128,8 @@ void apple2_shutdown(APPLE2 *m) {
 void apple2_slot_configure(APPLE2 *m, int slot, uint8_t type) {
     switch(type) {
         case SLOT_TYPE_SMARTPORT:
-            pages_map(&m->read_pages, (0xC000 + (slot * 0x100)) / PAGE_SIZE, 
-                0x100 / PAGE_SIZE, 
+            pages_map(&m->read_pages, (0xC000 + (slot * 0x100)) / PAGE_SIZE,
+                0x100 / PAGE_SIZE,
                 &m->roms.blocks[ROM_SMARTPORT].bytes[slot * 0x100]);
             m->sp_device[slot].sp_active = 1;
             break;
