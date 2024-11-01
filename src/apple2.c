@@ -72,7 +72,7 @@ int apple2_configure(APPLE2 *m) {
 
     // Should be obtained_spec.freq instead of SAMPLE_RATE, I think, but that doesn't work on macOS
     // The 1.5 is a fudge number to make sure the audio doesn't lag
-    m->speaker.sample_rate = ((float)CPU_FREQUENCY / SAMPLE_RATE) + 1.5f;
+    m->speaker.sample_rate = (CPU_FREQUENCY / SAMPLE_RATE) + 1.5f;
     m->speaker.current_rate = m->speaker.sample_rate;
 
     // Configure the LC using the same function the soft switches would, so the

@@ -5,7 +5,10 @@
 #pragma once
 
 // Apple II sim related
-#define CPU_FREQUENCY   1022727         // 1 MHz (cycles/sec) NTSC = 14.31818 MHz / 14, PAL = 14.25 MHz / 14
+// From John Brooks
+// The correct CPU frequency for an NTSC Apple II is 1020484.4.
+// The calc is 14,318,181 Hz crystal / 912 ticks per scanline (65 PH0 * 14 ticks + 2 tick stretched clock) * 65 PH0 per scanline.
+#define CPU_FREQUENCY   1020484.4
 
 // RAM
 enum {
