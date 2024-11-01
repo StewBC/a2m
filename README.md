@@ -135,6 +135,15 @@ These settings can only be altered when stopped, but stepping or running with `O
 ## Building from source  
 If I get a chance, I will rework this section, but for now, you are more or less on your own.  On Windows I installed SDL2 and SDL_mixer, and I use VS Code with the cmake and cmake tools plugins.  On Linux (WSL), I installed SDL2 and mixer from source, which had all sorts of dependencies, but that's the only way I got the `find_package` scripts to show up.  I also use VS Code and plugins on Linux, and I used clang.  I don't have access to a Mac as I write this, so I am not sure if that will work on a Mac now.  
   
+## Something about the code  
+In this project, I use the word "class" to describe a typedef struct. The main class for the hardware, which consists of several subcomponents like the speaker, smart port, etc., is called APPLE2. Additionally, there is a class named VIEWPORT. Together, these two classes make up the emulator. As described, hardware emulation resides in APPLE2, while drawing (screen rendering), keyboard input, speaker output, and so forth, are all managed by VIEWPORT. This includes debugging windows like disassembly, memory view, and more. Files related to these components are prefixed with view for easy identification.  
+  
+It’s theoretically possible to start multiple APPLE2 instances and connect any one of them to a single VIEWPORT to monitor its status (though I haven’t tested this). The APPLE2 class contains a pointer to a VIEWPORT, but the VIEWPORT itself does not retain a pointer back to the APPLE2 instance it is servicing. Most API calls accept an APPLE2 instance as the first parameter (I use m for machine, as this setup could theoretically extend to other machines, such as a Commodore 64, though I have no intention of expanding it into a multi-machine emulator). The API then queries APPLE2 for the active VIEWPORT. If no viewport is active, the call simply returns.  
+  
+I aimed to keep the size of the APPLE2 structure minimal. For example, the SMARTPORT requires a buffer of 512+4 bytes, which is allocated dynamically rather than included in the structure. This design allows for easier backup of the APPLE2 structure (a small structure), enabling potential backward and forward time travel within the emulator by also tracking memory changes—a challenging but theoretically feasible goal.  
+  
+The windows' contents are displayed using a dynamic array, allowing for flexible layout and size adjustments without significant rework. I started using the Nuklear GUI library for this project, and while there is still much I don’t fully understand, this approach enabled me to get the emulator running quickly without a deep dive into the GUI library.  
+
 ## The source files and what they do  
 File | Description 
 --- | --- 
@@ -161,7 +170,7 @@ viewmisc.c | Key and display handling of the miscellaneous window
 viewport.c | SDL2 initialization and manage all the other views, update the display
   
 ## Known issues  
-The Audio (speaker) might now work very well.  This is because I don't really know how to properly use SDL Audio.  It works very well on my Desktop PC and works okay on my laptop.  It stops working well when I use F3 to run the emulator at maximum speed.  
+The Audio (speaker) might not work very well.  This is because I don't really know how to properly use SDL Audio.  It works very well on my Desktop PC and works okay on my laptop.  It stops working well when I use F3 to run the emulator at maximum speed.  
 The language card implementation has an issue that I will try to track down, but it does not prevent most (or maybe all - I didn't test exhaustively) of Total Replay from working.  Some software, such as Orca/M and Program Writer don't work.  This may be because I have 65C02 versions, or because of my LC issues, or because I don't emulate quite enough of the Apple ][+ to make this software work.  At some point I may investigate.  
 The cleanup on exit (freeing memory that was malloc'd) isn't all there.
 There may be numerus other bugs, I have not thoroughly tested.  
