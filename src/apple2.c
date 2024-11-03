@@ -12,8 +12,8 @@ int apple2_configure(APPLE2 *m) {
 
     // Allocate the RAM
     m->RAM_MAIN = (uint8_t*)malloc(RAM_SIZE);
-    m->RAM_IO = (uint8_t*)malloc(RAM_SIZE);
-    if(!m->RAM_MAIN || !m->RAM_IO) {
+    m->RAM_WATCH = (uint8_t*)malloc(RAM_SIZE);
+    if(!m->RAM_MAIN || !m->RAM_WATCH) {
         return A2_ERR;
     }
 
@@ -43,7 +43,7 @@ int apple2_configure(APPLE2 *m) {
     if(!pages_init(&m->write_pages, RAM_SIZE / PAGE_SIZE)) {
         return A2_ERR;
     }
-    if(!pages_init(&m->io_pages, RAM_SIZE / PAGE_SIZE)) {
+    if(!pages_init(&m->watch_pages, RAM_SIZE / PAGE_SIZE)) {
         return A2_ERR;
     }
 
@@ -56,16 +56,17 @@ int apple2_configure(APPLE2 *m) {
     // Map the roms as read pages
     pages_map_memory_block(&m->read_pages, &m->roms.blocks[ROM_APPLE]);
 
-    // Install the IO callbacks
-    m->io_write = apple2_softswitch_write_callback;
-    m->io_read = apple2_softswitch_read_callback;
+    // Install the watch callbacks
+    m->callback_write = apple2_softswitch_write_callback;
+    m->callback_read = apple2_softswitch_read_callback;
+    m->callback_breakpoint = breakpoint_callback;
 
-    // Map IO area checks - start with no IO
-    memset(m->RAM_IO, 0, RAM_SIZE);
+    // Map watch area checks - start with no watch
+    memset(m->RAM_WATCH, 0, RAM_SIZE);
 
-    // Add the IO ports by flagging them as non-zero
-    memset(m->RAM_IO+0xC001, 1, 0xFE);  // Skip KBD
-    pages_map(&m->io_pages, 0, RAM_SIZE / PAGE_SIZE, m->RAM_IO);
+    // Add the IO ports by flagging them as 1 in the RAM watch
+    memset(m->RAM_WATCH+0xC001, 1, 0xFE);  // Skip KBD
+    pages_map(&m->watch_pages, 0, RAM_SIZE / PAGE_SIZE, m->RAM_WATCH);
 
     // Init the CPU to cold-start by jumping to ROM at 0xfffc
     cpu_init(&m->cpu);
@@ -119,8 +120,8 @@ void apple2_shutdown(APPLE2 *m) {
     ram_card_shutdown(&m->ram_card);
     free(m->RAM_MAIN);
     m->RAM_MAIN = 0;
-    free(m->RAM_IO);
-    m->RAM_IO = 0;
+    free(m->RAM_WATCH);
+    m->RAM_WATCH = 0;
     m->viewport = 0;
 }
 

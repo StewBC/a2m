@@ -4,6 +4,148 @@
 
 #include "header.h"
 
+int viewdlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT_EDIT *bpe) {
+    int ret = -1;
+    if(nk_popup_begin(ctx, NK_POPUP_STATIC, "Edit Breakpoint", 0, r)) {
+        nk_layout_row_dynamic(ctx, 66, 1);
+        if(nk_group_begin(ctx, "address", 0)) {
+            nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 5);
+            nk_layout_row_push(ctx, 0.12f);
+            nk_label(ctx, "Break At", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE);
+            nk_layout_row_push(ctx, 0.10f);
+            if(NK_EDIT_COMMITED & nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_address[0], &bpe->string_address_len[0], 5, nk_filter_hex)) {
+                ctx->active->popup.win->edit.active = 0;
+            }
+            nk_layout_row_push(ctx, 0.05f);
+            nk_label(ctx, "on", NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE);
+            nk_layout_row_push(ctx, 0.10f);
+            bpe->bp_under_edit.use_pc = nk_option_label(ctx, "PC", bpe->bp_under_edit.use_pc ? 1 : 0) ? 1 : 0;
+            nk_layout_row_push(ctx, 0.25f);
+            bpe->bp_under_edit.use_pc = nk_option_label(ctx, "Address Access", bpe->bp_under_edit.use_pc ? 0 : 1) ? 0 : 1;
+            if(bpe->bp_under_edit.use_pc) {
+                nk_widget_disable_begin(ctx);
+            }
+
+            // Mimic row above for spacing
+            nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 5);
+            nk_layout_row_push(ctx, 0.12f);
+            bpe->bp_under_edit.use_range = nk_check_label(ctx, "Range", bpe->bp_under_edit.use_range ? 1 : 0) ? 1 : 0;
+            nk_layout_row_push(ctx, 0.10f);
+            if(!bpe->bp_under_edit.use_pc && !bpe->bp_under_edit.use_range) {
+                nk_widget_disable_begin(ctx);
+            }
+            if(NK_EDIT_COMMITED & nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_address[1], &bpe->string_address_len[1], 5, nk_filter_hex)) {
+                ctx->active->popup.win->edit.active = 0;
+            }
+            if(!bpe->bp_under_edit.use_pc && !bpe->bp_under_edit.use_range) {
+                nk_widget_disable_end(ctx);
+            }
+            nk_layout_row_push(ctx, 0.05f);
+            nk_spacer(ctx); // On
+            nk_layout_row_push(ctx, 0.10f);
+            nk_spacer(ctx); // Pc
+            nk_layout_row_push(ctx, 0.12f);
+            if(!nk_check_label(ctx, "Read", bpe->bp_under_edit.break_on_read)) {
+                if(!bpe->bp_under_edit.break_on_write) {
+                    bpe->bp_under_edit.break_on_write = 1;
+                }
+                bpe->bp_under_edit.break_on_read = 0;
+            } else {
+                bpe->bp_under_edit.break_on_read = 1;
+            }
+            nk_layout_row_push(ctx, 0.12f);
+            if(!nk_check_label(ctx, "Write", bpe->bp_under_edit.break_on_write)) {
+                if(!bpe->bp_under_edit.break_on_read) {
+                    bpe->bp_under_edit.break_on_read = 1;
+                }
+                bpe->bp_under_edit.break_on_write = 0;
+            } else {
+                bpe->bp_under_edit.break_on_write = 1;
+            }
+            if(bpe->bp_under_edit.use_pc) {
+                nk_widget_disable_end(ctx);
+            }
+            nk_group_end(ctx);
+        }
+
+        nk_layout_row_dynamic(ctx, 44, 1);
+        if(nk_group_begin(ctx, "counter", 0)) {
+            nk_layout_row_dynamic(ctx, 20, 5);
+            bpe->bp_under_edit.use_counter = nk_check_label(ctx, "Use Counter", bpe->bp_under_edit.use_counter ? 1 : 0) ? 1 : 0;
+            if(!bpe->bp_under_edit.use_counter) {
+                nk_widget_disable_begin(ctx);
+            }
+            nk_label(ctx, "Initial Counter", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE);
+            if(NK_EDIT_COMMITED & nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_counter[0], &bpe->string_counter_len[0], 8, nk_filter_decimal)) {
+                ctx->active->popup.win->edit.active = 0;
+            }
+            nk_label(ctx, "Reset Counter", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE);
+            if(NK_EDIT_COMMITED & nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_counter[1], &bpe->string_counter_len[1], 8, nk_filter_decimal)) {
+                ctx->active->popup.win->edit.active = 0;
+            }
+            if(!bpe->bp_under_edit.use_counter) {
+                nk_widget_disable_end(ctx);
+            }
+            nk_group_end(ctx);
+        }
+        ctx->current->edit.mode = NK_TEXT_EDIT_MODE_REPLACE;
+
+        nk_layout_row_dynamic(ctx, 20, 2);
+        if(nk_button_label(ctx, "Cancel")) {
+            // Ignore all edits, retain original
+            ret = 0;
+        }
+        if(nk_button_label(ctx, "Apply")) {
+            int value;
+            // Validate that the options make sense
+            ctx->current->edit.active = 0;
+            // Reset the count
+            bpe->bp_under_edit.counter_count = 0;
+            // Address
+            bpe->string_address[0][bpe->string_address_len[0]] = '\0';
+            if(1 == sscanf(bpe->string_address[0], "%x", &value) && value >= 0 && value <= 65535) {
+                bpe->bp_under_edit.address = value;
+            } else {
+                ctx->current->edit.active = 1;
+            }
+            if(bpe->bp_under_edit.use_range) {
+                // Range Address
+                bpe->string_address[1][bpe->string_address_len[1]] = '\0';
+                if(1 == sscanf(bpe->string_address[1], "%x", &value) && value >= 0 && value <= 65535) {
+                    bpe->bp_under_edit.address_range_end = value;
+                } else {
+                    ctx->current->edit.active = 1;
+                }
+            } else {
+                bpe->bp_under_edit.address_range_end = bpe->bp_under_edit.address;
+            }
+            // Set the access rights
+            bpe->bp_under_edit.access = ((bpe->bp_under_edit.break_on_read ? 2 : 0) +(bpe->bp_under_edit.break_on_write ? 4 : 0));
+            if(bpe->bp_under_edit.use_counter) {
+                // Counter stop
+                bpe->string_counter[0][bpe->string_counter_len[0]] = '\0';
+                if((bpe->bp_under_edit.counter_stop_value = atoi(bpe->string_counter[0])) <= 0) {
+                    bpe->bp_under_edit.counter_stop_value = 1;
+                    bpe->string_counter_len[0] = sprintf(bpe->string_counter[0], "%d", bpe->bp_under_edit.counter_stop_value);
+                    ctx->current->edit.active = 1;
+                }
+                // Counter reset
+                bpe->string_counter[1][bpe->string_counter_len[1]] = '\0';
+                if((bpe->bp_under_edit.counter_reset = atoi(bpe->string_counter[1])) <= 0) {
+                    bpe->bp_under_edit.counter_reset = 1;
+                    bpe->string_counter_len[1] = sprintf(bpe->string_counter[1], "%d", bpe->bp_under_edit.counter_reset);
+                    ctx->current->edit.active = 1;
+                }
+            }
+            if(!ctx->current->edit.active) {
+                ret = 1;
+            }
+        }
+    }
+    nk_popup_end(ctx);
+    return ret;
+}
+
 int viewdlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
     int ret = -1;
     // The current folder is not loaded, so load it
@@ -126,7 +268,7 @@ int viewdlg_find(struct nk_context *ctx, struct nk_rect r, char *data, int *data
     }
     nk_popup_end(ctx);
     if(ret) {
-        error_status = 0;;
+        error_status = 0;
     }
     return ret;
 }

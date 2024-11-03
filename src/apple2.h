@@ -32,28 +32,30 @@ enum {
 };
 
 // Prototypes for callbacks when cpu accesses a port
-typedef uint8_t (*IO_READ)(APPLE2 *m, uint16_t address);
-typedef void (*IO_WRITE)(APPLE2 *m, uint16_t address, uint8_t value);
+typedef uint8_t (*CALLBACK_READ)(APPLE2 *m, uint16_t address);
+typedef void (*CALLBACK_WRITE)(APPLE2 *m, uint16_t address, uint8_t value);
+typedef void (*CALLBACK_BREAKP)(APPLE2 *m, uint16_t address);
 
 // The emulated apple2 (computer)
 struct APPLE2
 {
     // Hardware
-    CPU         cpu;                    // 6502
-    PAGES       read_pages;             // Up to 64K of bytes currently visible to CPU when reading
-    PAGES       write_pages;            // Up to 64K of bytes currently visible to CPU when writing
-    PAGES       io_pages;               // Up to 64K of bytes where 0 means this is MEMORY/ROM and 1 means it is a port
-    IO_READ     io_read;                // The callback when reading from a port
-    IO_WRITE    io_write;               // The callback when writing to a port
-    MEMORY      ram;                    // All MEMORY in the system (may be > 64K but up to 64K) mapped in throug pages
-    MEMORY      roms;                   // All MEMORY in the system, may be mapped into 64K, through read_pages
-    SPEAKER     speaker;                // 1 bit audio speaker
-    RAM_CARD    ram_card;               // State for which pages are visible
-    SP_DEVICE   sp_device[8];           // All slots could be made smartport
+    CPU             cpu;                    // 6502
+    PAGES           read_pages;             // Up to 64K of bytes currently visible to CPU when reading
+    PAGES           write_pages;            // Up to 64K of bytes currently visible to CPU when writing
+    PAGES           watch_pages;            // Up to 64K of bytes where 0 means this is MEMORY/ROM and 1 means it is a port
+    CALLBACK_READ   callback_read;          // The callback when reading from a port
+    CALLBACK_WRITE  callback_write;         // The callback when writing to a port
+    CALLBACK_BREAKP callback_breakpoint;
+    MEMORY          ram;                    // All MEMORY in the system (may be > 64K but up to 64K) mapped in throug pages
+    MEMORY          roms;                   // All MEMORY in the system, may be mapped into 64K, through read_pages
+    SPEAKER         speaker;                // 1 bit audio speaker
+    RAM_CARD        ram_card;               // State for which pages are visible
+    SP_DEVICE       sp_device[8];           // All slots could be made smartport
 
     // Base setup
     uint8_t *RAM_MAIN;         // The 64K MEMORY
-    uint8_t *RAM_IO;           // 64K of IO port "mask" (0 = is not a port)
+    uint8_t *RAM_WATCH;           // 64K of IO port "mask" (0 = is not a port)
 
     // keyboard
     uint8_t open_apple;

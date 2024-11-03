@@ -45,6 +45,7 @@ void viewdbg_build_code_lines(APPLE2 *m, uint16_t pc, int lines_needed) {
 }
 
 int viewdbg_disassemble_line(APPLE2 *m, uint16_t pc, CODE_LINE *line) {
+    char address_symbol[11];
     uint16_t address;
     char *text = line->text;
     DEBUGGER *d = &m->viewport->debugger;
@@ -53,7 +54,7 @@ int viewdbg_disassemble_line(APPLE2 *m, uint16_t pc, CODE_LINE *line) {
     char *symbol = d->symbol_view == SYMBOL_VIEW_NONE ? 0 : viewdbg_find_symbols(d, pc);
     line->pc = pc;
     line->length = length;
-    if(get_breakpoint_at(&d->flowmanager, pc)) {
+    if(breakpoint_at(&d->flowmanager, pc, 0)) {
         sprintf(text,"%04X> ", pc);
         line->is_breakpoint = 1;
     } else {
@@ -82,7 +83,16 @@ int viewdbg_disassemble_line(APPLE2 *m, uint16_t pc, CODE_LINE *line) {
             // Decode the class to decide if a symbol lookup is needed
             switch(instruction & 0x0f) {
                 case 0x00:  // Branches, adjusted (destination) lookup
-                    symbol = d->symbol_view ? 0 : viewdbg_find_symbols(d, pc + 2 + (int8_t)address);
+                    if(d->symbol_view) {
+                        symbol = 0;
+                    } else {
+                        symbol = viewdbg_find_symbols(d, pc + 2 + (int8_t)address);
+                        // If no symbol but symbol view is on - resolve to an address and pretend that's the symbol
+                        if(!symbol) {
+                            sprintf(address_symbol, "$%02X [%04X]", (uint8_t)address, (uint16_t)(pc + 2 + address));
+                            symbol = address_symbol;
+                        }
+                    }
                     break;
                 case 0x09:  // Immediate - no lookup
                     symbol = 0;
@@ -92,10 +102,10 @@ int viewdbg_disassemble_line(APPLE2 *m, uint16_t pc, CODE_LINE *line) {
                     break;
             }
             if(!symbol) {
-                sprintf(text, opcode_hex_params[instruction],address);
+                sprintf(text, opcode_hex_params[instruction], address);
             } else {
                 int tl = CODE_LINE_LENGTH-(text-line->text)-1;
-                snprintf(text, tl, opcode_symbol_params[instruction],symbol);
+                snprintf(text, tl, opcode_symbol_params[instruction], symbol);
             }
             break;
         case 3: {
@@ -318,13 +328,14 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
 
         case SDLK_F9:
             if(m->stopped) {
-                BREAKPOINT *b = get_breakpoint_at(&d->flowmanager, d->cursor_pc);
+                BREAKPOINT *b = breakpoint_at(&d->flowmanager, d->cursor_pc, 0);
                 if(!b) {
                     // Toggle breakpoint
                     BREAKPOINT bp;
                     memset(&bp, 0, sizeof(bp));
-                    bp.pc = d->cursor_pc;
-                    bp.condition = CONDITION_PC;
+                    bp.address = d->cursor_pc;
+                    bp.use_pc = bp.break_on_read = bp.break_on_write = 1;
+                    bp.counter_stop_value = bp.counter_reset = 1;
                     ARRAY_ADD(&d->flowmanager.breakpoints, bp);
                 } else {
                     array_remove(&d->flowmanager.breakpoints, b);
@@ -473,8 +484,9 @@ void viewdbg_update(APPLE2 *m) {
     DEBUGGER *d = &v->debugger;
     // after a step, the pc the debugger will want to show should be the cpu pc
     d->cursor_pc = m->cpu.pc;
-    // See if a breakpoint was hit
-    if(!m->stopped) {
+    // See if a breakpoint was hit (Also in step mode so counters can update if needed)
+    if(!m->stopped || m->step) {
+        m->step = 0;    // Set step off
         if(d->flowmanager.run_to_pc_set && d->flowmanager.run_to_pc == m->cpu.pc) {
             m->stopped = 1;
             d->flowmanager.run_to_pc_set = 0;
@@ -487,13 +499,13 @@ void viewdbg_update(APPLE2 *m) {
                 case OPCODE_RTS:
                     if(--d->flowmanager.jsr_counter < 0) {
                         m->stopped = 1;
-                        m->step = 1;
+                        m->step = 1;    // Step the RTS
                         d->flowmanager.run_to_rts_set = 0;
                     }
                     break;
             }
         }
-        if(get_breakpoint_at(&d->flowmanager, m->cpu.pc)) {
+        if(breakpoint_at(&d->flowmanager, m->cpu.pc, 1)) {
             m->stopped = 1;
         }
     }

@@ -4,29 +4,19 @@
 
 #pragma once
 
-typedef enum CONDITION {
-    CONDITION_NONE      = 0,
-    CONDITION_PC        = (1<<0),
-    CONDITION_COUNT     = (1<<1),
-    CONDITION_REG_VALUE = (1<<2),
-    CONDITION_MEM_VALUE = (1<<3),
-    CONDITION_ONE_TIME  = (1<<4),
-} CONDITION;
-
-// enum {
-//     VALUE_A,
-//     VALUE_X,
-//     VALUE_Y,
-//     VALUE_ADDRESS,
-// };
-
 typedef struct BREAKPOINT {
-    uint16_t    pc;
-    uint16_t    counter;
-    CONDITION   condition;
-    uint8_t     address;
-    uint8_t     value[4]; // a, x, y, address
+    uint16_t    address;
+    uint16_t    address_range_end;
+    int         counter_count;
+    int         counter_stop_value;
+    int         counter_reset;
+    uint8_t     access;                 // 4 (write) | 2 (read) when !use_pc (address bp) [1 is port]
     uint8_t     disabled:1;
+    uint8_t     use_pc:1;
+    uint8_t     break_on_read:1;
+    uint8_t     break_on_write:1;
+    uint8_t     use_range:1;
+    uint8_t     use_counter:1;
 } BREAKPOINT;
 
 typedef struct FLOWMANAGER {
@@ -38,4 +28,6 @@ typedef struct FLOWMANAGER {
 } FLOWMANAGER;
 
 void breakpoints_init();
-BREAKPOINT *get_breakpoint_at(FLOWMANAGER *b, uint16_t pc);
+BREAKPOINT *breakpoint_at(FLOWMANAGER *b, uint16_t pc, int running);
+void breakpoint_callback(APPLE2 *m, uint16_t address);
+void breakpoint_reapply_address_masks(APPLE2 *m);

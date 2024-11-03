@@ -181,6 +181,7 @@ Apart from fixing the LC bug and maybe adding some more breakpoint types, It wou
 ## Thank you  
 * Brendan Robert - Author of Jace, for telling me how to think about sampling for speaker emulation.  
 * Oliver Schmidt for, basically, teaching me all I know about the Apple II, but in this case showing me how easy it is to do SmartPort emulation.  
+* Zellyn Hunter for A2Audit.  That helped me identify and fix my Language Card bug.  (https://github.com/zellyn/a2audit)  
   
 ## Initial revision  
 This initial revision was made in London, UK, on 31 October 2024.  

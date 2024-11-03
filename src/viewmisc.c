@@ -5,6 +5,7 @@
 #include "header.h"
 
 // Display variables
+static const char *access_mode[3] = {"R", "W", "RW"};
 static int screen_mode[3] = {0,1,5};
 static int display_mode = 0;
 static int display_active_page = 0;
@@ -12,21 +13,13 @@ static int display_mixed = 0;
 static int display_override = 0;
 static int display_undo_change = 0;
 
-// static const char *text_condition[] = {
-//     "",
-//     "PC",
-//     "COUNT",
-//     "REG_VALUE",
-//     "MEM_VALUE,",
-//     "ONE_TIME",
-// };
-
 void viewmisc_show(APPLE2* m) {
     static int last_state = 0;
     VIEWPORT *v = m->viewport;
     struct nk_context *ctx = v->ctx;
     DEBUGGER *d = &v->debugger;
     FILE_BROWSER *fb = &v->viewmisc.file_browser;
+    BREAKPOINT_EDIT *bpe = &v->viewmisc.breakpoint_edit;
 
     int display_mode_setting = 0;
     int display_active_page_setting = 0;
@@ -129,22 +122,64 @@ void viewmisc_show(APPLE2* m) {
                     for(int i=0; i < fm->breakpoints.items; i++) {
                         char label[32];
                         BREAKPOINT *bp = ARRAY_GET(&fm->breakpoints, BREAKPOINT, i);
-                        if(bp->condition == CONDITION_PC) {
-                            nk_layout_row_begin(ctx, NK_DYNAMIC, 25, 4);
-                            nk_layout_row_push(ctx, 0.10f);
-                            nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%04X", bp->pc);
-                            nk_layout_row_push(ctx, 0.3f);
-                            if(nk_button_label(ctx, bp->disabled ? "Enable" : "Disable")) {
-                                bp->disabled ^= 1;
+                        nk_layout_row_begin(ctx, NK_DYNAMIC, 25, 5);
+                        nk_layout_row_push(ctx, 0.399f);
+                        if(bp->use_pc) {
+                            if(bp->use_counter) {
+                                nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%04X (%d/%d)", bp->address, bp->counter_count, bp->counter_stop_value);
+                            } else {
+                                nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%04X", bp->address);
                             }
-                            nk_layout_row_push(ctx, 0.30f);
-                            if(nk_button_label(ctx, "View PC")) {
-                                d->cursor_pc = bp->pc;
+                        } else {
+                            int access = (bp->access >> 1) - 1;
+                            if(bp->use_range) {
+                                if(bp->use_counter) {
+                                    nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, "%s[%04X-%04X] (%d/%d)", access_mode[access], bp->address, bp->address_range_end, bp->counter_count, bp->counter_stop_value);
+                                } else {
+                                    nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%s[%04X-%04X]", access_mode[access], bp->address, bp->address_range_end);
+                                }
+                            } else {
+                                if(bp->use_counter) {
+                                    nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%s[%04X] (%d/%d)", access_mode[access], bp->address, bp->counter_count, bp->counter_stop_value);
+                                } else {
+                                    nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%s[%04X]", access_mode[access], bp->address);
+                                }
                             }
-                            nk_layout_row_push(ctx, 0.3f);
-                            if(nk_button_label(ctx, "Clear")) {
-                                array_remove(&fm->breakpoints, bp);
+                        }
+                        nk_layout_row_push(ctx, 0.15f);
+                        if(nk_button_label(ctx, "Edit")) {
+                            bpe->bp_original = bp;
+                            bpe->bp_under_edit = *bp;
+                            bpe->string_address_len[0] = sprintf(bpe->string_address[0], "%04X", bp->address);
+                            bpe->string_address_len[1] = sprintf(bpe->string_address[1], "%04X", bp->address_range_end);
+                            bpe->string_counter_len[0] = sprintf(bpe->string_counter[0], "%d", bp->counter_stop_value);
+                            bpe->string_counter_len[1] = sprintf(bpe->string_counter[1], "%d", bp->counter_reset);
+                            v->viewdlg_modal = 1;
+                            v->dlg_breakpoint = 1;
+                        }
+                        nk_layout_row_push(ctx, 0.15f);
+                        if(nk_button_label(ctx, bp->disabled ? "Enable" : "Disable")) {
+                            bp->disabled ^= 1;
+                            if(!bp->use_pc) {
+                                breakpoint_reapply_address_masks(m);
                             }
+                        }
+                        if(!bp->use_pc) {
+                            nk_widget_disable_begin(ctx);
+                        }
+                        nk_layout_row_push(ctx, 0.15f);
+                        if(nk_button_label(ctx, "View PC")) {
+                            d->cursor_pc = bp->address;
+                        }
+                        if(!bp->use_pc) {
+                            nk_widget_disable_end(ctx);
+                        }
+                        nk_layout_row_push(ctx, 0.15f);
+                        if(nk_button_label(ctx, "Clear")) {
+                            // Delet the breakpoint
+                            array_remove(&fm->breakpoints, bp);
+                            // And reset the mask on memory to watch for any remaining address breakpoint
+                            breakpoint_reapply_address_masks(m);
                         }
                         nk_layout_row_end(ctx);
                     }
@@ -161,6 +196,19 @@ void viewmisc_show(APPLE2* m) {
                     }
                 }
                 nk_layout_row_end(ctx);
+                if(v->dlg_breakpoint) {
+                    struct nk_rect r = nk_rect(10, 40, ctx->current->bounds.w - 40, 160);
+                    int ret = viewdlg_breakpoint_edit(ctx, r, &v->viewmisc.breakpoint_edit);
+                    if(ret >= 0) {
+                        v->dlg_breakpoint = 0;
+                        v->viewdlg_modal = 0;
+                        if(1 == ret) {
+                            // Apply changes
+                            *bpe->bp_original = bpe->bp_under_edit;
+                            breakpoint_reapply_address_masks(m);
+                        }
+                    }
+                }
             }
             nk_tree_pop(ctx);
         }
@@ -200,9 +248,9 @@ void viewmisc_show(APPLE2* m) {
             }
             nk_layout_row_end(ctx);
 
-            nk_layout_row_static(ctx, 13, 100, 1);
+            nk_layout_row_dynamic(ctx, 13, 1);
             nk_label(ctx, "Override", NK_TEXT_LEFT);
-            nk_layout_row_static(ctx, 13, 60, 2);
+            nk_layout_row_static(ctx, 26, 60, 2);
             display_override = nk_option_label(ctx, "No", display_override == 0) ? 0 : display_override;
             display_override = nk_option_label(ctx, "Yes", display_override == 1) ? 1 : display_override;
 
@@ -237,6 +285,21 @@ void viewmisc_show(APPLE2* m) {
                 // stopped and a change was made, so update the Apple II display
                 viewapl2_screen_apple2(m);
             }
+            // nk_layout_row_dynamic(ctx, 13, 1);
+            // nk_spacer(ctx);
+            nk_tree_pop(ctx);
+        }
+
+        // The Language Card tab
+        if (nk_tree_push(ctx, NK_TREE_TAB, "Language Card", NK_MAXIMIZED)) {
+            RAM_CARD *lc = &m->ram_card;
+            nk_layout_row_dynamic(ctx, 26, 4);
+            nk_option_label(ctx, "Read ROM", lc->read_enable ? 0 : 1);
+            nk_option_label(ctx, "Read RAM", lc->read_enable ? 1 : 0);
+            nk_option_label(ctx, "Pre-Write", lc->pre_write ? 1 : 0);
+            nk_option_label(ctx, "Write", lc->write_enable ? 1 : 0);
+            nk_option_label(ctx, "Bank 1", lc->bank2_enable ? 0 : 1);
+            nk_option_label(ctx, "Bank 2", lc->bank2_enable ? 1 : 0);
             nk_tree_pop(ctx);
         }
     }

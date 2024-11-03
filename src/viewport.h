@@ -31,6 +31,7 @@ typedef struct VIEWPORT {
     int             dlg_filebrowser:1;
     int             dlg_memory_find:1;
     int             dlg_memory_go:1;
+    int             dlg_breakpoint:1;
     int             shadow_active_page:1;   // Flags that shadow machine states
     int             shadow_stopped:1;
     int             show_help:1;

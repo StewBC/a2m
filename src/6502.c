@@ -789,8 +789,14 @@ void push(APPLE2 *m, uint8_t value) {
 
 uint8_t read_from_memory(APPLE2 *m, uint16_t address) {
     assert(address / PAGE_SIZE < m->read_pages.num_pages);
-    if(m->io_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE]) {
-        return m->io_read(m, address);
+    uint8_t cb_mask = m->watch_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
+    if(cb_mask) {
+        if(cb_mask & 2) {
+            m->callback_breakpoint(m, address);
+        }
+        if(cb_mask & 1) {
+            return m->callback_read(m, address);
+        }
     }
     return m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
 }
@@ -810,9 +816,16 @@ void write_to_memory(APPLE2 *m, uint16_t address, uint8_t value) {
     uint16_t page = address / PAGE_SIZE;
     uint16_t offset = address % PAGE_SIZE;
     assert(page < m->write_pages.num_pages);
-    if(m->io_pages.pages[page].bytes[offset]) {
-        m->io_write(m, address, value);
-    } else {
+    uint8_t cb_mask = m->watch_pages.pages[page].bytes[offset];
+    if(cb_mask) {
+        if(cb_mask & 1) {
+            m->callback_write(m, address, value);
+        }
+        if(cb_mask & 4) {
+            m->callback_breakpoint(m, address);
+        }
+    }
+    if(!(cb_mask & 1)) {
         m->write_pages.pages[page].bytes[offset] = value;
     }
 }

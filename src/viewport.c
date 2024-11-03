@@ -10,6 +10,7 @@
 #include "nuklrsdl.h"
 
 #define color_active_win        nk_rgb( 50,100, 50)
+#define color_popup_border      nk_rgb(255,  0,  0)
 #define color_help_master       nk_rgb(  0,255,255)
 #define color_help_heading      nk_rgb(255,255,255)
 #define color_help_notice       nk_rgb(255,255,  0)
@@ -77,6 +78,9 @@ int viewport_init(VIEWPORT *v, int w, int h) {
     struct nk_font_config config = nk_font_config(0);
 
     v->ctx = nk_sdl_init(v->window, v->renderer);
+    if(!v->ctx) {
+        goto error;
+    }
     nk_sdl_font_stash_begin(&atlas);
     v->font = nk_font_atlas_add_default(atlas, 13, &config);
     nk_sdl_font_stash_end();
@@ -84,6 +88,8 @@ int viewport_init(VIEWPORT *v, int w, int h) {
     v->font_height = v->ctx->style.font->height;
     v->font_width = v->ctx->style.font->width(v->ctx->style.font->userdata, v->font_height, "W", 1);
     v->ctx->style.window.header.active.data.color = color_active_win;
+    v->ctx->style.window.popup_border_color = color_popup_border;
+
 
     // Init the file_broswer dynamic array
     array_init(&v->viewmisc.file_browser.dir_contents, sizeof(FILE_INFO));

@@ -21,7 +21,7 @@ int main(int argc, char* argv[]) {
     // Make this machine an Apple II
     if(A2_OK != apple2_configure(&m)) {
         free(m.RAM_MAIN);
-        free(m.RAM_IO);
+        free(m.RAM_WATCH);
         return A2_ERR;
     }
 
@@ -53,10 +53,7 @@ int main(int argc, char* argv[]) {
             viewapl2_speaker_update(&m);
         } while(m.cpu.instruction_cycle != -1);
 
-        // if stopped and stepping, reset to be not stepping
-        m.step = 0;
-
-        // Give debugger a chance to process the new state
+        // Give debugger a chance to process the new state and set m->step
         viewdbg_update(&m);
 
         // Force an update of the current page at the desired frame rate

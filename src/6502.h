@@ -98,6 +98,6 @@ void    machine_step(APPLE2 *m);
 
 // Helper calls that access the mapped in memory
 uint8_t read_from_memory(APPLE2 *m, uint16_t address);
-// This call for the debugger - doesn't trigger IO ports
+// This call for the debugger - doesn't trigger watch
 uint8_t read_from_memory_debug(APPLE2 *m, uint16_t address);
 void    write_to_memory(APPLE2 *m, uint16_t address, uint8_t value);
