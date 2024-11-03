@@ -12,6 +12,8 @@ typedef struct VIEWPORT {
     SDL_Rect target_rect;
     SDL_Rect full_window_rect;
 
+    float display_scale;
+
     struct nk_context *ctx;
     struct nk_font *font;
     int font_height;
@@ -42,7 +44,6 @@ typedef struct VIEWPORT {
     int viewmisc_show:1;
 } VIEWPORT;
 
-int viewdlg_hex_address(struct nk_context *ctx, struct nk_rect r, char *address, int *address_length);
 int viewport_init(VIEWPORT *v, int w, int h);
 void viewport_init_nuklear(VIEWPORT *v);
 int viewport_process_events(APPLE2 *m);

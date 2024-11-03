@@ -16,10 +16,37 @@
 #define color_help_notice       nk_rgb(255,255,  0)
 #define color_help_key_heading  nk_rgb(  0,255,128)
 
+// These values are picked up in nuklrsdl.h
+float sdl_x_scale, sdl_y_scale;
+
+void viewport_ini_load_callback(void *user_data, char *section, char *key, char *value) {
+    VIEWPORT *v = (VIEWPORT *) user_data;
+    static float scale = 1.0f;
+    // Uniform scale factor for the display
+    if(0 == stricmp(section, "display")) {
+        if(0 == stricmp(key, "scale")) {
+            sscanf(value, "%f", &scale);
+            if(scale > 0.0f) {
+                v->display_scale = scale;
+            }
+        }
+    }
+}
+
 int viewport_init(VIEWPORT *v, int w, int h) {
 
     // Clear the whole viewport struct to 0's
     memset(v, 0, sizeof(VIEWPORT));
+
+    v->display_scale = 1.0f;
+
+    // Configure display_scale from the ini file -- SQW ini file now read/parsed multiple times
+    util_ini_load_file("./apple2.ini", viewport_ini_load_callback, (void *)v);
+
+    // Scale the window, and set the SDL render scale accordingly
+    w *= v->display_scale;
+    h *= v->display_scale;
+    sdl_x_scale = sdl_y_scale = v->display_scale;
 
     // Set the window width and height
     v->target_rect.w = w;                                   // Width of the window
@@ -122,6 +149,12 @@ int viewport_process_events(APPLE2 *m) {
             ret = 1;
             break;
         }
+        // if(e.type == SDL_MOUSEMOTION) {
+        //     e.motion.x *= v->display_scale;
+        //     e.motion.y *= v->display_scale;
+        //     e.motion.xrel *= v->display_scale;
+        //     e.motion.yrel *= v->display_scale;
+        // }
         nk_sdl_handle_event(&e);
 
         // Function keys all go to the disassembly view no matter what is active

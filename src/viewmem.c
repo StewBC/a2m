@@ -413,7 +413,7 @@ void viewmem_show(APPLE2 *m) {
     MEMSHOW *ms = &v->memshow;
     int w = 512;
     viewmem_update(m);
-    if(nk_begin(ctx, "Memory", nk_rect(0, m->viewport->target_rect.h, w, m->viewport->full_window_rect.h - m->viewport->target_rect.h),
+    if(nk_begin(ctx, "Memory", nk_rect(0, 560, 512, 280),
                 NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
         nk_style_set_font(ctx, &v->font->handle);
         nk_layout_row_static(ctx, 10, w, 1);

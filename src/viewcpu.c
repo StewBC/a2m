@@ -24,7 +24,7 @@ void viewcpu_show(APPLE2 *m) {
     VIEWCPU *vcpu = &v->viewcpu;
 
     int w = m->viewport->full_window_rect.w - m->viewport->target_rect.w;
-    if(nk_begin(ctx, "CPU", nk_rect(m->viewport->target_rect.w, 0, w, 89), NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
+    if(nk_begin(ctx, "CPU", nk_rect(747, 0, 373, 89), NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
         if(m->stopped) {
             // I don't know what I have to set this
             ctx->current->edit.mode = NK_TEXT_EDIT_MODE_REPLACE;

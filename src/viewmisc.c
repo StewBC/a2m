@@ -31,7 +31,7 @@ void viewmisc_show(APPLE2 *m) {
     int x = 512;
     int w = m->viewport->full_window_rect.w - x;
     if(nk_begin
-       (ctx, "Miscellaneous", nk_rect(x, m->viewport->target_rect.h, w, m->viewport->full_window_rect.h - m->viewport->target_rect.h),
+       (ctx, "Miscellaneous", nk_rect(512, 560, 608, 280),
         NK_WINDOW_SCROLL_AUTO_HIDE | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
         // The Smartport
         if(nk_tree_push(ctx, NK_TREE_TAB, "SmartPort", NK_MAXIMIZED)) {
