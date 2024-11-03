@@ -45,38 +45,38 @@ int txt_row_start[] = {
 mRGB palette[16] = {
     {0X00, 0X00, 0X00},                 // HGR_BLACK
     {0X00, 0X00, 0X00},                 // HGR_BLACK
-    {0XDD, 0X6D, 0XEA},                 // HGR_VIOLET
+    {0xC7, 0x34, 0xFF},                 // HGR_VIOLET
     {0XFF, 0XFF, 0XFF},                 // HGR_WHITE
     {0X00, 0X00, 0X00},                 // HGR_BLACK
-    {0X46, 0XC4, 0X45},                 // HGR_GREEN
+    {0x38, 0xCB, 0x00},                 // HGR_GREEN
     {0XFF, 0XFF, 0XFF},                 // HGR_WHITE
     {0XFF, 0XFF, 0XFF},                 // HGR_WHITE
     {0X00, 0X00, 0X00},                 // HGR_BLACK
     {0X00, 0X00, 0X00},                 // HGR_BLACK
-    {0X30, 0XA7, 0XEB},                 // HGR_BLUE
+    {0x0D, 0xA1, 0xFF},                 // HGR_BLUE
     {0XFF, 0XFF, 0XFF},                 // HGR_WHITE
     {0X00, 0X00, 0X00},                 // HGR_BLACK
-    {0XE2, 0X84, 0X3A},                 // HGR_ORANGE
+    {0xF2, 0x5E, 0x00},                 // HGR_ORANGE
     {0XFF, 0XFF, 0XFF},                 // HGR_WHITE
     {0XFF, 0XFF, 0XFF},                 // HGR_WHITE
 };
 
 mRGB lores_palette[16] = {
     {0x00, 0x00, 0x00},    // Black
-    {0xDD, 0x00, 0x33},    // Red
-    {0x00, 0x00, 0x99},    // Dark blue
-    {0xDD, 0x22, 0xDD},    // Purple
-    {0x00, 0x77, 0x22},    // Dark green
-    {0x55, 0x55, 0x55},    // Gray
-    {0x22, 0x22, 0xFF},    // Blue-cyan
-    {0x66, 0xAA, 0xFF},    // Light blue
-    {0x88, 0x55, 0x00},    // Brown
-    {0xFF, 0x66, 0x00},    // Orange
-    {0xAA, 0xAA, 0xAA},    // Gray
-    {0xFF, 0x99, 0x88},    // Pink
-    {0x11, 0xDD, 0x00},    // Bright green
-    {0xFF, 0xFF, 0x00},    // Yellow
-    {0x44, 0xFF, 0x99},    // Cyan
+    {0x9D, 0x09, 0x66},    // Red
+    {0x2A, 0x2A, 0xE5},    // Dark blue
+    {0xC7, 0x34, 0xFF},    // Purple
+    {0x00, 0x80, 0x00},    // Dark green
+    {0x80, 0x80, 0x80},    // Gray
+    {0x0D, 0xA1, 0xFF},    // Blue-cyan
+    {0xAA, 0xAA, 0xFF},    // Light blue
+    {0x55, 0x55, 0x00},    // Brown
+    {0xF2, 0x5E, 0x00},    // Orange
+    {0xC0, 0xC0, 0xC0},    // Gray
+    {0xFF, 0x89, 0xE5},    // Pink
+    {0x38, 0xCB, 0x00},    // Bright green
+    {0xD5, 0xD5, 0x1A},    // Yellow
+    {0x62, 0xF6, 0x99},    // Cyan
     {0xFF, 0xFF, 0xFF},    // White
 };
 
