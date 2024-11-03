@@ -5,7 +5,7 @@
 #include "header.h"
 #include "dbgopcds.h"
 
-#define SYMBOL_COL_LEN      17 // 10 chars + \0
+#define SYMBOL_COL_LEN      17                              // 10 chars + \0
 // pc: sym xx xx xx opc sym (+2 because SYMBOL_COL_LEN includes room for a \0)
 #define CODE_LINE_LENGTH    (6+SYMBOL_COL_LEN+9+4+SYMBOL_COL_LEN)
 
@@ -55,10 +55,10 @@ int viewdbg_disassemble_line(APPLE2 *m, uint16_t pc, CODE_LINE *line) {
     line->pc = pc;
     line->length = length;
     if(breakpoint_at(&d->flowmanager, pc, 0)) {
-        sprintf(text,"%04X> ", pc);
+        sprintf(text, "%04X> ", pc);
         line->is_breakpoint = 1;
     } else {
-        sprintf(text,"%04X: ", pc);
+        sprintf(text, "%04X: ", pc);
         line->is_breakpoint = 0;
     }
     text += 6;
@@ -66,51 +66,51 @@ int viewdbg_disassemble_line(APPLE2 *m, uint16_t pc, CODE_LINE *line) {
         symbol = "                                ";
     }
     // Output is SYMBOL_COL_LEN-1 long, and I want the space so -2.
-    snprintf(text, SYMBOL_COL_LEN, "%-*.*s ", SYMBOL_COL_LEN-2, SYMBOL_COL_LEN-2, symbol);
+    snprintf(text, SYMBOL_COL_LEN, "%-*.*s ", SYMBOL_COL_LEN - 2, SYMBOL_COL_LEN - 2, symbol);
     text += SYMBOL_COL_LEN - 1;
-    switch(length) {
-        case 1:
-            sprintf(text, "%02X           ", instruction);
-            text += 9;
-            sprintf(text, opcode_text[instruction]);
-            break;
-        case 2:
-            address = read_from_memory_debug(m, pc+1);
-            sprintf(text, "%02X %02X      ", instruction, address);
-            text += 9;
-            sprintf(text, opcode_text[instruction]);
-            text += 4;
-            // Decode the class to decide if a symbol lookup is needed
-            switch(instruction & 0x0f) {
-                case 0x00:  // Branches, adjusted (destination) lookup
-                    if(d->symbol_view) {
-                        symbol = 0;
-                    } else {
-                        symbol = viewdbg_find_symbols(d, pc + 2 + (int8_t)address);
-                        // If no symbol but symbol view is on - resolve to an address and pretend that's the symbol
-                        if(!symbol) {
-                            sprintf(address_symbol, "$%02X [%04X]", (uint8_t)address, (uint16_t)(pc + 2 + address));
-                            symbol = address_symbol;
-                        }
-                    }
-                    break;
-                case 0x09:  // Immediate - no lookup
-                    symbol = 0;
-                    break;
-                default:    // just look for the byte address
-                    symbol = d->symbol_view ? 0 : viewdbg_find_symbols(d, address);
-                    break;
-            }
-            if(!symbol) {
-                sprintf(text, opcode_hex_params[instruction], address);
+    switch (length) {
+    case 1:
+        sprintf(text, "%02X           ", instruction);
+        text += 9;
+        sprintf(text, opcode_text[instruction]);
+        break;
+    case 2:
+        address = read_from_memory_debug(m, pc + 1);
+        sprintf(text, "%02X %02X      ", instruction, address);
+        text += 9;
+        sprintf(text, opcode_text[instruction]);
+        text += 4;
+        // Decode the class to decide if a symbol lookup is needed
+        switch (instruction & 0x0f) {
+        case 0x00:                                          // Branches, adjusted (destination) lookup
+            if(d->symbol_view) {
+                symbol = 0;
             } else {
-                int tl = CODE_LINE_LENGTH-(text-line->text)-1;
-                snprintf(text, tl, opcode_symbol_params[instruction], symbol);
+                symbol = viewdbg_find_symbols(d, pc + 2 + (int8_t) address);
+                // If no symbol but symbol view is on - resolve to an address and pretend that's the symbol
+                if(!symbol) {
+                    sprintf(address_symbol, "$%02X [%04X]", (uint8_t) address, (uint16_t) (pc + 2 + address));
+                    symbol = address_symbol;
+                }
             }
             break;
-        case 3: {
-            uint8_t al = read_from_memory_debug(m, pc+1);
-            uint8_t ah = read_from_memory_debug(m, pc+2);
+        case 0x09:                                          // Immediate - no lookup
+            symbol = 0;
+            break;
+        default:                                            // just look for the byte address
+            symbol = d->symbol_view ? 0 : viewdbg_find_symbols(d, address);
+            break;
+        }
+        if(!symbol) {
+            sprintf(text, opcode_hex_params[instruction], address);
+        } else {
+            int tl = CODE_LINE_LENGTH - (text - line->text) - 1;
+            snprintf(text, tl, opcode_symbol_params[instruction], symbol);
+        }
+        break;
+    case 3:{
+            uint8_t al = read_from_memory_debug(m, pc + 1);
+            uint8_t ah = read_from_memory_debug(m, pc + 2);
             address = ((ah << 8) | al);
             sprintf(text, "%02X %02X %02X ", instruction, al, ah);
             text += 9;
@@ -120,7 +120,7 @@ int viewdbg_disassemble_line(APPLE2 *m, uint16_t pc, CODE_LINE *line) {
             if(!symbol) {
                 sprintf(text, opcode_hex_params[instruction], address);
             } else {
-                snprintf(text, CODE_LINE_LENGTH-(text-line->text)-1, opcode_symbol_params[instruction], symbol);
+                snprintf(text, CODE_LINE_LENGTH - (text - line->text) - 1, opcode_symbol_params[instruction], symbol);
             }
             break;
         }
@@ -135,8 +135,7 @@ char *viewdbg_find_symbols(DEBUGGER *d, uint32_t address) {
         SYMBOL *sym = ARRAY_GET(s, SYMBOL, i);
         if(sym->pc < address) {
             continue;
-        }
-        else if(sym->pc == address) {
+        } else if(sym->pc == address) {
             return sym->symbol_name;
         } else {
             break;
@@ -147,7 +146,7 @@ char *viewdbg_find_symbols(DEBUGGER *d, uint32_t address) {
 
 int viewdbg_init(DEBUGGER *d, int num_lines) {
     // Allocate the array itself
-    d->code_lines = (DYNARRAY*)malloc(sizeof(DYNARRAY));
+    d->code_lines = (DYNARRAY *) malloc(sizeof(DYNARRAY));
     if(!d->code_lines) {
         return A2_ERR;
     }
@@ -160,11 +159,11 @@ int viewdbg_init(DEBUGGER *d, int num_lines) {
     }
 
     // Set all entries to 0
-    memset(d->code_lines->data, 0, sizeof(CODE_LINE)*num_lines);
+    memset(d->code_lines->data, 0, sizeof(CODE_LINE) *num_lines);
     // Allocate the buffer for the text of each line
-    for(int i=0; i < num_lines; i++) {
+    for(int i = 0; i < num_lines; i++) {
         CODE_LINE *code_line = ARRAY_GET(d->code_lines, CODE_LINE, i);
-        code_line->text = (char*)malloc(CODE_LINE_LENGTH);
+        code_line->text = (char *)malloc(CODE_LINE_LENGTH);
         if(!code_line->text) {
             goto error;
         }
@@ -177,11 +176,11 @@ int viewdbg_init(DEBUGGER *d, int num_lines) {
     d->num_lines = num_lines;
 
     // Make the 256 symbols "buckets"
-    d->symbols = (DYNARRAY*)malloc(sizeof(DYNARRAY) * 256);
+    d->symbols = (DYNARRAY *) malloc(sizeof(DYNARRAY) *256);
     if(!d->symbols) {
         goto error;
     }
-    for(int i=0; i < 256; i++) {
+    for(int i = 0; i < 256; i++) {
         DYNARRAY *s = &d->symbols[i];
         ARRAY_INIT(s, SYMBOL);
     }
@@ -205,8 +204,8 @@ int viewdbg_init(DEBUGGER *d, int num_lines) {
     breakpoints_init(&d->flowmanager);
     return A2_OK;
 
-error:
-    for(int i=0; i < num_lines; i++) {
+  error:
+    for(int i = 0; i < num_lines; i++) {
         free(ARRAY_GET(d->code_lines, CODE_LINE, i)->text);
     }
     array_free(d->code_lines);
@@ -224,20 +223,19 @@ uint16_t viewdbg_next_pc(APPLE2 *m, uint16_t pc) {
 uint16_t viewdbg_prev_pc(APPLE2 *m, uint16_t pc) {
     // Go back at least 7 "lines" (assume 3 byte instructions)
     // 7 is arbitrary but less screwes up more - balance speed with success
-    uint16_t step_back = 7 * 3;
-    while (step_back > 1) {
+    uint16_t step_back = 7 *3;
+    while(step_back > 1) {
         uint16_t search_pc = pc - step_back;
         // Walk towards the desired PC
-        while (search_pc != pc) {
+        while(search_pc != pc) {
             uint16_t next_pc = viewdbg_next_pc(m, search_pc);
             // If this matches up exactly, assume it's correct
-            if (next_pc == pc) {
+            if(next_pc == pc) {
                 return search_pc;
             }
             // Handle overshooting by comparing distances in a wraparound-safe way
-            if ((next_pc > pc && (next_pc - pc) < 0x8000) ||
-                (next_pc < pc && (pc - next_pc) > 0x8000)) {
-                break;  // We've overshot the target
+            if((next_pc > pc && (next_pc - pc) < 0x8000) || (next_pc < pc && (pc - next_pc) > 0x8000)) {
+                break;                                      // We've overshot the target
             }
             search_pc = next_pc;
         }
@@ -257,138 +255,138 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
     DEBUGGER *d = &v->debugger;
 
     switch (e->key.keysym.sym) {
-        case SDLK_g:
-            if(mod & KMOD_CTRL && !v->viewdlg_modal) {
-                v->viewdlg_modal = 1;
-                v->dlg_dissassembler_go = 1;
-            }
-            break;
+    case SDLK_g:
+        if(mod & KMOD_CTRL && !v->viewdlg_modal) {
+            v->viewdlg_modal = 1;
+            v->dlg_dissassembler_go = 1;
+        }
+        break;
 
-        case SDLK_p:
-            if(mod & KMOD_CTRL) {
-                m->cpu.pc = v->debugger.cursor_pc;
-            }
-            break;
+    case SDLK_p:
+        if(mod & KMOD_CTRL) {
+            m->cpu.pc = v->debugger.cursor_pc;
+        }
+        break;
 
-        case SDLK_TAB:
-            d->symbol_view++;
-            break;
+    case SDLK_TAB:
+        d->symbol_view++;
+        break;
 
-        case SDLK_UP:
-            d->cursor_pc = viewdbg_prev_pc(m, d->cursor_pc);
-            return 1;
+    case SDLK_UP:
+        d->cursor_pc = viewdbg_prev_pc(m, d->cursor_pc);
+        return 1;
 
-        case SDLK_DOWN:
-            d->cursor_pc = viewdbg_next_pc(m, d->cursor_pc);
-            return 1;
+    case SDLK_DOWN:
+        d->cursor_pc = viewdbg_next_pc(m, d->cursor_pc);
+        return 1;
 
-        case SDLK_LEFT:
-            break;
+    case SDLK_LEFT:
+        break;
 
-        case SDLK_RIGHT:
-            break;
+    case SDLK_RIGHT:
+        break;
 
-        case SDLK_PAGEUP:
-            d->cursor_pc -= ARRAY_GET(d->code_lines, CODE_LINE, d->num_lines-1)->pc - ARRAY_GET(d->code_lines, CODE_LINE, 0)->pc;
-            return 1;
+    case SDLK_PAGEUP:
+        d->cursor_pc -= ARRAY_GET(d->code_lines, CODE_LINE, d->num_lines - 1)->pc - ARRAY_GET(d->code_lines, CODE_LINE, 0)->pc;
+        return 1;
 
-        case SDLK_PAGEDOWN:
-            d->cursor_pc += ARRAY_GET(d->code_lines, CODE_LINE, d->num_lines-1)->pc - ARRAY_GET(d->code_lines, CODE_LINE, 0)->pc;
-            return 1;
+    case SDLK_PAGEDOWN:
+        d->cursor_pc += ARRAY_GET(d->code_lines, CODE_LINE, d->num_lines - 1)->pc - ARRAY_GET(d->code_lines, CODE_LINE, 0)->pc;
+        return 1;
 
-        case SDLK_F1:
-            if(v->show_help) {
-                m->stopped = v->shadow_stopped;
+    case SDLK_F1:
+        if(v->show_help) {
+            m->stopped = v->shadow_stopped;
+        } else {
+            v->shadow_stopped = m->stopped;
+            m->stopped = 1;
+        }
+        v->show_help ^= 1;
+        return 1;
+
+    case SDLK_F2:
+        viewport_toggle_debug(m);                           // Open or close the debug window
+        return 1;
+
+    case SDLK_F3:
+        m->free_run ^= 1;                                   // Toggle free-run / 1 MHz mode
+        return 1;
+
+    case SDLK_F5:
+        m->stopped = 0;                                     // Toggle run mode
+        break;
+
+    case SDLK_F6:
+        if(m->cpu.pc != d->cursor_pc) {
+            // This can only happenn if emulator is stopped
+            viewdbg_set_run_to_pc(m, d->cursor_pc);
+            m->stopped = 0;                                 // Put the emulator back in run mode
+        }
+        break;
+
+    case SDLK_F9:
+        if(m->stopped) {
+            BREAKPOINT *b = breakpoint_at(&d->flowmanager, d->cursor_pc, 0);
+            if(!b) {
+                // Toggle breakpoint
+                BREAKPOINT bp;
+                memset(&bp, 0, sizeof(bp));
+                bp.address = d->cursor_pc;
+                bp.use_pc = bp.break_on_read = bp.break_on_write = 1;
+                bp.counter_stop_value = bp.counter_reset = 1;
+                ARRAY_ADD(&d->flowmanager.breakpoints, bp);
             } else {
-                v->shadow_stopped = m->stopped;
-                m->stopped = 1;
+                array_remove(&d->flowmanager.breakpoints, b);
             }
-            v->show_help ^= 1;
-            return 1;
+        }
+        break;
 
-        case SDLK_F2:
-            viewport_toggle_debug(m);        // Open or close the debug window
-            return 1;
-
-        case SDLK_F3:
-            m->free_run ^= 1;               // Toggle free-run / 1 MHz mode
-            return 1;
-
-        case SDLK_F5:
-            m->stopped = 0;                // Toggle run mode
-            break;
-
-        case SDLK_F6:
-            if(m->cpu.pc != d->cursor_pc) {
-                // This can only happenn if emulator is stopped
-                viewdbg_set_run_to_pc(m, d->cursor_pc);
-                m->stopped = 0; // Put the emulator back in run mode
-            }
-            break;
-
-        case SDLK_F9:
-            if(m->stopped) {
-                BREAKPOINT *b = breakpoint_at(&d->flowmanager, d->cursor_pc, 0);
-                if(!b) {
-                    // Toggle breakpoint
-                    BREAKPOINT bp;
-                    memset(&bp, 0, sizeof(bp));
-                    bp.address = d->cursor_pc;
-                    bp.use_pc = bp.break_on_read = bp.break_on_write = 1;
-                    bp.counter_stop_value = bp.counter_reset = 1;
-                    ARRAY_ADD(&d->flowmanager.breakpoints, bp);
+    case SDLK_F10:{
+            // F10 will step, but if JSR will step through (over)
+            // if step over is active, F10 will do nothing.  This is so
+            // F10 can be held down to step-run the program
+            if(!d->flowmanager.run_to_pc_set) {
+                // Only JSR needs a run_to_pc breakpoint set for step-over
+                if(read_from_memory(m, m->cpu.pc) == OPCODE_JSR) {
+                    viewdbg_step_over_pc(m, m->cpu.pc);
+                    m->stopped = 0;                         // Put the emulator back in run mode
                 } else {
-                    array_remove(&d->flowmanager.breakpoints, b);
+                    // Not a step over, just a step
+                    m->stopped = 1;                         // Stop the emulator
+                    m->step = 1;                            // Step one opcode
                 }
             }
-            break;
+        }
+        break;
 
-        case SDLK_F10: {
-                // F10 will step, but if JSR will step through (over)
-                // if step over is active, F10 will do nothing.  This is so
-                // F10 can be held down to step-run the program
-                if(!d->flowmanager.run_to_pc_set) {
-                    // Only JSR needs a run_to_pc breakpoint set for step-over
-                    if(read_from_memory(m, m->cpu.pc) == OPCODE_JSR) {
-                        viewdbg_step_over_pc(m, m->cpu.pc);
-                        m->stopped = 0; // Put the emulator back in run mode
-                    } else {
-                        // Not a step over, just a step
-                        m->stopped = 1; // Stop the emulator
-                        m->step = 1;    // Step one opcode
-                    }
-                }
-            }
-            break;
+    case SDLK_F11:
+        // F11, with or without shift, will stop, even if run to rts is active
+        // F11 with shift, otherwise will step out and without shift will just step
+        d->flowmanager.run_to_pc_set = 0;
+        if(mod & KMOD_SHIFT && !d->flowmanager.run_to_rts_set) {
+            d->flowmanager.run_to_rts_set = 1;
+            // Reset the counter for this nesting-level
+            d->flowmanager.jsr_counter = 0;
+            // If the cuurennt instruction is a JSR the counter needs to be corrected
+            m->stopped = 0;                                 // Clear stopped
+            viewdbg_update(m);
+            // if on a breakpoint, stopped will now be set, so clear it again
+            m->stopped = 0;                                 // Run the emulator to the RTS for this nesting-level
+        } else {
+            // If run to rts was active, stop that and reset the counter
+            // This is needed so the user can initiate a new run to rts
+            d->flowmanager.run_to_rts_set = 0;
+            m->stopped = 1;                                 // Stop the emulator
+            m->step = 1;                                    // Step one opcode
+        }
+        break;
 
-        case SDLK_F11:
-            // F11, with or without shift, will stop, even if run to rts is active
-            // F11 with shift, otherwise will step out and without shift will just step
-            d->flowmanager.run_to_pc_set = 0;
-            if(mod & KMOD_SHIFT && !d->flowmanager.run_to_rts_set) {
-                d->flowmanager.run_to_rts_set = 1;
-                // Reset the counter for this nesting-level
-                d->flowmanager.jsr_counter = 0;
-                // If the cuurennt instruction is a JSR the counter needs to be corrected
-                m->stopped = 0; // Clear stopped
-                viewdbg_update(m);
-                // if on a breakpoint, stopped will now be set, so clear it again
-                m->stopped = 0; // Run the emulator to the RTS for this nesting-level
-            } else {
-                // If run to rts was active, stop that and reset the counter
-                // This is needed so the user can initiate a new run to rts
-                d->flowmanager.run_to_rts_set = 0;
-                m->stopped = 1; // Stop the emulator
-                m->step = 1;    // Step one opcode
-            }
-            break;
+    case SDLK_F12:
+        m->monitor_type ^= 1;                               // now just b&w/color toggle
+        return 1;
 
-        case SDLK_F12:
-            m->monitor_type ^= 1;            // now just b&w/color toggle
-            return 1;
-
-        default:
-            break;
+    default:
+        break;
     }
     return 0;
 }
@@ -399,7 +397,7 @@ void viewdbg_set_run_to_pc(APPLE2 *m, uint16_t pc) {
     d->flowmanager.run_to_pc_set = 1;
 }
 
-void viewdbg_show(APPLE2* m) {
+void viewdbg_show(APPLE2 *m) {
     VIEWPORT *v = m->viewport;
     struct nk_context *ctx = v->ctx;
     DEBUGGER *d = &v->debugger;
@@ -408,11 +406,10 @@ void viewdbg_show(APPLE2* m) {
     viewdbg_build_code_lines(m, d->cursor_pc, d->num_lines);
     int w = m->viewport->full_window_rect.w - m->viewport->target_rect.w;
     // Now draw the windows showing the lines
-    if(nk_begin(ctx, "Disassembly", nk_rect(m->viewport->target_rect.w, 90, w, m->viewport->target_rect.h-90),
-        NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER))
-    {
+    if(nk_begin(ctx, "Disassembly", nk_rect(m->viewport->target_rect.w, 90, w, m->viewport->target_rect.h - 90),
+                NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
         DEBUGGER *d = &v->debugger;
-        for(int i=0; i < d->num_lines; i++) {
+        for(int i = 0; i < d->num_lines; i++) {
             CODE_LINE *code_line = ARRAY_GET(d->code_lines, CODE_LINE, i);
             uint16_t pc = code_line->pc;
             nk_layout_row_static(ctx, 10, w, 1);
@@ -433,7 +430,7 @@ void viewdbg_show(APPLE2* m) {
         }
         if(v->dlg_dissassembler_go) {
             int ret;
-            static char address[5] = {0,0,0,0,0};
+            static char address[5] = { 0, 0, 0, 0, 0 };
             static int address_length = 0;
             if((ret = viewdlg_hex_address(ctx, nk_rect(60, 10, 280, 80), address, &address_length))) {
                 if(ret == 1) {
@@ -453,14 +450,14 @@ void viewdbg_show(APPLE2* m) {
 
 void viewdbg_shutdown(DEBUGGER *d) {
     int i;
-    for(i=0; i < d->code_lines->size; i++) {
+    for(i = 0; i < d->code_lines->size; i++) {
         free(ARRAY_GET(d->code_lines, CODE_LINE, i)->text);
     }
     array_free(d->code_lines);
     free(d->code_lines);
     d->code_lines = 0;
 
-    for(i=0; i<256; i++) {
+    for(i = 0; i < 256; i++) {
         array_free(&d->symbols[i]);
     }
     free(d->symbols);
@@ -486,23 +483,23 @@ void viewdbg_update(APPLE2 *m) {
     d->cursor_pc = m->cpu.pc;
     // See if a breakpoint was hit (Also in step mode so counters can update if needed)
     if(!m->stopped || m->step) {
-        m->step = 0;    // Set step off
+        m->step = 0;                                        // Set step off
         if(d->flowmanager.run_to_pc_set && d->flowmanager.run_to_pc == m->cpu.pc) {
             m->stopped = 1;
             d->flowmanager.run_to_pc_set = 0;
         } else if(d->flowmanager.run_to_rts_set) {
             uint8_t instruction = read_from_memory_debug(m, m->cpu.pc);
-            switch(instruction) {
-                case OPCODE_JSR:
-                    d->flowmanager.jsr_counter++;
-                    break;
-                case OPCODE_RTS:
-                    if(--d->flowmanager.jsr_counter < 0) {
-                        m->stopped = 1;
-                        m->step = 1;    // Step the RTS
-                        d->flowmanager.run_to_rts_set = 0;
-                    }
-                    break;
+            switch (instruction) {
+            case OPCODE_JSR:
+                d->flowmanager.jsr_counter++;
+                break;
+            case OPCODE_RTS:
+                if(--d->flowmanager.jsr_counter < 0) {
+                    m->stopped = 1;
+                    m->step = 1;                            // Step the RTS
+                    d->flowmanager.run_to_rts_set = 0;
+                }
+                break;
             }
         }
         if(breakpoint_at(&d->flowmanager, m->cpu.pc, 1)) {

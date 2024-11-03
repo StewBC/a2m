@@ -7,24 +7,24 @@
 #define MEMSHOW_ROWS                16
 
 typedef struct MEMLINE {
-    uint16_t    address;
-    uint16_t    id;         // This split ID
-    uint16_t    first_line;      // First line of this split
-    uint16_t    last_line;        // Last line of this split
-    char        *line_text;
+    uint16_t address;
+    uint16_t id;                                            // This split ID
+    uint16_t first_line;                                    // First line of this split
+    uint16_t last_line;                                     // Last line of this split
+    char *line_text;
 } MEMLINE;
 
 typedef struct MEMSHOW {
-    DYNARRAY    *lines;
-    int         num_lines;
-    int         line_length;
-    int         cursor_x;
-    int         cursor_y;
-    uint16_t    cursor_address;
-    uint8_t     *find_string;
-    int         find_string_len;
-    int         last_found_address;
-    int         edit_mode_ascii:1;
+    DYNARRAY *lines;
+    int num_lines;
+    int line_length;
+    int cursor_x;
+    int cursor_y;
+    uint16_t cursor_address;
+    char *find_string;
+    int find_string_len;
+    int last_found_address;
+    int edit_mode_ascii:1;
 } MEMSHOW;
 
 void viewmem_active_range(APPLE2 *m, int id);

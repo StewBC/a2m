@@ -40,7 +40,7 @@ int util_add_debug_symbols(DEBUGGER *d, char *data, size_t data_length, int over
                             item_action = 0;
                         }
                     } else {
-                        array_copy_items(s, i, items, i+1);
+                        array_copy_items(s, i, items, i + 1);
                     }
                     break;
                 }
@@ -55,7 +55,7 @@ int util_add_debug_symbols(DEBUGGER *d, char *data, size_t data_length, int over
                 }
                 SYMBOL *sym = ARRAY_GET(s, SYMBOL, i);
                 sym->pc = address;
-                sym->symbol_name = (char*)malloc(symbol_length+1);
+                sym->symbol_name = (char *)malloc(symbol_length + 1);
                 if(!sym->symbol_name) {
                     return A2_ERR;
                 }
@@ -78,11 +78,11 @@ int util_add_debug_symbols(DEBUGGER *d, char *data, size_t data_length, int over
 
 int util_dir_change(const char *path) {
 #ifdef _WIN32
-    if (_chdir(path) == 0) {
+    if(_chdir(path) == 0) {
         return A2_OK;
     }
 #else
-    if (chdir(path) == 0) {
+    if(chdir(path) == 0) {
         return A2_OK;
     }
 #endif
@@ -92,11 +92,11 @@ int util_dir_change(const char *path) {
 
 int util_dir_get_current(char *buffer, size_t buffer_size) {
 #ifdef _WIN32
-    if (_getcwd(buffer, (int)buffer_size) != NULL) {
+    if(_getcwd(buffer, (int)buffer_size) != NULL) {
         return A2_OK;
     }
 #else
-    if (getcwd(buffer, buffer_size) != NULL) {
+    if(getcwd(buffer, buffer_size) != NULL) {
         return A2_OK;
     }
 #endif
@@ -112,17 +112,16 @@ int util_dir_load_contents(DYNARRAY *array) {
     char dirSpec[PATH_MAX];
 
     // Prepare string for use with FindFile functions. First, copy the current directory path
-    if (_getcwd(dirSpec, PATH_MAX) == NULL) {
+    if(_getcwd(dirSpec, PATH_MAX) == NULL) {
         perror("_getcwd");
         return A2_ERR;
     }
-
     // Append the wildcard to search for all files
     strncat(dirSpec, "\\*", PATH_MAX - strlen(dirSpec) - 1);
 
     hFind = FindFirstFileA(dirSpec, &findFileData);
 
-    if (hFind == INVALID_HANDLE_VALUE) {
+    if(hFind == INVALID_HANDLE_VALUE) {
         perror("FindFirstFile");
         return A2_ERR;
     }
@@ -138,33 +137,32 @@ int util_dir_load_contents(DYNARRAY *array) {
         info.size = (size_t)fileSize.QuadPart;
 
         ARRAY_ADD(array, info);
-    } while (FindNextFileA(hFind, &findFileData) != 0);
+    } while(FindNextFileA(hFind, &findFileData) != 0);
 
     FindClose(hFind);
 
     // Check for errors in FindNextFile
     DWORD dwError = GetLastError();
-    if (dwError != ERROR_NO_MORE_FILES) {
+    if(dwError != ERROR_NO_MORE_FILES) {
         perror("FindNextFile");
         return A2_ERR;
     }
-
 #else
     DIR *dp;
     struct dirent *entry;
     struct stat statbuf;
 
     dp = opendir(".");
-    if (dp == NULL) {
+    if(dp == NULL) {
         perror("opendir");
         return A2_ERR;
     }
 
-    while ((entry = readdir(dp)) != NULL) {
+    while((entry = readdir(dp)) != NULL) {
         FILE_INFO info;
         strncpy(info.name, entry->d_name, PATH_MAX);
 
-        if (stat(entry->d_name, &statbuf) == 0) {
+        if(stat(entry->d_name, &statbuf) == 0) {
             info.size = (size_t)statbuf.st_size;
             info.is_directory = S_ISDIR(statbuf.st_mode);
         } else {
@@ -199,13 +197,11 @@ int util_file_load(UTIL_FILE *f, const char *file_name, const char *file_mode) {
     if(A2_OK != util_file_open(f, file_name, file_mode)) {
         return A2_ERR;
     }
-
     // Get a buffer to hold the contents
-    f->file_data = (char*)malloc(f->file_size + f->load_padding);
+    f->file_data = (char *)malloc(f->file_size + f->load_padding);
     if(!f->file_data) {
         return A2_ERR;
     }
-
     // Read the file into the buffer
     f->file_size = fread(f->file_data, 1, f->file_size, f->fp);
     f->is_file_loaded = 1;
@@ -291,7 +287,7 @@ char *util_ini_get_line(char **start, char *end) {
     while(*start < end && **start != '\n' && **start != '\r') {
         (*start)++;
     }
-    *(*start)++ = '\0'; // padding makes sure this will be safe
+    *(*start)++ = '\0';                                     // padding makes sure this will be safe
     while(*start < end && (**start == '\n' || **start == '\r')) {
         (*start)++;
     }
@@ -320,27 +316,27 @@ int util_ini_load_file(char *filename, ini_pair_callback callback, void *user_da
     while(current < end) {
         char *line = util_ini_get_line(&current, end);
         line = util_ini_next_token(&line);
-        switch(*line) {
-            case ';':
-                continue;
-            case '[':
-                line++;
+        switch (*line) {
+        case ';':
+            continue;
+        case '[':
+            line++;
+            util_ini_next_token(&line);
+            if(*line) {
+                section = util_ini_find_character(&line, ']');
+            }
+            break;
+        default:
+            if(*line) {
+                key = util_ini_find_character(&line, '=');
+                if(!key) {
+                    continue;
+                }
                 util_ini_next_token(&line);
-                if(*line) {
-                    section = util_ini_find_character(&line, ']');
-                }
-                break;
-            default:
-                if(*line) {
-                    key = util_ini_find_character(&line, '=');
-                    if(!key) {
-                        continue;
-                    }
-                    util_ini_next_token(&line);
-                    value = util_ini_find_character(&line, '\0');
-                    callback(user_data, section, key, value);
-                }
-                break;
+                value = util_ini_find_character(&line, '\0');
+                callback(user_data, section, key, value);
+            }
+            break;
         }
     }
     util_file_discard(&ini_file);
@@ -348,8 +344,8 @@ int util_ini_load_file(char *filename, ini_pair_callback callback, void *user_da
 }
 
 int util_qsort_cmp(const void *p1, const void *p2) {
-    FILE_INFO *fip1 = (FILE_INFO*)p1;
-    FILE_INFO *fip2 = (FILE_INFO*)p2;
+    FILE_INFO *fip1 = (FILE_INFO *) p1;
+    FILE_INFO *fip2 = (FILE_INFO *) p2;
     if(fip1->is_directory != fip2->is_directory) {
         return fip1->is_directory - fip2->is_directory;
     }

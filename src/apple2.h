@@ -7,7 +7,7 @@
 // Apple II sim related
 // From John Brooks
 // The correct CPU frequency for an NTSC Apple II is 1020484.4.
-// The calc is 14,318,181 Hz crystal / 912 ticks per scanline (65 PH0 * 14 ticks + 2 tick stretched clock) * 65 PH0 per scanline.
+// The calc is 14,318,181 Hz crystal / 912 ticks per scanline (65 PH0 *14 ticks + 2 tick stretched clock) *65 PH0 per scanline.
 #define CPU_FREQUENCY   1020484.4
 
 // RAM
@@ -32,50 +32,49 @@ enum {
 };
 
 // Prototypes for callbacks when cpu accesses a port
-typedef uint8_t (*CALLBACK_READ)(APPLE2 *m, uint16_t address);
+typedef uint8_t(*CALLBACK_READ) (APPLE2 *m, uint16_t address);
 typedef void (*CALLBACK_WRITE)(APPLE2 *m, uint16_t address, uint8_t value);
 typedef void (*CALLBACK_BREAKP)(APPLE2 *m, uint16_t address);
 
 // The emulated apple2 (computer)
-struct APPLE2
-{
+struct APPLE2 {
     // Hardware
-    CPU             cpu;                    // 6502
-    PAGES           read_pages;             // Up to 64K of bytes currently visible to CPU when reading
-    PAGES           write_pages;            // Up to 64K of bytes currently visible to CPU when writing
-    PAGES           watch_pages;            // Up to 64K of bytes where 0 means this is MEMORY/ROM and 1 means it is a port
-    CALLBACK_READ   callback_read;          // The callback when reading from a port
-    CALLBACK_WRITE  callback_write;         // The callback when writing to a port
-    CALLBACK_BREAKP callback_breakpoint;
-    MEMORY          ram;                    // All MEMORY in the system (may be > 64K but up to 64K) mapped in throug pages
-    MEMORY          roms;                   // All MEMORY in the system, may be mapped into 64K, through read_pages
-    SPEAKER         speaker;                // 1 bit audio speaker
-    RAM_CARD        ram_card;               // State for which pages are visible
-    SP_DEVICE       sp_device[8];           // All slots could be made smartport
+    CPU cpu;                                                // 6502
+    PAGES read_pages;                                       // Up to 64K of bytes currently visible to CPU when reading
+    PAGES write_pages;                                      // Up to 64K of bytes currently visible to CPU when writing
+    PAGES watch_pages;                                      // Up to 64K of bytes where 0 means this is MEMORY/ROM and 1 means it is a port
+    CALLBACK_READ callback_read;                            // The callback when reading from a port
+    CALLBACK_WRITE callback_write;                          // The callback when writing to a port
+    CALLBACK_BREAKP callback_breakpoint;                    // The callback when a breakpoint memory read/write triggers
+    MEMORY ram;                                             // All MEMORY in the system (may be > 64K but up to 64K) mapped in throug pages
+    MEMORY roms;                                            // All MEMORY in the system, may be mapped into 64K, through read_pages
+    SPEAKER speaker;                                        // 1 bit audio speaker
+    RAM_CARD ram_card;                                      // State for which pages are visible
+    SP_DEVICE sp_device[8];                                 // All slots could be made smartport
 
     // Base setup
-    uint8_t *RAM_MAIN;         // The 64K MEMORY
-    uint8_t *RAM_WATCH;           // 64K of IO port "mask" (0 = is not a port)
+    uint8_t *RAM_MAIN;                                      // The 64K MEMORY
+    uint8_t *RAM_WATCH;                                     // 64K of IO port "mask" (0 = is not a port)
 
     // keyboard
     uint8_t open_apple;
     uint8_t closed_apple;
 
     // Screen State
-    int     screen_updated;             // Counter - at TARGET_FPS forces screen update
-    int     screen_mode;
-    int     monitor_type;
+    int screen_updated;                                     // Counter - at TARGET_FPS forces screen update
+    int screen_mode;
+    int monitor_type;
 
     // Status flags
-    int     original_del:1;             // backspace key does crsr left if 0
-    int     active_page:1;              // 0x2000 or 0x4000 - active hires bytes page
-    int     free_run:1;                 // 0 - 1 Mhz, 1 - as fast as possible
-    int     debug_view:1;
-    int     stopped:1;
-    int     step:1;
+    int original_del:1;                                     // backspace key does crsr left if 0
+    int active_page:1;                                      // 0x2000 or 0x4000 - active hires bytes page
+    int free_run:1;                                         // 0 - 1 Mhz, 1 - as fast as possible
+    int debug_view:1;                                       // Apple ][ is not full-screen, debugger visible
+    int stopped:1;                                          // Emulation is halted
+    int step:1;                                             // Emulation halted but one instruction is "stepped"
 
     // Additiona Info
-    VIEWPORT    *viewport;              // 0 (no view) or active view for this instance
+    VIEWPORT *viewport;                                     // 0 (no view) or active view for this instance
 };
 typedef struct APPLE2 APPLE2;
 

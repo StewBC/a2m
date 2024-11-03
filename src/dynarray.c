@@ -8,11 +8,10 @@
 int array_add(DYNARRAY *array, void *element) {
     // If array is full, attempt to resize
     if(array->items == array->size) {
-        if(A2_OK != array_resize(array, array->size == 0 ? 1 : array->size * 2)) {
-            return A2_ERR; // Resize failed, return error
+        if(A2_OK != array_resize(array, array->size == 0 ? 1 : array->size *2)) {
+            return A2_ERR;                                  // Resize failed, return error
         }
     }
-
     // Add element to the array
     if(element) {
         memcpy((char *)array->data + (array->items * array->element_size), element, array->element_size);
@@ -22,7 +21,7 @@ int array_add(DYNARRAY *array, void *element) {
 }
 
 // Copy element in array from old to new index
-int array_copy_items(DYNARRAY *array, size_t start_index, size_t end_index, size_t to_index){
+int array_copy_items(DYNARRAY *array, size_t start_index, size_t end_index, size_t to_index) {
     size_t num_items = end_index - start_index;
     size_t next_index = to_index + num_items;
     if(next_index >= array->size) {
@@ -31,7 +30,8 @@ int array_copy_items(DYNARRAY *array, size_t start_index, size_t end_index, size
         }
     }
 
-    memmove((char*)array->data + to_index * array->element_size, (char*)array->data + start_index * array->element_size, num_items * array->element_size);
+    memmove((char *)array->data + to_index * array->element_size, (char *)array->data + start_index * array->element_size,
+            num_items * array->element_size);
     if(next_index > array->items) {
         array->items = next_index;
     }
@@ -51,7 +51,7 @@ void *array_get(DYNARRAY *array, size_t index) {
     if(index < array->size) {
         return (char *)array->data + (index * array->element_size);
     }
-    return NULL; // Out of bounds
+    return NULL;                                            // Out of bounds
 }
 
 // Initialize the array
@@ -63,10 +63,10 @@ void array_init(DYNARRAY *array, size_t element_size) {
 }
 
 // Remove the element from the array, moving all higer elements down
-int  array_remove(DYNARRAY *array, void *element) {
-    uint8_t *end = (uint8_t*)array->data + array->element_size * array->items;
-    if(array->data <= element && (void*)end > element) {
-        uint8_t *start = (uint8_t*)element + array->element_size;
+int array_remove(DYNARRAY *array, void *element) {
+    uint8_t *end = (uint8_t *) array->data + array->element_size * array->items;
+    if(array->data <= element && (void *)end > element) {
+        uint8_t *start = (uint8_t *) element + array->element_size;
         memmove(element, start, end - start);
         array->items--;
     }
@@ -80,13 +80,10 @@ int array_resize(DYNARRAY *array, size_t new_size) {
 
     // Check if reallocation was successful
     if(temp == NULL) {
-        return A2_ERR; // Memory allocation failed
+        return A2_ERR;                                      // Memory allocation failed
     }
-
     // Reallocation successful; update array->data
     array->data = temp;
     array->size = new_size;
     return A2_OK;
 }
-
-

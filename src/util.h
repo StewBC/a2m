@@ -5,20 +5,20 @@
 #pragma once
 
 typedef struct {
-    char    name[PATH_MAX];     // Name of file or folder
-    int     name_length;
-    size_t  size;               // Size in bytes
-    int     is_directory:1;     // 1 if directory, 0 if file
+    char name[PATH_MAX];                                    // Name of file or folder
+    int name_length;
+    size_t size;                                            // Size in bytes
+    int is_directory:1;                                     // 1 if directory, 0 if file
 } FILE_INFO;
 
 typedef struct UTIL_FILE {
-    FILE    *fp;
-    char    *file_display_name; // Points into file_path
-    char    *file_path;         // Full path of the file
-    char    *file_mode;         // How it was opened, example "rb+"
-    char    *file_data;         // Buffer with the contents of the file if it was loaded
-    off_t   file_size;          // File's size
-    size_t  load_padding;       // When alloc'ing a buffer to load the file, add this to size
+    FILE *fp;
+    char *file_display_name;                                // Points into file_path
+    char *file_path;                                        // Full path of the file
+    char *file_mode;                                        // How it was opened, example "rb+"
+    char *file_data;                                        // Buffer with the contents of the file if it was loaded
+    off_t file_size;                                        // File's size
+    size_t load_padding;                                    // When alloc'ing a buffer to load the file, add this to size
     uint8_t is_used:1;
     uint8_t is_file_open:1;
     uint8_t is_file_loaded:1;

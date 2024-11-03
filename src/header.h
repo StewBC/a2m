@@ -11,22 +11,22 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#include <direct.h> // For _getcwd and _chdir
+#include <direct.h>                                         // For _getcwd and _chdir
 #define stricmp _stricmp
 #ifndef PATH_MAX
 #define PATH_MAX MAX_PATH
 #define PATH_SEPARATOR '\\'
 #endif
 #else
-#include <unistd.h>  // For getcwd and chdir
+#include <unistd.h>                                         // For getcwd and chdir
 #include <sys/stat.h>
 #include <dirent.h>
-#if defined(__linux__)  // for PATH_MAX
-    #include <linux/limits.h>
+#if defined(__linux__)                                      // for PATH_MAX
+#include <linux/limits.h>
 #elif defined(__APPLE__)
-    #include <sys/syslimits.h>
+#include <sys/syslimits.h>
 #else
-    #include <limits.h>
+#include <limits.h>
 #endif
 #define stricmp strcasecmp
 #define PATH_SEPARATOR '/'

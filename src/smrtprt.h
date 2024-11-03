@@ -6,13 +6,13 @@
 
 // SmartPort Block Device
 typedef struct SP_DEVICE {
-    uint8_t     sp_active;
-    uint8_t     sp_status;
-    size_t      sp_read_offset;
-    size_t      sp_write_offset;
-    uint8_t     sp_buffer[512+4];
-    UTIL_FILE   sp_files[2];
-    size_t      file_header_size[2];
+    uint8_t sp_active;
+    uint8_t sp_status;
+    size_t sp_read_offset;
+    size_t sp_write_offset;
+    uint8_t sp_buffer[512 + 4];
+    UTIL_FILE sp_files[2];
+    size_t file_header_size[2];
 } SP_DEVICE;
 #define SP_BLOCK_SIZE       512
 #define SP_SUCCESS          0x00

@@ -4,12 +4,12 @@
 
 #include "header.h"
 
-#define TARGET_FPS      (1000000/60)    // (cycles/sec) / (updates/sec) = cycles/update
+#define TARGET_FPS      (1000000/60)                        // (cycles/sec) / (updates/sec) = cycles/update
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     int quit = 0;
-    APPLE2 m;   // The Apple II machine
-    VIEWPORT v; // The view that will display the Apple II machine
+    APPLE2 m;                                               // The Apple II machine
+    VIEWPORT v;                                             // The view that will display the Apple II machine
     Uint64 start_time, end_time;
     Uint64 ticks_per_clock_cycle = SDL_GetPerformanceFrequency() / CPU_FREQUENCY; // Ticks per microsecond
 
@@ -38,7 +38,7 @@ int main(int argc, char* argv[]) {
     SDL_PauseAudio(0);
 
     // Start running the sim loop
-    while (!quit) {
+    while(!quit) {
         // Take note of the time to help sync to Apple II speed
         start_time = SDL_GetPerformanceCounter();
 
@@ -74,7 +74,7 @@ int main(int argc, char* argv[]) {
             end_time = SDL_GetPerformanceCounter();
 
             // Sleep is only ms but I want us delays here
-            while ((end_time - start_time) < (ticks_per_clock_cycle * cycles)) {
+            while((end_time - start_time) < (ticks_per_clock_cycle * cycles)) {
                 end_time = SDL_GetPerformanceCounter();
             }
         }

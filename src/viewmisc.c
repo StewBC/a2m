@@ -5,15 +5,16 @@
 #include "header.h"
 
 // Display variables
-static const char *access_mode[3] = {"R", "W", "RW"};
-static int screen_mode[3] = {0,1,5};
+static const char *access_mode[3] = { "R", "W", "RW" };
+static int screen_mode[3] = { 0, 1, 5 };
+
 static int display_mode = 0;
 static int display_active_page = 0;
 static int display_mixed = 0;
 static int display_override = 0;
 static int display_undo_change = 0;
 
-void viewmisc_show(APPLE2* m) {
+void viewmisc_show(APPLE2 *m) {
     static int last_state = 0;
     VIEWPORT *v = m->viewport;
     struct nk_context *ctx = v->ctx;
@@ -29,10 +30,11 @@ void viewmisc_show(APPLE2* m) {
     struct nk_color ob = ctx->style.window.background;
     int x = 512;
     int w = m->viewport->full_window_rect.w - x;
-    if(nk_begin(ctx, "Miscellaneous", nk_rect(x, m->viewport->target_rect.h, w, m->viewport->full_window_rect.h - m->viewport->target_rect.h),
+    if(nk_begin
+       (ctx, "Miscellaneous", nk_rect(x, m->viewport->target_rect.h, w, m->viewport->full_window_rect.h - m->viewport->target_rect.h),
         NK_WINDOW_SCROLL_AUTO_HIDE | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
         // The Smartport
-        if (nk_tree_push(ctx, NK_TREE_TAB, "SmartPort", NK_MAXIMIZED)) {
+        if(nk_tree_push(ctx, NK_TREE_TAB, "SmartPort", NK_MAXIMIZED)) {
             SP_DEVICE *spd = m->sp_device;
             nk_layout_row_dynamic(ctx, 13, 1);
             nk_label(ctx, "Devices", NK_TEXT_LEFT);
@@ -43,13 +45,13 @@ void viewmisc_show(APPLE2* m) {
                         nk_layout_row_push(ctx, 0.08f);
                         if(!j) {
                             char label[4];
-                            sprintf(label, "%d.%d", i,j);
+                            sprintf(label, "%d.%d", i, j);
                             if(nk_button_label(ctx, label)) {
-                                m->cpu.pc = 0xc000 + i * 0x100;
+                                m->cpu.pc = 0xc000 + i *0x100;
                                 m->stopped = 0;
                             }
                         } else {
-                            nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%d.%d", i,j);
+                            nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%d.%d", i, j);
                         }
                         nk_layout_row_push(ctx, 0.08f);
                         if(nk_button_label(ctx, "Eject")) {
@@ -75,9 +77,8 @@ void viewmisc_show(APPLE2* m) {
             }
             nk_tree_pop(ctx);
         }
-
         // The Breakpoints tab
-        if (nk_tree_push(ctx, NK_TREE_TAB, "Debugger", NK_MAXIMIZED)) {
+        if(nk_tree_push(ctx, NK_TREE_TAB, "Debugger", NK_MAXIMIZED)) {
             FLOWMANAGER *fm = &d->flowmanager;
             nk_layout_row_dynamic(ctx, 13, 1);
             nk_label(ctx, "Debug Status", NK_TEXT_LEFT);
@@ -116,17 +117,18 @@ void viewmisc_show(APPLE2* m) {
 
             if(fm->breakpoints.items) {
                 // nk_layout_row_dynamic(ctx, 29*(fm->breakpoints.items + 1), 2);
-                nk_layout_row_begin(ctx, NK_DYNAMIC, 29*(fm->breakpoints.items + 1), 2);
+                nk_layout_row_begin(ctx, NK_DYNAMIC, 29 *(fm->breakpoints.items + 1), 2);
                 nk_layout_row_push(ctx, 0.80f);
                 if(nk_group_begin(ctx, "breakpoints group", 0)) {
-                    for(int i=0; i < fm->breakpoints.items; i++) {
+                    for(int i = 0; i < fm->breakpoints.items; i++) {
                         char label[32];
                         BREAKPOINT *bp = ARRAY_GET(&fm->breakpoints, BREAKPOINT, i);
                         nk_layout_row_begin(ctx, NK_DYNAMIC, 25, 5);
                         nk_layout_row_push(ctx, 0.399f);
                         if(bp->use_pc) {
                             if(bp->use_counter) {
-                                nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%04X (%d/%d)", bp->address, bp->counter_count, bp->counter_stop_value);
+                                nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%04X (%d/%d)", bp->address,
+                                          bp->counter_count, bp->counter_stop_value);
                             } else {
                                 nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%04X", bp->address);
                             }
@@ -134,15 +136,19 @@ void viewmisc_show(APPLE2* m) {
                             int access = (bp->access >> 1) - 1;
                             if(bp->use_range) {
                                 if(bp->use_counter) {
-                                    nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, "%s[%04X-%04X] (%d/%d)", access_mode[access], bp->address, bp->address_range_end, bp->counter_count, bp->counter_stop_value);
+                                    nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, "%s[%04X-%04X] (%d/%d)", access_mode[access],
+                                              bp->address, bp->address_range_end, bp->counter_count, bp->counter_stop_value);
                                 } else {
-                                    nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%s[%04X-%04X]", access_mode[access], bp->address, bp->address_range_end);
+                                    nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%s[%04X-%04X]", access_mode[access],
+                                              bp->address, bp->address_range_end);
                                 }
                             } else {
                                 if(bp->use_counter) {
-                                    nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%s[%04X] (%d/%d)", access_mode[access], bp->address, bp->counter_count, bp->counter_stop_value);
+                                    nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%s[%04X] (%d/%d)", access_mode[access],
+                                              bp->address, bp->counter_count, bp->counter_stop_value);
                                 } else {
-                                    nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%s[%04X]", access_mode[access], bp->address);
+                                    nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%s[%04X]", access_mode[access],
+                                              bp->address);
                                 }
                             }
                         }
@@ -212,12 +218,11 @@ void viewmisc_show(APPLE2* m) {
             }
             nk_tree_pop(ctx);
         }
-
         // The Display tab
-        if (nk_tree_push(ctx, NK_TREE_TAB, "Display", NK_MAXIMIZED)) {
+        if(nk_tree_push(ctx, NK_TREE_TAB, "Display", NK_MAXIMIZED)) {
             nk_layout_row_begin(ctx, NK_DYNAMIC, 50, 3);
             nk_layout_row_push(ctx, 0.40f);
-            if (nk_group_begin(ctx, "", 0)) {
+            if(nk_group_begin(ctx, "", 0)) {
                 nk_layout_row_static(ctx, 13, 100, 1);
                 nk_label(ctx, "Display Mode", NK_TEXT_LEFT);
                 nk_layout_row_static(ctx, 13, 60, 3);
@@ -228,7 +233,7 @@ void viewmisc_show(APPLE2* m) {
             }
 
             nk_layout_row_push(ctx, 0.30f);
-            if (nk_group_begin(ctx, "", 0)) {
+            if(nk_group_begin(ctx, "", 0)) {
                 nk_layout_row_static(ctx, 13, 80, 1);
                 nk_label(ctx, "Mixed Mode", NK_TEXT_LEFT);
                 nk_layout_row_static(ctx, 13, 60, 2);
@@ -238,12 +243,13 @@ void viewmisc_show(APPLE2* m) {
             }
 
             nk_layout_row_push(ctx, 0.30f);
-            if (nk_group_begin(ctx, "", 0)) {
+            if(nk_group_begin(ctx, "", 0)) {
                 nk_layout_row_static(ctx, 13, 100, 1);
                 nk_label(ctx, "Display Page", NK_TEXT_LEFT);
                 nk_layout_row_static(ctx, 13, 60, 2);
                 display_active_page_setting = nk_option_label(ctx, "Page 0", display_active_page == 0) ? 0 : display_active_page;
-                display_active_page_setting = nk_option_label(ctx, "Page 1", display_active_page_setting == 1) ? 1 : display_active_page_setting;
+                display_active_page_setting =
+                    nk_option_label(ctx, "Page 1", display_active_page_setting == 1) ? 1 : display_active_page_setting;
                 nk_group_end(ctx);
             }
             nk_layout_row_end(ctx);
@@ -256,7 +262,8 @@ void viewmisc_show(APPLE2* m) {
 
             if(display_override) {
                 // Only redraw the screen, when stopped, if a change is made
-                if(display_mode != display_mode_setting || display_mixed != display_mixed_setting || display_active_page != display_active_page_setting) {
+                if(display_mode != display_mode_setting || display_mixed != display_mixed_setting
+                   || display_active_page != display_active_page_setting) {
                     display_mode = display_mode_setting;
                     display_mixed = display_mixed_setting;
                     display_active_page = display_active_page_setting;
@@ -289,9 +296,8 @@ void viewmisc_show(APPLE2* m) {
             // nk_spacer(ctx);
             nk_tree_pop(ctx);
         }
-
         // The Language Card tab
-        if (nk_tree_push(ctx, NK_TREE_TAB, "Language Card", NK_MAXIMIZED)) {
+        if(nk_tree_push(ctx, NK_TREE_TAB, "Language Card", NK_MAXIMIZED)) {
             RAM_CARD *lc = &m->ram_card;
             nk_layout_row_dynamic(ctx, 26, 4);
             nk_option_label(ctx, "Read ROM", lc->read_enable ? 0 : 1);
