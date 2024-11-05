@@ -10,7 +10,7 @@ All you need to start is the apple2 executable. An optional configuration file, 
 ```
 ; Use this file to configure the slots on the Apple ][+
 [display]
-scale = 1.5                 ; Uniformly scale the whole applicationn window
+scale = 1.5                 ; Uniformly scale the whole application window
 
 [smartport]
 slot = 7                    ; Assigns a slot to a SmartPort
@@ -170,7 +170,7 @@ viewmisc.c | Key and display handling of the miscellaneous window
 viewport.c | SDL2 initialization and manage all the other views, update the display
   
 ## Known issues  
-Audio: SDL Audio may not work optimally, especially at maximum speed (F3).  
+Audio: Audio may not work great and at Max Speed (F3), not at all.  
 Memory Cleanup: Not all malloc allocations are freed on exit.  
 Other bugs may be present, as testing has been limited.  
   
