@@ -36,6 +36,7 @@ typedef struct VIEWPORT {
     int dlg_breakpoint:1;
     int shadow_active_page:1;                               // Flags that shadow machine states
     int shadow_stopped:1;
+    int shadow_free_run:1;
     int show_help:1;
     int viewcpu_show:1;
     int viewdbg_show:1;

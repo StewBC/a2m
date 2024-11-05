@@ -61,10 +61,7 @@ int main(int argc, char *argv[]) {
             // Assume hrdware drives the display
             v.shadow_screen_mode = m.screen_mode;
             v.shadow_active_page = m.active_page;
-            if(v.debug_view) {
-                // The display can be overridden in here
-                viewport_show(&m);
-            }
+            viewport_show(&m);
             viewapl2_screen_apple2(&m);
             viewport_update(&m);
         }

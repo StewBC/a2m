@@ -136,9 +136,20 @@ int viewport_process_events(APPLE2 *m) {
     if(!v) {
         return 0;
     }
+
     // Update the CPU view to the latest stats
     if(m->stopped && v->debug_view) {
         viewcpu_update(m);
+    }
+
+    if(v->shadow_stopped != m->stopped || v->shadow_free_run != m->free_run) {
+        char sdl_window_title[48];
+        v->shadow_stopped = m->stopped;
+        v->shadow_free_run = m->free_run;
+        strcpy(sdl_window_title, "Apple ][+ Emulator ");
+        strcat(sdl_window_title, v->shadow_stopped ? "[stopped]" : "[running]");
+        strcat(sdl_window_title, v->shadow_free_run ? " @ Fast" : " @ 1 MHz");
+        SDL_SetWindowTitle(v->window, sdl_window_title);
     }
 
     nk_input_begin(v->ctx);
@@ -149,12 +160,7 @@ int viewport_process_events(APPLE2 *m) {
             ret = 1;
             break;
         }
-        // if(e.type == SDL_MOUSEMOTION) {
-        //     e.motion.x *= v->display_scale;
-        //     e.motion.y *= v->display_scale;
-        //     e.motion.xrel *= v->display_scale;
-        //     e.motion.yrel *= v->display_scale;
-        // }
+
         nk_sdl_handle_event(&e);
 
         // Function keys all go to the disassembly view no matter what is active
@@ -190,11 +196,9 @@ int viewport_process_events(APPLE2 *m) {
             viewapl2_process_event(m, &e);
         }
 
-        if(v->debug_view || force_update) {
-            if((m->stopped && !m->step)) {
-                viewport_show(m);
-                viewport_update(m);
-            }
+        if(m->stopped && !m->step) {
+            viewport_show(m);
+            viewport_update(m);
             // The begin is needed to clear out keys that were handled
             // The end is called for good measure
             nk_input_end(v->ctx);
@@ -208,6 +212,18 @@ int viewport_process_events(APPLE2 *m) {
 void viewport_show(APPLE2 *m) {
     VIEWPORT *v = m->viewport;
     if(!v) {
+        // If the APPLE2 has no view attached, just return
+        return;
+    }
+
+    if(v->show_help) {
+        viewport_show_help(m);
+        // If help is up, it covers the whole sceen so don't draw anything else
+        return;
+    }
+
+    if(!v->debug_view) {
+        // If the debug view isn't open, don't draw anything
         return;
     }
 
@@ -227,10 +243,6 @@ void viewport_show(APPLE2 *m) {
 
     if(v->viewdbg_show) {
         viewdbg_show(m);
-    }
-
-    if(v->show_help) {
-        viewport_show_help(m);
     }
 }
 
