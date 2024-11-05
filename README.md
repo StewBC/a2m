@@ -1,30 +1,34 @@
 # Apple ][+ Emulator  
-This is an Apple ][+ emulator written in "C" using SDL and the Nuklear immediate mode GUI.  The emulator has a cycle correct 6502 CPU (does not support undocumented opcodes), a Language Card and a SmartPort block device.  No Disk II support.  
+This is an Apple ][+ emulator written in "C" using SDL and the Nuklear immediate mode GUI.  The emulator includes a cycle-accurate 6502 CPU (does not support undocumented opcodes), a Language Card and a SmartPort block device.  No Disk II support.  
   
-This configuration makes it possible to boot and run Total Replay or other ProDOS disk volumes.  
-
-![15 FPS Animated Gif of the emulator in action](assets/a2m-15.gif)
+This configuration allows booting and running Total Replay or other ProDOS disk volumes.  
+  
+![15 FPS Animated Gif of the emulator in action](assets/a2m-15.gif)  
   
 ## Starting the emulator  
-All that's needed is the apple2 executable.  There are a few optional files.  The first is apple2.ini.  The ini file is used to specify which slots contain a SmartPort interface, and what disks are mounted as devices 0 & 1 on the interface.  Optionally, a boot parameter can also be given, which will boot the disk0 image.  Here's an example ini file.  
+All you need to start is the apple2 executable. An optional configuration file, apple2.ini, can be used to specify settings such as which slots contain a SmartPort interface and which disks are mounted as devices 0 & 1 on the interface. A boot parameter can also be set to boot the disk0 image. Here's an example .ini file:  
 ```
-; Use this file to configure the slots on the Apple ][
+; Use this file to configure the slots on the Apple ][+
+[display]
+scale = 1.5                 ; Uniformly scale the whole applicationn window
+
 [smartport]
-slot = 7                    ; This says a slot contains a smartport
+slot = 7                    ; Assigns a slot to a SmartPort
 disk0 = ./disks/master.po   ; Path to a disk for device0 (called disk0 in here)
 disk1 = ./disks/Total Replay v5.2.hdv
-boot = yes                  ; optional and any value other than 0 will cause a boot of disk0
+boot = yes                  ; Any non-zero value will boot disk0
 ```  
-Multiple slots can be assigned a SmartPort.  If boot turned on for more than one slot, the last slot it was turned on for will be the one that is booted.  
-Note:  The path names are _not_ enclosed in quotation marks.  
+Multiple slots can be assigned a SmartPort. If boot is enabled for multiple slots, the last enabled slot will be booted.  
+Note: Pathnames are not enclosed in quotation marks.  
   
-The emulator can also load symbol files.  It will look in a folder called symbols for these files:  
+The emulator can also load symbol files.  It will look in a folder called symbols for the following files:  
 ```
-    A2_BASIC.SYM
-    APPLE2E.SYM
-    USER.SYM
+└───symbols
+        A2_BASIC.SYM
+        APPLE2E.SYM
+        USER.SYM
 ```  
-The A2_BASIC.SYM and APPLE2E.SYM were taken from `AppleWin`.  The USER.SYM is, as the title suggests, a symbol file with symbols that the user creates.  If these files are not found, they are silently ignored.  They are loaded in the order listed.  APPLE2E.SYM will not replace symbols defined in A2_BASIC.SYM, but USER.SYM will replace symbols found in either of the previous 2 symbol files.  The format of these files are that any line not starting, on the left margin, with a hex number, are ignored. Lines that start with hex numbers have the rest of the line defined as a symbol, at the address of the HEX number the line started with.  Here's a sample from my Manic Miner game:  
+A2_BASIC.SYM and APPLE2E.SYM are from `AppleWin`. USER.SYM is a custom symbol file with user-defined symbols. If these files are not found, they are silently ignored. They are loaded in the listed order. APPLE2E.SYM will not replace symbols defined in A2_BASIC.SYM, but USER.SYM will override symbols in either of the previous files. Lines that start with a hex number are treated as symbols, with the hex number indicating the address. Here’s an example from my Manic Miner game:  
 ```
 007338 read
 0072C0 screenDrawSprite
@@ -33,95 +37,92 @@ The A2_BASIC.SYM and APPLE2E.SYM were taken from `AppleWin`.  The USER.SYM is, a
 0066A7 allDrawn
 006657 setupSwitch
 ```  
-This USER.SYM file is generated for me by transforming the ca65 output using this SED command:  
+This USER.SYM file is generated for me by transforming the ca65 output (I used cc65's assembler, ca65, to write Manic Miner) using this SED command in the Makefile:  
 ```
 sed "s/^al \([[0-9A-F]\+\)\ \./\1 /g" $(NAME).apple2.lbl > USER.SYM
 ```  
   
-## Using the emulator  
-When the emulator starts, it starts as a 1120 x 840 window that shows the Apple ][+ screen.  If not booting a SmartPort disk, the emulator will be in Applesoft BASIC.  Remember to activate CAPS LOCK since, for example cursor controls, require uppercase letters to work.  
-
-The function keys all go to the emulator (or maybe call it the debugger) rather than to the Apple ][+ machine.  All other keys go to the Apple ][+ machine, while the machine is not stopped.  This is what the function keys do:  
+## Using the Emulator  
+When the emulator starts, it opens as a 1120 x 840 window displaying the Apple ][+ screen. The resolution can be scaled using the apple2.ini file. If no SmartPort disk is booted, the emulator defaults to Applesoft BASIC. Remember to activate CAPS LOCK, as cursor controls require uppercase letters.  
+  
+The function keys control the emulator (or debugger), while other keys go to the Apple ][+ machine when it’s running. The function keys and their functions are as follows:  
 ```
 F1 - Help
 F2 - Toggle debugger display ON/OFF
-F3 - Toggle Speed Limiter (Run at 1MHZ vs as fast as possible) 
-These keys only work when the Apple ][+ is stopped:
-F5 - Run (Go - exit stopped mode)
+F3 - Toggle Speed Limiter (1 MHz vs as fast as possible)
+When stopped:
+F5 - Run (exit stopped mode)
 F6 - Run to cursor
 F9 - Toggle breakpoint at PC
 F10 - Step (over)
 F11 - Step (into)
 F11 + SHIFT - Step (out)
-F12 - Toggle between Color and B&W display (monitor) mode
+F12 - Toggle between Color and B&W display
 ```
   
 ## The window layout when debugger is visible  
-Opening the debugger display (F2) shows these windows:  
+Opening the debugger (F2) displays the following windows:  
 ```
-CPU - Shows the Program Counter (PC), Stack Pointer (SP), registers and flags.
-Disassembly - Shows the program stream currently executing
-Memory - Shows a page of RAM in HEX and ASCII
-Miscellaneous
-  Shows the SmartPort devices
+CPU: Shows the Program Counter (PC), Stack Pointer (SP), registers, and flags.
+Disassembly: Displays the currently executing program stream.
+Memory: Shows a page of RAM in HEX and ASCII.
+Miscellaneous:
+  SmartPort devices
   Debugger status and breakpoints
-  Display status (text, lowres or HGR and active page)
+  Display status (text, low-res, or HGR and active page)
+  Language Card soft-switches
 ```
   
-## Using the debugger  
-While the machine is running (not stopped), the debug windows, if visible, all update (attempts to update at 60 FPS) but user control only applies to the emulated machine (the Apple ][+).  Once the machine is stopped, the windows can be interacted with.  Which window receives input is controlled by mouse hover.  The title of the "active window" will be shown in green.  (Note: I don't know Nuklear well enough to establish an "active window" so the mouse needs to stay over a window for that window to remain the active window - not ideal but that's how it currently works).  
+## Using the Debugger  
+When running, debug windows update at 60 FPS, but user control only applies to the Apple ][+ machine. Once stopped, you can interact with the debug windows. The window title changes to green when it is "active", with "active" determined by mouse hover and input going to the "active" window.  
   
-## Using the CPU window  
-The CPU window, when stopped, has edit boxes for the PC, SP, registers and flags.  To edit any of this, click in the box (make sure the mouse pointer stays over the CPU window) and type in a new value.  make the value effective by pressing ENTER.  
+## Using the CPU Window  
+The CPU window, when stopped, has editable boxes for the PC, SP, registers, and flags. To edit a value, click in the box, keep the mouse pointer over the CPU window, type a new value, and press ENTER.  
   
-## Using the Disassembly window  
-The following keys work in the disassembly window.  
+## Using the Disassembly Window  
+The following keys are supported in the disassembly window:  
 ```
-CTRL-g - Brings up a modal dialog to set the address for where to view disassembly (cursor PC)
-CTRL-p - Set the machine PC to the cursor PC 
-TAB - Toggle the symbol display between all / functions and labels / labels / none
-CURSOR - UP, DOWN - Move the cursor PC up/down an address (line)
-PAGE UP/DOWN - (Try to) move the cursor PC up/down a page
+CTRL + G - Set the address for viewing disassembly (cursor PC)
+CTRL + P - Set the machine PC to the cursor PC
+TAB - Toggle symbol display between all/functions and labels/labels/none
+CURSOR UP/DOWN - Move the cursor PC up/down an address
+PAGE UP/DOWN - (Try to) Move the cursor PC up/down a page
 ```
   
-## Using the Memory window  
-The address where the cursor is, is shown in the very last line of the window.  Editing memory edits at that address.  
+## Using the Memory Window  
+The address of the cursor is shown in the last line of the window. Memory can be edited at that address.  
 ```
-CTRL-f - Modal find dialog, search for strings or HEX "strings"
-CRTL-g - Modal go to address dialog
-CTRL-j - Join a split window with the one below
-CTRL-SHIFT-j - Join a split window with the one above
-CTRL-n - Find next (forward) (using same prev search from CTRL-f)
-CTRL-SHIFT-n - Find prev (backwards) (using same prev search from CTRL-f)
-CTRL-s - Split the memory display (up to 16 times) to make virtual memory windows
-CTRL-t - Toggle between editing the HEX or the ASCII memory at the cursor location
-ALT-0 through ALT-f - Select the virtual memory window (made with CTRL-S)
+CTRL + F - Find dialog (strings or HEX)
+CTRL + G - Go to address
+CTRL + J - Join a split window with the one below
+CTRL + SHIFT + J - Join a split window with the one above
+CTRL + N - Find next (forward) using the CTRL + F search
+CTRL + SHIFT + N - Find previous (backward) using the CTRL + F search
+CTRL + S - Split the memory display (up to 16 virtual memory windows)
+CTRL + T - Toggle between HEX and ASCII editing
+ALT + 0-F - Select a virtual memory window
 ```  
-Since there is only one memory window, I decided to make it possible to split it on any line.  So, pressing CTRL-s on any line other than the top line of any virtual window, will make a "split" at that line.  This changes the color of the virtual window, and it also sets the first digit on the line to the ID of this virtual window.  This might look like:  
-```
-0:0000:...
-0:0010:...
-1:0020:...
-```  
-The 0: and 1: regions now act like windows for scrolling, page up/down, go to, etc.  This makes it possible to set up multiple areas to watch.  Use ALT and the 1st digit on the line to activate that virtual window and CTRL-(shift-)j to join a window (unsplit) with its neighbor.  
+Split views are differentiated by colored with a virtual window ID (e.g., 0:0000). This enables viewing up to 16 distinct memory regions from the one Memory Window.  
+Type HEX digits to edit the memory in HEX mode and use any key to edit the memory in ASCII mode (switch using CTRL + T).  
   
-Type HEX digits in to edit the memory in HEX mode and use any key to edit the memory in ASCII mode (switch using CTRL-t).  
-  
-## Using the Miscellaneous window  
-This window currently has 3 sections.  Each section can be shown/hidden by clicking on the triangle before the section name.  NOTE:  These sections only respond to input when the emulator is stopped.  
+## Using the Miscellaneous Window  
+This window currently has 4 sections.  Each section can be shown/hidden by clicking on the triangle before the section name.  NOTE:  These sections only respond to input when the emulator is stopped.  
 ### SmartPort  
-This shows which slot has a SmartPort interface.  In each slot, slot 0 display (example `7.0`) is a button.  Pressing that button will just immediately boot disk0 (if mounted).  The `Eject` button "removes" the disk from the slot and the `Insert` button brings up a file browser through which a disk can be mounted.  Note: Selecting a file that is not a disk image will work as _no_ validation is done.  The only check is if a file has `2IMG` in the header, the offset for the start in the file is set to 64 bytes from the start of the file (ignoring/skipping the header).  
-This section is populated based on the apple2.ini file.  Making changes in the UI will _not_ update the apple2.ini file.  At the moment, this file needs to be edited by hand.  
+This shows which slot has a SmartPort interface.  In each slot, slot 0 display (example `7.0`) is a button.  Pressing that button will boot disk0 (if mounted).  The `Eject` button "removes" the disk from the slot and the `Insert` button brings up a file browser through which a disk can be mounted.  Note: Selecting a file that is not a disk image will work as _no_ validation is done.  The only check is if a file has `2IMG` in the header, the offset for the start in the file is set to 64 bytes from the start of the file (ignoring/skipping the header).  
+This section is populated based on the apple2.ini file.  Making changes in the UI will _not_ update the apple2.ini file.  The apple2.ini file needs to be edited by hand.  
 ### Debugger  
 The status display shows:  
-`Run to PC O XXXX`.  While the emulator is "running to the address XXXX" the `O` is lit.  It is just sometimes good to know that stepping over a `JSR` for example, is in progress.  `Step Out O` similarly is active when using SHIFT-F11 and the function doesn't "step out" quickly.  The Step Cycles show the number of cycles that elapsed from the emulator being stopped, till stopped again. So, if the emulator just stepped over a 2-cycle opcode using F11, that will show 2.  This is very handy for profiling since stepping over a `JSR` subroutine shows the all-inclusive number of cycles it took to run the routine.  Total cycles show the number of cycles executed since the start.  This number will roll over fairly quickly (minutes, not days of running the emulator).  
+`Run to PC O XXXX`.  While the emulator is "running to the address XXXX" the `O` is lit.  It is good to know that stepping over a `JSR` for example, is in progress.  `Step Out O` similarly is active when using SHIFT-F11 and the function doesn't "step out" quickly.  
+The `Step Cycles` show the number of cycles that elapsed from the emulator being stopped, till stopped again. So, if the emulator just stepped over a 2-cycle opcode using F11, that will show 2.  This is very handy for profiling since stepping over a `JSR` subroutine shows the all-inclusive number of cycles it took to run the routine.  
+`Total cycles` show the number of cycles executed since the start.  This number will roll over fairly quickly (minutes, not days of running the emulator).  
 Setting a breakpoint (Using `F9`) will add additional rows:  
-`XXXX` `Disable` `View PC` `Clear` and if multiple breakpoints are set `Clear All`.  These are:
-`XXXX` The address at which the breakpoint is set.  
+`XXXX` `Disable` `View PC` `Clear` and if multiple breakpoints are set `Clear All`.  These are:  
+`XXXX` This is the address to break on, or watch, and optionally on what type of access or on which count/pass to break.  
 `Disable` will disable the breakpoint and the button will read `Enable` to re-enable the breakpoint.  
-`View PC` will set the cursor PC to the address of the breakpoint.  
+`View PC` will set the cursor PC to the address of the breakpoint, if it is a PC breakpoint.  
 `Clear` will erase the breakpoint.  
 `Clear All` will erase all breakpoints.  
+Breakpoints come in two types. The first type is a _PC_ breakpoint, which triggers when the program counter (PC) matches the breakpoint address. The second type is an _ACCESS_ breakpoint, which triggers when any access matches the breakpoint address. For access breakpoints, a range of addresses can be specified, along with the type of access — Read, Write, or either. Both types of breakpoints also support optional count settings: the first count specifies how many times the breakpoint should trigger before a stop is activated. Once this count is reached, a second count determines how frequently the breakpoint will trigger thereafter. This setup allows you to specify, "When address XXXX has been read or written N times, break, and after that, break every K times the address is accessed."  
 ### Display  
 Display mode shows which of the `Text`, `Lowres` or `HGR` display modes is active.  `Mixed Mode` off indicates that the whole screen (in lores or HGR) is in that graphics mode, and `ON` shows that the last 4 "lines" of the display is shown in `Text` mode.  `Display page` indicates where from memory the display is showing what it is showing:  
 ```
@@ -129,21 +130,20 @@ Text: Page 0 = $0400, Page 1 = $0800
 Lowes: Same as Text
 HGR: Page 0 = $2000, Page 1 - $4000
 ```  
-`Override Yes` allows changing the values above to see non-active modes and pages.  This is especially useful when looking at how a program draws off-screen if it does page-flipping.  `Override No` restores the hardware view of the display.  
+`Override Yes` allows changing the values above to see non-active modes and pages.  This is especially useful when looking at how a program draws off-screen if it does page-flipping.  
+`Override No` restores the hardware view of the display.  
 These settings can only be altered when stopped, but stepping or running with `Override On` will keep the override settings.  
+### Language Card  
+The Language Card section shows the state of the Language Card, whether ROM or RAM is active, which bank, and if writing to RAM is enabled.  
   
 ## Building from source  
-If I get a chance, I will rework this section, but for now, you are more or less on your own.  On Windows I installed SDL2 and SDL_mixer, and I use VS Code with the cmake and cmake tools plugins.  On Linux (WSL), I installed SDL2 and mixer from source, which had all sorts of dependencies, but that's the only way I got the `find_package` scripts to show up.  I also use VS Code and plugins on Linux, and I used clang.  I don't have access to a Mac as I write this, so I am not sure if that will work on a Mac now.  
+Currently, building instructions are limited. On Windows, install SDL2 and SDL_mixer and use VS Code with CMake plugins. On Linux (WSL), SDL2 and mixer were installed from source to access find_package scripts. VS Code was used with Clang. Mac support is untested.  
   
 ## Something about the code  
-In this project, I use the word "class" to describe a typedef struct. The main class for the hardware, which consists of several subcomponents like the speaker, smart port, etc., is called APPLE2. Additionally, there is a class named VIEWPORT. Together, these two classes make up the emulator. As described, hardware emulation resides in APPLE2, while drawing (screen rendering), keyboard input, speaker output, and so forth, are all managed by VIEWPORT. This includes debugging windows like disassembly, memory view, and more. Files related to these components are prefixed with view for easy identification.  
+In this project, a typedef struct is referred to as a "class." The main hardware class, APPLE2, manages hardware subcomponents like the speaker and SmartPort. The VIEWPORT class handles rendering, keyboard input, making sounds, and debugging windows. Most API calls use an APPLE2 instance as the first parameter (named m for machine).  
   
-It’s theoretically possible to start multiple APPLE2 instances and connect any one of them to a single VIEWPORT to monitor its status (though I haven’t tested this). The APPLE2 class contains a pointer to a VIEWPORT, but the VIEWPORT itself does not retain a pointer back to the APPLE2 instance it is servicing. Most API calls accept an APPLE2 instance as the first parameter (I use m for machine, as this setup could theoretically extend to other machines, such as a Commodore 64, though I have no intention of expanding it into a multi-machine emulator). The API then queries APPLE2 for the active VIEWPORT. If no viewport is active, the call simply returns.  
+The APPLE2 structure is designed to be compact, with dynamic allocation for certain components to support potential "time travel" functionality.  
   
-I aimed to keep the size of the APPLE2 structure minimal. For example, the SMARTPORT requires a buffer of 512+4 bytes, which is allocated dynamically rather than included in the structure. This design allows for easier backup of the APPLE2 structure (a small structure), enabling potential backward and forward time travel within the emulator by also tracking memory changes—a challenging but theoretically feasible goal.  
-  
-The windows' contents are displayed using a dynamic array, allowing for flexible layout and size adjustments without significant rework. I started using the Nuklear GUI library for this project, and while there is still much I don’t fully understand, this approach enabled me to get the emulator running quickly without a deep dive into the GUI library.  
-
 ## The source files and what they do  
 File | Description 
 --- | --- 
@@ -170,13 +170,12 @@ viewmisc.c | Key and display handling of the miscellaneous window
 viewport.c | SDL2 initialization and manage all the other views, update the display
   
 ## Known issues  
-The Audio (speaker) might not work very well.  This is because I don't really know how to properly use SDL Audio.  It works very well on my Desktop PC and works okay on my laptop.  It stops working well when I use F3 to run the emulator at maximum speed.  
-The language card implementation has an issue that I will try to track down, but it does not prevent most (or maybe all - I didn't test exhaustively) of Total Replay from working.  Some software, such as Orca/M and Program Writer don't work.  This may be because I have 65C02 versions, or because of my LC issues, or because I don't emulate quite enough of the Apple ][+ to make this software work.  At some point I may investigate.  
-The cleanup on exit (freeing memory that was malloc'd) isn't all there.
-There may be numerus other bugs, I have not thoroughly tested.  
-
+Audio: SDL Audio may not work optimally, especially at maximum speed (F3).  
+Memory Cleanup: Not all malloc allocations are freed on exit.  
+Other bugs may be present, as testing has been limited.  
+  
 ## Future plans  
-Apart from fixing the LC bug and maybe adding some more breakpoint types, It would be fairly straight forward, I think, to keep track of the APPLE2 struct in an array, with deltas to memory.  That will make "time travel" easy and efficient.  I might attempt that.  I don't really have plans to add Disk II.  This all came about because I wanted to see if I could do a 6502 that can run the harte tests, and from that I realized I could probably do a small emulator that can run my Manic Miner for the Apple II in 6502, and from that I decided to make the whole emulator.  But, my real passion is actually making games so I want to get back to that.
+This project stemmed from an interest in creating a 6502 that could pass the Harte CPU tests, which led to making a small emulator for Manic Miner, which in turn led to the creation of this Emulator. While I may continue tinkering (possibly adding time travel), my passion is making games, and I want to get back to that.  
   
 ## Thank you  
 * Brendan Robert - Author of Jace, for telling me how to think about sampling for speaker emulation.  

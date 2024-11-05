@@ -254,11 +254,11 @@ void viewport_show_help(APPLE2 *m) {
         nk_layout_row_dynamic(ctx, 30, 1);
         nk_label_colored(ctx, "Apple ][+ emulator by Stefan Wessels, 2024.", NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE,
                          color_help_master);
-        nk_layout_row_dynamic(ctx, 30, 1);
-        nk_label_colored(ctx, "While emulation is running:", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, color_help_notice);
-        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_layout_row_dynamic(ctx, 13, 1);
+        nk_label_colored(ctx, "While emulation is running:", NK_TEXT_ALIGN_LEFT, color_help_notice);
         nk_label(ctx, "All keys go to the emulated machine, except for the function keys.", NK_TEXT_ALIGN_LEFT);
-        nk_label_colored(ctx, "Function keys always go to the emulator.", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE,
+        nk_layout_row_dynamic(ctx, 13, 1);
+        nk_label_colored(ctx, "Function keys always go to the emulator.", NK_TEXT_ALIGN_LEFT,
                          color_help_key_heading);
         nk_layout_row_dynamic(ctx, 13, 2);
         nk_label(ctx, "F1  - Help.", NK_TEXT_ALIGN_LEFT);
@@ -271,28 +271,24 @@ void viewport_show_help(APPLE2 *m) {
         nk_label(ctx, "F11 + Shift - Step out - Step past RTS at this calling level.", NK_TEXT_ALIGN_LEFT);
         nk_label(ctx, "F6  - Set Program Counter (PC) to cursor PC.", NK_TEXT_ALIGN_LEFT);
         nk_label(ctx, "F12 - Switch display between color and monochrome.", NK_TEXT_ALIGN_LEFT);
-        nk_layout_row_dynamic(ctx, 30, 1);
-        nk_label_colored(ctx, "While emulation is stopped:", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, color_help_notice);
         nk_layout_row_dynamic(ctx, 13, 1);
+        nk_label_colored(ctx, "While emulation is stopped:", NK_TEXT_ALIGN_LEFT, color_help_notice);
         nk_label(ctx, "If the debug view is visible (F2) keys go to the debug window over which the mouse is hovered.",
                  NK_TEXT_ALIGN_LEFT);
-        nk_layout_row_dynamic(ctx, 30, 1);
-        nk_label_colored(ctx, "CPU Window", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, color_help_heading);
-        nk_layout_row_dynamic(ctx, 13, 1);
+        nk_label_colored(ctx, "CPU Window", NK_TEXT_ALIGN_LEFT, color_help_heading);
         nk_label(ctx,
                  "Click into a box to edit, i.e. PC, SP, a register or flag and change the value.  Press ENTER to make the change effective.",
                  NK_TEXT_ALIGN_LEFT);
-        nk_layout_row_dynamic(ctx, 30, 1);
-        nk_label_colored(ctx, "Disassembly window", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, color_help_heading);
+        nk_label_colored(ctx, "Disassembly window", NK_TEXT_ALIGN_LEFT, color_help_heading);
         nk_layout_row_dynamic(ctx, 13, 2);
         nk_label(ctx, "CTRL + g - Set cursor PC to address.", NK_TEXT_ALIGN_LEFT);
         nk_label(ctx, "CURSOR UP/DOWN - Move the cursor PC by a line.", NK_TEXT_ALIGN_LEFT);
         nk_label(ctx, "CTRL + p - Set Apple ][+ PC to the cursor PC .", NK_TEXT_ALIGN_LEFT);
         nk_label(ctx, "PAGE UP/DOWN   - Move the cursor PC by a page.", NK_TEXT_ALIGN_LEFT);
         nk_label(ctx, "TAB    - Toggle symbol display (4 possible states).", NK_TEXT_ALIGN_LEFT);
-        nk_layout_row_dynamic(ctx, 30, 1);
-        nk_label_colored(ctx, "Memory window", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, color_help_heading);
-        nk_layout_row_dynamic(ctx, 30, 1);
+        nk_layout_row_dynamic(ctx, 13, 1);
+        nk_label_colored(ctx, "Memory window", NK_TEXT_ALIGN_LEFT, color_help_heading);
+        nk_layout_row_dynamic(ctx, 27, 1);
         nk_label_wrap(ctx,
                       "Type HEX digits to edit the memory in HEX edit mode, or type any key when editing in ASCII mode.  The address that will be edited is shown at the bottom of the window.");
         nk_layout_row_dynamic(ctx, 13, 2);
@@ -308,29 +304,39 @@ void viewport_show_help(APPLE2 *m) {
         nk_label(ctx, "ALT-0 through ALT-f - Select the virtual memory window (made with CTRL+S).", NK_TEXT_ALIGN_LEFT);
         nk_label(ctx, "PAGE   UP/DOWN - Move the cursor a page up or down.", NK_TEXT_ALIGN_LEFT);
         nk_spacer(ctx);
-        nk_layout_row_dynamic(ctx, 30, 2);
-        nk_label_colored(ctx, "Miscellaneous window", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, color_help_heading);
+        nk_layout_row_dynamic(ctx, 13, 1);
+        nk_label(ctx, "Split windows become \"virtual\" windows making it possible to monitor different address ranges all from the one memory window.",
+                 NK_TEXT_ALIGN_LEFT);
+        nk_label_colored(ctx, "Miscellaneous window", NK_TEXT_ALIGN_LEFT, color_help_heading);
         nk_layout_row_dynamic(ctx, 13, 1);
         nk_label(ctx, "Note that this window updates while running, but changes can only be made while the emulation is stopped.",
                  NK_TEXT_ALIGN_LEFT);
-        nk_layout_row_dynamic(ctx, 20, 1);
-        nk_label_colored(ctx, "Miscellaneous SmartPort", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, color_help_key_heading);
-        nk_layout_row_dynamic(ctx, 40, 1);
+        nk_label_colored(ctx, "Miscellaneous SmartPort", NK_TEXT_ALIGN_LEFT, color_help_key_heading);
+        nk_layout_row_dynamic(ctx, 27, 1);
         nk_label_wrap(ctx,
-                      "This section can be updated by using the apple2.ini file.  Add slots and drives using the [smartoprt] section and Slot=, drive0=, drive1= and Boot=.  Use the Slot.0 button to boot that disk.  Use Eject to eject the disk and Insert will bring up a file chooser to select a new disk.  No validation done on disk files selected.");
-        nk_layout_row_dynamic(ctx, 20, 1);
-        nk_label_colored(ctx, "Miscellaneous Debug", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, color_help_key_heading);
-        nk_layout_row_dynamic(ctx, 28, 1);
+                      "Use the Slot.0 button to boot that disk, when stopped.  Use Eject to eject the disk and Insert will bring up a file chooser to select a new disk.  No validation done on disk files selected.");
+        nk_layout_row_dynamic(ctx, 13, 1);
+        nk_label_colored(ctx, "Miscellaneous Debug", NK_TEXT_ALIGN_LEFT, color_help_key_heading);
+        nk_layout_row_dynamic(ctx, 27, 1);
         nk_label_wrap(ctx,
                       "The status shows when a Step Over or Step out is actively running.  The Step Cycles show how many cycles the last step took (for profiling) and Total Cycles show all cycles since start (will wrap).");
-        nk_layout_row_dynamic(ctx, 28, 1);
+        nk_layout_row_dynamic(ctx, 40, 1);
         nk_label_wrap(ctx,
-                      "Breakpoints show up at the address and can be disabled/enabled, cursor PC set to the breakpoint and the breakpoint can be cleared (deleted).  Clear all, shown when multiple breakpoints exist, will remove all breakpoints.");
-        nk_layout_row_dynamic(ctx, 20, 1);
-        nk_label_colored(ctx, "Miscellaneous Display", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, color_help_key_heading);
-        nk_layout_row_dynamic(ctx, 28, 1);
+                      "Breakpoints come in 2 forms.  PC or address (or range).  PC shows up as 4 HEX digits.  Address shows up as R(ead) and or W(rite) access with the address or range in ['s.  With both types, there's also an optional access count (current count/trigger count).  Breakpoints can be edited, enabled/disabled, View jumps to PC of breakpoint (disabled for address) and cleared.  If multiple breakpoints, Clear All removes all breakpoints.");
+        nk_layout_row_dynamic(ctx, 13, 1);
+        nk_label_colored(ctx, "Miscellaneous Display", NK_TEXT_ALIGN_LEFT, color_help_key_heading);
+        nk_layout_row_dynamic(ctx, 27, 1);
         nk_label_wrap(ctx,
                       "Shows the status of the display soft-switches.  Can be overridden to, for example, see the off-screen page where the application or game may be making changes if page flipping is used.  Turning Override off will reset back to the actual machine status.");
+        nk_layout_row_dynamic(ctx, 13, 1);
+        nk_label_colored(ctx, "Miscellaneous Language Card", NK_TEXT_ALIGN_LEFT, color_help_key_heading);
+        nk_layout_row_dynamic(ctx, 14, 1);
+        nk_label_wrap(ctx,
+                      "Shows the status of the language card soft-switches.  This is read-only information.");
+        nk_label_colored(ctx, "Configuration", NK_TEXT_ALIGN_LEFT, color_help_notice);
+        nk_layout_row_dynamic(ctx, 40, 1);
+        nk_label_wrap(ctx,
+                      "An optional apple2.ini file in the launch folder can configure option.  The sections are [display] with scale=<scale> for a uniform scaling of the emulator window/display (1.0 default).  [smartoprt] with slot=<0..7>, drive0=<path>, drive1=<path> and boot=<0|anything>, 0 is No.  Note the path does not contain \"'s and all pairs optional.  Slot= must be set for other smartport options.");
     }
     nk_end(ctx);
 }
