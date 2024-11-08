@@ -76,12 +76,12 @@ typedef struct CPU {
 struct APPLE2;
 
 // Function pointer prototype that point at the steps, each individual cycle, of a 6502 instruction
-typedef void (*opcode_steps)(APPLE2 *m);
+typedef void (*OPCODE_STEPS)(APPLE2 *m);
 
 // The 256 possible opcodes
-extern opcode_steps *opcodes[256];
+extern OPCODE_STEPS *opcodes[256];
 // The UNDEFINED step (cycle) is for the unimplemented opcodes
-extern opcode_steps UNDEFINED[];
+extern OPCODE_STEPS UNDEFINED[];
 
 // Configure the ram, MEMORY and bytes setup (what is mapped in)
 uint8_t memory_init(MEMORY *memory, uint16_t num_blocks);
