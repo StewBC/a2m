@@ -8,7 +8,9 @@ typedef struct VIEWPORT {
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Surface *surface;
+    SDL_Surface *surface640;
     SDL_Texture *texture;
+    SDL_Texture *texture640;
     SDL_Rect target_rect;
     SDL_Rect full_window_rect;
 

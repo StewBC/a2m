@@ -6,7 +6,7 @@
 
 int sp_mount(APPLE2 *m, const int slot, const int device, const char *file_name) {
     SP_DEVICE *spd = &m->sp_device[slot];
-    if(!spd->sp_active) {
+    if(m->slot_cards[slot].slot_type != SLOT_TYPE_SMARTPORT) {
         return A2_ERR;
     }
 

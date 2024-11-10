@@ -20,15 +20,19 @@ enum {
 enum {
     ROM_APPLE,
     ROM_CHARACTER,
+    ROM_DISKII,
+    ROM_FRANKLIN_ACE_DISPLAY,
+    ROM_FRANKLIN_ACE_CHARACTER,
     ROM_SMARTPORT,
     ROM_SSC,
-    ROM_DISKII,
+    ROM_NUM_ROMS
 };
 
 // SLOT cards supported
 enum {
     SLOT_TYPE_EMPTY,
     SLOT_TYPE_SMARTPORT,
+    SLOT_TYPE_VIDEX_API,
 };
 
 // Prototypes for callbacks when cpu accesses a port
@@ -48,9 +52,11 @@ struct APPLE2 {
     CALLBACK_BREAKP callback_breakpoint;                    // The callback when a breakpoint memory read/write triggers
     MEMORY ram;                                             // All MEMORY in the system (may be > 64K but up to 64K) mapped in throug pages
     MEMORY roms;                                            // All MEMORY in the system, may be mapped into 64K, through read_pages
+    SLOT_CARDS slot_cards[8];                               // The 8 slots and their status and option ROMs
     SPEAKER speaker;                                        // 1 bit audio speaker
     RAM_CARD ram_card;                                      // State for which pages are visible
     SP_DEVICE sp_device[8];                                 // All slots could be made smartport
+    FRANKLIN_DISPLAY franklin_display;                      // Franklin Display 80 col card
 
     // Base setup
     uint8_t *RAM_MAIN;                                      // The 64K MEMORY
@@ -67,6 +73,7 @@ struct APPLE2 {
 
     // Status flags
     int original_del:1;                                     // backspace key does crsr left if 0
+    int cols80active:1;                                      // Videx/Franklin Ace Display active
     int active_page:1;                                      // 0x2000 or 0x4000 - active hires bytes page
     int free_run:1;                                         // 0 - 1 Mhz, 1 - as fast as possible
     int debug_view:1;                                       // Apple ][ is not full-screen, debugger visible

@@ -27,12 +27,14 @@ int apple2_configure(APPLE2 *m) {
     memory_add(&m->ram, 0, 0x0000, RAM_SIZE, m->RAM_MAIN);
 
     // ROMS
-    if(!memory_init(&m->roms, 3)) {
+    if(!memory_init(&m->roms, ROM_NUM_ROMS)) {
         return A2_ERR;
     }
     memory_add(&m->roms, ROM_APPLE, 0xD000, apple2_rom_size, apple2_rom);
     memory_add(&m->roms, ROM_CHARACTER, 0x0000, apple_character_rom_size, apple_character_rom);
     memory_add(&m->roms, ROM_SMARTPORT, 0xC000, smartport_rom_size, smartport_rom);
+    memory_add(&m->roms, ROM_FRANKLIN_ACE_DISPLAY, 0x0000, franklin_ace_display_rom_size, franklin_ace_display_rom);
+    memory_add(&m->roms, ROM_FRANKLIN_ACE_CHARACTER, 0x0000, franklin_ace_character_rom_size, franklin_ace_character_rom);
 
     // PAGES
     if(!pages_init(&m->read_pages, RAM_SIZE / PAGE_SIZE)) {
@@ -63,6 +65,10 @@ int apple2_configure(APPLE2 *m) {
 
     // Add the IO ports by flagging them as 1 in the RAM watch
     memset(m->RAM_WATCH + 0xC001, 1, 0xFE);                 // Skip KBD
+    // Watch the location to clear slot rom
+    m->RAM_WATCH[CLRROM] = 1;
+
+    // Set up the Watch Pages (RAM_WATCH can be changed without re-doing the map)
     pages_map(&m->watch_pages, 0, RAM_SIZE / PAGE_SIZE, m->RAM_WATCH);
 
     // Init the CPU to cold-start by jumping to ROM at 0xfffc
@@ -81,7 +87,8 @@ int apple2_configure(APPLE2 *m) {
     // Configure slots from the ini file
     if(A2_OK != util_ini_load_file("./apple2.ini", apple2_ini_load_callback, (void *)m)) {
         // If apple2.ini doesn't succesfully load, just add a smartport in slot 7
-        apple2_slot_configure(m, 7, SLOT_TYPE_SMARTPORT);
+        slot_add_card(m, 7, SLOT_TYPE_SMARTPORT, &m->sp_device[7], 
+            &m->roms.blocks[ROM_SMARTPORT].bytes[0x700], NULL);
     }
 
     return A2_OK;
@@ -93,8 +100,9 @@ void apple2_ini_load_callback(void *user_data, char *section, char *key, char *v
     if(0 == stricmp(section, "smartport")) {
         if(0 == stricmp(key, "slot")) {
             sscanf(value, "%d", &slot_number);
-            if(slot_number >= 0 && slot_number < 8) {
-                apple2_slot_configure(m, slot_number, SLOT_TYPE_SMARTPORT);
+            if(slot_number >= 1 && slot_number < 8) {
+                slot_add_card(m, slot_number, SLOT_TYPE_SMARTPORT, &m->sp_device[slot_number],
+                    &m->roms.blocks[ROM_SMARTPORT].bytes[slot_number * 0x100], NULL);
             }
         } else if(slot_number >= 0 && slot_number < 8) {
             if(0 == stricmp(key, "disk0")) {
@@ -106,6 +114,21 @@ void apple2_ini_load_callback(void *user_data, char *section, char *key, char *v
                     // The rom doesn't get a chance to run but fortunately ProDOS does just fine
                     m->cpu.pc = 0xc000 + slot_number *0x100;
                     m->cpu.instruction_cycle = -1;
+                }
+            }
+        }
+    }
+    // The 80 col display card 
+    if(0 == stricmp(section, "video")) {
+        if(0 == stricmp(key, "slot")) {
+            sscanf(value, "%d", &slot_number);
+        }
+        if(0 == stricmp(key, "device")) {
+            if(slot_number >= 1 && slot_number < 8) {
+                if(A2_OK == franklin_display_init(&m->franklin_display)) {
+                    slot_add_card(m, slot_number, SLOT_TYPE_VIDEX_API, &m->franklin_display,
+                        &m->roms.blocks[ROM_FRANKLIN_ACE_DISPLAY].bytes[0x600], franklin_display_map_cx_rom);
+                    memset(m->RAM_WATCH + 0xCC00, 1, 0x200);
                 }
             }
         }
@@ -122,32 +145,38 @@ void apple2_shutdown(APPLE2 *m) {
     m->viewport = 0;
 }
 
-// Configure an apple ][ slot to behave as though it contains this type of periperal card
-void apple2_slot_configure(APPLE2 *m, int slot, uint8_t type) {
-    switch (type) {
-    case SLOT_TYPE_SMARTPORT:
-        pages_map(&m->read_pages, (0xC000 + (slot *0x100)) / PAGE_SIZE,
-                  0x100 / PAGE_SIZE, &m->roms.blocks[ROM_SMARTPORT].bytes[slot *0x100]);
-        m->sp_device[slot].sp_active = 1;
-        break;
-    }
-}
-
 // Handle the Apple II sofswitches when read
 uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
     if(address >= 0xC080 && address <= 0xC08F) {
         // Ram card address
         ram_card(m, address, 0x100);
     } else if(address >= 0xc090 && address <= 0xc0FF) {
-        // Smartport
         int slot = (address >> 4) & 0x7;
-        switch (address & 0x0f) {
-        case SP_DATA:
-            return m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_read_offset++];
-            break;
-        case SP_STATUS:
-            return m->sp_device[slot].sp_status;
-            break;
+        switch(m->slot_cards[slot].slot_type) {
+            case SLOT_TYPE_SMARTPORT:
+                switch (address & 0x0f) {
+                case SP_DATA:
+                    return m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_read_offset++];
+                    break;
+                case SP_STATUS:
+                    return m->sp_device[slot].sp_status;
+                    break;
+                }
+                break;
+
+            case SLOT_TYPE_VIDEX_API: {
+                    FRANKLIN_DISPLAY *fd80 = &m->franklin_display;
+                    fd80->bank = (address & 0x0C) >> 2;
+                    return fd80->registers[address & 0x0F];
+                }
+                break;  
+        }
+    } else if(address >= 0xc100 && address <= 0xcFFE) {
+		// Map the C800 ROM based on access to Cs00, if card provides a C800 ROM
+        int slot = (address >> 8) & 0x7;
+        if(!m->slot_cards[slot].cx_rom_mapped && m->slot_cards[slot].slot_map_cx_rom) {
+            m->slot_cards[slot].slot_map_cx_rom(m, address);
+            m->slot_cards[slot].cx_rom_mapped = 1;
         }
     } else {
         // Everything else
@@ -196,6 +225,13 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
         case PADDL3:
         case PTRIG:
             return 255;
+        case CLRROM: {
+                for(int i = 1; i < 8; i++) {
+                    m->slot_cards[i].cx_rom_mapped = 0;
+                }
+                pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, 0x800 / PAGE_SIZE, &m->RAM_MAIN[0xC800]);
+            }
+            break;
         default:
             break;
         }
@@ -209,31 +245,40 @@ void apple2_softswitch_write_callback(APPLE2 *m, uint16_t address, uint8_t value
         // Ram card address
         ram_card(m, address, value);
         return;
-    } else if(address >= 0xc090 && address <= 0xc0FF) {
-        // Smartport
+    } else if(address >= 0xc080 && address <= 0xc0FF) {
         int slot = (address >> 4) & 0x7;
-        switch (address & 0x0F) {
-        case SP_DATA:
-            m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_write_offset++] = value;
-            return;
-        case SP_STATUS:
-            m->sp_device[slot].sp_read_offset = 0;
-            m->sp_device[slot].sp_write_offset = 0;
+        switch(m->slot_cards[slot].slot_type) {
+            case SLOT_TYPE_SMARTPORT:
+                switch (address & 0x0F) {
+                case SP_DATA:
+                    m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_write_offset++] = value;
+                    return;
+                case SP_STATUS:
+                    m->sp_device[slot].sp_read_offset = 0;
+                    m->sp_device[slot].sp_write_offset = 0;
 
-            switch (m->sp_device[slot].sp_buffer[0]) {
-            case 0:
-                sp_status(m, slot);
+                    switch (m->sp_device[slot].sp_buffer[0]) {
+                    case 0:
+                        sp_status(m, slot);
+                        break;
+                    case 1:
+                        sp_read(m, slot);
+                        break;
+                    case 2:
+                        sp_write(m, slot);
+                        break;
+                    }
+                    m->sp_device[slot].sp_status = 0x80;
+                    return;
+                }
                 break;
-            case 1:
-                sp_read(m, slot);
+
+            case SLOT_TYPE_VIDEX_API:
+                franklin_display_set(m, address, value);
                 break;
-            case 2:
-                sp_write(m, slot);
-                break;
-            }
-            m->sp_device[slot].sp_status = 0x80;
-            return;
         }
+    } else if(address >= 0xCC00 && address < 0xCE00) {
+        m->franklin_display.display_ram[(address & 0x01ff) + m->franklin_display.bank * 0x200] = value;
     }
     // Everything else
     m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE] = value;

@@ -39,7 +39,7 @@ void viewmisc_show(APPLE2 *m) {
             nk_layout_row_dynamic(ctx, 13, 1);
             nk_label(ctx, "Devices", NK_TEXT_LEFT);
             for(int i = 0; i < 8; i++) {
-                if(spd[i].sp_active) {
+                if(m->slot_cards[i].slot_type == SLOT_TYPE_SMARTPORT) {
                     for(int j = 0; j < 2; j++) {
                         nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 5);
                         nk_layout_row_push(ctx, 0.08f);
@@ -113,8 +113,7 @@ void viewmisc_show(APPLE2 *m) {
             }
             // nk_spacing(ctx, 1);
 
-            // Now a list of active breakpoints
-
+            // Now a list of breakpoints
             if(fm->breakpoints.items) {
                 // nk_layout_row_dynamic(ctx, 29*(fm->breakpoints.items + 1), 2);
                 nk_layout_row_begin(ctx, NK_DYNAMIC, 29 *(fm->breakpoints.items + 1), 2);
@@ -203,7 +202,7 @@ void viewmisc_show(APPLE2 *m) {
                 }
                 nk_layout_row_end(ctx);
                 if(v->dlg_breakpoint) {
-                    struct nk_rect r = nk_rect(10, 40, ctx->current->bounds.w - 40, 160);
+                    struct nk_rect r = nk_rect(10, 40, 568, 160);
                     int ret = viewdlg_breakpoint_edit(ctx, r, &v->viewmisc.breakpoint_edit);
                     if(ret >= 0) {
                         v->dlg_breakpoint = 0;

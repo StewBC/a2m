@@ -8,18 +8,26 @@ This configuration allows booting and running Total Replay or other ProDOS disk 
 ## Starting the emulator  
 All you need to start is the apple2 executable. An optional configuration file, apple2.ini, can be used to specify settings such as which slots contain a SmartPort interface and which disks are mounted as devices 0 & 1 on the interface. A boot parameter can also be set to boot the disk0 image. Here's an example .ini file:  
 ```
-; Use this file to configure the slots on the Apple ][+
-[display]
-scale = 1.5                 ; Uniformly scale the whole application window
+[Display]
+scale = 1.0                   ; Uniformly scale Application Window
 
-[smartport]
-slot = 7                    ; Assigns a slot to a SmartPort
-disk0 = ./disks/master.po   ; Path to a disk for device0 (called disk0 in here)
+[Video]
+slot = 3
+device = Franklin Ace Display ; 80 Column Videx like card
+
+[SmartPort]
+; configure the slots on the Apple ][
+slot = 7                      ; This says a slot contains a smartport
+disk0 = ./disks/NewDisk.po    ; Path to a disk in the device (called disk in here)
 disk1 = ./disks/Total Replay v5.2.hdv
-boot = yes                  ; Any non-zero value will boot disk0
+boot = 0                      ; any value other than 0 will cause a boot of disk0
 ```  
 Multiple slots can be assigned a SmartPort. If boot is enabled for multiple slots, the last enabled slot will be booted.  
 Note: Pathnames are not enclosed in quotation marks.  
+  
+The Franklin Ace Display can be put in any slot 1..7.  When software, such as Davex, uses the card, the display must be manually switched to that card uing F12 (or F12 + Shift).  ProDOS Basic only partially works with the card.  PR#0 will not deactivate the card fully, but booting ProDOS will properly deactivate the card.  
+  
+Note: No error checking is done around putting any 2 cards in one slot.  The last one listed will be the active card.  
   
 The emulator can also load symbol files.  It will look in a folder called symbols for the following files:  
 ```
@@ -57,7 +65,8 @@ F9 - Toggle breakpoint at PC
 F10 - Step (over)
 F11 - Step (into)
 F11 + SHIFT - Step (out)
-F12 - Toggle between Color and B&W display
+F12 - Toggle between Color / Mono and 40/80 Colum display based on screen mode
+F12 + SHIFT - Force toggle Color / Mono & 40 / 80 Column text display
 ```
   
 ## The window layout when debugger is visible  
@@ -152,12 +161,14 @@ apple2.c | Apple ][+ hardware config & softswitch implementation
 breakpnt.c | Breakpoints.  Currently it only breaks on PC and run to or step out
 dbgopcds.c | Arrays for disassembly printing of opcodes
 dynarray.c | Dynamic arrays
+frankdisp.c | Franklin Ace Display 80 Col card
 header.h | One header file to include all needed header files
 main.c | Define the Apple ][+ machine and view (Display) and main emulation loop
 nuklear.h | GUI - see header (Modified very slightly for text background coloring)
 nuklrsdl.h | SDL draw of Nuklear GUI - comes with nuklear.h
 ramcard.c | Language card
-roms.c | Apple ][+, Smartport & character ROMS.  Also Disk II (unused).
+roms.c | Apple ][+, Smartport & character ROMS.  Also Disk II (unused)
+slot.c | Tracks plug-in cards in slots and activates C800 ROM as needed
 sftswtch.h | Addresses where the emulator cares about soft switches
 smrtprt.c | SmarPort block device
 util.c | File and folder utilities, ini parser, etc.

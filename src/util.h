@@ -25,7 +25,7 @@ typedef struct UTIL_FILE {
 } UTIL_FILE;
 
 // Prototype callback function for ini file loading
-typedef void (*ini_pair_callback)(void *user_data, char *section, char *key, char *value);
+typedef void (*INI_PAIR_CALLBACK)(void *user_data, char *section, char *key, char *value);
 
 int util_add_debug_symbols(DEBUGGER *d, char *data, size_t data_length, int overwrite);
 
@@ -40,7 +40,7 @@ int util_file_open(UTIL_FILE *f, const char *file_name, const char *file_mode);
 char *util_ini_find_character(char **start, char character);
 char *util_ini_get_line(char **start, char *end);
 char *util_ini_next_token(char **start);
-int util_ini_load_file(char *filename, ini_pair_callback callback, void *user_data);
+int util_ini_load_file(char *filename, INI_PAIR_CALLBACK callback, void *user_data);
 
 char *util_strrtok(char *str, const char *delim);
 int util_qsort_cmp(const void *p1, const void *p2);

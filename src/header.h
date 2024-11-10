@@ -63,9 +63,11 @@ typedef struct DYNARRAY DYNARRAY;
 
 // Machine
 #include "6502.h"
+#include "frankdisp.h"
 #include "ramcard.h"
 #include "roms.h"
 #include "sftswtch.h"
+#include "slot.h"
 #include "smrtprt.h"
 
 // Debugger/Viewer

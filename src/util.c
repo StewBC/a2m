@@ -61,7 +61,6 @@ int util_add_debug_symbols(DEBUGGER *d, char *data, size_t data_length, int over
                 }
                 strncpy(sym->symbol_name, symbol_start, symbol_length);
                 sym->symbol_name[symbol_length] = '\0';
-                // printf("Adding bucket:%02X index:%d count:%zd %04X %s\n", address & 0xff, i, s->items, sym->pc, sym->symbol_name);
             }
         }
         // Find the end of the line
@@ -86,7 +85,6 @@ int util_dir_change(const char *path) {
         return A2_OK;
     }
 #endif
-    perror("change_directory");
     return A2_ERR;
 }
 
@@ -100,7 +98,6 @@ int util_dir_get_current(char *buffer, size_t buffer_size) {
         return A2_OK;
     }
 #endif
-    perror("get_current_directory");
     return A2_ERR;
 }
 
@@ -113,7 +110,6 @@ int util_dir_load_contents(DYNARRAY *array) {
 
     // Prepare string for use with FindFile functions. First, copy the current directory path
     if(_getcwd(dirSpec, PATH_MAX) == NULL) {
-        perror("_getcwd");
         return A2_ERR;
     }
     // Append the wildcard to search for all files
@@ -122,7 +118,6 @@ int util_dir_load_contents(DYNARRAY *array) {
     hFind = FindFirstFileA(dirSpec, &findFileData);
 
     if(hFind == INVALID_HANDLE_VALUE) {
-        perror("FindFirstFile");
         return A2_ERR;
     }
 
@@ -144,7 +139,6 @@ int util_dir_load_contents(DYNARRAY *array) {
     // Check for errors in FindNextFile
     DWORD dwError = GetLastError();
     if(dwError != ERROR_NO_MORE_FILES) {
-        perror("FindNextFile");
         return A2_ERR;
     }
 #else
@@ -154,7 +148,6 @@ int util_dir_load_contents(DYNARRAY *array) {
 
     dp = opendir(".");
     if(dp == NULL) {
-        perror("opendir");
         return A2_ERR;
     }
 
@@ -174,13 +167,6 @@ int util_dir_load_contents(DYNARRAY *array) {
     closedir(dp);
 #endif
     return A2_OK;
-}
-
-void util_dir_print_directory_contents(DYNARRAY *array) {
-    for(size_t i = 0; i < array->items; i++) {
-        FILE_INFO *file = ARRAY_GET(array, FILE_INFO, i);
-        printf("%s%s (%zu bytes)\n", file->name, file->is_directory ? "/" : "", file->size);
-    }
 }
 
 void util_file_close(UTIL_FILE *f) {
@@ -301,7 +287,7 @@ char *util_ini_next_token(char **start) {
     return *start;
 }
 
-int util_ini_load_file(char *filename, ini_pair_callback callback, void *user_data) {
+int util_ini_load_file(char *filename, INI_PAIR_CALLBACK callback, void *user_data) {
     UTIL_FILE ini_file;
     memset(&ini_file, 0, sizeof(UTIL_FILE));
     ini_file.load_padding = 1;

@@ -17,11 +17,12 @@
 #define HIRES           0xC057                              // Enable Hires graphics (Disable Lores)
 #define BUTN0           0xC061                              // Open-Apple key
 #define BUTN1           0xC062                              // Closed-Apple key
-#define PADDL0          0xC064
+#define PADDL0          0xC064                              // Paddel / Joystic related
 #define PADDL1          0xC065
 #define PADDL2          0xC066
 #define PADDL3          0xC067
 #define PTRIG           0xC070
+#define CLRROM          0xCFFF                              // Release C800 ROM
 // These values effectively are $C080 + $s0 + value, where s is the slot number
 #define SP_DATA         4                                   // SmartPort Data Transfer Port
 #define SP_STATUS       5                                   // SmartPort Status update port

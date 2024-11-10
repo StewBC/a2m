@@ -6,7 +6,6 @@
 
 // SmartPort Block Device
 typedef struct SP_DEVICE {
-    uint8_t sp_active;
     uint8_t sp_status;
     size_t sp_read_offset;
     size_t sp_write_offset;

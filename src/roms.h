@@ -16,6 +16,14 @@ extern const int apple_character_rom_size;
 extern uint8_t disk2_rom[];
 extern const int disk2_rom_size;
 
+// 80 Col auto soft switch display card ROM
+extern uint8_t franklin_ace_display_rom[];
+extern const int franklin_ace_display_rom_size;
+
+// Character ROM for 80 col franklin ace display
+extern uint8_t franklin_ace_character_rom[];
+extern const int franklin_ace_character_rom_size;
+
 // This rom contains code for all slots.  Map as needed only.
 extern uint8_t smartport_rom[];
 extern const int smartport_rom_size;

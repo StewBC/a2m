@@ -44,6 +44,7 @@ void viewapl2_screen_lores_mono(APPLE2 *m, int start, int end);
 void viewapl2_screen_hgr(APPLE2 *m, int start, int end);
 void viewapl2_screen_hgr_mono(APPLE2 *m, int start, int end);
 void viewapl2_screen_txt(APPLE2 *m, int start, int end);
+void viewapl2_screen_80col(APPLE2 *m, int start, int end);
 int viewapl2_speaker_init();
 void viewapl2_speaker_play(SPEAKER *speaker);
 void viewapl2_speaker_update(APPLE2 *m);

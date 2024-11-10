@@ -71,14 +71,25 @@ int viewport_init(VIEWPORT *v, int w, int h) {
         goto error;
     }
     // Create RGB surface
-    v->surface = SDL_CreateRGBSurface(0, 280, 192, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+    v->surface = SDL_CreateRGBSurface(0, 40*7, 24*8, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
     if(v->surface == NULL) {
         printf("Surface could not be created! SDL_Error: %s\n", SDL_GetError());
+        goto error;
+    }
+    v->surface640 = SDL_CreateRGBSurface(0, 80*8, 24*8, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+    if(v->surface640 == NULL) {
+        printf("Surface640 could not be created! SDL_Error: %s\n", SDL_GetError());
         goto error;
     }
     // Create texture for pixel rendering
     v->texture = SDL_CreateTextureFromSurface(v->renderer, v->surface);
     if(v->texture == NULL) {
+        printf("Texture could not be created! SDL_Error: %s\n", SDL_GetError());
+        goto error;
+    }
+    // Create texture for pixel rendering
+    v->texture640 = SDL_CreateTextureFromSurface(v->renderer, v->surface640);
+    if(v->texture640 == NULL) {
         printf("Texture could not be created! SDL_Error: %s\n", SDL_GetError());
         goto error;
     }
@@ -270,7 +281,9 @@ void viewport_show_help(APPLE2 *m) {
         nk_label(ctx, "F5  - Run (Go) when emulation is stopped.", NK_TEXT_ALIGN_LEFT);
         nk_label(ctx, "F11 + Shift - Step out - Step past RTS at this calling level.", NK_TEXT_ALIGN_LEFT);
         nk_label(ctx, "F6  - Set Program Counter (PC) to cursor PC.", NK_TEXT_ALIGN_LEFT);
-        nk_label(ctx, "F12 - Switch display between color and monochrome.", NK_TEXT_ALIGN_LEFT);
+        nk_label(ctx, "F12 - Switch between color/mono (graphics mode) or 40/80 cols (text mode).", NK_TEXT_ALIGN_LEFT);
+        nk_spacer(ctx);
+        nk_label(ctx, "F12 + Shift - Force switch color/mono and 40/80 col regardless of screen mode.", NK_TEXT_ALIGN_LEFT);
         nk_layout_row_dynamic(ctx, 13, 1);
         nk_label_colored(ctx, "While emulation is stopped:", NK_TEXT_ALIGN_LEFT, color_help_notice);
         nk_label(ctx, "If the debug view is visible (F2) keys go to the debug window over which the mouse is hovered.",
@@ -367,9 +380,14 @@ void viewport_toggle_debug(APPLE2 *m) {
 
 void viewport_update(APPLE2 *m) {
     // Comit changes to the texture
-    SDL_UpdateTexture(m->viewport->texture, NULL, m->viewport->surface->pixels, m->viewport->surface->pitch);
     // And updare renderer with the texture
-    SDL_RenderCopy(m->viewport->renderer, m->viewport->texture, NULL, &m->viewport->target_rect);
+    if(m->cols80active) {
+        SDL_UpdateTexture(m->viewport->texture640, NULL, m->viewport->surface640->pixels, m->viewport->surface640->pitch);
+        SDL_RenderCopy(m->viewport->renderer, m->viewport->texture640, NULL, &m->viewport->target_rect);
+    } else {
+        SDL_UpdateTexture(m->viewport->texture, NULL, m->viewport->surface->pixels, m->viewport->surface->pitch);
+        SDL_RenderCopy(m->viewport->renderer, m->viewport->texture, NULL, &m->viewport->target_rect);
+    }
     if(m->viewport->debug_view) {
         // In debug view, the A2 screen is maube small black on black so outline it
         SDL_SetRenderDrawColor(m->viewport->renderer, 255, 255, 255, 255);

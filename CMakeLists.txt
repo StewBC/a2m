@@ -17,13 +17,15 @@ add_executable(${PROJECT_NAME}
     src/apple2.c
     src/breakpnt.c
     src/dbgopcds.c
-    src/viewapl2.c
     src/dynarray.c
+    src/frankdisp.c
     src/main.c
     src/ramcard.c
     src/roms.c
+    src/slot.c
     src/smrtprt.c
     src/util.c
+    src/viewapl2.c
     src/viewcpu.c
     src/viewdbg.c
     src/viewdlg.c

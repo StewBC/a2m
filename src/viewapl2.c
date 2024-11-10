@@ -226,7 +226,11 @@ void viewapl2_screen_apple2(APPLE2 *m) {
         // case 0b010: // mixed text (also just text)
         // case 0b100: // hgr but not graphics, so text
         // case 0b110: // hgr, mixed but not graphics, so text
-        viewapl2_screen_txt(m, 0, 24);
+        if(m->cols80active) {
+            viewapl2_screen_80col(m, 0, 24);
+        } else {
+            viewapl2_screen_txt(m, 0, 24);
+        }
         break;
     }
 
@@ -249,7 +253,7 @@ void viewapl2_screen_lores(APPLE2 *m, int start, int end) {
     // Loop through each row
     for(y = start; y < end; y++) {
         // Get the pointer to the start of the row in the SDL surface
-        uint32_t *p = &pixels[y *8 *surface->w];
+        uint32_t *p = &pixels[y * 8 * surface->w];
         int address = page + txt_row_start[y];
 
         // Loop through every col (byte)
@@ -299,7 +303,7 @@ void viewapl2_screen_lores_mono(APPLE2 *m, int start, int end) {
     // Loop through each row
     for(y = start; y < end; y++) {
         // Get the pointer to the start of the row in the SDL surface
-        uint32_t *p = &pixels[y *8 *surface->w];
+        uint32_t *p = &pixels[y * 8 * surface->w];
         int address = page + txt_row_start[y];
 
         // Loop through every col (byte)
@@ -399,14 +403,12 @@ void viewapl2_screen_hgr_mono(APPLE2 *m, int start, int end) {
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
     int page = m->viewport->shadow_active_page ? 0x4000 : 0x2000;
-    uint32_t c[2];
-    c[0] = color_table[0][0][0];
-    c[1] = color_table[7][0][0];
+    uint32_t c[2] = {color_table[0][0][0], color_table[7][0][0]};
 
     // Loop through each row
     for(y = start; y < end; y++) {
         // Get the pointer to the start of the row in the SDL surface
-        uint32_t *p = &pixels[y *surface->w];
+        uint32_t *p = &pixels[y * surface->w];
         int address = page + hgr_row_start[y];
 
         // Loop through every bytes (40 iterations for each 280-pixel row)
@@ -437,14 +439,12 @@ void viewapl2_screen_txt(APPLE2 *m, int start, int end) {
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
     int page = m->viewport->shadow_active_page ? 0x0800 : 0x0400;
-    uint32_t c[2];
-    c[0] = color_table[0][0][0];
-    c[1] = color_table[7][0][0];
+    uint32_t c[2] = {color_table[0][0][0], color_table[7][0][0]};
 
     // Loop through each row
     for(y = start; y < end; y++) {
         // Get the pointer to the start of the row in the SDL surface
-        uint32_t *p = &pixels[y *8 *surface->w];
+        uint32_t *p = &pixels[y * 8 * surface->w];
         int address = page + txt_row_start[y];
 
         // Loop through every col (byte)
@@ -455,7 +455,7 @@ void viewapl2_screen_txt(APPLE2 *m, int start, int end) {
             // See if inverse
             uint8_t inv = (~character >> 7) & 1;
             // Get the font offset in the font blocks
-            uint8_t *character_font = &m->roms.blocks[ROM_CHARACTER].bytes[character *8];
+            uint8_t *character_font = &m->roms.blocks[ROM_CHARACTER].bytes[character * 8];
             // "Plot" the character to the SDL graphics screen
             uint32_t *pr = p;
             for(r = 0; r < 8; r++) {
@@ -473,6 +473,62 @@ void viewapl2_screen_txt(APPLE2 *m, int start, int end) {
             }
             p += 7;
         }
+    }
+}
+
+// Display the 80 col text screen
+void viewapl2_screen_80col(APPLE2 *m, int start, int end) {
+    int x, y;
+    FRANKLIN_DISPLAY *fd80 = &m->franklin_display;
+    SDL_Surface *surface = m->viewport->surface640;
+    uint32_t *pixels = (uint32_t *) surface->pixels;
+    // int page = m->viewport->shadow_active_page ? 0x0800 : 0x0400;
+    uint32_t c[2] = {color_table[0][0][0], color_table[7][0][0]};
+    uint16_t display_offset = 256*fd80->registers[0x0c]+fd80->registers[0x0d];
+
+    // Loop through each row
+    for(y = start; y < end; y++) {
+        // Get the pointer to the start of the row in the SDL surface
+        uint32_t *p = &pixels[y * 8 * surface->w];
+        int address = y * 80 + display_offset;
+
+        // Loop through every col (byte)
+        for(int x = 0; x < 80; x++) {
+            int r;
+            // Get the character on screen
+            int character = fd80->display_ram[(address + x) & 0x7ff];
+            // See if inverse
+            uint8_t inv = (character >> 7) & 1;
+            // Get the font offset in the font blocks
+            uint8_t *character_font = &m->roms.blocks[ROM_FRANKLIN_ACE_CHARACTER].bytes[character * 16];
+            // "Plot" the character to the SDL graphics screen
+            uint32_t *pr = p;
+            for(r = 0; r < 8; r++) {
+                uint8_t pixels = *character_font++;
+                for(int i = 7; i >= 0; i--) {
+                    pr[i] = c[inv ^ (pixels & 1)];
+                    pixels >>= 1;
+                }
+                pr += surface->w;
+            }
+            p += 8;
+        }
+    }
+    // Draw the cursor
+    uint16_t cursor_address = 256 * fd80->registers[FD80_CURSOR_HI] + fd80->registers[FD80_CURSOR_LO];
+    uint16_t delta = (cursor_address - display_offset) % 2048;
+    uint8_t cursor_x = delta % 80;
+    uint8_t cursor_y = delta / 80;
+    uint32_t *p = &pixels[cursor_x * 8 + cursor_y * 8 * surface->w];
+    int character = fd80->display_ram[cursor_address % 2048];
+    uint8_t *character_font = &m->roms.blocks[ROM_FRANKLIN_ACE_CHARACTER].bytes[character * 16];
+    for(int r = 0; r < 8; r++) {
+        uint8_t pixels = 0xFF ^ *character_font++;
+        for(int i = 7; i >= 0; i--) {
+            p[i] = c[pixels & 1];
+            pixels >>= 1;
+        }
+        p += surface->w;
     }
 }
 
@@ -504,14 +560,14 @@ void viewapl2_speaker_play(SPEAKER *speaker) {
     float sample_current = speaker->samples[SAMPLE_CURRENT];
     // Calculate a high pass and low pass filtered sample
     float high_pass_result = alpha *(output_previous + sample_current - sample_previous);
-    float filter_result = beta *high_pass_result + (1 - beta) *output_previous;
+    float filter_result = beta * high_pass_result + (1 - beta) * output_previous;
     // Save the current sample of next time
     speaker->samples[SAMPLE_PREVIOUS] = sample_current;
     // And make the filtered sample prev and also use as left and right for SDL
     speaker->samples[OUTPUT_PREVIOUS] = filter_result;
     speaker->samples[SAMPLE_CURRENT] = filter_result;
     // Queue the stero samples
-    SDL_QueueAudio(1, &speaker->samples[OUTPUT_PREVIOUS], 2 *sizeof(float));
+    SDL_QueueAudio(1, &speaker->samples[OUTPUT_PREVIOUS], 2 * sizeof(float));
     // Start a new sample
     speaker->samples[SAMPLE_CURRENT] = 0.0f;
 }
