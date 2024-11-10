@@ -8,7 +8,7 @@
 typedef struct RAM_CARD {
     uint8_t *RAM;
     int bank2_enable:1;
-    int read_enable:1;
+    int read_ram_enable:1;
     int pre_write:1;
     int write_enable:1;
 } RAM_CARD;

@@ -8,9 +8,9 @@ uint8_t ram_card(APPLE2 *m, uint16_t address, uint16_t value) {
     RAM_CARD *lc = &m->ram_card;
     lc->bank2_enable = (address & 0b1000) ? 0 : 1;
     if((address & 0b11) && (address & 0b11) != 3) {
-        lc->read_enable = 0;
+        lc->read_ram_enable = 0;
     } else {
-        lc->read_enable = 1;
+        lc->read_ram_enable = 1;
     }
 
     if(!(address & 1) || value < 0x100) {
@@ -28,7 +28,7 @@ uint8_t ram_card(APPLE2 *m, uint16_t address, uint16_t value) {
         lc->pre_write = 1;
     }
 
-    if(lc->read_enable) {
+    if(lc->read_ram_enable) {
         pages_map(&m->read_pages, 0xD000 / PAGE_SIZE, 0x1000 / PAGE_SIZE, &lc->RAM[lc->bank2_enable ? 0x1000 : 0x0000]);
         pages_map(&m->read_pages, 0xE000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &lc->RAM[0x2000]);
     } else {

@@ -16,11 +16,10 @@ slot = 3
 device = Franklin Ace Display ; 80 Column Videx like card
 
 [SmartPort]
-; configure the slots on the Apple ][
 slot = 7                      ; This says a slot contains a smartport
-disk0 = ./disks/NewDisk.po    ; Path to a disk in the device (called disk in here)
+disk0 = ./disks/ProDOS.po    ; Path to a disk in the device (called disk in here)
 disk1 = ./disks/Total Replay v5.2.hdv
-boot = 0                      ; any value other than 0 will cause a boot of disk0
+boot = 1                      ; any value other than 0 will cause a boot of disk0
 ```  
 Multiple slots can be assigned a SmartPort. If boot is enabled for multiple slots, the last enabled slot will be booted.  
 Note: Pathnames are not enclosed in quotation marks.  
@@ -143,7 +142,7 @@ HGR: Page 0 = $2000, Page 1 - $4000
 `Override No` restores the hardware view of the display.  
 These settings can only be altered when stopped, but stepping or running with `Override On` will keep the override settings.  
 ### Language Card  
-The Language Card section shows the state of the Language Card, whether ROM or RAM is active, which bank, and if writing to RAM is enabled.  
+The Language Card section shows the state of the Language Card, whether ROM or RAM is active, which bank, and if writing to RAM is enabled.  The Read ROM / RAM toggle can be set but the rest are read-only.
   
 ## Building from source  
 Currently, building instructions are limited. On Windows, install SDL2 and SDL_mixer and use VS Code with CMake plugins. On Linux (WSL), SDL2 and mixer were installed from source to access find_package scripts. VS Code was used with Clang. Mac support is untested.  

@@ -345,7 +345,7 @@ void viewport_show_help(APPLE2 *m) {
         nk_label_colored(ctx, "Miscellaneous Language Card", NK_TEXT_ALIGN_LEFT, color_help_key_heading);
         nk_layout_row_dynamic(ctx, 14, 1);
         nk_label_wrap(ctx,
-                      "Shows the status of the language card soft-switches.  This is read-only information.");
+                      "Shows the status of the language card soft-switches.  Apart from Read ROM / RAM, this is read-only information.");
         nk_label_colored(ctx, "Configuration", NK_TEXT_ALIGN_LEFT, color_help_notice);
         nk_layout_row_dynamic(ctx, 40, 1);
         nk_label_wrap(ctx,
