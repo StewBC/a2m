@@ -41,7 +41,7 @@ typedef void (*CALLBACK_WRITE)(APPLE2 *m, uint16_t address, uint8_t value);
 typedef void (*CALLBACK_BREAKP)(APPLE2 *m, uint16_t address);
 
 // The emulated apple2 (computer)
-struct APPLE2 {
+typedef struct APPLE2 {
     // Hardware
     CPU cpu;                                                // 6502
     PAGES read_pages;                                       // Up to 64K of bytes currently visible to CPU when reading
@@ -82,8 +82,7 @@ struct APPLE2 {
 
     // Additiona Info
     VIEWPORT *viewport;                                     // 0 (no view) or active view for this instance
-};
-typedef struct APPLE2 APPLE2;
+} APPLE2;
 
 int apple2_configure(APPLE2 *m);
 void apple2_ini_load_callback(void *user_data, char *section, char *key, char *value);
