@@ -89,7 +89,7 @@ int viewdbg_disassemble_line(APPLE2 *m, uint16_t pc, CODE_LINE *line) {
                 symbol = viewdbg_find_symbols(d, pc + 2 + (int8_t) address);
                 // If no symbol but symbol view is on - resolve to an address and pretend that's the symbol
                 if(!symbol) {
-                    sprintf(address_symbol, "$%02X [%04X]", (uint8_t) address, (uint16_t) (pc + 2 + address));
+                    sprintf(address_symbol, "$%02X [%04X]", (uint8_t) address, (uint16_t) (pc + 2 + (int8_t) address));
                     symbol = address_symbol;
                 }
             }
