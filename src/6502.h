@@ -73,7 +73,7 @@ typedef struct CPU {
 } CPU;
 
 // Forward declarations
-struct APPLE2;
+typedef struct APPLE2 APPLE2;
 
 // Function pointer prototype that point at the steps, each individual cycle, of a 6502 instruction
 typedef void (*OPCODE_STEPS)(APPLE2 *m);

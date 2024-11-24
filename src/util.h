@@ -17,7 +17,7 @@ typedef struct UTIL_FILE {
     char *file_path;                                        // Full path of the file
     char *file_mode;                                        // How it was opened, example "rb+"
     char *file_data;                                        // Buffer with the contents of the file if it was loaded
-    off_t file_size;                                        // File's size
+    int64_t file_size;                                        // File's size
     size_t load_padding;                                    // When alloc'ing a buffer to load the file, add this to size
     uint8_t is_used:1;
     uint8_t is_file_open:1;
@@ -26,8 +26,6 @@ typedef struct UTIL_FILE {
 
 // Prototype callback function for ini file loading
 typedef void (*INI_PAIR_CALLBACK)(void *user_data, char *section, char *key, char *value);
-
-int util_add_debug_symbols(DEBUGGER *d, char *data, size_t data_length, int overwrite);
 
 int util_dir_change(const char *path);
 int util_dir_get_current(char *buffer, size_t buffer_size);

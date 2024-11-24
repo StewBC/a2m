@@ -24,6 +24,77 @@ enum {
     SYMBOL_VIEW_NONE,
 };
 
+int viewdbg_add_symbols(DEBUGGER *d, char *data, size_t data_length, int overwrite) {
+    int state = 0;
+    char *end = data + data_length;
+    while(data < end) {
+        unsigned int value;
+        int parsed;
+        // Search for a hex string at the start of a line
+        if(1 == sscanf(data, "%x%n", &value, &parsed)) {
+            uint16_t address = value;
+            DYNARRAY *s = &d->symbols[address & 0xff];
+
+            data += parsed;
+            char *symbol_start = data + strspn(data, " \t");
+            char *symbol_end = strpbrk(symbol_start, " \t\n\r");
+            if(!symbol_end) {
+                symbol_end = end;
+            }
+            int symbol_length = symbol_end - symbol_start;
+            data = symbol_end;
+
+            // Find where to insert the symbol
+            // Item actions are: 0 - No action, 1 - Add and set item, 2 - Just set item
+            int i, item_action = 1, items = s->items;
+            for(i = 0; i < items; i++) {
+                // Sort the address, low to high, into the array ("bucket)"
+                SYMBOL *sym = ARRAY_GET(s, SYMBOL, i);
+                if(address <= sym->pc) {
+                    // If the address already has a name, maybe skip it
+                    item_action = 2;
+                    if(address == sym->pc) {
+                        if(overwrite) {
+                            free(sym->symbol_name);
+                        } else {
+                            item_action = 0;
+                        }
+                    } else {
+                        array_copy_items(s, i, items, i + 1);
+                    }
+                    break;
+                }
+            }
+            // Insert the symbol into the array if the address isn't already named
+            if(item_action) {
+                if(1 == item_action) {
+                    // Append this symbol to the end
+                    if(A2_OK != array_add(s, NULL)) {
+                        return A2_ERR;
+                    }
+                }
+                SYMBOL *sym = ARRAY_GET(s, SYMBOL, i);
+                sym->pc = address;
+                sym->symbol_name = (char *)malloc(symbol_length + 1);
+                if(!sym->symbol_name) {
+                    return A2_ERR;
+                }
+                strncpy(sym->symbol_name, symbol_start, symbol_length);
+                sym->symbol_name[symbol_length] = '\0';
+            }
+        }
+        // Find the end of the line
+        while(data < end && *data && !(*data == '\n' || *data == '\r')) {
+            data++;
+        }
+        // Skip past the end of the line
+        while(data < end && *data && (*data == '\n' || *data == '\r')) {
+            data++;
+        }
+    }
+    return A2_OK;
+}
+
 void viewdbg_build_code_lines(APPLE2 *m, uint16_t pc, int lines_needed) {
     DEBUGGER *d = &m->viewport->debugger;
     int line = lines_needed / 2;
@@ -191,13 +262,13 @@ int viewdbg_init(DEBUGGER *d, int num_lines) {
 
     // Load the symbol files if they are found
     if(A2_OK == util_file_load(&fl, "symbols/A2_BASIC.SYM", "r")) {
-        util_add_debug_symbols(d, fl.file_data, fl.file_size, 0);
+        viewdbg_add_symbols(d, fl.file_data, fl.file_size, 0);
     }
     if(A2_OK == util_file_load(&fl, "symbols/APPLE2E.SYM", "r")) {
-        util_add_debug_symbols(d, fl.file_data, fl.file_size, 0);
+        viewdbg_add_symbols(d, fl.file_data, fl.file_size, 0);
     }
     if(A2_OK == util_file_load(&fl, "symbols/USER.SYM", "r")) {
-        util_add_debug_symbols(d, fl.file_data, fl.file_size, 1);
+        viewdbg_add_symbols(d, fl.file_data, fl.file_size, 1);
     }
 
     // Init the breakpoint structures

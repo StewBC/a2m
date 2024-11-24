@@ -12,10 +12,6 @@
 typedef struct SYMBOL {
     uint16_t pc;
     char *symbol_name;
-    // int8_t      is_cpu_pc:1;
-    // int8_t      is_breakpoint:1;
-    // int8_t      is_cursor:1;
-    // int8_t      is_run_to:1;
 } SYMBOL;
 
 typedef struct CODE_LINE {
@@ -37,6 +33,7 @@ typedef struct DEBUGGER {
     FLOWMANAGER flowmanager;
 } DEBUGGER;
 
+int viewdbg_add_symbols(DEBUGGER *d, char *data, size_t data_length, int overwrite);
 void viewdbg_build_code_lines(APPLE2 *m, uint16_t pc, int lines_needed);
 int viewdbg_disassemble_line(APPLE2 *m, uint16_t pc, CODE_LINE *line);
 char *viewdbg_find_symbols(DEBUGGER *d, uint32_t address);
