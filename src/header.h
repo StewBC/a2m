@@ -4,6 +4,7 @@
 
 // Standard Includes
 #include <assert.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -84,3 +85,8 @@ typedef struct DYNARRAY DYNARRAY;
 
 // It all comes together
 #include "apple2.h"
+
+#include "asm6502.h"
+#include "asmexpr.h"
+#include "asmgperf.h"
+#include "errorlog.h"

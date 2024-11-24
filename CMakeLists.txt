@@ -15,9 +15,17 @@ find_package(SDL2_mixer CONFIG REQUIRED)
 add_executable(${PROJECT_NAME}
     src/6502.c
     src/apple2.c
+    src/asm6502.c
+    src/asm6502.h
+    src/asmexpr.c
+    src/asmexpr.h
+    src/asmgperf.c
+    src/asmgperf.h
     src/breakpnt.c
     src/dbgopcds.c
     src/dynarray.c
+    src/errorlog.c
+    src/errorlog.h
     src/frankdisp.c
     src/main.c
     src/ramcard.c
