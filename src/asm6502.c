@@ -349,13 +349,13 @@ int symbol_sort(const void* lhs, const void* rhs) {
    return (uint16_t)(((SYMBOL_LABEL*)lhs)->symbol_value) - (uint16_t)(((SYMBOL_LABEL*)rhs)->symbol_value);
 }
 
-int symbol_store(const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TYPE symbol_type, uint64_t value) {
+SYMBOL_LABEL *symbol_store(const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TYPE symbol_type, uint64_t value) {
     uint32_t name_hash = fnv_1a_hash(symbol_name, symbol_name_length);
     SYMBOL_LABEL *sl = symbol_lookup(name_hash, symbol_name, symbol_name_length);
     if(sl) {
         if(sl->symbol_type == SYMBOL_UNKNOWN) {
             // Forward referenced variables are assigned a type and value when resolved
-            // The width is left unchanged (16 bit was assumed).  The width can't change 
+            // The width is left unchanged (16 bit was assumed).  The width can't change
             // between pass 1 & 2 or all other labels will be off, or need to be adjusted
             sl->symbol_type = symbol_type;
             sl->symbol_value = value;
@@ -374,18 +374,19 @@ int symbol_store(const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TY
         }
     } else {
         // Create a new entry for a previously unknown symbol
-        SYMBOL_LABEL sl;
-        sl.symbol_type = symbol_type;
-        sl.symbol_hash = name_hash;
-        sl.symbol_length = symbol_name_length;
-        sl.symbol_name = symbol_name;
-        sl.symbol_value = value;
-        sl.symbol_width = (value <= UINT8_MAX) ? 8 : (value <= UINT16_MAX) ? 16 : (value <= UINT32_MAX) ? 32 : 64;
+        SYMBOL_LABEL new_sl;
+        new_sl.symbol_type = symbol_type;
+        new_sl.symbol_hash = name_hash;
+        new_sl.symbol_length = symbol_name_length;
+        new_sl.symbol_name = symbol_name;
+        new_sl.symbol_value = value;
+        new_sl.symbol_width = (value <= UINT8_MAX) ? 8 : (value <= UINT16_MAX) ? 16 : (value <= UINT32_MAX) ? 32 : 64;
         uint8_t bucket = name_hash & 0xff;
         DYNARRAY *bucket_array = ARRAY_GET(&as->symbol_table, DYNARRAY, bucket);
-        ARRAY_ADD(bucket_array, sl);
+        ARRAY_ADD(bucket_array, &new_sl);
+        sl = ARRAY_GET(bucket_array, SYMBOL_LABEL, bucket_array->items - 1);
     }
-    return 1;
+    return sl;
 }
 
 SYMBOL_LABEL *symbol_lookup(uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length) {
@@ -590,16 +591,60 @@ int is_valid_instruction_only() {
 }
 
 //----------------------------------------------------------------------------
-void process_dot_org() {
-    uint64_t value = evaluate_expression();
-    if(as->current_address > value) {
-        errlog("Assigning address %04X when address is already %04X error", value, as->current_address);
-    } else {
-        as->current_address = value;
-        if(value < as->start_address) {
-            as->start_address = value;
+void parse_dot_endfor() {
+    if(as->loop_stack.items) {
+        const char *post_loop = as->input;
+        FOR_LOOP *for_loop = ARRAY_GET(&as->loop_stack, FOR_LOOP, as->loop_stack.items-1);
+        int same_file = stricmp(for_loop->loop_start_file, as->current_file) == 0;
+        as->token_start = as->input = for_loop->loop_adjust_start;
+        evaluate_expression();
+        as->token_start = as->input = for_loop->loop_condition_start;
+        if(same_file && evaluate_expression()) {
+            as->token_start = as->input = for_loop->loop_body_start;
+            as->current_line = for_loop->body_line;
+        } else {
+            // Pop the for loop from the stack
+            as->loop_stack.items--;
+            as->token_start = as->input = post_loop;
+            if(!same_file) {
+                errlog(".endfor matches .for in file %s, body at line %zd", for_loop->loop_start_file, for_loop->body_line);
+            }
+            as->current_line--;
         }
+    } else {
+        errlog(".endfor without a matching .for");
     }
+}
+
+void parse_dot_for() {
+    FOR_LOOP for_loop;
+    evaluate_expression(); // assignment
+    for_loop.loop_condition_start = as->input;
+    for_loop.loop_start_file = as->current_file;
+    // evaluate the condition
+    if(!evaluate_expression()) {
+        // failed so find .endfor (must be in same file)
+        do {
+            get_token();
+        } while(*as->input && (as->token_start == as->input || strnicmp(".endfor", as->token_start, 7)));
+        if(!*as->input) {
+            errlog(".for without .endfor");
+        } else {
+            // skip past .endfor
+            next_token();
+        }
+    } else {
+        // condition success
+        for_loop.loop_adjust_start = as->input;
+        // skip past the adjust condition
+        do {
+            get_token();
+        } while(*as->input && as->token_start != as->input);
+        // to find the loop body
+        for_loop.loop_body_start = as->input;
+        for_loop.body_line = as->current_line + as->next_line_count;
+    }
+    ARRAY_ADD(&as->loop_stack, for_loop);
 }
 
 void process_dot_include() {
@@ -612,6 +657,18 @@ void process_dot_include() {
         strncpy(file_name, as->token_start + 1, string_length);
         file_name[string_length] = '\0';
         include_files_push(file_name);
+    }
+}
+
+void process_dot_org() {
+    uint64_t value = evaluate_expression();
+    if(as->current_address > value) {
+        errlog("Assigning address %04X when address is already %04X error", value, as->current_address);
+    } else {
+        as->current_address = value;
+        if(value < as->start_address) {
+            as->start_address = value;
+        }
     }
 }
 
@@ -729,7 +786,7 @@ void process_dot_string() {
                             }
                             i++;
                         }
-                        // This is a sad hack to use evaluate_ to 
+                        // This is a sad hack to use evaluate_ to
                         // process the strcode expression with _'s
                         // filled in by the character from the string
                         const char *ts = as->token_start;
@@ -820,78 +877,51 @@ uint16_t parse_anonymous_address() {
 
 void parse_dot_command() {
     switch(as->opcode_info.opcode_id) {
-        case GPERF_DOT_ALIGN:   // .align
-                uint64_t value = evaluate_expression();
-                as->current_address = (as->current_address + (value - 1)) & ~(value - 1);
+        case GPERF_DOT_ALIGN:
+            uint64_t value = evaluate_expression();
+            as->current_address = (as->current_address + (value - 1)) & ~(value - 1);
             break;
-        case GPERF_DOT_BYTE:    // .byte
+        case GPERF_DOT_BYTE:
             write_values(8, BYTE_ORDER_LO);
             break;
-        case GPERF_DOT_DROW:    // .drow
+        case GPERF_DOT_DROW:
             write_values(16, BYTE_ORDER_HI);
             break;
-        case GPERF_DOT_DROWD:    // .drowd
+        case GPERF_DOT_DROWD:
             write_values(32, BYTE_ORDER_HI);
             break;
-        case GPERF_DOT_DROWQ:    // .drowq
+        case GPERF_DOT_DROWQ:
             write_values(64, BYTE_ORDER_HI);
             break;
-        case GPERF_DOT_DWORD:    // .dword
+        case GPERF_DOT_DWORD:
             write_values(32, BYTE_ORDER_LO);
             break;
-        case GPERF_DOT_ENDFOR:    // .endfor
-            if(as->loop_stack.items) {
-                FOR_LOOP *for_loop = ARRAY_GET(&as->loop_stack, FOR_LOOP, as->loop_stack.items-1);
-            } else {
-                errlog(".endfor without a matching .for");
-            }
+        case GPERF_DOT_ENDFOR:
+            parse_dot_endfor();
             break;
-        case GPERF_DOT_FOR:    // .for
-            {
-                // FOR_LOOP for_loop;
-                // const char *variable_name = as->token_start;
-                // if(find_delimiter(" ="))
-                // {
-                //     uint32_t name_length = as->token_start - variable_name;
-                //     if(name_length) {
-                //         skip_input_whitespace(0)
-                //         for_loop.loop_counter = evaluate_expression();
-                //         for_loop.loop_condition_start = as->token_start;
-                //         for_loop.loop_condition_end = as->input;
-                //         expect(',');
-                //         for_loop.loop_adjust_start = as->token_start;
-                //         for_loop.loop_adjust_end = as->input;
-                //         ARRAY_ADD(&as->loop_stack, for_loop);
-                //     } else {
-                //         errlog("FOR variable name missing");
-                //         as->token_start = as->input;
-                //     }
-                // } else {
-                //     errlog("FOR format: for var = initial, condition, adjust.")
-                //     as->token_start = as->input;
-                // }
-            }
+        case GPERF_DOT_FOR:
+            parse_dot_for();
             break;
-        case GPERF_DOT_INCLUDE:    // .include
+        case GPERF_DOT_INCLUDE:
             process_dot_include();
             break;
-        case GPERF_DOT_ORG:    // .org
+        case GPERF_DOT_ORG:
             process_dot_org();
             break;
-        case GPERF_DOT_OUTPUT:    // .output
+        case GPERF_DOT_OUTPUT:
             break;
-        case GPERF_DOT_QWORD:    // .qword
+        case GPERF_DOT_QWORD:
             write_values(64, BYTE_ORDER_LO);
             break;
-        case GPERF_DOT_SAVEAS:    // .saveas
+        case GPERF_DOT_SAVEAS:
             break;
-        case GPERF_DOT_STRCODE:    // .strcode
+        case GPERF_DOT_STRCODE:
             process_dot_strcode();
             break;
-        case GPERF_DOT_STRING:    // .string
+        case GPERF_DOT_STRING:
             process_dot_string();
             break;
-        case GPERF_DOT_WORD:    // .word
+        case GPERF_DOT_WORD:
             write_values(16, BYTE_ORDER_LO);
             break;
     }

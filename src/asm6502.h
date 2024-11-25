@@ -152,12 +152,10 @@ typedef struct INCLUDE_FILES {
 
 typedef struct FOR_LOOP {                   // For init, condition, adjust
     const char *loop_condition_start;       // Points at condition
-    const char *loop_condition_end;
     const char *loop_adjust_start;          // Points at loop counter adjust expression
-    const char *loop_adjust_end;
-    const char *loop_start;                 // Points at text to excute in loop
-    int64_t loop_counter;                   // Value of loop counter from init throug hiteration
-    size_t parent_line;
+    const char *loop_body_start;            // Points at text to excute in loop
+    const char *loop_start_file;            // .for and .endfor must be in same file
+    size_t body_line;                       // Line nuber where body loop starts
 } FOR_LOOP;
 
 typedef struct {
@@ -198,7 +196,7 @@ void write_bytes(uint64_t value, int width, int order);
 void write_values(int width, int order);
 int anonymous_symbol_lookup(uint16_t *address, int direction);
 int symbol_sort(const void* lhs, const void* rhs);
-int symbol_store(const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TYPE symbol_type, uint64_t value);
+SYMBOL_LABEL *symbol_store(const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TYPE symbol_type, uint64_t value);
 SYMBOL_LABEL *symbol_lookup(uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length);
 char character_in_characters(const char character, const char *characters);
 void expect(char op);
@@ -213,8 +211,10 @@ int is_newline(char c);
 int is_opcode();
 int is_variable();
 int is_valid_instruction_only();
-void process_dot_org();
+void parse_dot_endfor();
+void parse_dot_for();
 void process_dot_include();
+void process_dot_org();
 void process_dot_strcode();
 void process_dot_string();
 void parse_address();

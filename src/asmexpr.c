@@ -143,24 +143,34 @@ void next_token() {
             as->current_token.type = TOKEN_OP;
             as->current_token.op = '|'; // Binary Or
         }
-    } else if(*as->token_start == '.') {  // .lt, .le, .gt & .ge
+    } else if(*as->token_start == '.') {  // .lt, .le, .gt, .ge, .ne & .eq
         as->token_start++;
-        if(tolower(*as->token_start) == 'l') {
-            as->current_token.type = TOKEN_OP;
-            as->current_token.op = 'L';  // .lt as 'L'ess than
-            as->token_start++;
-        } else if(tolower(*as->token_start) == 'g') {
-            as->current_token.type = TOKEN_OP;
-            as->current_token.op = 'G';  // .gt as 'G'reater than
-            as->token_start++;
-        } else {
-            errlog(". must be followed by l or e for .lt, .le, .gt or .ge");
-        }
-        if(tolower(*as->token_start) == 'e') {
-            as->current_token.op = tolower(as->current_token.op); // .le | .ge as lowercase L|E (l|e)
-            as->token_start++;
-        } else if(tolower(*as->token_start) != 't') {
-            errlog("Expected .lt, .le, .gt or .ge");
+        char first = toupper(*as->token_start);
+        as->current_token.type = TOKEN_OP;
+        as->current_token.op = first;
+        as->token_start++;
+        char second = toupper(*as->token_start);
+        switch(first) {
+            case 'L':
+            case 'G':
+                if(second == 'E') {
+                    as->current_token.op = tolower(first);
+                } else if(second != 'T') {
+                    errlog("Expected .%cT or %cE", first, first);
+                }
+                break;
+            case 'E':
+                if(second != 'Q') {
+                    errlog("Expected .EQ");
+                }
+                break;
+            case 'N':
+                if(second != 'E') {
+                    errlog("Expected .NE");
+                }
+                break;
+            default:
+                errlog("Expected .LT, .LE, .GT, .GE, .EQ or .NE");
         }
     } else if(isdigit(*as->token_start)) {
         as->current_token.type = TOKEN_NUM; // Decimal Number
@@ -224,7 +234,7 @@ int64_t parse_primary() {
             // In pass 1 tokens not found have placeholders (SYMBOL_UNKNOWN) created
             // These are assumed 16-bit and can't change to 8-bit later
             value = 0xFFFF;
-            symbol_store(as->current_token.name, as->current_token.name_length, SYMBOL_UNKNOWN, value);
+            sl = symbol_store(as->current_token.name, as->current_token.name_length, SYMBOL_UNKNOWN, value);
             as->expression_size = 16;
         } else {
             value = sl->symbol_value;
@@ -235,6 +245,15 @@ int64_t parse_primary() {
             }
         }
         next_token();
+        if(as->current_token.type == TOKEN_OP && as->current_token.op == '=') {
+            next_token();
+            if(sl->symbol_type != SYMBOL_ADDRESS) {
+                sl->symbol_value = parse_expression();
+                sl->symbol_type = SYMBOL_VARIABLE;
+            } else {
+                errlog("Cannot assign value to label %.*s", sl->symbol_length, sl->symbol_name);
+            }
+        }
     } else if(as->current_token.type == TOKEN_OP && as->current_token.op == '(') {
         next_token();
         value = parse_expression();
@@ -359,22 +378,30 @@ int64_t parse_bitwise_or() {
 
 int64_t parse_relational() {
     int64_t value = parse_bitwise_or();
-    while(as->current_token.type == TOKEN_OP &&
-        (toupper(as->current_token.op) == 'L' || toupper(as->current_token.op) == 'G' ||
-        as->current_token.op == '=')) {
+    char op = toupper(as->current_token.op);
+    while(as->current_token.type == TOKEN_OP && (op == 'L' || op == 'G' || op == 'E' || op == 'N')) {
         char op = as->current_token.op;
         next_token();
         int64_t right = parse_bitwise_or();
-        if(op == 'l') {
-            value = value <= right;
-        } else if(op == 'g') {
-            value = value >= right;
-        } else if(op == 'L') {
-            value = value < right;
-        } else if(op == 'G') {
-            value = value > right;
-        } else {
-            value = value == right;
+        switch(op) {
+            case 'l':
+                value = value <= right;
+                break;
+            case 'g':
+                value = value >= right;
+                break;
+            case 'L':
+                value = value < right;
+                break;
+            case 'G':
+                value = value > right;
+                break;
+            case 'N':
+                value = value != right;
+                break;
+            case 'E':
+                value = value == right;
+                break;
         }
     }
     return value;
