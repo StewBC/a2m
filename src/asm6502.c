@@ -674,77 +674,25 @@ void process_dot_org() {
 }
 
 void process_dot_strcode() {
+    // Encoding doesn't matter till 2nd pass
     if(as->pass == 2) {
-        int insertions = 0;
-        int count_x = 0;
-        // Clear out any previous code
-        free(as->strcode);
-        as->strcode = 0;
-        free(as->strcode_work);
-        as->strcode_work = 0;
-        get_token();
-        const char *c = as->token_start;
-        // Count the _'s
-        while(!character_in_characters(as->current_token.op, ";\n\r")) {
-            while(as->token_start < as->input) {
-                if(*as->token_start == '_') {
-                    insertions++;
-                    while(as->token_start < as->input && *as->token_start == '_') {
-                        count_x++;
-                        as->token_start++;
-                    }
-                }
-                as->token_start++;
-            }
-            get_token();
-        }
-        if(!insertions) {
-            // An strcode with no replacements is meaningless
-            errlog(".strcode requires an _ for character replacement");
-        }
-        // The string length - extra _'s + space for 3 _'s per replacement + '\0'
-        int strcode_len = as->input - c - count_x + 3 * insertions + 1;
-        // A value of 4 with one _ means no transform, so leave as->strcode as null
-        if(!(insertions == 1 && strcode_len == 4)) {
-            as->strcode = (char*)malloc(strcode_len);
-            if(!as->strcode) {
-                errlog("Out of memory");
-            }
-            // Now copy the expression, but expanding _ to ___
-            char *d = as->strcode;
-            insertions = 0;
-            while(c < as->input) {
-                *d++ = *c;
-                if(*c == '_') {
-                    c++;
-                    while(c < as->input && *c == '_') {
-                        c++;
-                    }
-                    // Add 2 more x's to the code (total 3 for number up to 255 ie 3 digits)
-                    *d++ = '_';
-                    *d++ = '_';
-                } else {
-                    c++;
-                }
-            }
-            // Terminate with a null
-            *d = '\0';
-            // Make a work string (as->strcode is the template)
-            as->strcode_work = strdup(as->strcode);
-            if(!as->strcode_work) {
-                errlog("Out of memory");
-            }
-        }
-    } else {
-        get_token();
-        while(!character_in_characters(as->current_token.op, ";\n\r")) {
-            get_token();
-        }
+        get_token();    // skip past .strcode
+        // Mark the expression start
+        as->strcode = as->token_start;
     }
+    // Find the end of the .strcode expression
+    do {
+        next_token();
+    } while(as->current_token.type != TOKEN_END);
 }
 
 void process_dot_string() {
     uint64_t value;
+    SYMBOL_LABEL *sl;
+    if(as->strcode) {
+        // Add the _ variable if it doesn't yet exist and get a handle to the storage
+        sl = symbol_store("_", 1, SYMBOL_VARIABLE, 0);
+    }
     do {
         // Get to a token to process
         next_token();
@@ -774,29 +722,21 @@ void process_dot_string() {
                     }
                     emit(value);
                 } else {
-                    // Regular characters go through the strcode process
+                    // Regular characters can go through the strcode process
                     int character = *as->token_start;
-                    if(as->strcode_work) {
-                        int i = 0;
-                        while(as->strcode[i]) {
-                            if(as->strcode[i] == '_') {
-                                char temp[4];
-                                sprintf(temp ,"%3d", character);
-                                memcpy(&as->strcode_work[i], temp, 3);
-                                i += 2;
-                            }
-                            i++;
-                        }
-                        // This is a sad hack to use evaluate_ to
-                        // process the strcode expression with _'s
-                        // filled in by the character from the string
+
+                    if(as->strcode) {
+                        // Set the variable with the value of the string character
+                        sl->symbol_value = character;
                         const char *ts = as->token_start;
                         const char *in = as->input;
-                        as->input = as->token_start = as->strcode_work;
+                        as->input = as->token_start = as->strcode;
+                        // Evaluate the expression
                         character = evaluate_expression();
                         as->token_start = ts;
                         as->input = in;
                     }
+                    // Write the resultant character out
                     emit(character);
                     as->token_start++;
                 }
@@ -1045,7 +985,4 @@ void assembler_shutdown() {
         array_free(ARRAY_GET(&as->symbol_table, DYNARRAY, i));
     }
     array_free(&as->symbol_table);
-    free(as->strcode_work);
-    free(as->strcode);
 }
-

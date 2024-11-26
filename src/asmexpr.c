@@ -415,8 +415,11 @@ int64_t parse_bitwise_or() {
 
 int64_t parse_relational() {
     int64_t value = parse_bitwise_or();
-    char op = toupper(as->current_token.op);
-    while(as->current_token.type == TOKEN_OP && (op == 'L' || op == 'G' || op == 'E' || op == 'N')) {
+    while(as->current_token.type == TOKEN_OP && 
+        (toupper(as->current_token.op) == 'L' || 
+        toupper(as->current_token.op) == 'G' || 
+        toupper(as->current_token.op) == 'E' || 
+        toupper(as->current_token.op) == 'N')) {
         char op = as->current_token.op;
         next_token();
         int64_t right = parse_bitwise_or();

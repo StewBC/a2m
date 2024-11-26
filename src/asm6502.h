@@ -161,8 +161,7 @@ typedef struct FOR_LOOP {                   // For init, condition, adjust
 
 typedef struct {
     APPLE2 *m;                      // To be able to write to memory
-    char *strcode_work;             // .strcode expression work buffer
-    char *strcode;                  // .strcode expression template buffer
+    const char *strcode;            // Active .strcode expression
     const char *current_file;       // Points at a UTIL_FILE path_name
     const char *input;              // Points at the assembly language buffer (start through end)
     const char *line_start;         // Just past \n of line input is on
