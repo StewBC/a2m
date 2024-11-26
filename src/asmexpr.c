@@ -232,28 +232,61 @@ int64_t parse_primary() {
                 errlog("Value for %.*s not found", as->current_token.name_length, as->current_token.name);
             }
             // In pass 1 tokens not found have placeholders (SYMBOL_UNKNOWN) created
-            // These are assumed 16-bit and can't change to 8-bit later
             value = 0xFFFF;
             sl = symbol_store(as->current_token.name, as->current_token.name_length, SYMBOL_UNKNOWN, value);
-            as->expression_size = 16;
         } else {
             value = sl->symbol_value;
-            // Make the width that of the largest variable
-            // None of this is great
-            if(sl->symbol_width > as->expression_size) {
-                as->expression_size = sl->symbol_width;
-            }
         }
+
         next_token();
-        if(as->current_token.type == TOKEN_OP && as->current_token.op == '=') {
-            next_token();
-            if(sl->symbol_type != SYMBOL_ADDRESS) {
-                sl->symbol_value = parse_expression();
-                sl->symbol_type = SYMBOL_VARIABLE;
-            } else {
+        if(as->current_token.type == TOKEN_OP) {
+            char op = as->current_token.op;
+            if(op == '=') {
+                next_token();
+                if(sl->symbol_type != SYMBOL_ADDRESS) {
+                    sl->symbol_value = parse_expression();
+                    sl->symbol_type = SYMBOL_VARIABLE;
+                    // if it was used unknown or is assigned from an unknown it becomes 2 byte
+                    sl->symbol_width |= as->expression_size;
+                } else {
+                    op = 0;
+                }
+            } else if(op == '+' || op == '-') {
+                if(op == *as->token_start) {
+                    next_token();
+                    next_token();
+                    // SQW At this point I can know, in pass 1, that an uninitialised variable
+                    // is going to get used with ++ or -- but sinced pass 1 errors are
+                    // ignored, I can't log it :(
+                    if(sl->symbol_type == SYMBOL_ADDRESS) {
+                        op = 0;
+                    } else {
+                        if(sl->symbol_type == SYMBOL_UNKNOWN) {
+                           sl->symbol_type = SYMBOL_VARIABLE;
+                        }
+                        if(op == '+') {
+                            value = ++sl->symbol_value;
+                        } else {
+                            value = --sl->symbol_value;
+                        }
+                    }
+                }
+            }
+            if(!op) {
                 errlog("Cannot assign value to label %.*s", sl->symbol_length, sl->symbol_name);
             }
         }
+
+        // If a lookup reads an unknown variable, it becomes a 2-byte variable
+        // regardless of value later when that becomes known
+        if(sl->symbol_type == SYMBOL_UNKNOWN) {
+            sl->symbol_width = 16;
+        }
+        // The expression width is as wide as the widest element
+        if(sl->symbol_width > as->expression_size) {
+            as->expression_size = sl->symbol_width;
+        }
+
     } else if(as->current_token.type == TOKEN_OP && as->current_token.op == '(') {
         next_token();
         value = parse_expression();
@@ -275,10 +308,14 @@ int64_t parse_factor() {
             return -parse_factor();
         } else if (as->current_token.op == '<') {  // Low byte
             next_token();
-            return parse_factor() & 0xFF;
+            int64_t value = parse_factor() & 0xFF;
+            as->expression_size = 0;
+            return value;
         } else if (as->current_token.op == '>') {  // High byte
             next_token();
-            return (parse_factor() >> 8) & 0xFF;
+            int64_t value = (parse_factor() >> 8) & 0xFF;
+            as->expression_size = 0;
+            return value;
         } else if (as->current_token.op == '~') {  // Binary NOT
             next_token();
             return ~parse_factor();

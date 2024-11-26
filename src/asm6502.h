@@ -110,7 +110,7 @@ typedef struct {
     uint32_t symbol_length; // Name length
     uint64_t symbol_hash;
     uint64_t symbol_value;
-    uint32_t symbol_width;  // Bits, ie 8, 16, etc.
+    uint32_t symbol_width;  // 0 - depends on value, 16 not 1 byte
 } SYMBOL_LABEL;
 
 enum {
@@ -156,6 +156,7 @@ typedef struct FOR_LOOP {                   // For init, condition, adjust
     const char *loop_body_start;            // Points at text to excute in loop
     const char *loop_start_file;            // .for and .endfor must be in same file
     size_t body_line;                       // Line nuber where body loop starts
+    size_t iterations;                      // Break out of runaway loops
 } FOR_LOOP;
 
 typedef struct {

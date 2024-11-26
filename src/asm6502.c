@@ -354,9 +354,6 @@ SYMBOL_LABEL *symbol_store(const char *symbol_name, uint32_t symbol_name_length,
     SYMBOL_LABEL *sl = symbol_lookup(name_hash, symbol_name, symbol_name_length);
     if(sl) {
         if(sl->symbol_type == SYMBOL_UNKNOWN) {
-            // Forward referenced variables are assigned a type and value when resolved
-            // The width is left unchanged (16 bit was assumed).  The width can't change
-            // between pass 1 & 2 or all other labels will be off, or need to be adjusted
             sl->symbol_type = symbol_type;
             sl->symbol_value = value;
         } else {
@@ -380,7 +377,7 @@ SYMBOL_LABEL *symbol_store(const char *symbol_name, uint32_t symbol_name_length,
         new_sl.symbol_length = symbol_name_length;
         new_sl.symbol_name = symbol_name;
         new_sl.symbol_value = value;
-        new_sl.symbol_width = (value <= UINT8_MAX) ? 8 : (value <= UINT16_MAX) ? 16 : (value <= UINT32_MAX) ? 32 : 64;
+        new_sl.symbol_width = 0;
         uint8_t bucket = name_hash & 0xff;
         DYNARRAY *bucket_array = ARRAY_GET(&as->symbol_table, DYNARRAY, bucket);
         ARRAY_ADD(bucket_array, &new_sl);
@@ -575,12 +572,12 @@ int is_valid_instruction_only() {
         case GPERF_OPCODE_LSR:
         case GPERF_OPCODE_ROL:
         case GPERF_OPCODE_ROR:
-            // is it just the 3 letters
-            // or does an a follow (bi itelf or a;) 
-            // SQW - do this differently - consume token
-            return (as->input == as->token_start) ||
-            ((*as->token_start == 'a' || *as->token_start == 'A') && 
-                (isspace((*(as->token_start+1))) || *(as->token_start+1) == ';'));
+            if(as->current_token.type == TOKEN_VAR) {
+                if(as->current_token.name_length == 1 && tolower(*as->token_start) == 'a') {
+                    next_token();
+                }
+            }
+            return as->current_token.type == TOKEN_END;
 
         default:
             if(!as->opcode_info.width) {
@@ -596,10 +593,11 @@ void parse_dot_endfor() {
         const char *post_loop = as->input;
         FOR_LOOP *for_loop = ARRAY_GET(&as->loop_stack, FOR_LOOP, as->loop_stack.items-1);
         int same_file = stricmp(for_loop->loop_start_file, as->current_file) == 0;
+        int loop_iterations = ++for_loop->iterations;
         as->token_start = as->input = for_loop->loop_adjust_start;
         evaluate_expression();
         as->token_start = as->input = for_loop->loop_condition_start;
-        if(same_file && evaluate_expression()) {
+        if(loop_iterations < 65536 && same_file && evaluate_expression()) {
             as->token_start = as->input = for_loop->loop_body_start;
             as->current_line = for_loop->body_line;
         } else {
@@ -608,6 +606,8 @@ void parse_dot_endfor() {
             as->token_start = as->input = post_loop;
             if(!same_file) {
                 errlog(".endfor matches .for in file %s, body at line %zd", for_loop->loop_start_file, for_loop->body_line);
+            } else if (loop_iterations >= 65536) {
+                errlog("Exiting .for loop with body at line %zd, which has iterated 64K times", for_loop->body_line);
             }
             as->current_line--;
         }
@@ -619,6 +619,7 @@ void parse_dot_endfor() {
 void parse_dot_for() {
     FOR_LOOP for_loop;
     evaluate_expression(); // assignment
+    for_loop.iterations = 0;
     for_loop.loop_condition_start = as->input;
     for_loop.loop_start_file = as->current_file;
     // evaluate the condition
@@ -996,7 +997,7 @@ void parse_opcode() {
             // general case
             as->opcode_info.value = parse_expression();
             if(as->opcode_info.width >= 8 && as->expression_size > 8) {
-                as->opcode_info.width = as->expression_size;
+                as->opcode_info.width = 16; //as->expression_size;
             }
             decode_abs_rel_zp_opcode();
         }
