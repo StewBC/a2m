@@ -359,7 +359,7 @@ void viewapl2_screen_hgr(APPLE2 *m, int start, int end) {
     int surface_width = surface->w;
 
     for(y = start; y < end; y++) {
-        uint32_t *p = &pixels[y *surface_width];
+        uint32_t *p = &pixels[y * surface_width];
         int px = 0;
         uint16_t address = page + hgr_row_start[y];
         uint8_t byte = m->RAM_MAIN[address];
@@ -403,7 +403,7 @@ void viewapl2_screen_hgr_mono(APPLE2 *m, int start, int end) {
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
     int page = m->viewport->shadow_active_page ? 0x4000 : 0x2000;
-    uint32_t c[2] = {color_table[0][0][0], color_table[7][0][0]};
+    uint32_t c[2] = { color_table[0][0][0], color_table[7][0][0] };
 
     // Loop through each row
     for(y = start; y < end; y++) {
@@ -439,7 +439,7 @@ void viewapl2_screen_txt(APPLE2 *m, int start, int end) {
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
     int page = m->viewport->shadow_active_page ? 0x0800 : 0x0400;
-    uint32_t c[2] = {color_table[0][0][0], color_table[7][0][0]};
+    uint32_t c[2] = { color_table[0][0][0], color_table[7][0][0] };
 
     // Loop through each row
     for(y = start; y < end; y++) {
@@ -483,8 +483,8 @@ void viewapl2_screen_80col(APPLE2 *m, int start, int end) {
     SDL_Surface *surface = m->viewport->surface640;
     uint32_t *pixels = (uint32_t *) surface->pixels;
     // int page = m->viewport->shadow_active_page ? 0x0800 : 0x0400;
-    uint32_t c[2] = {color_table[0][0][0], color_table[7][0][0]};
-    uint16_t display_offset = 256*fd80->registers[0x0c]+fd80->registers[0x0d];
+    uint32_t c[2] = { color_table[0][0][0], color_table[7][0][0] };
+    uint16_t display_offset = 256 * fd80->registers[0x0c] + fd80->registers[0x0d];
 
     // Loop through each row
     for(y = start; y < end; y++) {
@@ -559,7 +559,7 @@ void viewapl2_speaker_play(SPEAKER *speaker) {
     float sample_previous = speaker->samples[SAMPLE_PREVIOUS];
     float sample_current = speaker->samples[SAMPLE_CURRENT];
     // Calculate a high pass and low pass filtered sample
-    float high_pass_result = alpha *(output_previous + sample_current - sample_previous);
+    float high_pass_result = alpha * (output_previous + sample_current - sample_previous);
     float filter_result = beta * high_pass_result + (1 - beta) * output_previous;
     // Save the current sample of next time
     speaker->samples[SAMPLE_PREVIOUS] = sample_current;

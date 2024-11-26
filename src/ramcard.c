@@ -50,7 +50,7 @@ int ram_card_init(RAM_CARD *ram_card) {
     // 4K ($0000 - $0FFF) Bank 1 @ $D000 - $DFFF
     // 4K ($1000 - $1FFF) Bank 2 @ $D000 - $DFFF
     // 8K ($2000 - $3FFF)        @ $E000 - $FFFF
-    ram_card->RAM = (uint8_t *) malloc(16 *1024);
+    ram_card->RAM = (uint8_t *) malloc(16 * 1024);
     if(!ram_card->RAM) {
         return A2_ERR;
     }

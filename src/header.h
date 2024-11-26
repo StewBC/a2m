@@ -2,6 +2,8 @@
 // Stefan Wessels, 2024
 // This is free and unencumbered software released into the public domain.
 
+#pragma once
+
 // Standard Includes
 #include <assert.h>
 #include <stdarg.h>
@@ -33,6 +35,8 @@
 #define PATH_SEPARATOR '/'
 #endif
 
+#ifdef IS_EMULATOR
+
 // SDL related
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
@@ -48,6 +52,8 @@
 // #define NK_IMPLEMENTATION
 #include "nuklear.h"
 
+#endif                                                      // IS_EMULATOR
+
 // Often used return codes
 #define A2_OK   0
 #define A2_ERR  1
@@ -55,12 +61,19 @@
 // Forward declares
 typedef struct APPLE2 APPLE2;
 typedef struct UTIL_FILE UTIL_FILE;
+typedef struct DYNARRAY DYNARRAY;
+
+#ifdef IS_EMULATOR
+
 typedef struct VIEWPORT VIEWPORT;
 typedef struct DEBUGGER DEBUGGER;
-typedef struct DYNARRAY DYNARRAY;
+
+#endif                                                      // IS_EMULATOR
 
 #include "util.h"
 #include "dynarray.h"
+
+#ifdef IS_EMULATOR
 
 // Machine
 #include "6502.h"
@@ -85,6 +98,8 @@ typedef struct DYNARRAY DYNARRAY;
 
 // It all comes together
 #include "apple2.h"
+
+#endif                                                      // IS_EMULATOR
 
 #include "asm6502.h"
 #include "asmexpr.h"

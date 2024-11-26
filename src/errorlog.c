@@ -1,3 +1,7 @@
+// Apple ][+ emulator and assembler
+// Stefan Wessels, 2024
+// This is free and unencumbered software released into the public domain.
+
 #include "header.h"
 
 ERRORLOG errorlog;
@@ -8,11 +12,12 @@ void errlog_init() {
 
 void errlog(const char *format, ...) {
     if(as->pass == 2) {
-        char arg_message[256], final_message[256]; 
+        char arg_message[256], final_message[256];
         va_list args;
         va_start(args, format);
         vsnprintf(arg_message, 256, format, args);
-        snprintf(final_message, 256, "File: %s L:%05zu C:%03zu: %s", as->current_file, as->current_line, as->token_start - as->line_start, arg_message);
+        snprintf(final_message, 256, "File: %s L:%05zu C:%03zu: %s", as->current_file, as->current_line, as->token_start - as->line_start,
+                 arg_message);
         char *err_str = strdup(final_message);
         if(err_str) {
             ARRAY_ADD(&errorlog.log_array, err_str);

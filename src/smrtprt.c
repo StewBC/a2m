@@ -22,7 +22,7 @@ int sp_mount(APPLE2 *m, const int slot, const int device, const char *file_name)
         util_file_close(f);
     }
 
-    if(strncmp((char *)&m->sp_device[slot].sp_buffer[1], "2IMG", 4) == 0) {
+    if(strncmp((char *) &m->sp_device[slot].sp_buffer[1], "2IMG", 4) == 0) {
         spd->file_header_size[device] = 0x40;
         f->file_size -= 0x40;
     } else {
@@ -42,7 +42,7 @@ void sp_read(APPLE2 *m, const int slot) {
         spd->sp_buffer[0] = SP_IO_ERROR;
         return;
     }
-    if(fseek(f->fp, spd->file_header_size[device] + (block *SP_BLOCK_SIZE), SEEK_SET) != 0) {
+    if(fseek(f->fp, spd->file_header_size[device] + (block * SP_BLOCK_SIZE), SEEK_SET) != 0) {
         spd->sp_buffer[0] = SP_IO_ERROR;
         return;
     }
@@ -80,7 +80,7 @@ void sp_write(APPLE2 *m, const int slot) {
     const uint8_t *data = (uint8_t *) & m->sp_device[slot].sp_buffer[4];
 
     if(!(f->is_file_open && block < spd->sp_files[device].file_size / SP_BLOCK_SIZE &&
-         fseek(spd->sp_files[device].fp, spd->file_header_size[device] + (block *SP_BLOCK_SIZE), SEEK_SET) == 0)) {
+         fseek(spd->sp_files[device].fp, spd->file_header_size[device] + (block * SP_BLOCK_SIZE), SEEK_SET) == 0)) {
         spd->sp_buffer[0] = SP_IO_ERROR;
         return;
     }

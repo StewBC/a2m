@@ -1,8 +1,12 @@
+// Apple ][+ emulator
+// Stefan Wessels, 2024
+// This is free and unencumbered software released into the public domain.
+
 #include "header.h"
 
 int franklin_display_init(FRANKLIN_DISPLAY *fd80) {
     memset(fd80, 0, sizeof(FRANKLIN_DISPLAY));
-    if(!(fd80->display_ram = (uint8_t*)malloc(2048))) {
+    if(!(fd80->display_ram = (uint8_t *) malloc(2048))) {
         return A2_ERR;
     }
     memset(fd80->display_ram, 32, 2048);
@@ -34,19 +38,3 @@ void franklin_display_set(APPLE2 *m, uint16_t address, uint8_t value) {
     }
     fd80->registers[fd80->reg_num] = value;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

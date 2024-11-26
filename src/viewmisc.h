@@ -9,4 +9,4 @@ typedef struct VIEWMISC {
     BREAKPOINT_EDIT breakpoint_edit;
 } VIEWMISC;
 
-void viewmisc_show(APPLE2 *m);
+void viewmisc_show(APPLE2 * m);

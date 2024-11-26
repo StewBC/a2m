@@ -1,66 +1,80 @@
+// Apple ][+ emulator and assembler
+// Stefan Wessels, 2024
+// This is free and unencumbered software released into the public domain.
+
 #include "header.h"
 
+#ifdef IS_ASSEMBLER
+typedef struct APPLE2 {
+    uint8_t RAM_MAIN[64 * 1024];
+} APPLE2;
+void write_to_memory(APPLE2 *m, uint16_t address, uint8_t value) {
+    m->RAM_MAIN[address] = value;
+}
+
+APPLE2 apple2;
+#endif
 // The assembler object and the pointer through which it is accessed
 ASSEMBLER assembler;
 ASSEMBLER *as;
 
 const uint8_t asm_opcode[56][11] = {
-    { -1  , 0x6d, 0x7d, 0x79, 0x69, 0x61, 0x71, 0x65, 0x75, -1   } , /*  0: ADC */
-    { -1  , 0x2d, 0x3d, 0x39, 0x29, 0x21, 0x31, 0x25, 0x35, -1   } , /*  1: AND */
-    { 0x0a, 0x0e, 0x1e, -1  , -1  , -1  , -1  , 0x06, 0x16, -1   } , /*  2: ASL */
-    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0x90, -1  , -1   } , /*  3: BCC */
-    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0xb0, -1  , -1   } , /*  4: BCS */
-    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0xf0, -1  , -1   } , /*  5: BEQ */
-    { -1  , 0x2c, -1  , -1  , -1  , -1  , -1  , 0x24, -1  , -1   } , /*  6: BIT */
-    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0x30, -1  , -1   } , /*  7: BMI */
-    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0xd0, -1  , -1   } , /*  8: BNE */
-    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0x10, -1  , -1   } , /*  9: BPL */
-    { 0x00, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 10: BRK */
-    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0x50, -1  , -1   } , /* 11: BVC */
-    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0x70, -1  , -1   } , /* 12: BVS */
-    { 0x18, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 13: CLC */
-    { 0xd8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 14: CLD */
-    { 0x58, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 15: CLI */
-    { 0xb8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 16: CLV */
-    { -1  , 0xcd, 0xdd, 0xd9, 0xc9, 0xc1, 0xd1, 0xc5, 0xd5, -1   } , /* 17: CMP */
-    { -1  , 0xec, -1  , -1  , 0xe0, -1  , -1  , 0xe4, -1  , -1   } , /* 18: CPX */
-    { -1  , 0xcc, -1  , -1  , 0xc0, -1  , -1  , 0xc4, -1  , -1   } , /* 19: CPY */
-    { -1  , 0xce, 0xde, -1  , -1  , -1  , -1  , 0xc6, 0xd6, -1   } , /* 20: DEC */
-    { 0xca, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 21: DEX */
-    { 0x88, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 22: DEY */
-    { -1  , 0x4d, 0x5d, 0x59, 0x49, 0x41, 0x51, 0x45, 0x55, -1   } , /* 23: EOR */
-    { -1  , 0xee, 0xfe, -1  , -1  , -1  , -1  , 0xe6, 0xf6, -1   } , /* 24: INC */
-    { 0xe8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 25: INX */
-    { 0xc8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 26: INY */
-    { -1  , 0x4c, -1  , -1  , 0x6C, -1  , -1  , -1  , -1  , -1   } , /* 27: JMP */
-    { -1  , 0x20, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 28: JSR */
-    { -1  , 0xad, 0xbd, 0xb9, 0xa9, 0xa1, 0xb1, 0xa5, 0xb5, -1   } , /* 29: LDA */
-    { -1  , 0xae, -1  , 0xbe, 0xa2, -1  , -1  , 0xa6, -1  , 0xb6 } , /* 30: LDX */
-    { -1  , 0xac, 0xbc, -1  , 0xa0, -1  , -1  , 0xa4, 0xb4, -1   } , /* 31: LDY */
-    { 0x4a, 0x4e, 0x5e, -1  , -1  , -1  , -1  , 0x46, 0x56, -1   } , /* 32: LSR */
-    { 0xea, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 33: NOP */
-    { -1  , 0x0d, 0x1d, 0x19, 0x09, 0x01, 0x11, 0x05, 0x15, -1   } , /* 34: ORA */
-    { 0x48, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 35: PHA */
-    { 0x08, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 36: PHP */
-    { 0x68, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 37: PLA */
-    { 0x28, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 38: PLP */
-    { 0x2a, 0x2e, 0x3e, -1  , -1  , -1  , -1  , 0x26, 0x36, -1   } , /* 39: ROL */
-    { 0x6a, 0x6e, 0x7e, -1  , -1  , -1  , -1  , 0x66, 0x76, -1   } , /* 40: ROR */
-    { 0x40, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 41: RTI */
-    { 0x60, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 42: RTS */
-    { -1  , 0xed, 0xfd, 0xf9, 0xe9, 0xe1, 0xf1, 0xe5, 0xf5, -1   } , /* 43: SBC */
-    { 0x38, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 44: SEC */
-    { 0xf8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 45: SED */
-    { 0x78, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 46: SEI */
-    { -1  , 0x8d, 0x9d, 0x99, -1  , 0x81, 0x91, 0x85, 0x95, -1   } , /* 47: STA */
-    { -1  , 0x8e, -1  , -1  , -1  , -1  , -1  , 0x86, -1  , 0x96 } , /* 48: STX */
-    { -1  , 0x8c, -1  , -1  , -1  , -1  , -1  , 0x84, 0x94, -1   } , /* 49: STY */
-    { 0xaa, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 50: TAX */
-    { 0xa8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 51: TAY */
-    { 0xba, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 52: TSX */
-    { 0x8a, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 53: TXA */
-    { 0x9a, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 54: TXS */
-    { 0x98, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   } , /* 55: TYA */
+    { -1  , 0x6d, 0x7d, 0x79, 0x69, 0x61, 0x71, 0x65, 0x75, -1   }, /* 0: ADC */
+    { -1  , 0x2d, 0x3d, 0x39, 0x29, 0x21, 0x31, 0x25, 0x35, -1   }, /* 1: AND */
+    { 0x0a, 0x0e, 0x1e, -1  , -1  , -1  , -1  , 0x06, 0x16, -1   }, /* 2: ASL */
+    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0x90, -1  , -1   }, /* 3: BCC */
+    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0xb0, -1  , -1   }, /* 4: BCS */
+    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0xf0, -1  , -1   }, /* 5: BEQ */
+    { -1  , 0x2c, -1  , -1  , -1  , -1  , -1  , 0x24, -1  , -1   }, /* 6: BIT */
+    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0x30, -1  , -1   }, /* 7: BMI */
+    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0xd0, -1  , -1   }, /* 8: BNE */
+    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0x10, -1  , -1   }, /* 9: BPL */
+    { 0x00, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 10: BRK */
+    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0x50, -1  , -1   }, /* 11: BVC */
+    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0x70, -1  , -1   }, /* 12: BVS */
+    { 0x18, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 13: CLC */
+    { 0xd8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 14: CLD */
+    { 0x58, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 15: CLI */
+    { 0xb8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 16: CLV */
+    { -1  , 0xcd, 0xdd, 0xd9, 0xc9, 0xc1, 0xd1, 0xc5, 0xd5, -1   }, /* 17: CMP */
+    { -1  , 0xec, -1  , -1  , 0xe0, -1  , -1  , 0xe4, -1  , -1   }, /* 18: CPX */
+    { -1  , 0xcc, -1  , -1  , 0xc0, -1  , -1  , 0xc4, -1  , -1   }, /* 19: CPY */
+    { -1  , 0xce, 0xde, -1  , -1  , -1  , -1  , 0xc6, 0xd6, -1   }, /* 20: DEC */
+    { 0xca, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 21: DEX */
+    { 0x88, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 22: DEY */
+    { -1  , 0x4d, 0x5d, 0x59, 0x49, 0x41, 0x51, 0x45, 0x55, -1   }, /* 23: EOR */
+    { -1  , 0xee, 0xfe, -1  , -1  , -1  , -1  , 0xe6, 0xf6, -1   }, /* 24: INC */
+    { 0xe8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 25: INX */
+    { 0xc8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 26: INY */
+    { -1  , 0x4c, -1  , -1  , 0x6C, -1  , -1  , -1  , -1  , -1   }, /* 27: JMP */
+    { -1  , 0x20, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 28: JSR */
+    { -1  , 0xad, 0xbd, 0xb9, 0xa9, 0xa1, 0xb1, 0xa5, 0xb5, -1   }, /* 29: LDA */
+    { -1  , 0xae, -1  , 0xbe, 0xa2, -1  , -1  , 0xa6, -1  , 0xb6 }, /* 30: LDX */
+    { -1  , 0xac, 0xbc, -1  , 0xa0, -1  , -1  , 0xa4, 0xb4, -1   }, /* 31: LDY */
+    { 0x4a, 0x4e, 0x5e, -1  , -1  , -1  , -1  , 0x46, 0x56, -1   }, /* 32: LSR */
+    { 0xea, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 33: NOP */
+    { -1  , 0x0d, 0x1d, 0x19, 0x09, 0x01, 0x11, 0x05, 0x15, -1   }, /* 34: ORA */
+    { 0x48, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 35: PHA */
+    { 0x08, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 36: PHP */
+    { 0x68, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 37: PLA */
+    { 0x28, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 38: PLP */
+    { 0x2a, 0x2e, 0x3e, -1  , -1  , -1  , -1  , 0x26, 0x36, -1   }, /* 39: ROL */
+    { 0x6a, 0x6e, 0x7e, -1  , -1  , -1  , -1  , 0x66, 0x76, -1   }, /* 40: ROR */
+    { 0x40, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 41: RTI */
+    { 0x60, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 42: RTS */
+    { -1  , 0xed, 0xfd, 0xf9, 0xe9, 0xe1, 0xf1, 0xe5, 0xf5, -1   }, /* 43: SBC */
+    { 0x38, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 44: SEC */
+    { 0xf8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 45: SED */
+    { 0x78, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 46: SEI */
+    { -1  , 0x8d, 0x9d, 0x99, -1  , 0x81, 0x91, 0x85, 0x95, -1   }, /* 47: STA */
+    { -1  , 0x8e, -1  , -1  , -1  , -1  , -1  , 0x86, -1  , 0x96 }, /* 48: STX */
+    { -1  , 0x8c, -1  , -1  , -1  , -1  , -1  , 0x84, 0x94, -1   }, /* 49: STY */
+    { 0xaa, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 50: TAX */
+    { 0xa8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 51: TAY */
+    { 0xba, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 52: TSX */
+    { 0x8a, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 53: TXA */
+    { 0x9a, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 54: TXS */
+    { 0x98, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 55: TYA */
 };
 
 const char *address_mode_txt[] = {
@@ -79,10 +93,10 @@ const char *address_mode_txt[] = {
 //----------------------------------------------------------------------------
 // https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function#FNV-1a_hash
 uint32_t fnv_1a_hash(const char *key, size_t len) {
-    uint32_t hash = 2166136261u;  // FNV offset basis
-    for (size_t i = 0; i < len; i++) {
-        hash ^= (uint8_t)key[i];
-        hash *= 16777619;  // FNV prime
+    uint32_t hash = 2166136261u;                            // FNV offset basis
+    for(size_t i = 0; i < len; i++) {
+        hash ^= (uint8_t) tolower(key[i]);
+        hash *= 16777619;                                   // FNV prime
     }
     return hash;
 }
@@ -143,7 +157,7 @@ int include_files_push(const char *file_name) {
         // If not, it's a new file, load it
         memset(&new_file, 0, sizeof(UTIL_FILE));
         new_file.load_padding = 1;
-        
+
         if(A2_OK == util_file_load(&new_file, file_name, "r")) {
             // Success, add tp list of laoded files and assign it to f
             if(A2_OK != ARRAY_ADD(&as->include_files.included_files, new_file)) {
@@ -170,7 +184,6 @@ int include_files_push(const char *file_name) {
         errlog("Recursive included of file %s ignored", file_name);
         return A2_ERR;
     }
-
     // Push the file onto the stack, documenting the current parse data
     PARSE_DATA pd;
     pd.file_name = as->current_file;
@@ -181,7 +194,6 @@ int include_files_push(const char *file_name) {
     if(A2_OK != ARRAY_ADD(&as->include_files.stack, pd)) {
         errlog("Out of memory");
     }
-
     // Prepare to parse the buffer that has now become active
     as->current_file = f->file_path;
     as->line_start = as->token_start = as->input = f->file_data;
@@ -194,6 +206,14 @@ int include_files_push(const char *file_name) {
 // Output
 void emit(uint8_t byte_value) {
     if(as->pass == 2) {
+#ifdef IS_ASSEMBLER
+        if(as->verbose) {
+            if(!(as->current_address % 16) || as->last_address != as->current_address) {
+                printf("\n%04X: ", as->current_address);
+            }
+            printf("%02X ", byte_value);
+        }
+#endif                                                      // IS_ASSEMBLER
         write_to_memory(as->m, as->current_address++, byte_value);
         as->last_address = as->current_address;
     } else {
@@ -209,29 +229,29 @@ void write_opcode() {
     // First the opcode
     emit(opcode);
     // Then the operand (0, ie implied, will do nothing more)
-    switch(as->opcode_info.width) {
-        case 1: // Relative - 1 byte
-            {
-                int32_t delta = as->opcode_info.value - 1 - as->current_address;
-                if(delta > 128 || delta < -128) {
-                    errlog("Relative branch out of range $%X", delta);
-                }
-                emit(delta);
+    switch (as->opcode_info.width) {
+    case 1:                                                 // Relative - 1 byte
+        {
+            int32_t delta = as->opcode_info.value - 1 - as->current_address;
+            if(delta > 128 || delta < -128) {
+                errlog("Relative branch out of range $%X", delta);
             }
-            break;
-        case 8: // 1 byte
-            if(as->opcode_info.value >= 256) {
-                errlog("8-bit value expected but value = $%X", as->opcode_info.value);
-            }
-            emit(as->opcode_info.value);
-            break;
-        case 16:    // 2 bytes
-            if(as->opcode_info.value >= 65536) {
-                errlog("16-bit value expected but value = $%X", as->opcode_info.value);
-            }
-            emit(as->opcode_info.value);
-            emit(as->opcode_info.value >> 8);
-            break;
+            emit(delta);
+        }
+        break;
+    case 8:                                                 // 1 byte
+        if(as->opcode_info.value >= 256) {
+            errlog("8-bit value expected but value = $%X", as->opcode_info.value);
+        }
+        emit(as->opcode_info.value);
+        break;
+    case 16:                                                // 2 bytes
+        if(as->opcode_info.value >= 65536) {
+            errlog("16-bit value expected but value = $%X", as->opcode_info.value);
+        }
+        emit(as->opcode_info.value);
+        emit(as->opcode_info.value >> 8);
+        break;
     }
 }
 
@@ -239,14 +259,23 @@ void write_bytes(uint64_t value, int width, int order) {
     if(order == BYTE_ORDER_HI) {
         if(width == 8) {
             emit(value);
+            if(value >= 256) {
+                errlog("Warning: value (%zd) >= 256 output as byte value", value);
+            }
         } else if(width == 16) {
             emit(value >> 8);
             emit(value);
+            if(value >= 65536) {
+                errlog("Warning: value (%zd) >= 65535 output as word value", value);
+            }
         } else if(width == 32) {
             emit(value >> 24);
             emit(value >> 16);
             emit(value >> 8);
             emit(value);
+            if(value >= 4294967295) {
+                errlog("Warning: value (%zd) >= 4,294,967,295 output as dword value", value);
+            }
         } else if(width == 64) {
             emit(value >> 56);
             emit(value >> 48);
@@ -256,18 +285,30 @@ void write_bytes(uint64_t value, int width, int order) {
             emit(value >> 16);
             emit(value >> 8);
             emit(value);
+            if(value >= 9223372036854775807) {
+                errlog("Warning: value (%zd) >= 4,294,967,295 output as qword value", value);
+            }
         }
     } else {
         if(width == 8) {
             emit(value);
+            if(value >= 256) {
+                errlog("Warning: value (%zd) >= 256 output as byte value", value);
+            }
         } else if(width == 16) {
             emit(value);
             emit(value >> 8);
+            if(value >= 65536) {
+                errlog("Warning: value (%zd) >= 65535 output as word value", value);
+            }
         } else if(width == 32) {
             emit(value);
             emit(value >> 8);
             emit(value >> 16);
             emit(value >> 24);
+            if(value >= 4294967295) {
+                errlog("Warning: value (%zd) >= 4,294,967,295 output as dword value", value);
+            }
         } else if(width == 64) {
             emit(value);
             emit(value >> 8);
@@ -277,6 +318,9 @@ void write_bytes(uint64_t value, int width, int order) {
             emit(value >> 40);
             emit(value >> 48);
             emit(value >> 56);
+            if(value >= 9223372036854775807) {
+                errlog("Warning: value (%zd) >= 4,294,967,295 output as qword value", value);
+            }
         }
     }
 }
@@ -291,26 +335,26 @@ void write_values(int width, int order) {
 // Symbol storage / lookup
 int anonymous_symbol_lookup(uint16_t *address, int direction) {
     // Ensure the array has items
-    if (as->anon_symbols.items == 0) {
+    if(as->anon_symbols.items == 0) {
         *address = 0xFFFF;
-        return 0; // Not found
+        return 0;                                           // Not found
     }
 
     int low = 0;
-    int high = (int)as->anon_symbols.items - 1;
+    int high = (int) as->anon_symbols.items - 1;
     int exact_match_index = -1;
     int closest_smaller_index = -1;
     int target_index;
 
     // Perform binary search to find the closest smaller or equal label
-    while (low <= high) {
+    while(low <= high) {
         int mid = (low + high) / 2;
         uint16_t value = *ARRAY_GET(&as->anon_symbols, uint16_t, mid);
 
-        if (value == *address) {
-            exact_match_index = mid; // Exact match found, not sure this can happen?
+        if(value == *address) {
+            exact_match_index = mid;                        // Exact match found, not sure this can happen?
             break;
-        } else if (value < *address) {
+        } else if(value < *address) {
             closest_smaller_index = mid;
             low = mid + 1;
         } else {
@@ -318,12 +362,12 @@ int anonymous_symbol_lookup(uint16_t *address, int direction) {
         }
     }
 
-    if (exact_match_index != -1) {
+    if(exact_match_index != -1) {
         // If we have an exact match
         target_index = exact_match_index + direction;
     } else {
         // Determine the target_index with direction
-        if (direction < 0) {
+        if(direction < 0) {
             // For negative direction: Start at the label greater than
             // the closest_smaller_index
             target_index = closest_smaller_index + 1 + direction;
@@ -334,7 +378,7 @@ int anonymous_symbol_lookup(uint16_t *address, int direction) {
     }
 
     // Check bounds
-    if (target_index < 0 || target_index >= (int)as->anon_symbols.items) {
+    if(target_index < 0 || target_index >= (int) as->anon_symbols.items) {
         // Error out of bounds
         *address = 0xFFFF;
         return 0;
@@ -345,8 +389,8 @@ int anonymous_symbol_lookup(uint16_t *address, int direction) {
     return 1;
 }
 
-int symbol_sort(const void* lhs, const void* rhs) {
-   return (uint16_t)(((SYMBOL_LABEL*)lhs)->symbol_value) - (uint16_t)(((SYMBOL_LABEL*)rhs)->symbol_value);
+int symbol_sort(const void *lhs, const void *rhs) {
+    return (uint16_t) (((SYMBOL_LABEL *) lhs)->symbol_value) - (uint16_t) (((SYMBOL_LABEL *) rhs)->symbol_value);
 }
 
 SYMBOL_LABEL *symbol_store(const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TYPE symbol_type, uint64_t value) {
@@ -468,16 +512,16 @@ void decode_abs_rel_zp_opcode() {
         if(as->current_token.op == ',') {
             // Make sure a comma is followed by x or y
             get_token();
-            switch(tolower(*as->token_start)) {
-                case 'x':
-                    as->opcode_info.addressing_mode++;
-                    break;
-                case 'y':
-                    as->opcode_info.addressing_mode += 2;
-                    break;
-                default:
-                    errlog("Unexpected ,%c", *as->token_start);
-                    break;
+            switch (tolower(*as->token_start)) {
+            case 'x':
+                as->opcode_info.addressing_mode++;
+                break;
+            case 'y':
+                as->opcode_info.addressing_mode += 2;
+                break;
+            default:
+                errlog("Unexpected ,%c", *as->token_start);
+                break;
             }
         }
     }
@@ -531,7 +575,7 @@ int is_dot_command() {
 }
 
 int is_label() {
-    if(*(as->input-1) != ':') {
+    if(*(as->input - 1) != ':') {
         return 0;
     }
     return 1;
@@ -567,22 +611,22 @@ int is_variable() {
 }
 
 int is_valid_instruction_only() {
-    switch(as->opcode_info.opcode_id) {
-        case GPERF_OPCODE_ASL:
-        case GPERF_OPCODE_LSR:
-        case GPERF_OPCODE_ROL:
-        case GPERF_OPCODE_ROR:
-            if(as->current_token.type == TOKEN_VAR) {
-                if(as->current_token.name_length == 1 && tolower(*as->token_start) == 'a') {
-                    next_token();
-                }
+    switch (as->opcode_info.opcode_id) {
+    case GPERF_OPCODE_ASL:
+    case GPERF_OPCODE_LSR:
+    case GPERF_OPCODE_ROL:
+    case GPERF_OPCODE_ROR:
+        if(as->current_token.type == TOKEN_VAR) {
+            if(as->current_token.name_length == 1 && tolower(*as->token_start) == 'a') {
+                next_token();
             }
-            return as->current_token.type == TOKEN_END;
+        }
+        return as->current_token.type == TOKEN_END;
 
-        default:
-            if(!as->opcode_info.width) {
-                return 1;
-            }
+    default:
+        if(!as->opcode_info.width) {
+            return 1;
+        }
     }
     return 0;
 }
@@ -591,7 +635,7 @@ int is_valid_instruction_only() {
 void parse_dot_endfor() {
     if(as->loop_stack.items) {
         const char *post_loop = as->input;
-        FOR_LOOP *for_loop = ARRAY_GET(&as->loop_stack, FOR_LOOP, as->loop_stack.items-1);
+        FOR_LOOP *for_loop = ARRAY_GET(&as->loop_stack, FOR_LOOP, as->loop_stack.items - 1);
         int same_file = stricmp(for_loop->loop_start_file, as->current_file) == 0;
         int loop_iterations = ++for_loop->iterations;
         as->token_start = as->input = for_loop->loop_adjust_start;
@@ -606,7 +650,7 @@ void parse_dot_endfor() {
             as->token_start = as->input = post_loop;
             if(!same_file) {
                 errlog(".endfor matches .for in file %s, body at line %zd", for_loop->loop_start_file, for_loop->body_line);
-            } else if (loop_iterations >= 65536) {
+            } else if(loop_iterations >= 65536) {
                 errlog("Exiting .for loop with body at line %zd, which has iterated 64K times", for_loop->body_line);
             }
             as->current_line--;
@@ -618,7 +662,7 @@ void parse_dot_endfor() {
 
 void parse_dot_for() {
     FOR_LOOP for_loop;
-    evaluate_expression(); // assignment
+    evaluate_expression();                                  // assignment
     for_loop.iterations = 0;
     for_loop.loop_condition_start = as->input;
     for_loop.loop_start_file = as->current_file;
@@ -676,7 +720,7 @@ void process_dot_org() {
 void process_dot_strcode() {
     // Encoding doesn't matter till 2nd pass
     if(as->pass == 2) {
-        get_token();    // skip past .strcode
+        get_token();                                        // skip past .strcode
         // Mark the expression start
         as->strcode = as->token_start;
     }
@@ -708,14 +752,14 @@ void process_dot_string() {
                         as->token_start++;
                     } else if(tolower(*as->token_start) == 'x') {
                         as->token_start++;
-                        value = strtoll(as->token_start, (char**)&as->token_start, 16);
+                        value = strtoll(as->token_start, (char **) &as->token_start, 16);
                     } else if(*as->token_start == '%') {
                         as->token_start++;
-                        value = strtoll(as->token_start, (char**)&as->token_start, 2);
+                        value = strtoll(as->token_start, (char **) &as->token_start, 2);
                     } else if(*as->token_start == '0') {
-                        value = strtoll(as->token_start, (char**)&as->token_start, 8);
+                        value = strtoll(as->token_start, (char **) &as->token_start, 8);
                     } else {
-                        value = strtoll(as->token_start, (char**)&as->token_start, 10);
+                        value = strtoll(as->token_start, (char **) &as->token_start, 10);
                     }
                     if(value >= 256) {
                         errlog("Escape value %ld not between 0 and 255", value);
@@ -770,14 +814,14 @@ void parse_address() {
         next_token();
     }
     int64_t value = evaluate_expression();
-    switch(op) {
-        case 0:
-        case 1:
-            address = as->current_address + value;
-            break;
-        case 2:
-            address = value;
-            break;
+    switch (op) {
+    case 0:
+    case 1:
+        address = as->current_address + value;
+        break;
+    case 2:
+        address = value;
+        break;
     }
     if(as->current_address > address) {
         errlog("Assigning address %04X when address is already %04X error", address, as->current_address);
@@ -798,15 +842,15 @@ uint16_t parse_anonymous_address() {
         direction++;
         next_token();
     }
-    switch(op) {
-        case '+':
-            break;
-        case '-':
-            direction = -direction;
-            break;
-        defailt:
-            errlog("Unexpected symbol after anonymoys : (%c)", op);
-            break;
+    switch (op) {
+    case '+':
+        break;
+    case '-':
+        direction = -direction;
+        break;
+      defailt:
+        errlog("Unexpected symbol after anonymoys : (%c)", op);
+        break;
     }
     // The opcode has not been emitted so + 1
     uint16_t address = as->current_address + 1;
@@ -817,54 +861,54 @@ uint16_t parse_anonymous_address() {
 }
 
 void parse_dot_command() {
-    switch(as->opcode_info.opcode_id) {
-        case GPERF_DOT_ALIGN:
-            uint64_t value = evaluate_expression();
-            as->current_address = (as->current_address + (value - 1)) & ~(value - 1);
-            break;
-        case GPERF_DOT_BYTE:
-            write_values(8, BYTE_ORDER_LO);
-            break;
-        case GPERF_DOT_DROW:
-            write_values(16, BYTE_ORDER_HI);
-            break;
-        case GPERF_DOT_DROWD:
-            write_values(32, BYTE_ORDER_HI);
-            break;
-        case GPERF_DOT_DROWQ:
-            write_values(64, BYTE_ORDER_HI);
-            break;
-        case GPERF_DOT_DWORD:
-            write_values(32, BYTE_ORDER_LO);
-            break;
-        case GPERF_DOT_ENDFOR:
-            parse_dot_endfor();
-            break;
-        case GPERF_DOT_FOR:
-            parse_dot_for();
-            break;
-        case GPERF_DOT_INCLUDE:
-            process_dot_include();
-            break;
-        case GPERF_DOT_ORG:
-            process_dot_org();
-            break;
-        case GPERF_DOT_OUTPUT:
-            break;
-        case GPERF_DOT_QWORD:
-            write_values(64, BYTE_ORDER_LO);
-            break;
-        case GPERF_DOT_SAVEAS:
-            break;
-        case GPERF_DOT_STRCODE:
-            process_dot_strcode();
-            break;
-        case GPERF_DOT_STRING:
-            process_dot_string();
-            break;
-        case GPERF_DOT_WORD:
-            write_values(16, BYTE_ORDER_LO);
-            break;
+    switch (as->opcode_info.opcode_id) {
+    case GPERF_DOT_ALIGN:
+        uint64_t value = evaluate_expression();
+        as->current_address = (as->current_address + (value - 1)) & ~(value - 1);
+        break;
+    case GPERF_DOT_BYTE:
+        write_values(8, BYTE_ORDER_LO);
+        break;
+    case GPERF_DOT_DROW:
+        write_values(16, BYTE_ORDER_HI);
+        break;
+    case GPERF_DOT_DROWD:
+        write_values(32, BYTE_ORDER_HI);
+        break;
+    case GPERF_DOT_DROWQ:
+        write_values(64, BYTE_ORDER_HI);
+        break;
+    case GPERF_DOT_DWORD:
+        write_values(32, BYTE_ORDER_LO);
+        break;
+    case GPERF_DOT_ENDFOR:
+        parse_dot_endfor();
+        break;
+    case GPERF_DOT_FOR:
+        parse_dot_for();
+        break;
+    case GPERF_DOT_INCLUDE:
+        process_dot_include();
+        break;
+    case GPERF_DOT_ORG:
+        process_dot_org();
+        break;
+    case GPERF_DOT_OUTPUT:
+        break;
+    case GPERF_DOT_QWORD:
+        write_values(64, BYTE_ORDER_LO);
+        break;
+    case GPERF_DOT_SAVEAS:
+        break;
+    case GPERF_DOT_STRCODE:
+        process_dot_strcode();
+        break;
+    case GPERF_DOT_STRING:
+        process_dot_string();
+        break;
+    case GPERF_DOT_WORD:
+        write_values(16, BYTE_ORDER_LO);
+        break;
     }
 }
 
@@ -889,55 +933,55 @@ void parse_opcode() {
         emit(asm_opcode[as->opcode_info.opcode_id][ADDRESS_MODE_ACCUMULATOR]);
     } else {
         int processed = 0;
-        switch(as->current_token.op) {
-            case '#':
-                // Immidiate
-                as->opcode_info.value = evaluate_expression();
+        switch (as->current_token.op) {
+        case '#':
+            // Immidiate
+            as->opcode_info.value = evaluate_expression();
+            as->opcode_info.addressing_mode = ADDRESS_MODE_IMMEDIATE;
+            write_opcode();
+            processed = 1;
+            break;
+        case '(':
+            if(as->opcode_info.opcode_id == GPERF_OPCODE_JMP) {
+                // jmp (INDIRECT) is a special case
+                as->opcode_info.value = parse_expression();
                 as->opcode_info.addressing_mode = ADDRESS_MODE_IMMEDIATE;
                 write_opcode();
                 processed = 1;
-                break;
-            case '(':
-                if(as->opcode_info.opcode_id == GPERF_OPCODE_JMP) {
-                    // jmp (INDIRECT) is a special case
-                    as->opcode_info.value = parse_expression();
-                    as->opcode_info.addressing_mode = ADDRESS_MODE_IMMEDIATE;
-                    write_opcode();
-                    processed = 1;
-                } else {
-                    char reg;
-                    int indexed_indirect = is_indexed_indirect(&reg);
-                    if(indexed_indirect) {
-                        // Already inside bracket
-                        if(reg == 'x') {
-                            // , in ,x ends expression so evaluate to ignore active open (
-                            as->opcode_info.value = evaluate_expression();
-                        } else {
-                            // start with the "active" ( and end in ) so parse
-                            as->opcode_info.value = parse_expression();
-                        }
-                        as->opcode_info.addressing_mode = indexed_indirect;
-                        write_opcode();
-                        next_token();
-                        // Make sure it was ,x or ,y
-                        if(tolower(*as->token_start) != reg) {
-                            errlog("Expected ,%c", reg);
-                        }
-                        next_token();
-                        // If it was ,x go past the closing )
-                        if(as->current_token.op == ')') {
-                            next_token();
-                        }
-                        processed = 1;
+            } else {
+                char reg;
+                int indexed_indirect = is_indexed_indirect(&reg);
+                if(indexed_indirect) {
+                    // Already inside bracket
+                    if(reg == 'x') {
+                        // , in ,x ends expression so evaluate to ignore active open (
+                        as->opcode_info.value = evaluate_expression();
+                    } else {
+                        // start with the "active" ( and end in ) so parse
+                        as->opcode_info.value = parse_expression();
                     }
+                    as->opcode_info.addressing_mode = indexed_indirect;
+                    write_opcode();
+                    next_token();
+                    // Make sure it was ,x or ,y
+                    if(tolower(*as->token_start) != reg) {
+                        errlog("Expected ,%c", reg);
+                    }
+                    next_token();
+                    // If it was ,x go past the closing )
+                    if(as->current_token.op == ')') {
+                        next_token();
+                    }
+                    processed = 1;
                 }
-                break;
+            }
+            break;
         }
         if(!processed) {
             // general case
             as->opcode_info.value = parse_expression();
             if(as->opcode_info.width >= 8 && as->expression_size > 8) {
-                as->opcode_info.width = 16; //as->expression_size;
+                as->opcode_info.width = 16;                 //as->expression_size;
             }
             decode_abs_rel_zp_opcode();
         }
@@ -957,18 +1001,18 @@ void parse_variable() {
 int assembler_init(const char *starting_file) {
     as->current_file = starting_file;
 
-    memset(as->m->RAM_MAIN, 0, 64*1024);
-    
+    memset(as->m->RAM_MAIN, 0, 64 * 1024);
+
     errlog_init();
 
     array_init(&as->symbol_table, sizeof(DYNARRAY));
     array_resize(&as->symbol_table, 256);
-    for(int i=0; i < 256; i++) {
+    for(int i = 0; i < 256; i++) {
         array_init(ARRAY_GET(&as->symbol_table, DYNARRAY, i), sizeof(SYMBOL_LABEL));
     }
     array_init(&as->anon_symbols, sizeof(uint16_t));
     array_init(&as->loop_stack, sizeof(FOR_LOOP));
-    
+
     include_files_init();
 
     as->start_address = -1;
@@ -981,8 +1025,160 @@ void assembler_shutdown() {
     include_files_cleanup();
     errlog_shutdown(errorlog.log_array);
     array_free(&as->anon_symbols);
-    for(int i=0; i < 256; i++) {
+    for(int i = 0; i < 256; i++) {
         array_free(ARRAY_GET(&as->symbol_table, DYNARRAY, i));
     }
     array_free(&as->symbol_table);
 }
+
+#ifdef IS_ASSEMBLER
+
+int get_argument(int argc, char *argv[], const char *key, const char **value) {
+    for(int i = 1; i < argc; ++i) {
+        if(stricmp(argv[i], key) == 0 && (i + 1 < argc || !value)) {
+            if(value) {
+                *value = argv[i + 1];
+            }
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void usage(char *program_name) {
+    char *c = program_name + strlen(program_name) - 1;
+    while(c > program_name) {
+        if(*c == '/' || *c == '\\') {
+            c++;
+            break;
+        }
+        c--;
+    }
+
+    fprintf(stderr, "Usage: %s <-i infile> [-o outfile] [-v]\n", c);
+    fprintf(stderr, "Where: infile is a 6502 assembly language file\n");
+    fprintf(stderr, "       outfile will be a binary file containing the assembled 6502\n");
+    fprintf(stderr, "       -v turns on verbose and will dump the hex 6502 as it was assembled\n");
+}
+
+int main(int argc, char **argv) {
+    char *output_file_name = 0;
+    char *symbol_file_name = 0;
+    char *input_file;
+    int required = 1;
+
+    as = &assembler;
+    as->m = &apple2;
+
+    required &= get_argument(argc, argv, "-i", &input_file);
+    get_argument(argc, argv, "-o", &output_file_name);
+    as->verbose = get_argument(argc, argv, "-v", NULL);
+    get_argument(argc, argv, "-s", &symbol_file_name);
+
+    if(!required) {
+        usage(argv[0]);
+        exit(1);
+    }
+
+    if(A2_OK != assembler_init(input_file)) {
+        exit(1);
+    }
+
+    while(as->pass < 2) {
+        if(A2_OK != include_files_push(input_file)) {
+            fprintf(stderr, "File %s could not be opened\n", input_file);
+            exit(1);
+        }
+        as->current_address = 0;
+        as->pass++;
+        while(as->pass < 3) {
+            do {
+                // a newline returns an empty token so keep
+                // getting tokens till there's something to process
+                get_token();
+            } while(as->token_start == as->input && *as->input);
+
+            if(as->token_start == as->input) {
+                // The end of the file has been reached so if it was an included file
+                // pop to the parent, or end
+                if(A2_OK == include_files_pop()) {
+                    continue;
+                }
+                break;
+            }
+
+            // Prioritize specific checks to avoid ambiguity
+            if(is_opcode()) {                               // Opcode first
+                parse_opcode();
+            } else if(is_dot_command()) {                   // Dot commands next
+                parse_dot_command();
+            } else if(is_label()) {                         // Labels (endings in ":")
+                parse_label();
+            } else if(is_address()) {                       // Address (starting with "*")
+                parse_address();
+            } else if(is_variable()) {                      // Variables are last (followed by "=")
+                // parse_variable();
+                as->current_token.type = TOKEN_VAR;         // Variable Name
+                as->current_token.name = as->token_start;
+                as->current_token.name_length = as->input - as->token_start;
+                as->current_token.name_hash = fnv_1a_hash(as->current_token.name, as->current_token.name_length);
+                parse_expression();
+            } else {
+                errlog("Unknown token");
+            }
+        }
+        if(errorlog.log_array.items) {
+            // Second pass errors get reported
+            fprintf(stderr, "\nAssembly errors:\n");
+            for(size_t i = 0; i < errorlog.log_array.items; i++) {
+                fprintf(stderr, "%s\n", *ARRAY_GET(&errorlog.log_array, char *, i));
+            }
+        }
+    }
+
+    // Write the output to a file
+    if(output_file_name && as->start_address < as->last_address) {
+        UTIL_FILE output_file;
+        memset(&output_file, 0, sizeof(UTIL_FILE));
+        if(A2_OK != util_file_open(&output_file, output_file_name, "wb")) {
+            fprintf(stderr, "Could not open output file %s for writing\n", output_file_name);
+        } else {
+            fwrite(&as->m->RAM_MAIN[as->start_address], 1, as->last_address - as->start_address, output_file.fp);
+        }
+        util_file_discard(&output_file);
+    }
+
+    // sort the symbol table by adress and write to a file
+    if(symbol_file_name) {
+        UTIL_FILE symbol_file;
+        memset(&symbol_file, 0, sizeof(UTIL_FILE));
+        if(A2_OK != util_file_open(&symbol_file, symbol_file_name, "w")) {
+            fprintf(stderr, "Could not open output file %s for writing\n", symbol_file_name);
+        } else {
+            size_t bucket, i;
+            // Accumulate all symbols in hash bucket 0
+            DYNARRAY *b0 = ARRAY_GET(&as->symbol_table, DYNARRAY, 0);
+            for(bucket = 1; bucket < 256; bucket++) {
+                DYNARRAY *b = ARRAY_GET(&as->symbol_table, DYNARRAY, bucket);
+                for(i = 0; i < b->items; i++) {
+                    SYMBOL_LABEL *sl = ARRAY_GET(b, SYMBOL_LABEL, i);
+                    ARRAY_ADD(b0, *sl);
+                }
+            }
+            // Sort hash bucket 0
+            qsort(b0->data, b0->items, sizeof(SYMBOL_LABEL), symbol_sort);
+            // Write the sorted symbols to a file
+            for(i = 0; i < b0->items; i++) {
+                SYMBOL_LABEL *sl = ARRAY_GET(b0, SYMBOL_LABEL, i);
+                fprintf(symbol_file.fp, "%04X %.*s\n", (uint16_t) sl->symbol_value, (int) sl->symbol_length, sl->symbol_name);
+            }
+        }
+        util_file_discard(&symbol_file);
+    }
+
+    assembler_shutdown();
+    puts("\nDone.\n");
+    return 0;
+}
+
+#endif                                                      // IS_ASSEMBLER

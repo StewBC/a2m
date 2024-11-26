@@ -1,7 +1,12 @@
+#-----------------------------------------------------------------------------
+# Stefan Wessels, November 2024
+# Builds an Apple ][+ emulator, called apple2
+# Builds a 6502 assembler, called asm6502
+
 cmake_minimum_required(VERSION 3.16)
 
 # Set project name
-project(apple2 LANGUAGES C)
+project(a2m LANGUAGES C)
 
 # Set the C++ standard
 set(CMAKE_CXX_STANDARD 11)
@@ -11,8 +16,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 find_package(SDL2 CONFIG REQUIRED)
 find_package(SDL2_mixer CONFIG REQUIRED)
 
+#-----------------------------------------------------------------------------
+# EMULATOR with some sources shared with ASSEMBLER below
+
 # Add the executable
-add_executable(${PROJECT_NAME}
+add_executable(apple2
     src/6502.c
     src/apple2.c
     src/asm6502.c
@@ -42,8 +50,10 @@ add_executable(${PROJECT_NAME}
     src/viewport.c
 )
 
+target_compile_definitions(apple2 PRIVATE IS_EMULATOR)
+
 # Link SDL2, SDL2main, and SDL2_mixer libraries
-target_link_libraries(${PROJECT_NAME}
+target_link_libraries(apple2
     SDL2::SDL2
     SDL2::SDL2main
     $<IF:$<TARGET_EXISTS:SDL2_mixer::SDL2_mixer>,SDL2_mixer::SDL2_mixer,SDL2_mixer::SDL2_mixer-static>
@@ -62,7 +72,7 @@ if(UNIX AND NOT APPLE)
     )
 endif()
 
-target_compile_definitions(${PROJECT_NAME}
+target_compile_definitions(apple2
     PRIVATE $<$<PLATFORM_ID:Windows>:-D_CRT_SECURE_NO_WARNINGS>
 )
 
@@ -77,10 +87,33 @@ if(WIN32)
     file(GLOB DLLS "${_VCPKG_INSTALLED_DIR}/bin/*.dll")
 
     foreach(DLL ${DLLS})
-        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        add_custom_command(TARGET apple2 POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "${DLL}"
-                $<TARGET_FILE_DIR:${PROJECT_NAME}>
+                $<TARGET_FILE_DIR:apple2>
         )
     endforeach()
 endif()
+
+#-----------------------------------------------------------------------------
+# ASSEMBLER with shared sources
+
+# Add the executable
+add_executable(asm6502
+    src/asm6502.c
+    src/asm6502.h
+    src/asmexpr.c
+    src/asmexpr.h
+    src/asmgperf.c
+    src/asmgperf.h
+    src/dynarray.c
+    src/errorlog.c
+    src/errorlog.h
+    src/util.c
+)
+
+target_compile_definitions(asm6502 PRIVATE IS_ASSEMBLER)
+
+target_link_libraries(asm6502
+    $<$<PLATFORM_ID:Linux>:m>
+)

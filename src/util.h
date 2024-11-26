@@ -17,7 +17,7 @@ typedef struct UTIL_FILE {
     char *file_path;                                        // Full path of the file
     char *file_mode;                                        // How it was opened, example "rb+"
     char *file_data;                                        // Buffer with the contents of the file if it was loaded
-    int64_t file_size;                                        // File's size
+    int64_t file_size;                                      // File's size
     size_t load_padding;                                    // When alloc'ing a buffer to load the file, add this to size
     uint8_t is_used:1;
     uint8_t is_file_open:1;
@@ -29,11 +29,11 @@ typedef void (*INI_PAIR_CALLBACK)(void *user_data, char *section, char *key, cha
 
 int util_dir_change(const char *path);
 int util_dir_get_current(char *buffer, size_t buffer_size);
-int util_dir_load_contents(DYNARRAY *array);
+int util_dir_load_contents(DYNARRAY * array);
 
-void util_file_close(UTIL_FILE *f);
-int util_file_load(UTIL_FILE *f, const char *file_name, const char *file_mode);
-int util_file_open(UTIL_FILE *f, const char *file_name, const char *file_mode);
+void util_file_close(UTIL_FILE * f);
+int util_file_load(UTIL_FILE * f, const char *file_name, const char *file_mode);
+int util_file_open(UTIL_FILE * f, const char *file_name, const char *file_mode);
 
 char *util_ini_find_character(char **start, char character);
 char *util_ini_get_line(char **start, char *end);
@@ -42,4 +42,4 @@ int util_ini_load_file(char *filename, INI_PAIR_CALLBACK callback, void *user_da
 
 char *util_strrtok(char *str, const char *delim);
 int util_qsort_cmp(const void *p1, const void *p2);
-void util_file_discard(UTIL_FILE *f);
+void util_file_discard(UTIL_FILE * f);

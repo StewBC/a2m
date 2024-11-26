@@ -1,3 +1,7 @@
+// Apple ][+ emulator and assembler
+// Stefan Wessels, 2024
+// This is free and unencumbered software released into the public domain.
+
 #pragma once
 
 // Also see ../gperf/asm6502.gperf
@@ -89,10 +93,10 @@ typedef enum {
 
 // Token structure
 typedef struct {
-    TOKENTYPE type; // For the expression parser state machine
+    TOKENTYPE type;                                         // For the expression parser state machine
     int64_t value;
-    char op;    // Im expressions the operator but also useful for token ID
-    const char *name;  // Variable name for lookup
+    char op;                                                // Im expressions the operator but also useful for token ID
+    const char *name;                                       // Variable name for lookup
     uint32_t name_length;
     uint32_t name_hash;
 } TOKEN;
@@ -106,11 +110,11 @@ typedef enum {
 // Named symbols lookup struct
 typedef struct {
     SYMBOL_TYPE symbol_type;
-    const char *symbol_name;    // Non-null-terminated name
-    uint32_t symbol_length; // Name length
+    const char *symbol_name;                                // Non-null-terminated name
+    uint32_t symbol_length;                                 // Name length
     uint64_t symbol_hash;
     uint64_t symbol_value;
-    uint32_t symbol_width;  // 0 - depends on value, 16 not 1 byte
+    uint32_t symbol_width;                                  // 0 - depends on value, 16 not 1 byte
 } SYMBOL_LABEL;
 
 enum {
@@ -127,59 +131,62 @@ enum {
 };
 
 typedef struct OpcodeInfo {
-    const char *mnemonic;   // lda, etc.
-    uint8_t opcode_id;      // GPERF_OPCODE_*
-    uint8_t width;          // 0 (implied), 1 (relative), 8, 16
+    const char *mnemonic;                                   // lda, etc.
+    uint8_t opcode_id;                                      // GPERF_OPCODE_*
+    uint8_t width;                                          // 0 (implied), 1 (relative), 8, 16
     uint8_t addressing_mode;
     uint64_t value;
 } OpcodeInfo;
 
 enum {
-    BYTE_ORDER_LO,  // for exmple .word vs .drow
+    BYTE_ORDER_LO,                                          // for exmple .word vs .drow
     BYTE_ORDER_HI,
 };
 
 typedef struct PARSE_DATA {
-    const char *file_name;          // Name of the file in which .include encountered
-    const char *input;              // Input token position when .include encountered
-    size_t line_number;             // Line number when include .include encountered
+    const char *file_name;                                  // Name of the file in which .include encountered
+    const char *input;                                      // Input token position when .include encountered
+    size_t line_number;                                     // Line number when include .include encountered
 } PARSE_DATA;
 
 typedef struct INCLUDE_FILES {
-    DYNARRAY included_files;        // Array of all files loaded (UTIL_FILE)
-    DYNARRAY stack;                 // .include causes a push of PARSE_DATA
+    DYNARRAY included_files;                                // Array of all files loaded (UTIL_FILE)
+    DYNARRAY stack;                                         // .include causes a push of PARSE_DATA
 } INCLUDE_FILES;
 
-typedef struct FOR_LOOP {                   // For init, condition, adjust
-    const char *loop_condition_start;       // Points at condition
-    const char *loop_adjust_start;          // Points at loop counter adjust expression
-    const char *loop_body_start;            // Points at text to excute in loop
-    const char *loop_start_file;            // .for and .endfor must be in same file
-    size_t body_line;                       // Line nuber where body loop starts
-    size_t iterations;                      // Break out of runaway loops
+typedef struct FOR_LOOP {                                   // For init, condition, adjust
+    const char *loop_condition_start;                       // Points at condition
+    const char *loop_adjust_start;                          // Points at loop counter adjust expression
+    const char *loop_body_start;                            // Points at text to excute in loop
+    const char *loop_start_file;                            // .for and .endfor must be in same file
+    size_t body_line;                                       // Line nuber where body loop starts
+    size_t iterations;                                      // Break out of runaway loops
 } FOR_LOOP;
 
 typedef struct {
-    APPLE2 *m;                      // To be able to write to memory
-    const char *strcode;            // Active .strcode expression
-    const char *current_file;       // Points at a UTIL_FILE path_name
-    const char *input;              // Points at the assembly language buffer (start through end)
-    const char *line_start;         // Just past \n of line input is on
-    const char *next_start;         // So errors get reported on line of last token
-    const char *token_start;        // Points at the start of a token (and input the end)
-    DYNARRAY anon_symbols;          // Array of anonymous symbols
-    DYNARRAY loop_stack;            // Array of for loops
-    DYNARRAY symbol_table;          // Array of arrays of symbols
-    INCLUDE_FILES include_files;    // The arrays for files and stack for .include
-    int expression_size;            // Forward defs can't change size (16 bit can't become 8 later)
-    int pass;                       // 1 or 2 for 2 pass assembler
-    OpcodeInfo opcode_info;         // State of what is to be emitted in terms of 6502 opcodes
-    size_t current_line;            // for error reporting, line being processed
-    size_t next_line_count;         // count of lines past last token
-    TOKEN current_token;            // What is being parsed
-    uint16_t current_address;       // Address where next byte will be emitted
-    uint16_t start_address;         // First address where the assembler output a byte
-    uint16_t last_address;          // Last address where the assembler put a byte
+    APPLE2 *m;                                              // To be able to write to memory
+    const char *strcode;                                    // Active .strcode expression
+    const char *current_file;                               // Points at a UTIL_FILE path_name
+    const char *input;                                      // Points at the assembly language buffer (start through end)
+    const char *line_start;                                 // Just past \n of line input is on
+    const char *next_start;                                 // So errors get reported on line of last token
+    const char *token_start;                                // Points at the start of a token (and input the end)
+    DYNARRAY anon_symbols;                                  // Array of anonymous symbols
+    DYNARRAY loop_stack;                                    // Array of for loops
+    DYNARRAY symbol_table;                                  // Array of arrays of symbols
+    INCLUDE_FILES include_files;                            // The arrays for files and stack for .include
+    int expression_size;                                    // Forward defs can't change size (16 bit can't become 8 later)
+    int pass;                                               // 1 or 2 for 2 pass assembler
+    OpcodeInfo opcode_info;                                 // State of what is to be emitted in terms of 6502 opcodes
+    size_t current_line;                                    // for error reporting, line being processed
+    size_t next_line_count;                                 // count of lines past last token
+    TOKEN current_token;                                    // What is being parsed
+    uint16_t current_address;                               // Address where next byte will be emitted
+    uint16_t start_address;                                 // First address where the assembler output a byte
+    uint16_t last_address;                                  // Last address where the assembler put a byte
+#ifdef IS_ASSEMBLER
+    int verbose;
+#endif                                                      // IS_ASSEMBLER
 } ASSEMBLER;
 
 extern ASSEMBLER *as;
@@ -194,8 +201,8 @@ void emit(uint8_t byte_value);
 void write_opcode();
 void write_bytes(uint64_t value, int width, int order);
 void write_values(int width, int order);
-int anonymous_symbol_lookup(uint16_t *address, int direction);
-int symbol_sort(const void* lhs, const void* rhs);
+int anonymous_symbol_lookup(uint16_t * address, int direction);
+int symbol_sort(const void *lhs, const void *rhs);
 SYMBOL_LABEL *symbol_store(const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TYPE symbol_type, uint64_t value);
 SYMBOL_LABEL *symbol_lookup(uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length);
 char character_in_characters(const char character, const char *characters);

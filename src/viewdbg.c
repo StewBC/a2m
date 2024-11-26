@@ -75,7 +75,7 @@ int viewdbg_add_symbols(DEBUGGER *d, char *data, size_t data_length, int overwri
                 }
                 SYMBOL *sym = ARRAY_GET(s, SYMBOL, i);
                 sym->pc = address;
-                sym->symbol_name = (char *)malloc(symbol_length + 1);
+                sym->symbol_name = (char *) malloc(symbol_length + 1);
                 if(!sym->symbol_name) {
                     return A2_ERR;
                 }
@@ -230,11 +230,11 @@ int viewdbg_init(DEBUGGER *d, int num_lines) {
     }
 
     // Set all entries to 0
-    memset(d->code_lines->data, 0, sizeof(CODE_LINE) *num_lines);
+    memset(d->code_lines->data, 0, sizeof(CODE_LINE) * num_lines);
     // Allocate the buffer for the text of each line
     for(int i = 0; i < num_lines; i++) {
         CODE_LINE *code_line = ARRAY_GET(d->code_lines, CODE_LINE, i);
-        code_line->text = (char *)malloc(CODE_LINE_LENGTH);
+        code_line->text = (char *) malloc(CODE_LINE_LENGTH);
         if(!code_line->text) {
             goto error;
         }
@@ -247,7 +247,7 @@ int viewdbg_init(DEBUGGER *d, int num_lines) {
     d->num_lines = num_lines;
 
     // Make the 256 symbols "buckets"
-    d->symbols = (DYNARRAY *) malloc(sizeof(DYNARRAY) *256);
+    d->symbols = (DYNARRAY *) malloc(sizeof(DYNARRAY) * 256);
     if(!d->symbols) {
         goto error;
     }
@@ -294,7 +294,7 @@ uint16_t viewdbg_next_pc(APPLE2 *m, uint16_t pc) {
 uint16_t viewdbg_prev_pc(APPLE2 *m, uint16_t pc) {
     // Go back at least 7 "lines" (assume 3 byte instructions)
     // 7 is arbitrary but less screwes up more - balance speed with success
-    uint16_t step_back = 7 *3;
+    uint16_t step_back = 7 * 3;
     while(step_back > 1) {
         uint16_t search_pc = pc - step_back;
         // Walk towards the desired PC
@@ -463,17 +463,17 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
             m->monitor_type = mode & 1;
         } else {
             switch (m->screen_mode) {
-                case 0b000:
-                case 0b010:
-                case 0b100:
-                case 0b110:
-                    // If a text mode, toggle 80 col mode
-                    m->cols80active ^= 1;                       // 80 col toggle
-                    break;
-                default:
-                    // Otherwise toggle mono mode
-                    m->monitor_type ^= 1;                       // b&w/color toggle
-                    break;
+            case 0b000:
+            case 0b010:
+            case 0b100:
+            case 0b110:
+                // If a text mode, toggle 80 col mode
+                m->cols80active ^= 1;                       // 80 col toggle
+                break;
+            default:
+                // Otherwise toggle mono mode
+                m->monitor_type ^= 1;                       // b&w/color toggle
+                break;
             }
         }
         return 1;
@@ -499,8 +499,7 @@ void viewdbg_show(APPLE2 *m) {
     viewdbg_build_code_lines(m, d->cursor_pc, d->num_lines);
     int w = m->viewport->full_window_rect.w - m->viewport->target_rect.w;
     // Now draw the windows showing the lines
-    if(nk_begin(ctx, "Disassembly", nk_rect(747, 90, 373, 470),
-                NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
+    if(nk_begin(ctx, "Disassembly", nk_rect(747, 90, 373, 470), NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
         DEBUGGER *d = &v->debugger;
         for(int i = 0; i < d->num_lines; i++) {
             CODE_LINE *code_line = ARRAY_GET(d->code_lines, CODE_LINE, i);

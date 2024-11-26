@@ -1,3 +1,7 @@
+// Apple ][+ emulator and assembler
+// Stefan Wessels, 2024
+// This is free and unencumbered software released into the public domain.
+
 #include "header.h"
 
 //----------------------------------------------------------------------------
@@ -9,8 +13,8 @@ void get_token() {
         // End of file, or a line/token terminating character encountered
         as->current_token.type = TOKEN_END;
         as->current_token.op = c;
-        if(c == ',') { 
-            as->input++; 
+        if(c == ',') {
+            as->input++;
         } else if(c == ';') {
             while(*as->input && !is_newline(*as->input)) {
                 as->input++;
@@ -19,7 +23,7 @@ void get_token() {
         while(is_newline(*as->input)) {
             as->next_line_count++;
             // MS line endings are 2 characters
-            if(is_newline(*(as->input+1)) && *as->input != *(as->input+1)) {
+            if(is_newline(*(as->input + 1)) && *as->input != *(as->input + 1)) {
                 as->input++;
             }
             as->input++;
@@ -33,8 +37,7 @@ void get_token() {
         as->line_start = as->next_start;
         as->current_line += as->next_line_count;
         as->next_line_count = 0;
-    }   
-
+    }
     // Skip whitespace
     while(isspace(*as->input) && !is_newline(*as->input)) {
         as->input++;
@@ -45,7 +48,6 @@ void get_token() {
         get_token();
         return;
     }
-
     // include valid token characters in token
     as->token_start = as->input;
     int instring = *as->token_start == '"';
@@ -96,87 +98,87 @@ void next_token() {
 
     if(as->token_start >= as->input || character_in_characters(*as->token_start, ",;\n\r")) {
         as->current_token.type = TOKEN_END;
-    } else if(*as->token_start == '$') {  // Hex number
+    } else if(*as->token_start == '$') {                    // Hex number
         get_token();
         as->current_token.type = TOKEN_NUM;
-        as->current_token.value = strtoll(as->token_start, (char**)&as->token_start, 16);
-        as->input = as->token_start; // If there are unconverted characters, set the input back to them
-    } else if(*as->token_start == '0') {  // Octal number
+        as->current_token.value = strtoll(as->token_start, (char **) &as->token_start, 16);
+        as->input = as->token_start;                        // If there are unconverted characters, set the input back to them
+    } else if(*as->token_start == '0') {                    // Octal number
         as->token_start++;
         as->current_token.type = TOKEN_NUM;
-        as->current_token.value = strtoll(as->token_start, (char**)&as->token_start, 8);
+        as->current_token.value = strtoll(as->token_start, (char **) &as->token_start, 8);
         as->input = as->token_start;
-    } else if(*as->token_start == '%') {  // Binary or Mod
-        if(*(as->token_start+1) == '0' || *(as->token_start+1) == '1') {
+    } else if(*as->token_start == '%') {                    // Binary or Mod
+        if(*(as->token_start + 1) == '0' || *(as->token_start + 1) == '1') {
             get_token();
-            as->current_token.type = TOKEN_NUM; // Binary number
-            as->current_token.value = strtoll(as->token_start, (char**)&as->token_start, 2);
+            as->current_token.type = TOKEN_NUM;             // Binary number
+            as->current_token.value = strtoll(as->token_start, (char **) &as->token_start, 2);
             as->input = as->token_start;
         } else {
             as->current_token.type = TOKEN_OP;
-            as->current_token.op = '%'; // Mod
+            as->current_token.op = '%';                     // Mod
         }
-    } else if(*as->token_start == '*') {  // Detect multiply or exponentiation '**'
-        if(*(as->token_start+1) == '*') {
+    } else if(*as->token_start == '*') {                    // Detect multiply or exponentiation '**'
+        if(*(as->token_start + 1) == '*') {
             get_token();
             as->current_token.type = TOKEN_OP;
-            as->current_token.op = 'P';  // '**' = Raise to 'P'ower of
+            as->current_token.op = 'P';                     // '**' = Raise to 'P'ower of
         } else {
             as->current_token.type = TOKEN_OP;
-            as->current_token.op = '*'; // Multiply
+            as->current_token.op = '*';                     // Multiply
         }
-    } else if(*as->token_start == '&') { // And
-        if(*(as->token_start+1) == '&') {
+    } else if(*as->token_start == '&') {                    // And
+        if(*(as->token_start + 1) == '&') {
             get_token();
             as->current_token.type = TOKEN_OP;
-            as->current_token.op = 'A';  // Logical And '&&' as 'A'nd
+            as->current_token.op = 'A';                     // Logical And '&&' as 'A'nd
         } else {
             as->current_token.type = TOKEN_OP;
-            as->current_token.op = '&'; // Binary And
+            as->current_token.op = '&';                     // Binary And
         }
-    } else if(*as->token_start == '|') { // Or
-        if(*(as->token_start+1) == '|') {
+    } else if(*as->token_start == '|') {                    // Or
+        if(*(as->token_start + 1) == '|') {
             get_token();
             as->current_token.type = TOKEN_OP;
-            as->current_token.op = 'O';  // Logical Or '||' as 'O'r
+            as->current_token.op = 'O';                     // Logical Or '||' as 'O'r
         } else {
             as->current_token.type = TOKEN_OP;
-            as->current_token.op = '|'; // Binary Or
+            as->current_token.op = '|';                     // Binary Or
         }
-    } else if(*as->token_start == '.') {  // .lt, .le, .gt, .ge, .ne & .eq
+    } else if(*as->token_start == '.') {                    // .lt, .le, .gt, .ge, .ne & .eq
         as->token_start++;
         char first = toupper(*as->token_start);
         as->current_token.type = TOKEN_OP;
         as->current_token.op = first;
         as->token_start++;
         char second = toupper(*as->token_start);
-        switch(first) {
-            case 'L':
-            case 'G':
-                if(second == 'E') {
-                    as->current_token.op = tolower(first);
-                } else if(second != 'T') {
-                    errlog("Expected .%cT or %cE", first, first);
-                }
-                break;
-            case 'E':
-                if(second != 'Q') {
-                    errlog("Expected .EQ");
-                }
-                break;
-            case 'N':
-                if(second != 'E') {
-                    errlog("Expected .NE");
-                }
-                break;
-            default:
-                errlog("Expected .LT, .LE, .GT, .GE, .EQ or .NE");
+        switch (first) {
+        case 'L':
+        case 'G':
+            if(second == 'E') {
+                as->current_token.op = tolower(first);
+            } else if(second != 'T') {
+                errlog("Expected .%cT or %cE", first, first);
+            }
+            break;
+        case 'E':
+            if(second != 'Q') {
+                errlog("Expected .EQ");
+            }
+            break;
+        case 'N':
+            if(second != 'E') {
+                errlog("Expected .NE");
+            }
+            break;
+        default:
+            errlog("Expected .LT, .LE, .GT, .GE, .EQ or .NE");
         }
     } else if(isdigit(*as->token_start)) {
-        as->current_token.type = TOKEN_NUM; // Decimal Number
-        as->current_token.value = strtoll(as->token_start, (char**)&as->token_start, 10);
-    } else if(isalpha(*as->token_start) || *as->token_start == '_') {  // Detect variable names, allowing '_'
-        as->current_token.type = TOKEN_VAR; // Variable Name
+        as->current_token.type = TOKEN_NUM;                 // Decimal Number
+        as->current_token.value = strtoll(as->token_start, (char **) &as->token_start, 10);
+    } else if(isalpha(*as->token_start) || *as->token_start == '_') { // Detect variable names, allowing '_'
+        as->current_token.type = TOKEN_VAR;                 // Variable Name
         as->current_token.name = as->token_start;
         as->current_token.name_length = as->input - as->token_start;
         as->current_token.name_hash = fnv_1a_hash(as->current_token.name, as->current_token.name_length);
@@ -191,7 +193,7 @@ void next_token() {
         // as->current_token.type = TOKEN_NUM;  // All other one char operators (+ - ? : etc.)
         // get_token();
     } else {
-        as->current_token.type = TOKEN_OP;  // All other one char operators (+ - ? : etc.)
+        as->current_token.type = TOKEN_OP;                  // All other one char operators (+ - ? : etc.)
         as->current_token.op = *as->token_start++;
     }
 }
@@ -200,8 +202,8 @@ void next_token() {
 // Math worker function
 int64_t exponentiation_by_squaring(int64_t base, int64_t exp) {
     int64_t result = 1;
-    while (exp > 0) {
-        if (exp & 1) {
+    while(exp > 0) {
+        if(exp & 1) {
             result *= base;
         }
         exp >>= 1;
@@ -216,7 +218,7 @@ int64_t exponentiation_by_squaring(int64_t base, int64_t exp) {
 int64_t parse_primary() {
     int64_t value;
     // Expreesion starting with * is an address expression
-    if (as->current_token.type == TOKEN_OP && as->current_token.op == '*') {
+    if(as->current_token.type == TOKEN_OP && as->current_token.op == '*') {
         next_token();
         value = 1 + as->current_address;
     } else if(as->current_token.type == TOKEN_OP && as->current_token.op == ':') {
@@ -262,7 +264,7 @@ int64_t parse_primary() {
                         op = 0;
                     } else {
                         if(sl->symbol_type == SYMBOL_UNKNOWN) {
-                           sl->symbol_type = SYMBOL_VARIABLE;
+                            sl->symbol_type = SYMBOL_VARIABLE;
                         }
                         if(op == '+') {
                             value = ++sl->symbol_value;
@@ -276,7 +278,6 @@ int64_t parse_primary() {
                 errlog("Cannot assign value to label %.*s", sl->symbol_length, sl->symbol_name);
             }
         }
-
         // If a lookup reads an unknown variable, it becomes a 2-byte variable
         // regardless of value later when that becomes known
         if(sl->symbol_type == SYMBOL_UNKNOWN) {
@@ -299,34 +300,34 @@ int64_t parse_primary() {
 }
 
 int64_t parse_factor() {
-    if (as->current_token.type == TOKEN_OP) {
-        if (as->current_token.op == '+') {  // Unary positive
+    if(as->current_token.type == TOKEN_OP) {
+        if(as->current_token.op == '+') {                   // Unary positive
             next_token();
             return parse_factor();
-        } else if (as->current_token.op == '-') {  // Unary negation
+        } else if(as->current_token.op == '-') {            // Unary negation
             next_token();
             return -parse_factor();
-        } else if (as->current_token.op == '<') {  // Low byte
+        } else if(as->current_token.op == '<') {            // Low byte
             next_token();
             int64_t value = parse_factor() & 0xFF;
             as->expression_size = 0;
             return value;
-        } else if (as->current_token.op == '>') {  // High byte
+        } else if(as->current_token.op == '>') {            // High byte
             next_token();
             int64_t value = (parse_factor() >> 8) & 0xFF;
             as->expression_size = 0;
             return value;
-        } else if (as->current_token.op == '~') {  // Binary NOT
+        } else if(as->current_token.op == '~') {            // Binary NOT
             next_token();
             return ~parse_factor();
         }
     }
-    return parse_primary();  // Fallback to parse_primary for numbers, variables, etc.
+    return parse_primary();                                 // Fallback to parse_primary for numbers, variables, etc.
 }
 
 int64_t parse_exponentiation() {
     int64_t value = parse_factor();
-    while (as->current_token.type == TOKEN_OP && as->current_token.op == 'P') {  // '**' as 'P'ower
+    while(as->current_token.type == TOKEN_OP && as->current_token.op == 'P') { // '**' as 'P'ower
         next_token();
         int64_t right = parse_factor();
         value = exponentiation_by_squaring(value, right);
@@ -336,17 +337,16 @@ int64_t parse_exponentiation() {
 
 int64_t parse_term() {
     int64_t value = parse_exponentiation();
-    while(as->current_token.type == TOKEN_OP && (as->current_token.op == '*' || as->current_token.op == '/' || as->current_token.op == '%')) {
+    while(as->current_token.type == TOKEN_OP
+          && (as->current_token.op == '*' || as->current_token.op == '/' || as->current_token.op == '%')) {
         char op = as->current_token.op;
         next_token();
         int64_t right = parse_exponentiation();
         if(op == '*') {
             value *= right;
-        }
-        else if(op == '/') {
+        } else if(op == '/') {
             value /= right;
-        }
-        else if(op == '%') {
+        } else if(op == '%') {
             value %= right;
         }
     }
@@ -361,8 +361,7 @@ int64_t parse_additive() {
         int64_t right = parse_term();
         if(op == '+') {
             value += right;
-        }
-        else if(op == '-') {
+        } else if(op == '-') {
             value -= right;
         }
     }
@@ -371,15 +370,14 @@ int64_t parse_additive() {
 
 int64_t parse_shift() {
     int64_t value = parse_additive();
-    while (as->current_token.type == TOKEN_OP && (as->current_token.op == '<' || as->current_token.op == '>')) {
+    while(as->current_token.type == TOKEN_OP && (as->current_token.op == '<' || as->current_token.op == '>')) {
         char op = as->current_token.op;
         next_token();
-        expect(op);  // Expect double operators for << and >>
+        expect(op);                                         // Expect double operators for << and >>
         int64_t right = parse_additive();
-        if (op == '<') {
+        if(op == '<') {
             value <<= right;
-        }
-        else if (op == '>') {
+        } else if(op == '>') {
             value >>= right;
         }
     }
@@ -388,7 +386,7 @@ int64_t parse_shift() {
 
 int64_t parse_bitwise_and() {
     int64_t value = parse_shift();
-    while (as->current_token.type == TOKEN_OP && as->current_token.op == '&') {
+    while(as->current_token.type == TOKEN_OP && as->current_token.op == '&') {
         next_token();
         value &= parse_shift();
     }
@@ -397,7 +395,7 @@ int64_t parse_bitwise_and() {
 
 int64_t parse_bitwise_xor() {
     int64_t value = parse_bitwise_and();
-    while (as->current_token.type == TOKEN_OP && as->current_token.op == '^') {
+    while(as->current_token.type == TOKEN_OP && as->current_token.op == '^') {
         next_token();
         value ^= parse_bitwise_and();
     }
@@ -406,7 +404,7 @@ int64_t parse_bitwise_xor() {
 
 int64_t parse_bitwise_or() {
     int64_t value = parse_bitwise_xor();
-    while (as->current_token.type == TOKEN_OP && as->current_token.op == '|') {
+    while(as->current_token.type == TOKEN_OP && as->current_token.op == '|') {
         next_token();
         value |= parse_bitwise_xor();
     }
@@ -415,33 +413,31 @@ int64_t parse_bitwise_or() {
 
 int64_t parse_relational() {
     int64_t value = parse_bitwise_or();
-    while(as->current_token.type == TOKEN_OP && 
-        (toupper(as->current_token.op) == 'L' || 
-        toupper(as->current_token.op) == 'G' || 
-        toupper(as->current_token.op) == 'E' || 
-        toupper(as->current_token.op) == 'N')) {
+    while(as->current_token.type == TOKEN_OP &&
+          (toupper(as->current_token.op) == 'L' ||
+           toupper(as->current_token.op) == 'G' || toupper(as->current_token.op) == 'E' || toupper(as->current_token.op) == 'N')) {
         char op = as->current_token.op;
         next_token();
         int64_t right = parse_bitwise_or();
-        switch(op) {
-            case 'l':
-                value = value <= right;
-                break;
-            case 'g':
-                value = value >= right;
-                break;
-            case 'L':
-                value = value < right;
-                break;
-            case 'G':
-                value = value > right;
-                break;
-            case 'N':
-                value = value != right;
-                break;
-            case 'E':
-                value = value == right;
-                break;
+        switch (op) {
+        case 'l':
+            value = value <= right;
+            break;
+        case 'g':
+            value = value >= right;
+            break;
+        case 'L':
+            value = value < right;
+            break;
+        case 'G':
+            value = value > right;
+            break;
+        case 'N':
+            value = value != right;
+            break;
+        case 'E':
+            value = value == right;
+            break;
         }
     }
     return value;
@@ -449,8 +445,7 @@ int64_t parse_relational() {
 
 int64_t parse_logical() {
     int64_t value = parse_relational();
-    while(as->current_token.type == TOKEN_OP &&
-        (toupper(as->current_token.op) == 'A' || toupper(as->current_token.op) == 'O')) {
+    while(as->current_token.type == TOKEN_OP && (toupper(as->current_token.op) == 'A' || toupper(as->current_token.op) == 'O')) {
         char op = as->current_token.op;
         next_token();
         int64_t right = parse_relational();
@@ -474,7 +469,7 @@ int64_t parse_conditional(int64_t condition_value) {
 int64_t parse_expression() {
     as->expression_size = 0;
     int64_t value = parse_logical();
-    if (as->current_token.type == TOKEN_OP && as->current_token.op == '?') {
+    if(as->current_token.type == TOKEN_OP && as->current_token.op == '?') {
         value = parse_conditional(value);
     }
 

@@ -30,9 +30,7 @@ void viewmisc_show(APPLE2 *m) {
     struct nk_color ob = ctx->style.window.background;
     int x = 512;
     int w = m->viewport->full_window_rect.w - x;
-    if(nk_begin
-       (ctx, "Miscellaneous", nk_rect(512, 560, 608, 280),
-        NK_WINDOW_SCROLL_AUTO_HIDE | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
+    if(nk_begin(ctx, "Miscellaneous", nk_rect(512, 560, 608, 280), NK_WINDOW_SCROLL_AUTO_HIDE | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
         // The Smartport
         if(nk_tree_push(ctx, NK_TREE_TAB, "SmartPort", NK_MAXIMIZED)) {
             SP_DEVICE *spd = m->sp_device;
@@ -47,7 +45,7 @@ void viewmisc_show(APPLE2 *m) {
                             char label[4];
                             sprintf(label, "%d.%d", i, j);
                             if(nk_button_label(ctx, label)) {
-                                m->cpu.pc = 0xc000 + i *0x100;
+                                m->cpu.pc = 0xc000 + i * 0x100;
                                 m->stopped = 0;
                             }
                         } else {
@@ -116,7 +114,7 @@ void viewmisc_show(APPLE2 *m) {
             // Now a list of breakpoints
             if(fm->breakpoints.items) {
                 // nk_layout_row_dynamic(ctx, 29*(fm->breakpoints.items + 1), 2);
-                nk_layout_row_begin(ctx, NK_DYNAMIC, 29 *(fm->breakpoints.items + 1), 2);
+                nk_layout_row_begin(ctx, NK_DYNAMIC, 29 * (fm->breakpoints.items + 1), 2);
                 nk_layout_row_push(ctx, 0.80f);
                 if(nk_group_begin(ctx, "breakpoints group", 0)) {
                     for(int i = 0; i < fm->breakpoints.items; i++) {

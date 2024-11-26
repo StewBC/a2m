@@ -19,7 +19,7 @@ int util_dir_change(const char *path) {
 
 int util_dir_get_current(char *buffer, size_t buffer_size) {
 #ifdef _WIN32
-    if(_getcwd(buffer, (int)buffer_size) != NULL) {
+    if(_getcwd(buffer, (int) buffer_size) != NULL) {
         return A2_OK;
     }
 #else
@@ -58,7 +58,7 @@ int util_dir_load_contents(DYNARRAY *array) {
         LARGE_INTEGER fileSize;
         fileSize.LowPart = findFileData.nFileSizeLow;
         fileSize.HighPart = findFileData.nFileSizeHigh;
-        info.size = (size_t)fileSize.QuadPart;
+        info.size = (size_t) fileSize.QuadPart;
 
         ARRAY_ADD(array, info);
     } while(FindNextFileA(hFind, &findFileData) != 0);
@@ -85,7 +85,7 @@ int util_dir_load_contents(DYNARRAY *array) {
         strncpy(info.name, entry->d_name, PATH_MAX);
 
         if(stat(entry->d_name, &statbuf) == 0) {
-            info.size = (size_t)statbuf.st_size;
+            info.size = (size_t) statbuf.st_size;
             info.is_directory = S_ISDIR(statbuf.st_mode);
         } else {
             info.size = 0;
@@ -114,7 +114,7 @@ int util_file_load(UTIL_FILE *f, const char *file_name, const char *file_mode) {
     }
     // Get a buffer to hold the contents
     int64_t total_size = f->file_size + f->load_padding;
-    f->file_data = (char *)malloc(total_size);
+    f->file_data = (char *) malloc(total_size);
     if(!f->file_data) {
         return A2_ERR;
     }

@@ -135,22 +135,22 @@ int viewmem_init(MEMSHOW *ms, int num_lines) {
         return A2_ERR;
     }
     // Set all of the MEMLINE structures to 0
-    memset(ms->lines->data, 0, sizeof(MEMLINE) *num_lines);
+    memset(ms->lines->data, 0, sizeof(MEMLINE) * num_lines);
     ms->num_lines = num_lines;
     ms->line_length = MEMSHOW_INITIAL_LINE_LENGTH;
     // Init each memline structure and allocate the space for the text
     for(int i = 0; i < num_lines; i++) {
         MEMLINE *memline = ARRAY_GET(ms->lines, MEMLINE, i);
-        memline->line_text = (char *)malloc(MEMSHOW_INITIAL_LINE_LENGTH);
+        memline->line_text = (char *) malloc(MEMSHOW_INITIAL_LINE_LENGTH);
         if(!memline->line_text) {
             return A2_ERR;
         }
         // null terminate the text and set up the address this line will show
         *memline->line_text = 0;
-        memline->address = i *MEMSHOW_BYTES_PER_ROW;
+        memline->address = i * MEMSHOW_BYTES_PER_ROW;
         memline->last_line = num_lines - 1;
     }
-    ms->find_string = (char *)malloc(MAX_FIND_STRING_LENGTH + 1);
+    ms->find_string = (char *) malloc(MAX_FIND_STRING_LENGTH + 1);
     if(!ms->find_string) {
         return A2_ERR;
     }
@@ -335,7 +335,7 @@ int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window) {
 
         case SDLK_t:                                        // CTRL T - Toggle between ascii and hex edit
             ms->edit_mode_ascii ^= 1;
-            ms->cursor_x = (ms->edit_mode_ascii ? (ms->cursor_x / 2 + 32) : ((ms->cursor_x - 32) *2));
+            ms->cursor_x = (ms->edit_mode_ascii ? (ms->cursor_x / 2 + 32) : ((ms->cursor_x - 32) * 2));
             break;
         }
     } else {
@@ -413,8 +413,7 @@ void viewmem_show(APPLE2 *m) {
     MEMSHOW *ms = &v->memshow;
     int w = 512;
     viewmem_update(m);
-    if(nk_begin(ctx, "Memory", nk_rect(0, 560, 512, 280),
-                NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
+    if(nk_begin(ctx, "Memory", nk_rect(0, 560, 512, 280), NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
         nk_style_set_font(ctx, &v->font->handle);
         nk_layout_row_static(ctx, 10, w, 1);
         struct nk_color active_background = ctx->style.window.background;
@@ -428,7 +427,7 @@ void viewmem_show(APPLE2 *m) {
                 r.h = v->font_height;
                 r.w = v->font_width;
                 r.y += ctx->style.edit.cursor_size + ((r.h + 1) * i); // empirically determined
-                int cx = (ms->cursor_x <= 31 ? (7 + (ms->cursor_x / 2) *3 + (ms->cursor_x % 2)) : (ms->cursor_x + 23));
+                int cx = (ms->cursor_x <= 31 ? (7 + (ms->cursor_x / 2) * 3 + (ms->cursor_x % 2)) : (ms->cursor_x + 23));
                 r.x += cx * r.w;
                 nk_draw_text(&ctx->active->buffer, r, &memline->line_text[cx], 1, ctx->style.font,
                              viewmem_range_colors[memline->id].text_color, viewmem_range_colors[memline->id].background_color);
@@ -491,10 +490,10 @@ void viewmem_update(APPLE2 *m) {
         sprintf(memline->line_text, "%X:%04X:", memline->id, address);
         for(j = 0; j < MEMSHOW_BYTES_PER_ROW; j++) {
             characters[j] = read_from_memory_debug(m, address++);
-            sprintf(memline->line_text + 7 + j *3, "%02X ", characters[j]);
+            sprintf(memline->line_text + 7 + j * 3, "%02X ", characters[j]);
         }
         for(j = 0; j < MEMSHOW_BYTES_PER_ROW; j++) {
-            sprintf(memline->line_text + 7 + MEMSHOW_BYTES_PER_ROW *3 + j, "%c",
+            sprintf(memline->line_text + 7 + MEMSHOW_BYTES_PER_ROW * 3 + j, "%c",
                     isprint(characters[j]) ? characters[j] : isprint(characters[j] & 0x7f) ? characters[j] & 0x7f : '.');
         }
     }

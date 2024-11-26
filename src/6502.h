@@ -76,7 +76,7 @@ typedef struct CPU {
 typedef struct APPLE2 APPLE2;
 
 // Function pointer prototype that point at the steps, each individual cycle, of a 6502 instruction
-typedef void (*OPCODE_STEPS)(APPLE2 *m);
+typedef void (*OPCODE_STEPS)(APPLE2 * m);
 
 // The 256 possible opcodes
 extern OPCODE_STEPS *opcodes[256];
@@ -84,20 +84,20 @@ extern OPCODE_STEPS *opcodes[256];
 extern OPCODE_STEPS UNDEFINED[];
 
 // Configure the ram, MEMORY and bytes setup (what is mapped in)
-uint8_t memory_init(MEMORY *memory, uint16_t num_blocks);
-void memory_add(MEMORY *memory, uint8_t block_num, uint32_t address, uint32_t length, uint8_t *bytes);
-uint8_t pages_init(PAGES *pages, uint16_t num_pages);
-void pages_map(PAGES *pages, uint32_t start_page, uint32_t num_pages, uint8_t *bytes);
-void pages_map_memory_block(PAGES *pages, MEMORY_BLOCK *block);
+uint8_t memory_init(MEMORY * memory, uint16_t num_blocks);
+void memory_add(MEMORY * memory, uint8_t block_num, uint32_t address, uint32_t length, uint8_t * bytes);
+uint8_t pages_init(PAGES * pages, uint16_t num_pages);
+void pages_map(PAGES * pages, uint32_t start_page, uint32_t num_pages, uint8_t * bytes);
+void pages_map_memory_block(PAGES * pages, MEMORY_BLOCK * block);
 
 // 1 time init
-void cpu_init(CPU *cpu);
+void cpu_init(CPU * cpu);
 
 // Step the apple2 a single CPU cycle
-void machine_step(APPLE2 *m);
+void machine_step(APPLE2 * m);
 
 // Helper calls that access the mapped in memory
-uint8_t read_from_memory(APPLE2 *m, uint16_t address);
+uint8_t read_from_memory(APPLE2 * m, uint16_t address);
 // This call for the debugger - doesn't trigger watch
-uint8_t read_from_memory_debug(APPLE2 *m, uint16_t address);
-void write_to_memory(APPLE2 *m, uint16_t address, uint8_t value);
+uint8_t read_from_memory_debug(APPLE2 * m, uint16_t address);
+void write_to_memory(APPLE2 * m, uint16_t address, uint8_t value);

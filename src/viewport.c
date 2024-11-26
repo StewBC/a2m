@@ -41,7 +41,7 @@ int viewport_init(VIEWPORT *v, int w, int h) {
     v->display_scale = 1.0f;
 
     // Configure display_scale from the ini file -- SQW ini file now read/parsed multiple times
-    util_ini_load_file("./apple2.ini", viewport_ini_load_callback, (void *)v);
+    util_ini_load_file("./apple2.ini", viewport_ini_load_callback, (void *) v);
 
     // Scale the window, and set the SDL render scale accordingly
     w *= v->display_scale;
@@ -71,12 +71,12 @@ int viewport_init(VIEWPORT *v, int w, int h) {
         goto error;
     }
     // Create RGB surface
-    v->surface = SDL_CreateRGBSurface(0, 40*7, 24*8, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+    v->surface = SDL_CreateRGBSurface(0, 40 * 7, 24 * 8, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
     if(v->surface == NULL) {
         printf("Surface could not be created! SDL_Error: %s\n", SDL_GetError());
         goto error;
     }
-    v->surface640 = SDL_CreateRGBSurface(0, 80*8, 24*8, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+    v->surface640 = SDL_CreateRGBSurface(0, 80 * 8, 24 * 8, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
     if(v->surface640 == NULL) {
         printf("Surface640 could not be created! SDL_Error: %s\n", SDL_GetError());
         goto error;
@@ -147,7 +147,6 @@ int viewport_process_events(APPLE2 *m) {
     if(!v) {
         return 0;
     }
-
     // Update the CPU view to the latest stats
     if(m->stopped && v->debug_view) {
         viewcpu_update(m);
@@ -269,8 +268,7 @@ void viewport_show_help(APPLE2 *m) {
         nk_label_colored(ctx, "While emulation is running:", NK_TEXT_ALIGN_LEFT, color_help_notice);
         nk_label(ctx, "All keys go to the emulated machine, except for the function keys.", NK_TEXT_ALIGN_LEFT);
         nk_layout_row_dynamic(ctx, 13, 1);
-        nk_label_colored(ctx, "Function keys always go to the emulator.", NK_TEXT_ALIGN_LEFT,
-                         color_help_key_heading);
+        nk_label_colored(ctx, "Function keys always go to the emulator.", NK_TEXT_ALIGN_LEFT, color_help_key_heading);
         nk_layout_row_dynamic(ctx, 13, 2);
         nk_label(ctx, "F1  - Help.", NK_TEXT_ALIGN_LEFT);
         nk_label(ctx, "F9  - Set a breakpoint at the cursor PC.", NK_TEXT_ALIGN_LEFT);
@@ -318,7 +316,8 @@ void viewport_show_help(APPLE2 *m) {
         nk_label(ctx, "PAGE   UP/DOWN - Move the cursor a page up or down.", NK_TEXT_ALIGN_LEFT);
         nk_spacer(ctx);
         nk_layout_row_dynamic(ctx, 13, 1);
-        nk_label(ctx, "Split windows become \"virtual\" windows making it possible to monitor different address ranges all from the one memory window.",
+        nk_label(ctx,
+                 "Split windows become \"virtual\" windows making it possible to monitor different address ranges all from the one memory window.",
                  NK_TEXT_ALIGN_LEFT);
         nk_label_colored(ctx, "Miscellaneous window", NK_TEXT_ALIGN_LEFT, color_help_heading);
         nk_layout_row_dynamic(ctx, 13, 1);

@@ -28,6 +28,6 @@ typedef struct FLOWMANAGER {
 } FLOWMANAGER;
 
 void breakpoints_init();
-BREAKPOINT *breakpoint_at(FLOWMANAGER *b, uint16_t pc, int running);
-void breakpoint_callback(APPLE2 *m, uint16_t address);
-void breakpoint_reapply_address_masks(APPLE2 *m);
+BREAKPOINT *breakpoint_at(FLOWMANAGER * b, uint16_t pc, int running);
+void breakpoint_callback(APPLE2 * m, uint16_t address);
+void breakpoint_reapply_address_masks(APPLE2 * m);

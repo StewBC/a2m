@@ -3,3 +3,4 @@ build/
 disks/
 apple2.ini
 symbols/USER.SYM
+samples/*

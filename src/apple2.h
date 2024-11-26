@@ -36,9 +36,9 @@ enum {
 };
 
 // Prototypes for callbacks when cpu accesses a port
-typedef uint8_t(*CALLBACK_READ) (APPLE2 *m, uint16_t address);
-typedef void (*CALLBACK_WRITE)(APPLE2 *m, uint16_t address, uint8_t value);
-typedef void (*CALLBACK_BREAKP)(APPLE2 *m, uint16_t address);
+typedef uint8_t(*CALLBACK_READ) (APPLE2 * m, uint16_t address);
+typedef void (*CALLBACK_WRITE)(APPLE2 * m, uint16_t address, uint8_t value);
+typedef void (*CALLBACK_BREAKP)(APPLE2 * m, uint16_t address);
 
 // The emulated apple2 (computer)
 typedef struct APPLE2 {
@@ -73,7 +73,7 @@ typedef struct APPLE2 {
 
     // Status flags
     int original_del:1;                                     // backspace key does crsr left if 0
-    int cols80active:1;                                      // Videx/Franklin Ace Display active
+    int cols80active:1;                                     // Videx/Franklin Ace Display active
     int active_page:1;                                      // 0x2000 or 0x4000 - active hires bytes page
     int free_run:1;                                         // 0 - 1 Mhz, 1 - as fast as possible
     int debug_view:1;                                       // Apple ][ is not full-screen, debugger visible
@@ -84,9 +84,9 @@ typedef struct APPLE2 {
     VIEWPORT *viewport;                                     // 0 (no view) or active view for this instance
 } APPLE2;
 
-int apple2_configure(APPLE2 *m);
+int apple2_configure(APPLE2 * m);
 void apple2_ini_load_callback(void *user_data, char *section, char *key, char *value);
-void apple2_shutdown(APPLE2 *m);
-void apple2_slot_configure(APPLE2 *m, int slot, uint8_t type);
-uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address);
-void apple2_softswitch_write_callback(APPLE2 *m, uint16_t address, uint8_t value);
+void apple2_shutdown(APPLE2 * m);
+void apple2_slot_configure(APPLE2 * m, int slot, uint8_t type);
+uint8_t apple2_softswitch_read_callback(APPLE2 * m, uint16_t address);
+void apple2_softswitch_write_callback(APPLE2 * m, uint16_t address, uint8_t value);
