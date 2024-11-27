@@ -1,6 +1,7 @@
 # Apple ][+ Emulator  
-This is an Apple ][+ emulator written in "C" using SDL and the Nuklear immediate mode GUI.  The emulator includes a cycle-accurate 6502 CPU (does not support undocumented opcodes), a Language Card and a SmartPort block device.  No Disk II support.  
+This is an Apple ][+ emulator written in "C" using SDL and the Nuklear immediate mode GUI.  The emulator includes a cycle-accurate 6502 CPU (does not support undocumented opcodes), a Language Card a Franklin Ace 80col display card, and a SmartPort block device.  No Disk II support.  
   
+This repository also contains a stand-alone version of a [6502 Assembler](#6502-assembler) I created, built into the emulator (but not yet accesible from within the emulator).
 This configuration allows booting and running Total Replay or other ProDOS disk volumes.  
   
 ![15 FPS Animated Gif of the emulator in action](assets/a2m-15.gif)  
@@ -140,7 +141,7 @@ HGR: Page 0 = $2000, Page 1 - $4000
 ```  
 `Override Yes` allows changing the values above to see non-active modes and pages.  This is especially useful when looking at how a program draws off-screen if it does page-flipping.  
 `Override No` restores the hardware view of the display.  
-These settings can only be altered when stopped, but stepping or running with `Override On` will keep the override settings.  
+These settings can only be altered when stopped, but stepping or running with `Override On` will keep the override settings.    
 ### Language Card  
 The Language Card section shows the state of the Language Card, whether ROM or RAM is active, which bank, and if writing to RAM is enabled.  The Read ROM / RAM toggle can be set but the rest are read-only.
   
@@ -152,14 +153,159 @@ In this project, a typedef struct is referred to as a "class." The main hardware
   
 The APPLE2 structure is designed to be compact, with dynamic allocation for certain components to support potential "time travel" functionality.  
   
+## 6502 Assembler  
+I added a 6502 assembler to the project.  The assembler will be integrated into the emulator so assembeling code will just show up in memory.  I made a stand-alone version of the assembler which shares the code with the emulator version - it's the same assembler but with command line parsing etc. to make it a useful command line tool.  
+```
+Usage: asm6502.exe <-i infile> [-o outfile] [-s symbolfile] [-v]
+       infile is a 6502 assembly language file
+       outfile will be a binary file containing the assembled 6502
+       symbolfile contains a list of the addresses of all the named variables and labels
+       -v turns on verbose and will dump the hex 6502 as it was assembled
+```
+  
+### Assembler Features  
+The assembler supports these features:  
+Feature | Description
+--- | ---
+6502 Mnemonics | All standard opcodes and modes
+Labels | labels start with `[a-z|_]` and can contain that and `numbers`, and end with a `:`
+Variables | Values can be assigned and used in [expressions](#assembler-expressions)
+.commands | [dot commands](#assembler-dot-commands) are described below
+comments | The comment character is `;` and everything after `;` on a line is ignired
+address | The addres character is `*` and it can be assigned and read
+expressions | The assmebler has a nice [expression](#assembler-expressions) parser
+  
+#### Assembler DOT Commands  
+In the table below, value can be any legal [expression](#assembler-expressions):  
+Command | Description
+--- | ---
+.align `value`| Aligns data to the next `value` boundry
+.byte `value`[, value]* | Outputs `value` as 8 bits
+.drow `value`[, value]* | Outputs `value` as 16 bits, hi to lo
+.drowd `value`[, value]* | Outputs `value` as 32 bits, hi to lo
+.drowq `value`[, value]* | Outputs `value` as 64 bits, hi to lo
+.dword `value`[, value]* | Outputs `value` as 32 bits, lo to hi
+.endfor | Ends a [for loop](#assembler-for-loops)
+.for | Starts a [for loop](#assembler-for-loops)
+.include "filename" | Includes the file, filename, at this point
+.org `value`| Another way to set the current address
+.qword `value`[, value]* | Outputs `value` as 64 bits, lo to hi
+.strcode | Sets a string [character parser](#assembler-strcode)
+.string value | `string`[,[value | `string`]]* | [Outputs](#assembler-strcode) the values or characters
+.word `value`[, value]* | Outputs `value` as 16 bits, lo to hi
+  
+#### Assembler Expressions  
+The assembler has a nice expression parser.  These are valid cluases, operands and operators, here called the tokens, and this also illustrates the order of presedence.  
+Token | Description
+--- | ---
+`*` `:` [Num](#assembler-numbers) [variables](#assembler-variables) `(` | Address, anonymous labels, variables and brackets
+`+` `-` `<` `>` `~` | Unary plus, minus, lo byte, hi byte and not
+`**` | Exponentiation (Raise to the power of)
+`*` `/` `%` | Multiply, divide and modulus
+`+` `-` | Addative (plus and minus)
+`<<` `>>` | Shift left and shift right
+`&` | Bitwise and
+`^` | exclusive or
+`|` | Bitwise or
+relational | `lt` < `.le` <= `.gt` > `.ge` >= `.ne` != and `.eq` =
+`&&` `||` | Logical `and` and `or`
+`?` `:` | [Ternary Conditional](#assembler-ternary)
+  
+#### Assembler Numbers  
+Numbers can be in these formats:  
+Prefix | Base
+--- | ---
+`$` | Hexadecimal
+`0` | Octal
+`%` | Binary
+`1`-`9` | Decimal
+  
+Inside strings, numbers can be quoted as well.  In that case, the numbers are:  
+Quote prefix | Base
+`\x[N]+` | Hex
+`\0[N]+` | Octal
+`\%[1|0]+` | Binary
+`\[0-9]+` | Decimal
+  
+#### Assembler Variables  
+Variables can be followed by assignment `=`, increment (`++`) and decrement (`--`) operators.  Note that, even though this looks like postfix "C" notation, it is actually executed as prefix operator.  See this example:  
+```
+i = 0
+lda #i++
+```
+will not load a with 0, but with 1.  
+  
+NOTE: The address character, `*`, is intentionally returned as +1 from where it is read.  This means:  
+```
+* = $8000
+a = *    ; a will now be $8001
+: b = :- ; but b will be $8000
+```
+The reason for this is that in statements like `lda *` the `lda` will not yet have been emited when `*` is evaluated, so reading `*` adds one.  `a = * - 1` is also valid.  
+  
+#### Assembler Ternary  
+Much like "C", the ternary conditional has the form (condition expression) ? (when true condition) : (when false condition).  I it's simplest form it works like this:  
+```
+1: i = 1 ? 2 : 3
+Will assign 2 to i, since 1 is true.
+2: i = j .eq 1 ? 4 : j .eq 2 ? 5 : 6
+A silly example but if j == 1, i = 4; else if j == 2, i = 5; else for all other values of j, i = 6
+```
+So, as can be seen in the second example, the conditions can be mixed and any valid expression, no matter how complex, is allowed for each of the 3 clauses (condition ? true : false).  
+  
+#### Assembler For Loops  
+The for loop syntax of the assembler is useful for, for example, creatimg data tables.  The syntax is:  
+```
+.for <initialization>, <condition>, <iteration>
+    ; fill in something here
+.endfor
+```
+Here's an example that might better illustrate:
+```
+rowL:
+    .for row=0, row .lt $C0, row++
+        .byte   row & $08 << 4 | row & $C0 >> 1 | row & $C0 >> 3
+    .endfor
+rowH:
+    .for row=0, row .lt $C0, row++
+        .byte   >$2000 | row & $07 << 2 | row & $30 >> 4
+    .endfor
+```
+FWIW, the `row++` could also have been, for example `row = row + 1`.  Any valid expression in any clause.  If a loop fails to stop (ie the condition is never true), the assembler will automatically stop after 64K iterations.  
+The for loops above will output the following bytes, which are the start line addresses for the first few lines of the Apple ][ highres screen at $2000.  
+```
+rowL:
+0000: 00 00 00 00 00 00 00 00 08 08 08 08 08 08 08 08
+0010: 10 10 10 10 10 10 10 10 18 18 18 18 18 18 18 18
+...
+rowH:
+00C0: 20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+00D0: 30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D 3E 3F
+...
+```
+  
+#### Assembler Strcode  
+`.strcode` can be used to map characters in a string to other values.  An example might best illustrate:  
+```
+.strcode _-1
+.string "1234"
+```
+This will output `0000: 30 31 32 33` which is "0123".  Where this becomes relevant is when you have to map characters between modes, for example on a Commodore 64.  A printed `A` is 65 but an `A` poked into the screen needs to have a `0x01` value.  Using [Ternary Conditional](#assembler-ternary) expressions, it can help map characters between ranges, to other ranges, for the example I gave, maybe this, which maps uppen and lower case letters in the assembly string to uppercase valued good for poking to the screen on the C64:  
+`.strcode _ .ge $61 ? _ - $60 : _ .ge $41 ? _ - $40 : _`  
+NOTE: `.strcode` assigns the charcaters in the string, one after the other, to `_` and then evaluates the `.strcode` expression.  To turn off processing, simply use `.strcode _`.  
+  
 ## The source files and what they do  
 File | Description 
 --- | --- 
 6502.c | Cycle accurate 6502 implementation
 apple2.c | Apple ][+ hardware config & softswitch implementation
+asm6502.c | The "front end" of the assembler
+asmexpr.c | The recursive expression parser
+asmgperf.c | The dot command and mnemonic lookup (generated by gperf)
 breakpnt.c | Breakpoints.  Currently it only breaks on PC and run to or step out
 dbgopcds.c | Arrays for disassembly printing of opcodes
 dynarray.c | Dynamic arrays
+errorloh.c | Assembler error logging mechanism
 frankdisp.c | Franklin Ace Display 80 Col card
 header.h | One header file to include all needed header files
 main.c | Define the Apple ][+ machine and view (Display) and main emulation loop
@@ -185,7 +331,7 @@ Memory Cleanup: Not all malloc allocations are freed on exit.
 Other bugs may be present, as testing has been limited.  
   
 ## Future plans  
-This project stemmed from an interest in creating a 6502 that could pass the Harte CPU tests, which led to making a small emulator for Manic Miner, which in turn led to the creation of this Emulator. While I may continue tinkering (possibly adding time travel), my passion is making games, and I want to get back to that.  
+This project stemmed from an interest in creating a 6502 that could pass the Harte CPU tests, which led to making a small emulator for Manic Miner, which in turn led to the creation of this Emulator. I thought I was done but then I decided to add the Assembler so I am not sure where this project is taking me ;)  I do know that I still have to integrate the assembler into the emulator, of course. 
   
 ## Thank you  
 * Brendan Robert - Author of Jace, for telling me how to think about sampling for speaker emulation.  

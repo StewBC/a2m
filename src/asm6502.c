@@ -1058,6 +1058,7 @@ void usage(char *program_name) {
     fprintf(stderr, "Usage: %s <-i infile> [-o outfile] [-v]\n", c);
     fprintf(stderr, "Where: infile is a 6502 assembly language file\n");
     fprintf(stderr, "       outfile will be a binary file containing the assembled 6502\n");
+    fprintf(stderr, "       symbolfile contains a list of the addresses of all the named variables and labels\n");
     fprintf(stderr, "       -v turns on verbose and will dump the hex 6502 as it was assembled\n");
 }
 
