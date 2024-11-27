@@ -6,16 +6,19 @@
 
 // Standard Includes
 #include <assert.h>
+#include <ctype.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 
 #ifdef _WIN32
 #include <windows.h>
 #include <direct.h>                                         // For _getcwd and _chdir
 #define stricmp _stricmp
+#define strnicmp _strnicmp
 #ifndef PATH_MAX
 #define PATH_MAX MAX_PATH
 #define PATH_SEPARATOR '\\'
@@ -32,6 +35,7 @@
 #include <limits.h>
 #endif
 #define stricmp strcasecmp
+#define strnicmp strncasecmp
 #define PATH_SEPARATOR '/'
 #endif
 

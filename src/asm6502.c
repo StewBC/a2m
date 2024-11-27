@@ -424,7 +424,7 @@ SYMBOL_LABEL *symbol_store(const char *symbol_name, uint32_t symbol_name_length,
         new_sl.symbol_width = 0;
         uint8_t bucket = name_hash & 0xff;
         DYNARRAY *bucket_array = ARRAY_GET(&as->symbol_table, DYNARRAY, bucket);
-        ARRAY_ADD(bucket_array, &new_sl);
+        ARRAY_ADD(bucket_array, new_sl);
         sl = ARRAY_GET(bucket_array, SYMBOL_LABEL, bucket_array->items - 1);
     }
     return sl;
@@ -863,8 +863,10 @@ uint16_t parse_anonymous_address() {
 void parse_dot_command() {
     switch (as->opcode_info.opcode_id) {
     case GPERF_DOT_ALIGN:
-        uint64_t value = evaluate_expression();
-        as->current_address = (as->current_address + (value - 1)) & ~(value - 1);
+        {
+            uint64_t value = evaluate_expression();
+            as->current_address = (as->current_address + (value - 1)) & ~(value - 1);
+        }
         break;
     case GPERF_DOT_BYTE:
         write_values(8, BYTE_ORDER_LO);
@@ -1063,9 +1065,9 @@ void usage(char *program_name) {
 }
 
 int main(int argc, char **argv) {
-    char *output_file_name = 0;
-    char *symbol_file_name = 0;
-    char *input_file;
+    const char *output_file_name = 0;
+    const char *symbol_file_name = 0;
+    const char *input_file;
     int required = 1;
 
     as = &assembler;
