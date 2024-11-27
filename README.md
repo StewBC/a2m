@@ -154,7 +154,7 @@ In this project, a typedef struct is referred to as a "class." The main hardware
 The APPLE2 structure is designed to be compact, with dynamic allocation for certain components to support potential "time travel" functionality.  
   
 ## 6502 Assembler  
-I added a 6502 assembler to the project.  The assembler will be integrated into the emulator so assembeling code will just show up in memory.  I made a stand-alone version of the assembler which shares the code with the emulator version - it's the same assembler but with command line parsing etc. to make it a useful command line tool.  
+I added a 6502 assembler to the project.  The assembler will be integrated into the emulator so assembeling code will just show up in memory.  I made a stand-alone version of the assembler which shares the code with the emulator version - it's the same assembler but with command line execution to make it an otherwise useful tool, outside of the emulator.  
 ```
 Usage: asm6502.exe <-i infile> [-o outfile] [-s symbolfile] [-v]
        infile is a 6502 assembly language file
@@ -205,7 +205,7 @@ Token | Description
 `+` `-` | Addative (plus and minus)
 `<<` `>>` | Shift left and shift right
 `&` | Bitwise and
-`^` | exclusive or
+`^` | Exclusive or
 `\|` | Bitwise or
 relational | `lt` < `.le` <= `.gt` > `.ge` >= `.ne` != and `.eq` =
 `&&` `\|\|` | Logical `and` and `or`
@@ -225,7 +225,7 @@ Quote prefix | Base
 --- | ---
 `\x[N]+` | Hex
 `\0[N]+` | Octal
-`\%[1|0]+` | Binary
+`\%[1\|0]+` | Binary
 `\[0-9]+` | Decimal
   
 #### Assembler Variables  
@@ -274,7 +274,7 @@ rowH:
         .byte   >$2000 | row & $07 << 2 | row & $30 >> 4
     .endfor
 ```
-FWIW, the `row++` could also have been, for example `row = row + 1`.  Any valid expression in any clause.  If a loop fails to stop (ie the condition is never true), the assembler will automatically stop after 64K iterations.  
+FWIW, the `row++` could also have been, for example, `row = row + 1`.  Any valid expression in any clause.  If a loop fails to stop (ie the `<condition>` is never true), the assembler will automatically stop after 64K iterations.  
 The for loops above will output the following bytes, which are the start line addresses for the first few lines of the Apple ][ highres screen at $2000.  
 ```
 rowL:
