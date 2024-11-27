@@ -171,15 +171,15 @@ Feature | Description
 Labels | labels start with `[a-z\|_]` and can contain that and `numbers`, and end with a `:`
 Variables | Values can be assigned and used in [expressions](#assembler-expressions)
 .commands | [dot commands](#assembler-dot-commands) are described below
-comments | The comment character is `;` and everything after `;` on a line is ignired
-address | The addres character is `*` and it can be assigned and read
-expressions | The assmebler has a nice [expression](#assembler-expressions) parser
+comments | The comment character is `;` and everything after `;` on a line is ignored
+address | The address character is `*` and it can be assigned and read
+expressions | The assembler has a nice [expression](#assembler-expressions) parser
   
 #### Assembler DOT Commands  
 In the table below, value can be any legal [expression](#assembler-expressions):  
 Command | Description
 --- | ---
-.align `value`| Aligns data to the next `value` boundry
+.align `value`| Aligns data to the next `value` boundary
 .byte `value`[, value]* | Outputs `value` as 8 bits
 .drow `value`[, value]* | Outputs `value` as 16 bits, hi to lo
 .drowd `value`[, value]* | Outputs `value` as 32 bits, hi to lo
@@ -195,14 +195,14 @@ Command | Description
 .word `value`[, value]* | Outputs `value` as 16 bits, lo to hi
   
 #### Assembler Expressions  
-The assembler has a nice expression parser.  These are valid cluases, operands and operators, here called the tokens, and this also illustrates the order of presedence.  
+The assembler has a nice expression parser.  These are valid clauses, operands and operators, here called the tokens, and this also illustrates the order of precedence.  
 Token | Description
 --- | ---
 `*` `:` [Num](#assembler-numbers) [variables](#assembler-variables) `(` | Address, anonymous labels, variables and brackets
 `+` `-` `<` `>` `~` | Unary plus, minus, lo byte, hi byte and not
 `**` | Exponentiation (Raise to the power of)
 `*` `/` `%` | Multiply, divide and modulus
-`+` `-` | Addative (plus and minus)
+`+` `-` | Additive (plus and minus)
 `<<` `>>` | Shift left and shift right
 `&` | Bitwise and
 `^` | Exclusive or
@@ -242,7 +242,7 @@ NOTE: The address character, `*`, is intentionally returned as +1 from where it 
 a = *    ; a will now be $8001
 : b = :- ; but b will be $8000
 ```
-The reason for this is that in statements like `lda *` the `lda` will not yet have been emited when `*` is evaluated, so reading `*` adds one.  `a = * - 1` is also valid.  
+The reason for this is that in statements like `lda *` the `lda` will not yet have been emitted when `*` is evaluated, so reading `*` adds one.  `a = * - 1` is also valid.  
   
 #### Assembler Ternary  
 Much like "C", the ternary conditional has the form (condition expression) ? (when true condition) : (when false condition).  I it's simplest form it works like this:  
@@ -257,7 +257,7 @@ A silly example:
 As can be seen in the second example, the conditions can be mixed and any valid expression, no matter how complex, is allowed for each of the 3 clauses (condition ? true : false).  
   
 #### Assembler For Loops  
-The for loop syntax of the assembler is useful for, for example, creatimg data tables.  The syntax is:  
+The for loop syntax of the assembler is useful for, for example, creating data tables.  The syntax is:  
 ```
 .for <initialization>, <condition>, <iteration>
     ; fill in something here
@@ -275,7 +275,7 @@ rowH:
     .endfor
 ```
 FWIW, the `row++` could also have been, for example, `row = row + 1`.  Any valid expression in any clause.  If a loop fails to stop (ie the `<condition>` is never true), the assembler will automatically stop after 64K iterations.  
-The for loops above will output the following bytes, which are the start line addresses for the first few lines of the Apple ][ highres screen at $2000.  
+The for loops above will output the following bytes, which are the start line addresses for the first few lines of the Apple ][ high resolution screen at $2000.  
 ```
 rowL:
 0000: 00 00 00 00 00 00 00 00 08 08 08 08 08 08 08 08
@@ -293,9 +293,9 @@ rowH:
 .strcode _-1
 .string "1234"
 ```
-This will output `0000: 30 31 32 33` which is "0123".  Where this becomes relevant is when you have to map characters between modes, for example on a Commodore 64.  A printed `A` is 65 but an `A` poked into the screen needs to have a `0x01` value.  Using [Ternary Conditional](#assembler-ternary) expressions, it can help map characters between ranges, to other ranges, for the example I gave, maybe this, which maps uppen and lower case letters in the assembly string to uppercase valued good for poking to the screen on the C64:  
+This will output `0000: 30 31 32 33` which is "0123".  Where this becomes relevant is when you have to map characters between modes, for example on a Commodore 64.  A printed `A` is 65 but an `A` poked into the screen needs to have a `0x01` value.  Using [Ternary Conditional](#assembler-ternary) expressions, it can help map characters between ranges, to other ranges, for the example I gave, maybe this, which maps upper and lower case letters in the assembly string to uppercase valued good for poking to the screen on the C64:  
 `.strcode _ .ge $61 ? _ - $60 : _ .ge $41 ? _ - $40 : _`  
-NOTE: `.strcode` assigns the charcaters in the string, one after the other, to `_` and then evaluates the `.strcode` expression.  To turn off processing, simply use `.strcode _`.  
+NOTE: `.strcode` assigns the characters in the string, one after the other, to `_` and then evaluates the `.strcode` expression.  To turn off processing, simply use `.strcode _`.  
   
 ## The source files and what they do  
 File | Description 
