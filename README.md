@@ -291,14 +291,15 @@ rowH:
 Note that in rowH, the hi byte of $2000 is $20 and that is `|`'d with the other expressions.  The order of operations are not such that the `|` happens before the `>`.  If `|` was higher, the output for rowH would have simply been $20 as the lo byte portion that contains the data we are interested in, would have been discarded.  
   
 #### Assembler Strcode  
-`.strcode` can be used to map characters in a string to other values.  An example might best illustrate:  
+`.strcode` can be used to map characters in a string to other values.  It uses the variable `_` to do the mapping.  
+An example might best illustrate:  
 ```
 .strcode _-1
 .string "1234"
 ```
 This will output `0000: 30 31 32 33` which is "0123".  Where this becomes relevant is when you have to map characters between modes, for example on a Commodore 64.  A printed `A` is 65 but an `A` poked into the screen needs to have a `0x01` value.  Using [Ternary Conditional](#assembler-ternary) expressions, it can help map characters from one range or ranges, to another range or ranges. Think about the example I gave of poking characters on the Commodore 64 needing A through Z as values 1 through 26. Maybe this expression, which maps upper and lower case letters in the assembly file "string" to uppercase values good for poking to the screen on the C64, can be used:  
 `.strcode _ .ge $61 ? _ - $60 : _ .ge $41 ? _ - $40 : _`  
-NOTE: `.strcode` assigns the characters in the string, one after the other, to `_` and then evaluates the `.strcode` expression.  To turn off processing, simply use `.strcode _`.  
+NOTE: `.strcode` assigns the characters in the string, one after the other, to `_` and then evaluates the `.strcode` expression.  To turn off processing, simply use `.strcode _`. If you use just `_` as a variable in your own code, then `.strcode` will overwrite it.  
   
 ## The source files and what they do  
 File | Description 
