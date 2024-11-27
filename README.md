@@ -206,9 +206,9 @@ Token | Description
 `<<` `>>` | Shift left and shift right
 `&` | Bitwise and
 `^` | exclusive or
-`|` | Bitwise or
+`\|` | Bitwise or
 relational | `lt` < `.le` <= `.gt` > `.ge` >= `.ne` != and `.eq` =
-`&&` `||` | Logical `and` and `or`
+`&&` `\|\|` | Logical `and` and `or`
 `?` `:` | [Ternary Conditional](#assembler-ternary)
   
 #### Assembler Numbers  
@@ -222,6 +222,7 @@ Prefix | Base
   
 Inside strings, numbers can be quoted as well.  In that case, the numbers are:  
 Quote prefix | Base
+--- | ---
 `\x[N]+` | Hex
 `\0[N]+` | Octal
 `\%[1|0]+` | Binary
@@ -247,11 +248,13 @@ The reason for this is that in statements like `lda *` the `lda` will not yet ha
 Much like "C", the ternary conditional has the form (condition expression) ? (when true condition) : (when false condition).  I it's simplest form it works like this:  
 ```
 1: i = 1 ? 2 : 3
-Will assign 2 to i, since 1 is true.
+ Will assign 2 to i, since 1 is true.
+
+A silly example:
 2: i = j .eq 1 ? 4 : j .eq 2 ? 5 : 6
-A silly example but if j == 1, i = 4; else if j == 2, i = 5; else for all other values of j, i = 6
+ if j == 1, i = 4; else if j == 2, i = 5; else for all other values of j, i = 6
 ```
-So, as can be seen in the second example, the conditions can be mixed and any valid expression, no matter how complex, is allowed for each of the 3 clauses (condition ? true : false).  
+As can be seen in the second example, the conditions can be mixed and any valid expression, no matter how complex, is allowed for each of the 3 clauses (condition ? true : false).  
   
 #### Assembler For Loops  
 The for loop syntax of the assembler is useful for, for example, creatimg data tables.  The syntax is:  
