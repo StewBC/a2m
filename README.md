@@ -168,7 +168,7 @@ The assembler supports these features:
 Feature | Description
 --- | ---
 6502 Mnemonics | All standard opcodes and modes
-Labels | labels start with `[a-z|_]` and can contain that and `numbers`, and end with a `:`
+Labels | labels start with `[a-z\|_]` and can contain that and `numbers`, and end with a `:`
 Variables | Values can be assigned and used in [expressions](#assembler-expressions)
 .commands | [dot commands](#assembler-dot-commands) are described below
 comments | The comment character is `;` and everything after `;` on a line is ignired
@@ -191,7 +191,7 @@ Command | Description
 .org `value`| Another way to set the current address
 .qword `value`[, value]* | Outputs `value` as 64 bits, lo to hi
 .strcode | Sets a string [character parser](#assembler-strcode)
-.string value | `string`[,[value | `string`]]* | [Outputs](#assembler-strcode) the values or characters
+.string value | `string`[,[value \| `string`]]* \| [Outputs](#assembler-strcode) the values or characters
 .word `value`[, value]* | Outputs `value` as 16 bits, lo to hi
   
 #### Assembler Expressions  
