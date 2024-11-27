@@ -168,8 +168,8 @@ The assembler supports these features:
 Feature | Description
 --- | ---
 6502 Mnemonics | All standard opcodes and modes
-Labels | labels start with `[a-z\|_]` and can contain that and `numbers`, and end with a `:`
-Variables | Values can be assigned and used in [expressions](#assembler-expressions)
+labels | labels start with `[a-z\|_]` and can contain that and `numbers`, and end with a `:`
+variables | Values can be assigned and used in [expressions](#assembler-expressions)
 .commands | [dot commands](#assembler-dot-commands) are described below
 comments | The comment character is `;` and everything after `;` on a line is ignored
 address | The address character is `*` and it can be assigned and read
@@ -207,7 +207,7 @@ Token | Description
 `&` | Bitwise and
 `^` | Exclusive or
 `\|` | Bitwise or
-relational | `lt` < `.le` <= `.gt` > `.ge` >= `.ne` != and `.eq` =
+relational | `.lt .le .gt .ge .ne .eq` for `<, <=, >, >=, !=, and ==`
 `&&` `\|\|` | Logical `and` and `or`
 `?` `:` | [Ternary Conditional](#assembler-ternary)
   
@@ -245,7 +245,9 @@ a = *    ; a will now be $8001
 The reason for this is that in statements like `lda *` the `lda` will not yet have been emitted when `*` is evaluated, so reading `*` adds one.  `a = * - 1` is also valid.  
   
 #### Assembler Ternary  
-Much like "C", the ternary conditional has the form (condition expression) ? (when true condition) : (when false condition).  I it's simplest form it works like this:  
+Much like "C", the ternary conditional has the form:  
+`(condition expression)` `?` `(when true condition)` `:` `(when false condition)`  
+In it's simplest form it works like this:  
 ```
 1: i = 1 ? 2 : 3
  Will assign 2 to i, since 1 is true.
@@ -275,7 +277,7 @@ rowH:
     .endfor
 ```
 FWIW, the `row++` could also have been, for example, `row = row + 1`.  Any valid expression in any clause.  If a loop fails to stop (ie the `<condition>` is never true), the assembler will automatically stop after 64K iterations.  
-The for loops above will output the following bytes, which are the start line addresses for the first few lines of the Apple ][ high resolution screen at $2000.  
+Here are some of the bytes that the for loops above will output.  These are the start line addresses for the rows of the Apple ][ high resolution screen at $2000.  
 ```
 rowL:
 0000: 00 00 00 00 00 00 00 00 08 08 08 08 08 08 08 08
@@ -286,6 +288,7 @@ rowH:
 00D0: 30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D 3E 3F
 ...
 ```
+Note that in rowH, the hi byte of $2000 is $20 and that is `|`'d with the other expressions.  The order of operations are not such that the `|` happens before the `>`.  If `|` was higher, the output for rowH would have simply been $20 as the lo byte portion that contains the data we are interested in, would have been discarded.  
   
 #### Assembler Strcode  
 `.strcode` can be used to map characters in a string to other values.  An example might best illustrate:  
@@ -293,7 +296,7 @@ rowH:
 .strcode _-1
 .string "1234"
 ```
-This will output `0000: 30 31 32 33` which is "0123".  Where this becomes relevant is when you have to map characters between modes, for example on a Commodore 64.  A printed `A` is 65 but an `A` poked into the screen needs to have a `0x01` value.  Using [Ternary Conditional](#assembler-ternary) expressions, it can help map characters between ranges, to other ranges, for the example I gave, maybe this, which maps upper and lower case letters in the assembly string to uppercase valued good for poking to the screen on the C64:  
+This will output `0000: 30 31 32 33` which is "0123".  Where this becomes relevant is when you have to map characters between modes, for example on a Commodore 64.  A printed `A` is 65 but an `A` poked into the screen needs to have a `0x01` value.  Using [Ternary Conditional](#assembler-ternary) expressions, it can help map characters from one range or ranges, to another range or ranges. Think about the example I gave of poking characters on the Commodore 64 needing A through Z as values 1 through 26. Maybe this expression, which maps upper and lower case letters in the assembly file "string" to uppercase values good for poking to the screen on the C64, can be used:  
 `.strcode _ .ge $61 ? _ - $60 : _ .ge $41 ? _ - $40 : _`  
 NOTE: `.strcode` assigns the characters in the string, one after the other, to `_` and then evaluates the `.strcode` expression.  To turn off processing, simply use `.strcode _`.  
   
