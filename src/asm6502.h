@@ -230,5 +230,6 @@ void parse_dot_command();
 void parse_label();
 void parse_opcode();
 void parse_variable();
-int assembler_init(const char *starting_file);
+int assembler_init(APPLE2 * m);
+int assembler_assemble(const char *input_file, uint16_t address);
 void assembler_shutdown();

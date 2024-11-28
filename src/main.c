@@ -13,6 +13,9 @@ int main(int argc, char *argv[]) {
     Uint64 start_time, end_time;
     Uint64 ticks_per_clock_cycle = SDL_GetPerformanceFrequency() / CPU_FREQUENCY; // Ticks per microsecond
 
+    // Init the assembler error log
+    errlog_init();
+
     // Init the viewport
     if(A2_OK != viewport_init(&v, 1120, 840)) {
         return A2_ERR;
@@ -80,6 +83,7 @@ int main(int argc, char *argv[]) {
     // Cleanup, Apple II first and then the viewport for it
     apple2_shutdown(&m);
     viewport_shutdown(&v);
+    errlog_shutdown();
 
     return 0;
 }

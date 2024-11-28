@@ -4,6 +4,101 @@
 
 #include "header.h"
 
+int viewdlg_assembler_config(struct nk_context *ctx, struct nk_rect r, ASSEMBLER_CONFIG *ac) {
+    int ret = 0;
+    FILE_BROWSER *fb = &ac->file_browser;
+    if(nk_popup_begin(ctx, NK_POPUP_STATIC, "Assembler Config", 0, r)) {
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 3);
+        nk_layout_row_push(ctx, 0.20f);
+        nk_label(ctx, "Path", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE);
+        nk_layout_row_push(ctx, 0.60f);
+        ctx->current->edit.mode = NK_TEXT_EDIT_MODE_REPLACE;
+        if(NK_EDIT_COMMITED &
+           nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, fb->dir_selected.name,
+                          &fb->dir_selected.name_length, PATH_MAX - 1, nk_filter_default)) {
+            UTIL_FILE file;
+            memset(&file, 0, sizeof(file));
+            fb->dir_selected.name[fb->dir_selected.name_length] = '\0';
+            if(A2_OK == util_file_open(&file, fb->dir_selected.name, "r")) {
+                // If the file could open, well, it's a file that was selected, so use it
+                strcpy(fb->file_selected.name, file.file_display_name);
+                // fb->dir_selected.name[file.file_display_name - file.file_path] = '\0';
+                util_file_discard(&file);
+                ret = 1;
+            } else {
+                // If it wasn't a file, assume it was a folder and just ignore any errors here
+                util_dir_change(fb->dir_selected.name);
+                // rescan the current, which if it was typed correctly, will be what was typed,
+                // else rescan what was already "current"
+                fb->dir_contents.items = 0;
+                util_dir_get_current(fb->dir_selected.name, PATH_MAX);
+                fb->dir_selected.name_length = strnlen(fb->dir_selected.name, PATH_MAX);
+                // This keeps the cursor active in the edit box, and places it at the end
+                ctx->current->edit.cursor = ctx->current->edit.sel_start = ctx->current->edit.sel_end =
+                    strnlen(fb->dir_selected.name, PATH_MAX);
+                // ctx->current->edit.active = 1;
+            }
+        }
+        nk_layout_row_push(ctx, 0.20f);
+        if(nk_button_label(ctx, "Browse") && !ac->dlg_asm_filebrowser) {
+            ac->dlg_asm_filebrowser = 1;
+        }
+        nk_layout_row_end(ctx);
+
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 3);
+        nk_layout_row_push(ctx, 0.40f);
+        nk_checkbox_label_align(ctx, "Auto Run", &ac->auto_run_after_assemble, 0, NK_TEXT_LEFT);
+        nk_layout_row_push(ctx, 0.30f);
+        nk_label(ctx, "Address", NK_TEXT_CENTERED | NK_TEXT_ALIGN_MIDDLE);
+        nk_layout_row_push(ctx, 0.30f);
+        if(NK_EDIT_COMMITED &
+           nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER,
+                          ac->start_address_text, &ac->start_address_text_len, 5, nk_filter_hex)) {
+            ac->start_address = strtol(ac->start_address_text, NULL, 16);
+        }
+        nk_layout_row_end(ctx);
+
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 3);
+        nk_layout_row_push(ctx, 0.40f);
+        nk_spacer(ctx);
+        nk_layout_row_push(ctx, 0.30f);
+        if(nk_button_label(ctx, "Cancel")) {
+            ret = -1;
+        }
+        nk_layout_row_push(ctx, 0.30f);
+        if(nk_button_label(ctx, "OK")) {
+            ac->start_address = strtol(ac->start_address_text, NULL, 16);
+            ret = 1;
+        }
+        nk_layout_row_end(ctx);
+    }
+    nk_popup_end(ctx);
+    return ret;
+}
+
+int viewdlg_assembler_errors(struct nk_context *ctx, struct nk_rect r) {
+    int ret = 0;
+    static int x_offset = 0, y_offset = 0;
+    if(nk_popup_begin(ctx, NK_POPUP_STATIC, "Assembler errors", 0, r)) {
+        nk_layout_row_dynamic(ctx, 360, 1);
+        if(nk_group_scrolled_offset_begin(ctx, &x_offset, &y_offset, "Error Messages", NK_WINDOW_BORDER)) {
+            size_t i;
+            nk_layout_row_static(ctx, 13, 8 * errorlog.longest_error_message_length, 1);
+            for(i = 0; i < errorlog.log_array.items; i++) {
+                char *text = *ARRAY_GET(&errorlog.log_array, char *, i);
+                nk_label(ctx, text, NK_TEXT_ALIGN_LEFT);
+            }
+            nk_group_end(ctx);
+        }
+        nk_layout_row_dynamic(ctx, 28, 1);
+        if(nk_button_label(ctx, "OK")) {
+            ret = 1;
+        }
+    }
+    nk_popup_end(ctx);
+    return ret;
+}
+
 int viewdlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT_EDIT *bpe) {
     int ret = -1;
     if(nk_popup_begin(ctx, NK_POPUP_STATIC, "Edit Breakpoint", 0, r)) {
@@ -182,7 +277,7 @@ int viewdlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
             memset(&file, 0, sizeof(file));
             fb->dir_selected.name[fb->dir_selected.name_length] = '\0';
             if(A2_OK == util_file_open(&file, fb->dir_selected.name, "r")) {
-                // If the file culd open, well, it's a file that was selected, so use it
+                // If the file could open, well, it's a file that was selected, so use it
                 strcpy(fb->file_selected.name, file.file_display_name);
                 fb->dir_selected.name[file.file_display_name - file.file_path] = '\0';
                 util_file_discard(&file);
@@ -193,6 +288,8 @@ int viewdlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
                 // rescan the current, which if it was typed correctly, will be what was typed,
                 // else rescan what was already "current"
                 fb->dir_contents.items = 0;
+                util_dir_get_current(fb->dir_selected.name, PATH_MAX);
+                fb->dir_selected.name_length = strnlen(fb->dir_selected.name, PATH_MAX);
             }
         }
         ctx->current->edit.mode = NK_TEXT_EDIT_MODE_INSERT;

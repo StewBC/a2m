@@ -12,7 +12,7 @@ void write_to_memory(APPLE2 *m, uint16_t address, uint8_t value) {
     m->RAM_MAIN[address] = value;
 }
 
-APPLE2 apple2;
+APPLE2 m;
 #endif
 // The assembler object and the pointer through which it is accessed
 ASSEMBLER assembler;
@@ -632,6 +632,7 @@ int is_valid_instruction_only() {
 }
 
 //----------------------------------------------------------------------------
+// Parse DOT commands
 void parse_dot_endfor() {
     if(as->loop_stack.items) {
         const char *post_loop = as->input;
@@ -1000,12 +1001,10 @@ void parse_variable() {
 
 //----------------------------------------------------------------------------
 // Assembler start and end routines
-int assembler_init(const char *starting_file) {
-    as->current_file = starting_file;
+int assembler_init(APPLE2 *m) {
 
-    memset(as->m->RAM_MAIN, 0, 64 * 1024);
-
-    errlog_init();
+    memset(as, 0, sizeof(ASSEMBLER));
+    as->m = m;
 
     array_init(&as->symbol_table, sizeof(DYNARRAY));
     array_resize(&as->symbol_table, 256);
@@ -1023,9 +1022,58 @@ int assembler_init(const char *starting_file) {
     return A2_OK;
 }
 
+int assembler_assemble(const char *input_file, uint16_t address) {
+    as->pass = 0;
+    as->current_file = input_file;
+    while(as->pass < 2) {
+        if(A2_OK != include_files_push(input_file)) {
+            return A2_ERR;
+        }
+        as->current_file = ARRAY_GET(&as->include_files.included_files, UTIL_FILE, 0)->file_display_name;
+        as->current_address = address;
+        as->pass++;
+        while(as->pass < 3) {
+            do {
+                // a newline returns an empty token so keep
+                // getting tokens till there's something to process
+                get_token();
+            } while(as->token_start == as->input && *as->input);
+
+            if(as->token_start == as->input) {
+                // The end of the file has been reached so if it was an included file
+                // pop to the parent, or end
+                if(A2_OK == include_files_pop()) {
+                    continue;
+                }
+                break;
+            }
+
+            // Prioritize specific checks to avoid ambiguity
+            if(is_opcode()) {                               // Opcode first
+                parse_opcode();
+            } else if(is_dot_command()) {                   // Dot commands next
+                parse_dot_command();
+            } else if(is_label()) {                         // Labels (endings in ":")
+                parse_label();
+            } else if(is_address()) {                       // Address (starting with "*")
+                parse_address();
+            } else if(is_variable()) {                      // Variables are last (followed by "=")
+                // parse_variable();
+                as->current_token.type = TOKEN_VAR;         // Variable Name
+                as->current_token.name = as->token_start;
+                as->current_token.name_length = as->input - as->token_start;
+                as->current_token.name_hash = fnv_1a_hash(as->current_token.name, as->current_token.name_length);
+                parse_expression();
+            } else {
+                errlog("Unknown token");
+            }
+        }
+    }
+    return A2_OK;
+}
+
 void assembler_shutdown() {
     include_files_cleanup();
-    errlog_shutdown(errorlog.log_array);
     array_free(&as->anon_symbols);
     for(int i = 0; i < 256; i++) {
         array_free(ARRAY_GET(&as->symbol_table, DYNARRAY, i));
@@ -1071,7 +1119,15 @@ int main(int argc, char **argv) {
     int required = 1;
 
     as = &assembler;
-    as->m = &apple2;
+    as->m = &m;
+
+    // Set the "machine" RAM to all 0's
+    memset(as->m->RAM_MAIN, 0, 64 * 1024);
+    errlog_init();
+
+    if(A2_OK != assembler_init(&m)) {
+        exit(1);
+    }
 
     required &= get_argument(argc, argv, "-i", &input_file);
     get_argument(argc, argv, "-o", &output_file_name);
@@ -1083,59 +1139,19 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    if(A2_OK != assembler_init(input_file)) {
+    if(A2_OK != assembler_assemble(input_file, 0)) {
+        fprintf(stderr, "File %s could not be opened\n", input_file);
         exit(1);
     }
 
-    while(as->pass < 2) {
-        if(A2_OK != include_files_push(input_file)) {
-            fprintf(stderr, "File %s could not be opened\n", input_file);
-            exit(1);
+    if(errorlog.log_array.items) {
+        // Second pass errors get reported
+        fprintf(stderr, "\nAssembly errors:\n");
+        for(size_t i = 0; i < errorlog.log_array.items; i++) {
+            fprintf(stderr, "%s\n", *ARRAY_GET(&errorlog.log_array, char *, i));
         }
-        as->current_address = 0;
-        as->pass++;
-        while(as->pass < 3) {
-            do {
-                // a newline returns an empty token so keep
-                // getting tokens till there's something to process
-                get_token();
-            } while(as->token_start == as->input && *as->input);
-
-            if(as->token_start == as->input) {
-                // The end of the file has been reached so if it was an included file
-                // pop to the parent, or end
-                if(A2_OK == include_files_pop()) {
-                    continue;
-                }
-                break;
-            }
-
-            // Prioritize specific checks to avoid ambiguity
-            if(is_opcode()) {                               // Opcode first
-                parse_opcode();
-            } else if(is_dot_command()) {                   // Dot commands next
-                parse_dot_command();
-            } else if(is_label()) {                         // Labels (endings in ":")
-                parse_label();
-            } else if(is_address()) {                       // Address (starting with "*")
-                parse_address();
-            } else if(is_variable()) {                      // Variables are last (followed by "=")
-                // parse_variable();
-                as->current_token.type = TOKEN_VAR;         // Variable Name
-                as->current_token.name = as->token_start;
-                as->current_token.name_length = as->input - as->token_start;
-                as->current_token.name_hash = fnv_1a_hash(as->current_token.name, as->current_token.name_length);
-                parse_expression();
-            } else {
-                errlog("Unknown token");
-            }
-        }
-        if(errorlog.log_array.items) {
-            // Second pass errors get reported
-            fprintf(stderr, "\nAssembly errors:\n");
-            for(size_t i = 0; i < errorlog.log_array.items; i++) {
-                fprintf(stderr, "%s\n", *ARRAY_GET(&errorlog.log_array, char *, i));
-            }
+        if(errorlog.errors_supressed) {
+            printf("Supressed %zd errors on lines with multiple error messages\n", errorlog.errors_supressed);
         }
     }
 
@@ -1180,6 +1196,7 @@ int main(int argc, char **argv) {
     }
 
     assembler_shutdown();
+    errlog_shutdown();
     puts("\nDone.\n");
     return 0;
 }

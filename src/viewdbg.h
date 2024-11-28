@@ -31,6 +31,7 @@ typedef struct DEBUGGER {
 
     DYNARRAY *symbols;
     FLOWMANAGER flowmanager;
+    ASSEMBLER_CONFIG assembler_config;
 } DEBUGGER;
 
 int viewdbg_add_symbols(DEBUGGER * d, char *data, size_t data_length, int overwrite);

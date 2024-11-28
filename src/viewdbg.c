@@ -24,6 +24,8 @@ enum {
     SYMBOL_VIEW_NONE,
 };
 
+static ASSEMBLER_CONFIG local_assembler_config;
+
 int viewdbg_add_symbols(DEBUGGER *d, char *data, size_t data_length, int overwrite) {
     int state = 0;
     char *end = data + data_length;
@@ -273,6 +275,14 @@ int viewdbg_init(DEBUGGER *d, int num_lines) {
 
     // Init the breakpoint structures
     breakpoints_init(&d->flowmanager);
+
+    // Init the assembler structure
+    d->assembler_config.auto_run_after_assemble = nk_true;
+    d->assembler_config.start_address = 0x2000;
+    d->assembler_config.start_address_text_len =
+        sprintf(d->assembler_config.start_address_text, "%04X", d->assembler_config.start_address);
+    d->assembler_config.dlg_asm_filebrowser = 0;
+    array_init(&d->assembler_config.file_browser.dir_contents, sizeof(FILE_INFO));
     return A2_OK;
 
   error:
@@ -326,6 +336,50 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
     DEBUGGER *d = &v->debugger;
 
     switch (e->key.keysym.sym) {
+    case SDLK_a:
+        if(!v->viewdlg_modal && d->assembler_config.file_browser.dir_selected.name_length) {
+            ASSEMBLER_CONFIG *ac = &d->assembler_config;
+            ASSEMBLER assembler;
+            as = &assembler;
+
+            errlog_clean();
+            assembler_init(m);
+            if(A2_OK != assembler_assemble(ac->file_browser.dir_selected.name, 0 /*ac->start_address */ )) {
+                int loglevel = errorlog.log_level;
+                errorlog.log_level = 1;
+                as->pass = 2;
+                errlog("Could not open file %s to assemble", ac->file_browser.dir_selected.name);
+                errorlog.log_level = loglevel;
+            }
+            assembler_shutdown();
+
+            if(errorlog.log_array.items) {
+                v->viewdlg_modal = 1;
+                v->dlg_assassembler_errors = 1;
+            } else {
+                if(ac->auto_run_after_assemble) {
+                    m->cpu.pc = ac->start_address;
+                    m->stopped = 0;
+                }
+            }
+        }
+        break;
+
+    case SDLK_b:
+        if(mod & KMOD_CTRL && !v->viewdlg_modal) {
+            local_assembler_config = d->assembler_config;
+            v->viewdlg_modal = 1;
+            v->dlg_assassembler_config = 1;
+        }
+        break;
+
+    case SDLK_e:
+        if(mod & KMOD_CTRL && !v->viewdlg_modal) {
+            v->viewdlg_modal = 1;
+            v->dlg_assassembler_errors = 1;
+        }
+        break;
+
     case SDLK_g:
         if(mod & KMOD_CTRL && !v->viewdlg_modal) {
             v->viewdlg_modal = 1;
@@ -494,6 +548,7 @@ void viewdbg_show(APPLE2 *m) {
     VIEWPORT *v = m->viewport;
     struct nk_context *ctx = v->ctx;
     DEBUGGER *d = &v->debugger;
+    int ret;
 
     // Populate the disassembly lines
     viewdbg_build_code_lines(m, d->cursor_pc, d->num_lines);
@@ -520,8 +575,24 @@ void viewdbg_show(APPLE2 *m) {
             }
             ctx->style.window.background = ob;
         }
+        if(v->dlg_assassembler_config) {
+            if((ret = viewdlg_assembler_config(ctx, nk_rect(0, 0, 360, 115), &local_assembler_config))) {
+                local_assembler_config.dlg_asm_filebrowser = 0;
+                if(ret == 1) {
+                    d->assembler_config = local_assembler_config;
+                }
+                v->dlg_assassembler_config = 0;
+                v->viewdlg_modal = 0;
+            }
+        }
+        if(v->dlg_assassembler_errors) {
+            if((ret = viewdlg_assembler_errors(ctx, nk_rect(0, 0, 360, 430)))) {
+                errlog_clean();
+                v->dlg_assassembler_errors = 0;
+                v->viewdlg_modal = 0;
+            }
+        }
         if(v->dlg_dissassembler_go) {
-            int ret;
             static char address[5] = { 0, 0, 0, 0, 0 };
             static int address_length = 0;
             if((ret = viewdlg_hex_address(ctx, nk_rect(60, 10, 280, 80), address, &address_length))) {
@@ -538,6 +609,18 @@ void viewdbg_show(APPLE2 *m) {
         }
     }
     nk_end(ctx);
+    if(local_assembler_config.dlg_asm_filebrowser) {
+        FILE_BROWSER *fb = &local_assembler_config.file_browser;
+        int ret = viewdlg_file_browser(ctx, fb);
+        if(ret >= 0) {
+            local_assembler_config.dlg_asm_filebrowser = 0;
+            if(1 == ret) {
+                // A file was selected, so get a FQN
+                strncat(fb->dir_selected.name, "/", PATH_MAX);
+                strncat(fb->dir_selected.name, fb->file_selected.name, PATH_MAX);
+            }
+        }
+    }
 }
 
 void viewdbg_shutdown(DEBUGGER *d) {

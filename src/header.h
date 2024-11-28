@@ -92,9 +92,9 @@ typedef struct DEBUGGER DEBUGGER;
 #include "breakpnt.h"
 #include "viewapl2.h"
 #include "viewcpu.h"
+#include "viewdlg.h"                                        // ASSEMBLER_CONFIG before DEBUGGER
 #include "viewdbg.h"
 #include "viewdbg.h"
-#include "viewdlg.h"
 #include "viewmem.h"
 #include "viewmem.h"
 #include "viewmisc.h"
