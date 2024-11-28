@@ -384,11 +384,47 @@ int64_t parse_shift() {
     return value;
 }
 
-int64_t parse_bitwise_and() {
+int64_t parse_relational() {
     int64_t value = parse_shift();
+    while(as->current_token.type == TOKEN_OP && (toupper(as->current_token.op) == 'L' || // .lt | .le
+                                                 toupper(as->current_token.op) == 'G')) { // .gt | .ge
+        char op = as->current_token.op;
+        next_token();
+        int64_t right = parse_shift();
+        if(op == 'L') {
+            value = value < right;
+        } else if(op == 'G') {
+            value = value > right;
+        } else if(op == 'l') {
+            value = value <= right;
+        } else if(op == 'g') {
+            value = value >= right;
+        }
+    }
+    return value;
+}
+
+int64_t parse_equality() {
+    int64_t value = parse_relational();
+    while(as->current_token.type == TOKEN_OP && (toupper(as->current_token.op) == 'E' || // .eq
+                                                 toupper(as->current_token.op) == 'N')) { // .ne
+        char op = as->current_token.op;
+        next_token();
+        int64_t right = parse_relational();
+        if(op == 'E') {
+            value = value == right;
+        } else if(op == 'N') {
+            value = value != right;
+        }
+    }
+    return value;
+}
+
+int64_t parse_bitwise_and() {
+    int64_t value = parse_equality();
     while(as->current_token.type == TOKEN_OP && as->current_token.op == '&') {
         next_token();
-        value &= parse_shift();
+        value &= parse_equality();
     }
     return value;
 }
@@ -411,44 +447,12 @@ int64_t parse_bitwise_or() {
     return value;
 }
 
-int64_t parse_relational() {
-    int64_t value = parse_bitwise_or();
-    while(as->current_token.type == TOKEN_OP &&
-          (toupper(as->current_token.op) == 'L' ||
-           toupper(as->current_token.op) == 'G' || toupper(as->current_token.op) == 'E' || toupper(as->current_token.op) == 'N')) {
-        char op = as->current_token.op;
-        next_token();
-        int64_t right = parse_bitwise_or();
-        switch (op) {
-        case 'l':
-            value = value <= right;
-            break;
-        case 'g':
-            value = value >= right;
-            break;
-        case 'L':
-            value = value < right;
-            break;
-        case 'G':
-            value = value > right;
-            break;
-        case 'N':
-            value = value != right;
-            break;
-        case 'E':
-            value = value == right;
-            break;
-        }
-    }
-    return value;
-}
-
 int64_t parse_logical() {
-    int64_t value = parse_relational();
+    int64_t value = parse_bitwise_or();
     while(as->current_token.type == TOKEN_OP && (toupper(as->current_token.op) == 'A' || toupper(as->current_token.op) == 'O')) {
         char op = as->current_token.op;
         next_token();
-        int64_t right = parse_relational();
+        int64_t right = parse_bitwise_or();
         if(op == 'A') {
             value = value && right;
         } else {
