@@ -1,8 +1,9 @@
 # Apple ][+ Emulator  
 This is an Apple ][+ emulator written in "C" using SDL and the Nuklear immediate mode GUI.  The emulator includes a cycle-accurate 6502 CPU (does not support undocumented opcodes), a Language Card a Franklin Ace 80col display card, and a SmartPort block device.  No Disk II support.  
   
-This repository also contains a stand-alone version of a [6502 Assembler](#6502-assembler) I created, built into the emulator (but not yet accesible from within the emulator).
 This configuration allows booting and running Total Replay or other ProDOS disk volumes.  
+  
+This repository also contains a stand-alone version of the [6502 Assembler](#6502-assembler) I created and built into the emulator.  
   
 ![15 FPS Animated Gif of the emulator in action](assets/a2m-15.gif)  
   
@@ -91,6 +92,9 @@ The CPU window, when stopped, has editable boxes for the PC, SP, registers, and 
 ## Using the Disassembly Window  
 The following keys are supported in the disassembly window:  
 ```
+CTRL + B - Configure an assembler source file for use with the built-in Assembler
+CTRL + A - Assemble the configured assembler source file
+CTRL + E - Re-show the errors output from the Assemble process
 CTRL + G - Set the address for viewing disassembly (cursor PC)
 CTRL + P - Set the machine PC to the cursor PC
 TAB - Toggle symbol display between all/functions and labels/labels/none
@@ -204,10 +208,11 @@ Token | Description
 `*` `/` `%` | Multiply, divide and modulus
 `+` `-` | Additive (plus and minus)
 `<<` `>>` | Shift left and shift right
+relational | `.lt .le .gt .ge` for `<, <=, >, >=`
+equality | `.ne .eq` for `!=, ==`
 `&` | Bitwise and
 `^` | Exclusive or
 `\|` | Bitwise or
-relational | `.lt .le .gt .ge .ne .eq` for `<, <=, >, >=, !=, and ==`
 `&&` `\|\|` | Logical `and` and `or`
 `?` `:` | [Ternary Conditional](#assembler-ternary)
   
@@ -269,26 +274,36 @@ Here's an example that might better illustrate:
 ```
 rowL:
     .for row=0, row .lt $C0, row++
-        .byte   row & $08 << 4 | row & $C0 >> 1 | row & $C0 >> 3
+        .byte   (row & $08) << 4 | (row & $C0) >> 1 | (row & $C0) >> 3
     .endfor
+
 rowH:
     .for row=0, row .lt $C0, row++
-        .byte   >$2000 | row & $07 << 2 | row & $30 >> 4
+        .byte   >$2000 | (row & $07) << 2 | (row & $30) >> 4
     .endfor
 ```
 FWIW, the `row++` could also have been, for example, `row = row + 1`.  Any valid expression in any clause.  If a loop fails to stop (ie the `<condition>` is never true), the assembler will automatically stop after 64K iterations.  
 Here are some of the bytes that the for loops above will output.  These are the start line addresses for the rows of the Apple ][ high resolution screen at $2000.  
 ```
 rowL:
-0000: 00 00 00 00 00 00 00 00 08 08 08 08 08 08 08 08
-0010: 10 10 10 10 10 10 10 10 18 18 18 18 18 18 18 18
-...
+0000: 00 00 00 00 00 00 00 00 80 80 80 80 80 80 80 80
+0010: 00 00 00 00 00 00 00 00 80 80 80 80 80 80 80 80
+0020: 00 00 00 00 00 00 00 00 80 80 80 80 80 80 80 80
+0030: 00 00 00 00 00 00 00 00 80 80 80 80 80 80 80 80
+0040: 28 28 28 28 28 28 28 28 A8 A8 A8 A8 A8 A8 A8 A8
+0050: 28 28 28 28 28 28 28 28 A8 A8 A8 A8 A8 A8 A8 A8
+<...>
+
 rowH:
-00C0: 20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
-00D0: 30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D 3E 3F
-...
+00C0: 20 24 28 2C 30 34 38 3C 20 24 28 2C 30 34 38 3C
+00D0: 21 25 29 2D 31 35 39 3D 21 25 29 2D 31 35 39 3D
+00E0: 22 26 2A 2E 32 36 3A 3E 22 26 2A 2E 32 36 3A 3E
+00F0: 23 27 2B 2F 33 37 3B 3F 23 27 2B 2F 33 37 3B 3F
+0100: 20 24 28 2C 30 34 38 3C 20 24 28 2C 30 34 38 3C
+0110: 21 25 29 2D 31 35 39 3D 21 25 29 2D 31 35 39 3D
+<...>
 ```
-Note that in rowH, the hi byte of $2000 is $20 and that is `|`'d with the other expressions.  The order of operations are not such that the `|` happens before the `>`.  If `|` was higher, the output for rowH would have simply been $20 as the lo byte portion that contains the data we are interested in, would have been discarded.  
+Note that in rowH, the hi byte of $2000 is $20 and that is `|`'d with the other expressions.  The order of operations are not such that the `|` happens before the `>`.  If `|` was higher, the output for rowH would have simply been $20 as the lo byte portion that contains the data we are interested in, would have been discarded.  Also note that shift's `<<` and `>>` are higher than bitwise-and `&`, so the brackets are needed around the `&`.  The basic order of operations matches that of the "C" language.
   
 #### Assembler Strcode  
 `.strcode` can be used to map characters in a string to other values.  It uses the variable `_` to do the mapping.  
