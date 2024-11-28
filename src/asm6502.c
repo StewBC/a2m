@@ -144,6 +144,7 @@ int include_files_pop() {
     as->current_file = pd->file_name;
     as->token_start = as->input = pd->input;
     as->current_line = pd->line_number;
+    as->next_line_count = 0;
     return A2_OK;
 }
 
