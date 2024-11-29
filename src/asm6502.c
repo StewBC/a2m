@@ -1157,6 +1157,7 @@ int assembler_init(APPLE2 *m) {
     ARRAY_INIT(&as->symbol_table, DYNARRAY);
     array_resize(&as->symbol_table, 256);
     for(int i = 0; i < 256; i++) {
+        array_add(&as->symbol_table, NULL);
         ARRAY_INIT(ARRAY_GET(&as->symbol_table, DYNARRAY, i), SYMBOL_LABEL);
     }
 
