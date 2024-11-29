@@ -27,14 +27,14 @@ void get_token() {
                 as->input++;
             }
             as->input++;
-            as->next_start = as->input;
+            as->next_line_start = as->input;
         }
         as->token_start = as->input;
         return;
     }
 
     if(as->next_line_count) {
-        as->line_start = as->next_start;
+        as->line_start = as->next_line_start;
         as->current_line += as->next_line_count;
         as->next_line_count = 0;
     }

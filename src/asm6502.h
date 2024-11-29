@@ -13,12 +13,12 @@ enum {
     GPERF_DOT_DROWQ,
     GPERF_DOT_DWORD,
     GPERF_DOT_ENDFOR,
+    GPERF_DOT_ENDMACRO,
     GPERF_DOT_FOR,
     GPERF_DOT_INCLUDE,
+    GPERF_DOT_MACRO,
     GPERF_DOT_ORG,
-    GPERF_DOT_OUTPUT,
     GPERF_DOT_QWORD,
-    GPERF_DOT_SAVEAS,
     GPERF_DOT_STRCODE,
     GPERF_DOT_STRING,
     GPERF_DOT_WORD,
@@ -143,6 +143,15 @@ enum {
     BYTE_ORDER_HI,
 };
 
+typedef struct INPUT_STACK {
+    const char *input;
+    const char *token_start;
+    const char *current_file;
+    const char *next_line_start;
+    size_t next_line_count;
+    size_t current_line;
+} INPUT_STACK;
+
 typedef struct PARSE_DATA {
     const char *file_name;                                  // Name of the file in which .include encountered
     const char *input;                                      // Input token position when .include encountered
@@ -163,16 +172,30 @@ typedef struct FOR_LOOP {                                   // For init, conditi
     size_t iterations;                                      // Break out of runaway loops
 } FOR_LOOP;
 
+typedef struct MACRO_VARIABLE {
+    const char *variable_name;
+    int variable_name_length;
+} MACRO_VARIABLE;
+
+typedef struct MACRO {
+    const char *macro_name;
+    int macro_name_length;
+    INPUT_STACK macro_body_input;
+    DYNARRAY macro_parameters;
+} MACRO;
+
 typedef struct {
     APPLE2 *m;                                              // To be able to write to memory
     const char *strcode;                                    // Active .strcode expression
     const char *current_file;                               // Points at a UTIL_FILE path_name
     const char *input;                                      // Points at the assembly language buffer (start through end)
     const char *line_start;                                 // Just past \n of line input is on
-    const char *next_start;                                 // So errors get reported on line of last token
+    const char *next_line_start;                                 // So errors get reported on line of last token
     const char *token_start;                                // Points at the start of a token (and input the end)
     DYNARRAY anon_symbols;                                  // Array of anonymous symbols
     DYNARRAY loop_stack;                                    // Array of for loops
+    DYNARRAY macros;                                        // Array of all macros
+    DYNARRAY input_stack;                                   // Array of token "reset" points (saved token_start, input, etc)
     DYNARRAY symbol_table;                                  // Array of arrays of symbols
     INCLUDE_FILES include_files;                            // The arrays for files and stack for .include
     int expression_size;                                    // Forward defs can't change size (16 bit can't become 8 later)
@@ -197,6 +220,10 @@ UTIL_FILE *include_files_find_file(const char *file_name);
 void include_files_init();
 int include_files_pop();
 int include_files_push(const char *file_name);
+int input_stack_empty();
+int input_stack_push();
+void input_stack_pop();
+void flush_macros();
 void emit(uint8_t byte_value);
 void write_opcode();
 void write_bytes(uint64_t value, int width, int order);
@@ -214,6 +241,7 @@ int is_indexed_indirect(char *reg);
 int is_address();
 int is_dot_command();
 int is_label();
+int is_macro_parse_macro();
 int is_newline(char c);
 int is_opcode();
 int is_variable();

@@ -204,6 +204,45 @@ int include_files_push(const char *file_name) {
 }
 
 //----------------------------------------------------------------------------
+// input stack & macros
+int input_stack_empty() {
+    return as->input_stack.items == 0;
+}
+
+int input_stack_push() {
+    INPUT_STACK is;
+    is.input = as->input;
+    is.token_start = as->token_start;
+    is.current_file = as->current_file;
+    is.current_line = as->current_line;
+    is.next_line_count = as->next_line_count;
+    is.next_line_start = as->next_line_start;
+    return ARRAY_ADD(&as->input_stack, is);
+}
+
+void input_stack_pop() {
+    if(as->input_stack.items) {
+        as->input_stack.items--;
+        INPUT_STACK *is = ARRAY_GET(&as->input_stack, INPUT_STACK, as->input_stack.items);
+        as->input = is->input;
+        as->token_start = is->token_start;
+        as->current_file = is->current_file;
+        as->current_line = is->current_line;
+        as->next_line_count = is->next_line_count;
+        as->next_line_start = is->next_line_start;
+    }
+}
+
+void flush_macros() {
+    size_t i;
+    for(i = 0; i < as->macros.items; i++) {
+        MACRO *m = ARRAY_GET(&as->macros, MACRO, i);
+        array_free(&m->macro_parameters);
+    }
+    as->macros.items = 0;
+}
+
+//----------------------------------------------------------------------------
 // Output
 void emit(uint8_t byte_value) {
     if(as->pass == 2) {
@@ -582,6 +621,32 @@ int is_label() {
     return 1;
 }
 
+// In this case, also do the work since finding the macro is 
+// already a significant effort
+int is_macro_parse_macro() {
+    size_t i;
+    int name_length = (int)(as->input - as->token_start);
+    for(i = 0; i < as->macros.items; i++) {
+        MACRO *macro = ARRAY_GET(&as->macros, MACRO, i);
+        if(name_length == macro->macro_name_length && 0 == strnicmp(as->token_start, macro->macro_name, name_length)) {
+            size_t p;
+            // This is a macro to excute - load the parameters into the variables
+            for(p = 0; p < macro->macro_parameters.items; p++) {
+                MACRO_VARIABLE *mv = ARRAY_GET(&macro->macro_parameters, MACRO_VARIABLE, p);
+                uint64_t value = evaluate_expression();
+                symbol_store(mv->variable_name, mv->variable_name_length, SYMBOL_VARIABLE, value);
+            }
+            // Then make the macro active
+            input_stack_push(); // save current parse point
+            ARRAY_ADD(&as->input_stack, macro->macro_body_input); // add macro parse point
+            input_stack_pop(); // make that the current parse point
+            
+            return 1;
+        }
+    }
+    return 0;
+}
+
 int is_newline(char c) {
     return (c == '\n' || c == '\r');
 }
@@ -662,6 +727,15 @@ void parse_dot_endfor() {
     }
 }
 
+void parse_dot_endmacro() {
+    if(!input_stack_empty()) {
+        // Return to the parse point where the macro was called
+        input_stack_pop();
+    } else {
+        errlog(".endmacro but not running a macro");
+    }
+}
+
 void parse_dot_for() {
     FOR_LOOP for_loop;
     evaluate_expression();                                  // assignment
@@ -704,6 +778,72 @@ void process_dot_include() {
         strncpy(file_name, as->token_start + 1, string_length);
         file_name[string_length] = '\0';
         include_files_push(file_name);
+    }
+}
+
+void process_dot_macro() {
+    int macro_okay = 1;
+    MACRO macro;
+    ARRAY_INIT(&macro.macro_parameters, MACRO_VARIABLE);
+    next_token();   // Get to the name
+    if(as->current_token.type != TOKEN_VAR) {
+        macro.macro_name = NULL;
+        macro.macro_name_length = 0;
+        macro_okay = 0;
+        errlog("Macro has no name");
+    } else {
+        size_t i;
+        macro.macro_name = as->token_start;
+        macro.macro_name_length = (int)(as->input - as->token_start);
+        // Make sure no other macro by this name exists
+        for(i = 0; i < as->macros.items; i++) {
+            MACRO *existing_macro = ARRAY_GET(&as->macros, MACRO, i);
+            if(existing_macro->macro_name_length == macro.macro_name_length && 0 == strnicmp(existing_macro->macro_name, macro.macro_name, macro.macro_name_length)) {
+                macro_okay = 0;
+                errlog("Macro with name %.*s has already been defined", macro.macro_name_length, macro.macro_name);
+            }
+        }
+    }
+    // Add macro parameters, if any
+    while(as->current_token.type == TOKEN_VAR) {
+        next_token();
+        if(as->current_token.op == ',') {
+            next_token();
+        }
+        if(as->current_token.type != TOKEN_END) {
+            MACRO_VARIABLE mv;
+            mv.variable_name = as->token_start;
+            mv.variable_name_length = (int)(as->input - as->token_start);
+            ARRAY_ADD(&macro.macro_parameters, mv);
+        }
+    }
+    // After parameters it must be the end of the line
+    if(!(is_newline(as->current_token.op) || as->current_token.op == ';')) {
+        macro_okay = 0;
+        errlog("Macro defenition error");
+    }
+    // Save the parse point as the macro body start point
+    input_stack_push(); 
+    macro.macro_body_input = *ARRAY_GET(&as->input_stack, INPUT_STACK, as->input_stack.items - 1);
+    input_stack_pop();
+    // Look for .endmacro, ignoring the macro body
+    while(*as->input) {
+        while(*as->input && *as->input != '.') {
+            get_token();
+        }
+        if(!(*as->input)) {
+            macro_okay = 0;
+            errlog(".macro with no .endmacro\n");
+            break;
+        }
+        if(stricmp(as->input, ".endmacro")) {
+            get_token();
+            break;
+        }
+    }
+    // If there were no errors, add the macro to the list of macros
+    if(macro_okay) {
+        ARRAY_ADD(&as->macros, macro);
     }
 }
 
@@ -774,13 +914,13 @@ void process_dot_string() {
                     if(as->strcode) {
                         // Set the variable with the value of the string character
                         sl->symbol_value = character;
-                        const char *ts = as->token_start;
-                        const char *in = as->input;
+                        // Save the parse state to parse the expression
+                        input_stack_push();
                         as->input = as->token_start = as->strcode;
                         // Evaluate the expression
                         character = evaluate_expression();
-                        as->token_start = ts;
-                        as->input = in;
+                        // Restore the parse state into the string
+                        input_stack_pop();
                     }
                     // Write the resultant character out
                     emit(character);
@@ -888,21 +1028,23 @@ void parse_dot_command() {
     case GPERF_DOT_ENDFOR:
         parse_dot_endfor();
         break;
+    case GPERF_DOT_ENDMACRO:
+        parse_dot_endmacro();
+        break;
     case GPERF_DOT_FOR:
         parse_dot_for();
         break;
     case GPERF_DOT_INCLUDE:
         process_dot_include();
         break;
+    case GPERF_DOT_MACRO:
+        process_dot_macro();
+        break;
     case GPERF_DOT_ORG:
         process_dot_org();
         break;
-    case GPERF_DOT_OUTPUT:
-        break;
     case GPERF_DOT_QWORD:
         write_values(64, BYTE_ORDER_LO);
-        break;
-    case GPERF_DOT_SAVEAS:
         break;
     case GPERF_DOT_STRCODE:
         process_dot_strcode();
@@ -1007,13 +1149,16 @@ int assembler_init(APPLE2 *m) {
     memset(as, 0, sizeof(ASSEMBLER));
     as->m = m;
 
-    array_init(&as->symbol_table, sizeof(DYNARRAY));
+    ARRAY_INIT(&as->anon_symbols, uint16_t);
+    ARRAY_INIT(&as->loop_stack, FOR_LOOP);
+    ARRAY_INIT(&as->macros, MACRO);
+    ARRAY_INIT(&as->input_stack, INPUT_STACK);
+
+    ARRAY_INIT(&as->symbol_table, DYNARRAY);
     array_resize(&as->symbol_table, 256);
     for(int i = 0; i < 256; i++) {
-        array_init(ARRAY_GET(&as->symbol_table, DYNARRAY, i), sizeof(SYMBOL_LABEL));
+        ARRAY_INIT(ARRAY_GET(&as->symbol_table, DYNARRAY, i), SYMBOL_LABEL);
     }
-    array_init(&as->anon_symbols, sizeof(uint16_t));
-    array_init(&as->loop_stack, sizeof(FOR_LOOP));
 
     include_files_init();
 
@@ -1058,6 +1203,8 @@ int assembler_assemble(const char *input_file, uint16_t address) {
                 parse_label();
             } else if(is_address()) {                       // Address (starting with "*")
                 parse_address();
+            } else if(is_macro_parse_macro()) {             // Macros are like variables but can be found
+                continue;
             } else if(is_variable()) {                      // Variables are last (followed by "=")
                 // parse_variable();
                 as->current_token.type = TOKEN_VAR;         // Variable Name
@@ -1069,17 +1216,23 @@ int assembler_assemble(const char *input_file, uint16_t address) {
                 errlog("Unknown token");
             }
         }
+        // Flush the macros between passes so they can be re-parsed and
+        // errors reported properly om the second pass
+        flush_macros();
     }
     return A2_OK;
 }
 
 void assembler_shutdown() {
     include_files_cleanup();
-    array_free(&as->anon_symbols);
     for(int i = 0; i < 256; i++) {
         array_free(ARRAY_GET(&as->symbol_table, DYNARRAY, i));
     }
     array_free(&as->symbol_table);
+    array_free(&as->input_stack);
+    array_free(&as->macros);
+    array_free(&as->loop_stack);
+    array_free(&as->anon_symbols);
 }
 
 #ifdef IS_ASSEMBLER
@@ -1182,7 +1335,7 @@ int main(int argc, char **argv) {
                 DYNARRAY *b = ARRAY_GET(&as->symbol_table, DYNARRAY, bucket);
                 for(i = 0; i < b->items; i++) {
                     SYMBOL_LABEL *sl = ARRAY_GET(b, SYMBOL_LABEL, i);
-                    ARRAY_ADD(b0, *sl);
+                    ARRAY_ADD(b0, sl);
                 }
             }
             // Sort hash bucket 0
