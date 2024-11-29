@@ -368,9 +368,10 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
                 errorlog.log_level = loglevel;
             }
             viewdbg_remove_symbols(d, "assembler");
-            size_t bucket_index, symbol_index;
-            for(bucket_index = 0; bucket_index < as->symbol_table.items; bucket_index++) {
-                DYNARRAY *bucket = ARRAY_GET(&as->symbol_table, DYNARRAY, bucket_index);
+            size_t bucket_index;
+            for(bucket_index = 0; bucket_index < 256; bucket_index++) {
+                size_t symbol_index;
+                DYNARRAY *bucket = &as->symbol_table[bucket_index];
                 for(symbol_index = 0; symbol_index < bucket->items; symbol_index++) {
                     SYMBOL_LABEL *sl = ARRAY_GET(bucket, SYMBOL_LABEL, symbol_index);
                     viewdbg_add_symbol(d, "assembler", sl->symbol_name, sl->symbol_length, sl->symbol_value, 1);

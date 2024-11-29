@@ -463,7 +463,7 @@ SYMBOL_LABEL *symbol_store(const char *symbol_name, uint32_t symbol_name_length,
         new_sl.symbol_value = value;
         new_sl.symbol_width = 0;
         uint8_t bucket = name_hash & 0xff;
-        DYNARRAY *bucket_array = ARRAY_GET(&as->symbol_table, DYNARRAY, bucket);
+        DYNARRAY *bucket_array = &as->symbol_table[bucket];
         ARRAY_ADD(bucket_array, new_sl);
         sl = ARRAY_GET(bucket_array, SYMBOL_LABEL, bucket_array->items - 1);
     }
@@ -472,7 +472,7 @@ SYMBOL_LABEL *symbol_store(const char *symbol_name, uint32_t symbol_name_length,
 
 SYMBOL_LABEL *symbol_lookup(uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length) {
     uint8_t bucket = name_hash & 0xff;
-    DYNARRAY *bucket_array = ARRAY_GET(&as->symbol_table, DYNARRAY, bucket);
+    DYNARRAY *bucket_array = &as->symbol_table[bucket];
     for(size_t i = 0; i < bucket_array->items; i++) {
         SYMBOL_LABEL *sl = ARRAY_GET(bucket_array, SYMBOL_LABEL, i);
         if(sl->symbol_hash == name_hash && !strnicmp(symbol_name, sl->symbol_name, symbol_name_length)) {
@@ -1154,11 +1154,10 @@ int assembler_init(APPLE2 *m) {
     ARRAY_INIT(&as->macros, MACRO);
     ARRAY_INIT(&as->input_stack, INPUT_STACK);
 
-    ARRAY_INIT(&as->symbol_table, DYNARRAY);
-    array_resize(&as->symbol_table, 256);
-    for(int i = 0; i < 256; i++) {
-        array_add(&as->symbol_table, NULL);
-        ARRAY_INIT(ARRAY_GET(&as->symbol_table, DYNARRAY, i), SYMBOL_LABEL);
+    int bucket;
+    as->symbol_table = (DYNARRAY*)malloc(sizeof(DYNARRAY) * 256);
+    for(bucket = 0; bucket < 256; bucket++) {
+        ARRAY_INIT(&as->symbol_table[bucket], SYMBOL_LABEL);
     }
 
     include_files_init();
@@ -1227,9 +1226,9 @@ int assembler_assemble(const char *input_file, uint16_t address) {
 void assembler_shutdown() {
     include_files_cleanup();
     for(int i = 0; i < 256; i++) {
-        array_free(ARRAY_GET(&as->symbol_table, DYNARRAY, i));
+        array_free(&as->symbol_table[i]);
     }
-    array_free(&as->symbol_table);
+    free(as->symbol_table);
     array_free(&as->input_stack);
     array_free(&as->macros);
     array_free(&as->loop_stack);
@@ -1331,9 +1330,9 @@ int main(int argc, char **argv) {
         } else {
             size_t bucket, i;
             // Accumulate all symbols in hash bucket 0
-            DYNARRAY *b0 = ARRAY_GET(&as->symbol_table, DYNARRAY, 0);
+            DYNARRAY *b0 = &as->symbol_table[0];
             for(bucket = 1; bucket < 256; bucket++) {
-                DYNARRAY *b = ARRAY_GET(&as->symbol_table, DYNARRAY, bucket);
+                DYNARRAY *b = &as->symbol_table[bucket];
                 for(i = 0; i < b->items; i++) {
                     SYMBOL_LABEL *sl = ARRAY_GET(b, SYMBOL_LABEL, i);
                     ARRAY_ADD(b0, sl);

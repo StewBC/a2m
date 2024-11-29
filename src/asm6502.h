@@ -190,13 +190,13 @@ typedef struct {
     const char *current_file;                               // Points at a UTIL_FILE path_name
     const char *input;                                      // Points at the assembly language buffer (start through end)
     const char *line_start;                                 // Just past \n of line input is on
-    const char *next_line_start;                                 // So errors get reported on line of last token
+    const char *next_line_start;                            // So errors get reported on line of last token
     const char *token_start;                                // Points at the start of a token (and input the end)
     DYNARRAY anon_symbols;                                  // Array of anonymous symbols
     DYNARRAY loop_stack;                                    // Array of for loops
     DYNARRAY macros;                                        // Array of all macros
     DYNARRAY input_stack;                                   // Array of token "reset" points (saved token_start, input, etc)
-    DYNARRAY symbol_table;                                  // Array of arrays of symbols
+    DYNARRAY *symbol_table;                                 // Array of arrays of symbols
     INCLUDE_FILES include_files;                            // The arrays for files and stack for .include
     int expression_size;                                    // Forward defs can't change size (16 bit can't become 8 later)
     int pass;                                               // 1 or 2 for 2 pass assembler
