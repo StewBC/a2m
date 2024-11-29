@@ -1335,7 +1335,7 @@ int main(int argc, char **argv) {
                 DYNARRAY *b = &as->symbol_table[bucket];
                 for(i = 0; i < b->items; i++) {
                     SYMBOL_LABEL *sl = ARRAY_GET(b, SYMBOL_LABEL, i);
-                    ARRAY_ADD(b0, sl);
+                    ARRAY_ADD(b0, *sl);
                 }
             }
             // Sort hash bucket 0
