@@ -93,7 +93,7 @@ The CPU window, when stopped, has editable boxes for the PC, SP, registers, and 
 The following keys are supported in the disassembly window:  
 ```
 CTRL + B - Configure an assembler source file for use with the built-in Assembler
-CTRL + A - Assemble the configured assembler source file
+CTRL + A - Assemble the configured assembler source file (No error message, no errors)
 CTRL + E - Re-show the errors output from the Assemble process
 CTRL + G - Set the address for viewing disassembly (cursor PC)
 CTRL + P - Set the machine PC to the cursor PC
@@ -158,7 +158,7 @@ In this project, a typedef struct is referred to as a "class." The main hardware
 The APPLE2 structure is designed to be compact, with dynamic allocation for certain components to support potential "time travel" functionality.  
   
 ## 6502 Assembler  
-I added a 6502 assembler to the project.  The assembler will be integrated into the emulator so assembeling code will just show up in memory.  I made a stand-alone version of the assembler which shares the code with the emulator version - it's the same assembler but with command line execution to make it an otherwise useful tool, outside of the emulator.  
+I added a 6502 assembler to the project.  The assembler is integrated into the emulator so assembled code just shows up in memory.  I made a stand-alone version of the assembler which shares the code with the emulator version - it's the same assembler but with command line execution to make it an otherwise useful tool, outside of the emulator.  
 ```
 Usage: asm6502.exe <-i infile> [-o outfile] [-s symbolfile] [-v]
        infile is a 6502 assembly language file
@@ -387,7 +387,7 @@ Memory Cleanup: Not all malloc allocations are freed on exit.
 Other bugs may be present, as testing has been limited.  
   
 ## Future plans  
-This project stemmed from an interest in creating a 6502 that could pass the Harte CPU tests, which led to making a small emulator for Manic Miner, which in turn led to the creation of this Emulator. I thought I was done but then I decided to add the Assembler so I am not sure where this project is taking me ;)  I do know that I still have to integrate the assembler into the emulator, of course. 
+This project stemmed from an interest in creating a 6502 that could pass the Harte CPU tests, which led to making a small emulator for Manic Miner, which in turn led to the creation of this Emulator. I thought I was done but then I decided to add the Assembler so I am not sure where this project is taking me `;)`
   
 ## Thank you  
 * Brendan Robert - Author of Jace, for telling me how to think about sampling for speaker emulation.  
