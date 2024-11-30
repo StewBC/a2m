@@ -16,6 +16,7 @@ struct OpcodeInfo
 .endfor,    GPERF_DOT_ENDFOR, 0, 0, 0
 .endmacro,  GPERF_DOT_ENDMACRO, 0, 0, 0
 .for,       GPERF_DOT_FOR, 0, 0, 0
+.incbin,    GPERF_DOT_INCBIN, 0, 0, 0
 .include,   GPERF_DOT_INCLUDE, 0, 0, 0
 .macro,     GPERF_DOT_MACRO, 0, 0, 0
 .org,       GPERF_DOT_ORG, 0, 0, 0

@@ -15,6 +15,7 @@ enum {
     GPERF_DOT_ENDFOR,
     GPERF_DOT_ENDMACRO,
     GPERF_DOT_FOR,
+    GPERF_DOT_INCBIN,
     GPERF_DOT_INCLUDE,
     GPERF_DOT_MACRO,
     GPERF_DOT_ORG,
@@ -248,6 +249,7 @@ int is_variable();
 int is_valid_instruction_only();
 void parse_dot_endfor();
 void parse_dot_for();
+void process_dot_incbin();
 void process_dot_include();
 void process_dot_org();
 void process_dot_strcode();

@@ -160,7 +160,7 @@ int include_files_push(const char *file_name) {
         new_file.load_padding = 1;
 
         if(A2_OK == util_file_load(&new_file, file_name, "r")) {
-            // Success, add tp list of laoded files and assign it to f
+            // Success, add to list of loaded files and assign it to f
             if(A2_OK != ARRAY_ADD(&as->include_files.included_files, new_file)) {
                 errlog("Out of memory");
             }
@@ -768,6 +768,44 @@ void parse_dot_for() {
     ARRAY_ADD(&as->loop_stack, for_loop);
 }
 
+void process_dot_incbin() {
+    get_token();
+    if(*as->token_start != '"') {
+        errlog("include expects a \" enclosed string as a parameter");
+    } else {
+        UTIL_FILE new_file;
+        char file_name[PATH_MAX];
+        size_t string_length = as->input - as->token_start - 2;
+        strncpy(file_name, as->token_start + 1, string_length);
+        file_name[string_length] = '\0';
+
+        // See if the file had previously been loaded
+        UTIL_FILE *f = include_files_find_file(file_name);
+        if(!f) {
+            // If not, it's a new file, load it
+            memset(&new_file, 0, sizeof(UTIL_FILE));
+
+            if(A2_OK == util_file_load(&new_file, file_name, "rb")) {
+                // Success, add to list of loaded files and assign it to f
+                if(A2_OK != ARRAY_ADD(&as->include_files.included_files, new_file)) {
+                    errlog("Out of memory");
+                }
+                f = &new_file;
+            } else {
+                errlog(".incbin could not load the file %s", file_name);
+            }
+        }
+        if(f) {
+            // if is now in memory, either previously or newly loaded
+            size_t data_size = f->file_size;
+            uint8_t *data = (uint8_t*)f->file_data;
+            while(data_size--) {
+                emit(*data++);
+            }
+        }
+    }
+}
+
 void process_dot_include() {
     get_token();
     if(*as->token_start != '"') {
@@ -1033,6 +1071,9 @@ void parse_dot_command() {
         break;
     case GPERF_DOT_FOR:
         parse_dot_for();
+        break;
+    case GPERF_DOT_INCBIN:
+        process_dot_incbin();
         break;
     case GPERF_DOT_INCLUDE:
         process_dot_include();

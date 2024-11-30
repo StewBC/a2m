@@ -190,8 +190,11 @@ Command | Description
 .drowq `value`[, value]* | Outputs `value` as 64 bits, hi to lo
 .dword `value`[, value]* | Outputs `value` as 32 bits, lo to hi
 .endfor | Ends a [for loop](#assembler-for-loops)
+.endmacro | Ends a [macro](#assembler-macros)
 .for | Starts a [for loop](#assembler-for-loops)
+.incbin "file" | Include a binary file, byte for byte, at this point
 .include "filename" | Includes the file, filename, at this point
+.macro "name" `[...]` | [macro](#assembler-macros)
 .org `value`| Another way to set the current address
 .qword `value`[, value]* | Outputs `value` as 64 bits, lo to hi
 .strcode | Sets a string [character parser](#assembler-strcode)
@@ -304,6 +307,33 @@ rowH:
 <...>
 ```
 Note that in rowH, the hi byte of $2000 is $20 and that is `|`'d with the other expressions.  The order of operations are not such that the `|` happens before the `>`.  If `|` was higher, the output for rowH would have simply been $20 as the lo byte portion that contains the data we are interested in, would have been discarded.  Also note that shift's `<<` and `>>` are higher than bitwise-and `&`, so the brackets are needed around the `&`.  The basic order of operations matches that of the "C" language.
+  
+#### Assembler Macros  
+The macros have the form  
+```
+.macro <name> [arg [, arg]*]
+ <macro body>
+.endmacro
+```
+The arguments are variables.  Best illustrated as an example:  
+```
+.macro add_a_b a b
+    clc
+    lda a
+    adc b
+.endmacro
+
+    add_a_b 12, 25 ; This is a call to use the macro
+```
+This will emit the code:
+```
+    clc
+    lda 12
+    adc 15
+```
+Note the lack of #.  You also cannot call it with `add_a_b #12, #15` since `#12` is not a valid variable "value".  The `#` would have to go into the code.  This macro system is not all that powerful, but it does help make repetitive tasks a little less tedious.  
+  
+NOTE (to self mainly): Maybe make variables that can be `immediate` so the parser can say if `lda` is followed by `#` or a `immediate` variable, this is an immediate load. That would make passing `#value` and things like `<value` possible.  Something to consider.  
   
 #### Assembler Strcode  
 `.strcode` can be used to map characters in a string to other values.  It uses the variable `_` to do the mapping.  
