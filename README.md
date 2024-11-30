@@ -152,11 +152,6 @@ The Language Card section shows the state of the Language Card, whether ROM or R
 ## Building from source  
 Currently, building instructions are limited. On Windows, install SDL2 and SDL_mixer and use VS Code with CMake plugins. On Linux (WSL), SDL2 and mixer were installed from source to access find_package scripts. VS Code was used with Clang. Mac support is untested.  
   
-## Something about the code  
-In this project, a typedef struct is referred to as a "class." The main hardware class, APPLE2, manages hardware subcomponents like the speaker and SmartPort. The VIEWPORT class handles rendering, keyboard input, making sounds, and debugging windows. Most API calls use an APPLE2 instance as the first parameter (named m for machine).  
-  
-The APPLE2 structure is designed to be compact, with dynamic allocation for certain components to support potential "time travel" functionality.  
-  
 ## 6502 Assembler  
 I added a 6502 assembler to the project.  The assembler is integrated into the emulator so assembled code just shows up in memory.  I made a stand-alone version of the assembler which shares the code with the emulator version - it's the same assembler but with command line execution to make it an otherwise useful tool, outside of the emulator.  
 ```
@@ -349,6 +344,11 @@ NOTE: `.strcode` assigns the characters in the string, one after the other, to `
 ### Assembler sample
 The sample folder contains sample code for use with the assembler.  See the [Sample Code README](samples/README.md).  
 There's also a python script to help de-scope ca65 assembler source files.  
+  
+## Something about the code  
+In this project, a typedef struct is referred to as a "class." The main hardware class, APPLE2, manages hardware subcomponents like the speaker and SmartPort. The VIEWPORT class handles rendering, keyboard input, making sounds, and debugging windows. Most API calls use an APPLE2 instance as the first parameter (named m for machine).  
+  
+The APPLE2 structure is designed to be compact, with dynamic allocation for certain components to support potential "time travel" functionality.  
   
 ## The source files and what they do  
 File | Description 
