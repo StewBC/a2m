@@ -219,188 +219,188 @@ void txs(APPLE2 * m);         /* 9A */
 void tya(APPLE2 * m);         /* 98 */
 
 // All cycle stages for all instructions
-OPCODE_STEPS ADC_IMM[] = { adc_imm };                       // 2
-OPCODE_STEPS ADC_ZP[] = { al_read_pc, adc_a16 };            // 3
-OPCODE_STEPS ADC_ZP_X[] = { al_read_pc, read_a16_ind_x, adc_a16 }; // 4
-OPCODE_STEPS ADC_ABS[] = { al_read_pc, ah_read_pc, adc_a16 }; // 4
-OPCODE_STEPS ADC_ABS_X[] = { al_read_pc, ah_read_pc, adc_abs_x }; // 4*
-OPCODE_STEPS ADC_ABS_Y[] = { al_read_pc, ah_read_pc, adc_abs_y }; // 4*
-OPCODE_STEPS ADC_IND_X[] = { al_read_pc, read_a16_ind_x, sl_read_a16, ah_read_a16_sl2al, adc_a16 }; // 6
-OPCODE_STEPS ADC_IND_Y[] = { al_read_pc, sl_read_a16, ah_read_a16_sl2al, adc_abs_y }; // 5*
+OPCODE_STEPS ADC_IMM[]   = { adc_imm                                                                                          }; // 2
+OPCODE_STEPS ADC_ZP[]    = { al_read_pc, adc_a16                                                                              }; // 3
+OPCODE_STEPS ADC_ZP_X[]  = { al_read_pc, read_a16_ind_x  , adc_a16                                                            }; // 4
+OPCODE_STEPS ADC_ABS[]   = { al_read_pc, ah_read_pc      , adc_a16                                                            }; // 4
+OPCODE_STEPS ADC_ABS_X[] = { al_read_pc, ah_read_pc      , adc_abs_x                                                          }; // 4*
+OPCODE_STEPS ADC_ABS_Y[] = { al_read_pc, ah_read_pc      , adc_abs_y                                                          }; // 4*
+OPCODE_STEPS ADC_IND_X[] = { al_read_pc, read_a16_ind_x  , sl_read_a16       , ah_read_a16_sl2al , adc_a16                    }; // 6
+OPCODE_STEPS ADC_IND_Y[] = { al_read_pc, sl_read_a16     , ah_read_a16_sl2al , adc_abs_y                                      }; // 5*
 
-OPCODE_STEPS AND_IMM[] = { and_imm };                       // 2
-OPCODE_STEPS AND_ZP[] = { al_read_pc, and_a16 };            // 3
-OPCODE_STEPS AND_ZP_X[] = { al_read_pc, read_a16_ind_x, and_a16 }; // 4
-OPCODE_STEPS AND_ABS[] = { al_read_pc, ah_read_pc, and_abs }; // 4
-OPCODE_STEPS AND_ABS_X[] = { al_read_pc, ah_read_pc, and_abs_x }; // 4*
-OPCODE_STEPS AND_ABS_Y[] = { al_read_pc, ah_read_pc, and_abs_y }; // 4*
-OPCODE_STEPS AND_IND_X[] = { al_read_pc, read_a16_ind_x, sl_read_a16, ah_read_a16_sl2al, and_ind_x }; // 6
-OPCODE_STEPS AND_IND_Y[] = { al_read_pc, sl_read_a16, ah_read_a16_sl2al, and_abs_y }; // 5*
+OPCODE_STEPS AND_IMM[]   = { and_imm                                                                                          }; // 2
+OPCODE_STEPS AND_ZP[]    = { al_read_pc, and_a16                                                                              }; // 3
+OPCODE_STEPS AND_ZP_X[]  = { al_read_pc, read_a16_ind_x  , and_a16                                                            }; // 4
+OPCODE_STEPS AND_ABS[]   = { al_read_pc, ah_read_pc      , and_abs                                                            }; // 4
+OPCODE_STEPS AND_ABS_X[] = { al_read_pc, ah_read_pc      , and_abs_x                                                          }; // 4*
+OPCODE_STEPS AND_ABS_Y[] = { al_read_pc, ah_read_pc      , and_abs_y                                                          }; // 4*
+OPCODE_STEPS AND_IND_X[] = { al_read_pc, read_a16_ind_x  , sl_read_a16       , ah_read_a16_sl2al , and_ind_x                  }; // 6
+OPCODE_STEPS AND_IND_Y[] = { al_read_pc, sl_read_a16     , ah_read_a16_sl2al , and_abs_y                                      }; // 5*
 
-OPCODE_STEPS ASL_A[] = { asl_a };                           // 2
-OPCODE_STEPS ASL_ZP[] = { al_read_pc, sl_read_a16, sl_write_a16, asl_a16 }; // 5
-OPCODE_STEPS ASL_ZP_X[] = { al_read_pc, read_a16_ind_x, sl_read_a16, sl_write_a16, asl_a16 }; // 6
-OPCODE_STEPS ASL_ABS[] = { al_read_pc, ah_read_pc, sl_read_a16, sl_write_a16, asl_a16 }; // 6
-OPCODE_STEPS ASL_ABS_X[] = { al_read_pc, ah_read_pc, sl_read_xpf_a16, sl_read_x_a16, sl_write_a16, asl_a16 }; // 7
+OPCODE_STEPS ASL_A[]     = { asl_a                                                                                            }; // 2
+OPCODE_STEPS ASL_ZP[]    = { al_read_pc, sl_read_a16     , sl_write_a16      , asl_a16                                        }; // 5
+OPCODE_STEPS ASL_ZP_X[]  = { al_read_pc, read_a16_ind_x  , sl_read_a16       , sl_write_a16      , asl_a16                    }; // 6
+OPCODE_STEPS ASL_ABS[]   = { al_read_pc, ah_read_pc      , sl_read_a16       , sl_write_a16      , asl_a16                    }; // 6
+OPCODE_STEPS ASL_ABS_X[] = { al_read_pc, ah_read_pc      , sl_read_xpf_a16   , sl_read_x_a16     , sl_write_a16     , asl_a16 }; // 7
 
-OPCODE_STEPS BCC[] = { bcc, branch };                       // 2**
-OPCODE_STEPS BCS[] = { bcs, branch };                       // 2**
-OPCODE_STEPS BEQ[] = { beq, branch };                       // 2**
+OPCODE_STEPS BCC[]       = { bcc       , branch                                                                               }; // 2**
+OPCODE_STEPS BCS[]       = { bcs       , branch                                                                               }; // 2**
+OPCODE_STEPS BEQ[]       = { beq       , branch                                                                               }; // 2**
 
-OPCODE_STEPS BIT_ZP[] = { al_read_pc, bit_a16 };            // 3
-OPCODE_STEPS BIT_ABS[] = { al_read_pc, ah_read_pc, bit_a16 }; // 4
+OPCODE_STEPS BIT_ZP[]    = { al_read_pc, bit_a16                                                                              }; // 3
+OPCODE_STEPS BIT_ABS[]   = { al_read_pc, ah_read_pc      , bit_a16                                                            }; // 4
 
-OPCODE_STEPS BMI[] = { bmi, branch };                       // 2**
-OPCODE_STEPS BNE[] = { bne, branch };                       // 2**
-OPCODE_STEPS BPL[] = { bpl, branch };                       // 2**
-OPCODE_STEPS BRK[] = { al_read_pc, pc_hi_to_stack, pc_lo_to_stack, p_to_stack, brk_pc, a2brk }; // 7
-OPCODE_STEPS BVC[] = { bvc, branch };                       // 2**
-OPCODE_STEPS BVS[] = { bvs, branch };                       // 2**
+OPCODE_STEPS BMI[]       = { bmi       , branch                                                                               }; // 2**
+OPCODE_STEPS BNE[]       = { bne       , branch                                                                               }; // 2**
+OPCODE_STEPS BPL[]       = { bpl       , branch                                                                               }; // 2**
+OPCODE_STEPS BRK[]       = { al_read_pc, pc_hi_to_stack  , pc_lo_to_stack    , p_to_stack        , brk_pc           , a2brk   }; // 7
+OPCODE_STEPS BVC[]       = { bvc       , branch                                                                               }; // 2**
+OPCODE_STEPS BVS[]       = { bvs       , branch                                                                               }; // 2**
 
-OPCODE_STEPS CLC[] = { clc };                               // 2
-OPCODE_STEPS CLD[] = { cld };                               // 2
-OPCODE_STEPS CLI[] = { cli };                               // 2
-OPCODE_STEPS CLV[] = { clv };                               // 2
+OPCODE_STEPS CLC[]       = { clc                                                                                              }; // 2
+OPCODE_STEPS CLD[]       = { cld                                                                                              }; // 2
+OPCODE_STEPS CLI[]       = { cli                                                                                              }; // 2
+OPCODE_STEPS CLV[]       = { clv                                                                                              }; // 2
 
-OPCODE_STEPS CMP_IMM[] = { cmp_imm };                       // 2
-OPCODE_STEPS CMP_ZP[] = { al_read_pc, cmp_a16 };            // 3
-OPCODE_STEPS CMP_ZP_X[] = { al_read_pc, read_a16_ind_x, cmp_a16 }; // 4
-OPCODE_STEPS CMP_ABS[] = { al_read_pc, ah_read_pc, cmp_a16 }; // 4
-OPCODE_STEPS CMP_ABS_X[] = { al_read_pc, ah_read_pc, cmp_abs_x }; // 4*
-OPCODE_STEPS CMP_ABS_Y[] = { al_read_pc, ah_read_pc, cmp_abs_y }; // 4*
-OPCODE_STEPS CMP_IND_X[] = { al_read_pc, read_a16_ind_x, sl_read_a16, ah_read_a16_sl2al, cmp_a16 }; // 6
-OPCODE_STEPS CMP_IND_Y[] = { al_read_pc, sl_read_a16, ah_read_a16_sl2al, cmp_abs_y }; // 5*
+OPCODE_STEPS CMP_IMM[]   = { cmp_imm                                                                                          }; // 2
+OPCODE_STEPS CMP_ZP[]    = { al_read_pc, cmp_a16                                                                              }; // 3
+OPCODE_STEPS CMP_ZP_X[]  = { al_read_pc, read_a16_ind_x  , cmp_a16                                                            }; // 4
+OPCODE_STEPS CMP_ABS[]   = { al_read_pc, ah_read_pc      , cmp_a16                                                            }; // 4
+OPCODE_STEPS CMP_ABS_X[] = { al_read_pc, ah_read_pc      , cmp_abs_x                                                          }; // 4*
+OPCODE_STEPS CMP_ABS_Y[] = { al_read_pc, ah_read_pc      , cmp_abs_y                                                          }; // 4*
+OPCODE_STEPS CMP_IND_X[] = { al_read_pc, read_a16_ind_x  , sl_read_a16       , ah_read_a16_sl2al , cmp_a16                    }; // 6
+OPCODE_STEPS CMP_IND_Y[] = { al_read_pc, sl_read_a16     , ah_read_a16_sl2al , cmp_abs_y                                      }; // 5*
 
-OPCODE_STEPS CPX_IMM[] = { cpx_imm };                       // 2
-OPCODE_STEPS CPX_ZP[] = { al_read_pc, cpx_a16 };            // 3
-OPCODE_STEPS CPX_ABS[] = { al_read_pc, ah_read_pc, cpx_a16 }; // 4
+OPCODE_STEPS CPX_IMM[]   = { cpx_imm                                                                                          }; // 2
+OPCODE_STEPS CPX_ZP[]    = { al_read_pc, cpx_a16                                                                              }; // 3
+OPCODE_STEPS CPX_ABS[]   = { al_read_pc, ah_read_pc      , cpx_a16                                                            }; // 4
 
-OPCODE_STEPS CPY_IMM[] = { cpy_imm };                       // 2
-OPCODE_STEPS CPY_ZP[] = { al_read_pc, cpy_a16 };            // 3
-OPCODE_STEPS CPY_ABS[] = { al_read_pc, ah_read_pc, cpy_a16 }; // 4
+OPCODE_STEPS CPY_IMM[]   = { cpy_imm                                                                                          }; // 2
+OPCODE_STEPS CPY_ZP[]    = { al_read_pc, cpy_a16                                                                              }; // 3
+OPCODE_STEPS CPY_ABS[]   = { al_read_pc, ah_read_pc      , cpy_a16                                                            }; // 4
 
-OPCODE_STEPS DEC_ZP[] = { al_read_pc, sl_read_a16, sl_write_a16, dec_a16 }; // 5
-OPCODE_STEPS DEC_ZP_X[] = { al_read_pc, read_a16_ind_x, sl_read_a16, sl_write_a16, dec_a16 }; // 6
-OPCODE_STEPS DEC_ABS[] = { al_read_pc, ah_read_pc, sl_read_a16, sl_write_a16, dec_a16 }; // 6
-OPCODE_STEPS DEC_ABS_X[] = { al_read_pc, ah_read_pc, sl_read_xpf_a16, sl_read_x_a16, sl_write_a16, dec_a16 }; // 7
+OPCODE_STEPS DEC_ZP[]    = { al_read_pc, sl_read_a16     , sl_write_a16      , dec_a16                                        }; // 5
+OPCODE_STEPS DEC_ZP_X[]  = { al_read_pc, read_a16_ind_x  , sl_read_a16       , sl_write_a16      , dec_a16                    }; // 6
+OPCODE_STEPS DEC_ABS[]   = { al_read_pc, ah_read_pc      , sl_read_a16       , sl_write_a16      , dec_a16                    }; // 6
+OPCODE_STEPS DEC_ABS_X[] = { al_read_pc, ah_read_pc      , sl_read_xpf_a16   , sl_read_x_a16     , sl_write_a16     , dec_a16 }; // 7
 
-OPCODE_STEPS DEX[] = { dex };                               // 2
-OPCODE_STEPS DEY[] = { dey };                               // 2
+OPCODE_STEPS DEX[]       = { dex                                                                                              }; // 2
+OPCODE_STEPS DEY[]       = { dey                                                                                              }; // 2
 
-OPCODE_STEPS EOR_IMM[] = { eor_imm };                       // 2
-OPCODE_STEPS EOR_ZP[] = { al_read_pc, eor_a16 };            // 3
-OPCODE_STEPS EOR_ZP_X[] = { al_read_pc, read_a16_ind_x, eor_a16 }; // 4
-OPCODE_STEPS EOR_ABS[] = { al_read_pc, ah_read_pc, eor_a16 }; // 4
-OPCODE_STEPS EOR_ABS_X[] = { al_read_pc, ah_read_pc, eor_abs_x }; // 4*
-OPCODE_STEPS EOR_ABS_Y[] = { al_read_pc, ah_read_pc, eor_abs_y }; // 4*
-OPCODE_STEPS EOR_IND_X[] = { al_read_pc, read_a16_ind_x, sl_read_a16, ah_read_a16_sl2al, eor_a16 }; // 6
-OPCODE_STEPS EOR_IND_Y[] = { al_read_pc, sl_read_a16, ah_read_a16_sl2al, eor_abs_y }; // 5*
+OPCODE_STEPS EOR_IMM[]   = { eor_imm                                                                                          }; // 2
+OPCODE_STEPS EOR_ZP[]    = { al_read_pc, eor_a16                                                                              }; // 3
+OPCODE_STEPS EOR_ZP_X[]  = { al_read_pc, read_a16_ind_x  , eor_a16                                                            }; // 4
+OPCODE_STEPS EOR_ABS[]   = { al_read_pc, ah_read_pc      , eor_a16                                                            }; // 4
+OPCODE_STEPS EOR_ABS_X[] = { al_read_pc, ah_read_pc      , eor_abs_x                                                          }; // 4*
+OPCODE_STEPS EOR_ABS_Y[] = { al_read_pc, ah_read_pc      , eor_abs_y                                                          }; // 4*
+OPCODE_STEPS EOR_IND_X[] = { al_read_pc, read_a16_ind_x  , sl_read_a16       , ah_read_a16_sl2al , eor_a16                    }; // 6
+OPCODE_STEPS EOR_IND_Y[] = { al_read_pc, sl_read_a16     , ah_read_a16_sl2al , eor_abs_y                                      }; // 5*
 
-OPCODE_STEPS INC_ZP[] = { al_read_pc, sl_read_a16, sl_write_a16, inc_a16 }; // 5
-OPCODE_STEPS INC_ZP_X[] = { al_read_pc, read_a16_ind_x, sl_read_a16, sl_write_a16, inc_a16 }; // 6
-OPCODE_STEPS INC_ABS[] = { al_read_pc, ah_read_pc, sl_read_a16, sl_write_a16, inc_a16 }; // 6
-OPCODE_STEPS INC_ABS_X[] = { al_read_pc, ah_read_pc, sl_read_xpf_a16, sl_read_x_a16, sl_write_a16, inc_a16 }; // 7
+OPCODE_STEPS INC_ZP[]    = { al_read_pc, sl_read_a16     , sl_write_a16      , inc_a16                                        }; // 5
+OPCODE_STEPS INC_ZP_X[]  = { al_read_pc, read_a16_ind_x  , sl_read_a16       , sl_write_a16      , inc_a16                    }; // 6
+OPCODE_STEPS INC_ABS[]   = { al_read_pc, ah_read_pc      , sl_read_a16       , sl_write_a16      , inc_a16                    }; // 6
+OPCODE_STEPS INC_ABS_X[] = { al_read_pc, ah_read_pc      , sl_read_xpf_a16   , sl_read_x_a16     , sl_write_a16     , inc_a16 }; // 7
 
-OPCODE_STEPS INX[] = { inx };                               // 2
-OPCODE_STEPS INY[] = { iny };                               // 2
+OPCODE_STEPS INX[]       = { inx                                                                                              }; // 2
+OPCODE_STEPS INY[]       = { iny                                                                                              }; // 2
 
-OPCODE_STEPS JMP_ABS[] = { al_read_pc, jmp_abs };           // 3
-OPCODE_STEPS JMP_IND[] = { al_read_pc, ah_read_pc, sl_read_a16, jmp_ind }; // 5
-OPCODE_STEPS JSR_ABS[] = { al_read_pc, read_sp, pc_hi_to_stack, pc_lo_to_stack, jsr_abs }; // 6
+OPCODE_STEPS JMP_ABS[]   = { al_read_pc, jmp_abs                                                                              }; // 3
+OPCODE_STEPS JMP_IND[]   = { al_read_pc, ah_read_pc      , sl_read_a16       , jmp_ind                                        }; // 5
+OPCODE_STEPS JSR_ABS[]   = { al_read_pc, read_sp         , pc_hi_to_stack    , pc_lo_to_stack    , jsr_abs                    }; // 6
 
-OPCODE_STEPS LDA_IMM[] = { lda_imm };                       // 2
-OPCODE_STEPS LDA_ZP[] = { al_read_pc, lda_a16 };            // 3
-OPCODE_STEPS LDA_ZP_X[] = { al_read_pc, read_a16_ind_x, lda_a16 }; // 4
-OPCODE_STEPS LDA_ABS[] = { al_read_pc, ah_read_pc, lda_a16 }; // 4
-OPCODE_STEPS LDA_ABS_X[] = { al_read_pc, ah_read_pc, lda_abs_x }; // 4*
-OPCODE_STEPS LDA_ABS_Y[] = { al_read_pc, ah_read_pc, lda_abs_y }; // 4*
-OPCODE_STEPS LDA_IND_X[] = { al_read_pc, read_a16_ind_x, sl_read_a16, ah_read_a16_sl2al, lda_a16 }; // 6
-OPCODE_STEPS LDA_IND_Y[] = { al_read_pc, sl_read_a16, ah_read_a16_sl2al, lda_abs_y }; // 5*
+OPCODE_STEPS LDA_IMM[]   = { lda_imm                                                                                          }; // 2
+OPCODE_STEPS LDA_ZP[]    = { al_read_pc, lda_a16                                                                              }; // 3
+OPCODE_STEPS LDA_ZP_X[]  = { al_read_pc, read_a16_ind_x  , lda_a16                                                            }; // 4
+OPCODE_STEPS LDA_ABS[]   = { al_read_pc, ah_read_pc      , lda_a16                                                            }; // 4
+OPCODE_STEPS LDA_ABS_X[] = { al_read_pc, ah_read_pc      , lda_abs_x                                                          }; // 4*
+OPCODE_STEPS LDA_ABS_Y[] = { al_read_pc, ah_read_pc      , lda_abs_y                                                          }; // 4*
+OPCODE_STEPS LDA_IND_X[] = { al_read_pc, read_a16_ind_x  , sl_read_a16       , ah_read_a16_sl2al , lda_a16                    }; // 6
+OPCODE_STEPS LDA_IND_Y[] = { al_read_pc, sl_read_a16     , ah_read_a16_sl2al , lda_abs_y                                      }; // 5*
 
-OPCODE_STEPS LDX_IMM[] = { ldx_imm };                       // 2
-OPCODE_STEPS LDX_ZP[] = { al_read_pc, ldx_a16 };            // 3
-OPCODE_STEPS LDX_ZP_Y[] = { al_read_pc, read_a16_ind_y, ldx_a16 }; // 4
-OPCODE_STEPS LDX_ABS[] = { al_read_pc, ah_read_pc, ldx_a16 }; // 4
-OPCODE_STEPS LDX_ABS_Y[] = { al_read_pc, ah_read_pc, ldx_abs_y }; // 4*
+OPCODE_STEPS LDX_IMM[]   = { ldx_imm                                                                                          }; // 2
+OPCODE_STEPS LDX_ZP[]    = { al_read_pc, ldx_a16                                                                              }; // 3
+OPCODE_STEPS LDX_ZP_Y[]  = { al_read_pc, read_a16_ind_y  , ldx_a16                                                            }; // 4
+OPCODE_STEPS LDX_ABS[]   = { al_read_pc, ah_read_pc      , ldx_a16                                                            }; // 4
+OPCODE_STEPS LDX_ABS_Y[] = { al_read_pc, ah_read_pc      , ldx_abs_y                                                          }; // 4*
 
-OPCODE_STEPS LDY_IMM[] = { ldy_imm };                       // 2
-OPCODE_STEPS LDY_ZP[] = { al_read_pc, ldy_a16 };            // 3
-OPCODE_STEPS LDY_ZP_X[] = { al_read_pc, read_a16_ind_x, ldy_a16 }; // 4
-OPCODE_STEPS LDY_ABS[] = { al_read_pc, ah_read_pc, ldy_a16 }; // 4
-OPCODE_STEPS LDY_ABS_X[] = { al_read_pc, ah_read_pc, ldy_abs_x }; // 4*
+OPCODE_STEPS LDY_IMM[]   = { ldy_imm                                                                                          }; // 2
+OPCODE_STEPS LDY_ZP[]    = { al_read_pc, ldy_a16                                                                              }; // 3
+OPCODE_STEPS LDY_ZP_X[]  = { al_read_pc, read_a16_ind_x  , ldy_a16                                                            }; // 4
+OPCODE_STEPS LDY_ABS[]   = { al_read_pc, ah_read_pc      , ldy_a16                                                            }; // 4
+OPCODE_STEPS LDY_ABS_X[] = { al_read_pc, ah_read_pc      , ldy_abs_x                                                          }; // 4*
 
-OPCODE_STEPS LSR_A[] = { lsr_a };                           // 2
-OPCODE_STEPS LSR_ZP[] = { al_read_pc, sl_read_a16, sl_write_a16, lsr_a16 }; // 5
-OPCODE_STEPS LSR_ZP_X[] = { al_read_pc, read_a16_ind_x, sl_read_a16, sl_write_a16, lsr_a16 }; // 6
-OPCODE_STEPS LSR_ABS[] = { al_read_pc, ah_read_pc, sl_read_a16, sl_write_a16, lsr_a16 }; // 6
-OPCODE_STEPS LSR_ABS_X[] = { al_read_pc, ah_read_pc, sl_read_xpf_a16, sl_read_x_a16, sl_write_a16, lsr_a16 }; // 7
+OPCODE_STEPS LSR_A[]     = { lsr_a                                                                                            }; // 2
+OPCODE_STEPS LSR_ZP[]    = { al_read_pc, sl_read_a16     , sl_write_a16      , lsr_a16                                        }; // 5
+OPCODE_STEPS LSR_ZP_X[]  = { al_read_pc, read_a16_ind_x  , sl_read_a16       , sl_write_a16      , lsr_a16                    }; // 6
+OPCODE_STEPS LSR_ABS[]   = { al_read_pc, ah_read_pc      , sl_read_a16       , sl_write_a16      , lsr_a16                    }; // 6
+OPCODE_STEPS LSR_ABS_X[] = { al_read_pc, ah_read_pc      , sl_read_xpf_a16   , sl_read_x_a16     , sl_write_a16     , lsr_a16 }; // 7
 
-OPCODE_STEPS NOP[] = { nop };                               // 2
+OPCODE_STEPS NOP[]       = { nop                                                                                              }; // 2
 
-OPCODE_STEPS ORA_IMM[] = { ora_imm };                       // 2
-OPCODE_STEPS ORA_ZP[] = { al_read_pc, ora_a16 };            // 3
-OPCODE_STEPS ORA_ZP_X[] = { al_read_pc, read_a16_ind_x, ora_a16 }; // 4
-OPCODE_STEPS ORA_ABS[] = { al_read_pc, ah_read_pc, ora_a16 }; // 4
-OPCODE_STEPS ORA_ABS_X[] = { al_read_pc, ah_read_pc, ora_abs_x }; // 4*
-OPCODE_STEPS ORA_ABS_Y[] = { al_read_pc, ah_read_pc, ora_abs_y }; // 4*
-OPCODE_STEPS ORA_IND_X[] = { al_read_pc, read_a16_ind_x, sl_read_a16, ah_read_a16_sl2al, ora_a16 }; // 6
-OPCODE_STEPS ORA_IND_Y[] = { al_read_pc, sl_read_a16, ah_read_a16_sl2al, ora_abs_y }; // 5*
+OPCODE_STEPS ORA_IMM[]   = { ora_imm                                                                                          }; // 2
+OPCODE_STEPS ORA_ZP[]    = { al_read_pc, ora_a16                                                                              }; // 3
+OPCODE_STEPS ORA_ZP_X[]  = { al_read_pc, read_a16_ind_x  , ora_a16                                                            }; // 4
+OPCODE_STEPS ORA_ABS[]   = { al_read_pc, ah_read_pc      , ora_a16                                                            }; // 4
+OPCODE_STEPS ORA_ABS_X[] = { al_read_pc, ah_read_pc      , ora_abs_x                                                          }; // 4*
+OPCODE_STEPS ORA_ABS_Y[] = { al_read_pc, ah_read_pc      , ora_abs_y                                                          }; // 4*
+OPCODE_STEPS ORA_IND_X[] = { al_read_pc, read_a16_ind_x  , sl_read_a16       , ah_read_a16_sl2al , ora_a16                    }; // 6
+OPCODE_STEPS ORA_IND_Y[] = { al_read_pc, sl_read_a16     , ah_read_a16_sl2al , ora_abs_y                                      }; // 5*
 
-OPCODE_STEPS PHA[] = { read_pc, pha };                      // 3
-OPCODE_STEPS PHP[] = { read_pc, php };                      // 3
-OPCODE_STEPS PLA[] = { read_pc, read_sp, pla };             // 4
-OPCODE_STEPS PLP[] = { read_pc, read_sp, plp };             // 4
+OPCODE_STEPS PHA[]       = { read_pc   , pha                                                                                  }; // 3
+OPCODE_STEPS PHP[]       = { read_pc   , php                                                                                  }; // 3
+OPCODE_STEPS PLA[]       = { read_pc   , read_sp         , pla                                                                }; // 4
+OPCODE_STEPS PLP[]       = { read_pc   , read_sp         , plp                                                                }; // 4
 
-OPCODE_STEPS ROL_A[] = { rol_a };                           // 2
-OPCODE_STEPS ROL_ZP[] = { al_read_pc, sl_read_a16, sl_write_a16, rol_a16 }; // 5
-OPCODE_STEPS ROL_ZP_X[] = { al_read_pc, read_a16_ind_x, sl_read_a16, sl_write_a16, rol_a16 }; // 6
-OPCODE_STEPS ROL_ABS[] = { al_read_pc, ah_read_pc, sl_read_a16, sl_write_a16, rol_a16 }; // 6
-OPCODE_STEPS ROL_ABS_X[] = { al_read_pc, ah_read_pc, sl_read_xpf_a16, sl_read_x_a16, sl_write_a16, rol_a16 }; // 7
+OPCODE_STEPS ROL_A[]     = { rol_a                                                                                            }; // 2
+OPCODE_STEPS ROL_ZP[]    = { al_read_pc, sl_read_a16     , sl_write_a16      , rol_a16                                        }; // 5
+OPCODE_STEPS ROL_ZP_X[]  = { al_read_pc, read_a16_ind_x  , sl_read_a16       , sl_write_a16      , rol_a16                    }; // 6
+OPCODE_STEPS ROL_ABS[]   = { al_read_pc, ah_read_pc      , sl_read_a16       , sl_write_a16      , rol_a16                    }; // 6
+OPCODE_STEPS ROL_ABS_X[] = { al_read_pc, ah_read_pc      , sl_read_xpf_a16   , sl_read_x_a16     , sl_write_a16     , rol_a16 }; // 7
 
-OPCODE_STEPS ROR_A[] = { ror_a };                           // 2
-OPCODE_STEPS ROR_ZP[] = { al_read_pc, sl_read_a16, sl_write_a16, ror_a16 }; // 5
-OPCODE_STEPS ROR_ZP_X[] = { al_read_pc, read_a16_ind_x, sl_read_a16, sl_write_a16, ror_a16 }; // 6
-OPCODE_STEPS ROR_ABS[] = { al_read_pc, ah_read_pc, sl_read_a16, sl_write_a16, ror_a16 }; // 6
-OPCODE_STEPS ROR_ABS_X[] = { al_read_pc, ah_read_pc, sl_read_xpf_a16, sl_read_x_a16, sl_write_a16, ror_a16 }; // 7
+OPCODE_STEPS ROR_A[]     = { ror_a                                                                                            }; // 2
+OPCODE_STEPS ROR_ZP[]    = { al_read_pc, sl_read_a16     , sl_write_a16      , ror_a16                                        }; // 5
+OPCODE_STEPS ROR_ZP_X[]  = { al_read_pc, read_a16_ind_x  , sl_read_a16       , sl_write_a16      , ror_a16                    }; // 6
+OPCODE_STEPS ROR_ABS[]   = { al_read_pc, ah_read_pc      , sl_read_a16       , sl_write_a16      , ror_a16                    }; // 6
+OPCODE_STEPS ROR_ABS_X[] = { al_read_pc, ah_read_pc      , sl_read_xpf_a16   , sl_read_x_a16     , sl_write_a16     , ror_a16 }; // 7
 
-OPCODE_STEPS RTI[] = { read_pc, read_sp, p_from_stack, al_from_stack, rti }; // 6
-OPCODE_STEPS RTS[] = { read_pc, read_sp, al_from_stack, ah_from_stack, rts }; // 6
+OPCODE_STEPS RTI[]       = { read_pc   , read_sp         , p_from_stack      , al_from_stack     , rti                        }; // 6
+OPCODE_STEPS RTS[]       = { read_pc   , read_sp         , al_from_stack     , ah_from_stack     , rts                        }; // 6
 
-OPCODE_STEPS SBC_IMM[] = { sbc_imm };                       // 2
-OPCODE_STEPS SBC_ZP[] = { al_read_pc, sbc_a16 };            // 3
-OPCODE_STEPS SBC_ZP_X[] = { al_read_pc, read_a16_ind_x, sbc_a16 }; // 4
-OPCODE_STEPS SBC_ABS[] = { al_read_pc, ah_read_pc, sbc_a16 }; // 4
-OPCODE_STEPS SBC_ABS_X[] = { al_read_pc, ah_read_pc, sbc_abs_x }; // 4*
-OPCODE_STEPS SBC_ABS_Y[] = { al_read_pc, ah_read_pc, sbc_abs_y }; // 4*
-OPCODE_STEPS SBC_IND_X[] = { al_read_pc, read_a16_ind_x, sl_read_a16, ah_read_a16_sl2al, sbc_a16 }; // 6
-OPCODE_STEPS SBC_IND_Y[] = { al_read_pc, sl_read_a16, ah_read_a16_sl2al, sbc_abs_y }; // 5*
+OPCODE_STEPS SBC_IMM[]   = { sbc_imm                                                                                          }; // 2
+OPCODE_STEPS SBC_ZP[]    = { al_read_pc, sbc_a16                                                                              }; // 3
+OPCODE_STEPS SBC_ZP_X[]  = { al_read_pc, read_a16_ind_x  , sbc_a16                                                            }; // 4
+OPCODE_STEPS SBC_ABS[]   = { al_read_pc, ah_read_pc      , sbc_a16                                                            }; // 4
+OPCODE_STEPS SBC_ABS_X[] = { al_read_pc, ah_read_pc      , sbc_abs_x                                                          }; // 4*
+OPCODE_STEPS SBC_ABS_Y[] = { al_read_pc, ah_read_pc      , sbc_abs_y                                                          }; // 4*
+OPCODE_STEPS SBC_IND_X[] = { al_read_pc, read_a16_ind_x  , sl_read_a16       , ah_read_a16_sl2al , sbc_a16                    }; // 6
+OPCODE_STEPS SBC_IND_Y[] = { al_read_pc, sl_read_a16     , ah_read_a16_sl2al , sbc_abs_y                                      }; // 5*
 
-OPCODE_STEPS SEC[] = { sec };                               // 2
-OPCODE_STEPS SED[] = { sed };                               // 2
-OPCODE_STEPS SEI[] = { sei };                               // 2
+OPCODE_STEPS SEC[]       = { sec                                                                                              }; // 2
+OPCODE_STEPS SED[]       = { sed                                                                                              }; // 2
+OPCODE_STEPS SEI[]       = { sei                                                                                              }; // 2
 
-OPCODE_STEPS STA_ZP[] = { al_read_pc, sta_a16 };            // 3
-OPCODE_STEPS STA_ZP_X[] = { al_read_pc, read_a16_ind_x, sta_a16 }; // 4
-OPCODE_STEPS STA_ABS[] = { al_read_pc, ah_read_pc, sta_a16 }; // 4
-OPCODE_STEPS STA_ABS_X[] = { al_read_pc, ah_read_pc, sl_read_xpf_a16, sta_abs_x }; // 5
-OPCODE_STEPS STA_ABS_Y[] = { al_read_pc, ah_read_pc, sl_read_ypf_a16, sta_abs_y }; // 5
-OPCODE_STEPS STA_IND_X[] = { al_read_pc, read_a16_ind_x, sl_read_a16, ah_read_a16_sl2al, sta_a16 }; // 6
-OPCODE_STEPS STA_IND_Y[] = { al_read_pc, sl_read_a16, ah_read_a16_sl2al, sl_read_ypf_a16, sta_abs_y }; // 6
+OPCODE_STEPS STA_ZP[]    = { al_read_pc, sta_a16                                                                              }; // 3
+OPCODE_STEPS STA_ZP_X[]  = { al_read_pc, read_a16_ind_x  , sta_a16                                                            }; // 4
+OPCODE_STEPS STA_ABS[]   = { al_read_pc, ah_read_pc      , sta_a16                                                            }; // 4
+OPCODE_STEPS STA_ABS_X[] = { al_read_pc, ah_read_pc      , sl_read_xpf_a16   , sta_abs_x                                      }; // 5
+OPCODE_STEPS STA_ABS_Y[] = { al_read_pc, ah_read_pc      , sl_read_ypf_a16   , sta_abs_y                                      }; // 5
+OPCODE_STEPS STA_IND_X[] = { al_read_pc, read_a16_ind_x  , sl_read_a16       , ah_read_a16_sl2al , sta_a16                    }; // 6
+OPCODE_STEPS STA_IND_Y[] = { al_read_pc, sl_read_a16     , ah_read_a16_sl2al , sl_read_ypf_a16   , sta_abs_y                  }; // 6
 
-OPCODE_STEPS STX_ZP[] = { al_read_pc, stx_a16 };            // 3
-OPCODE_STEPS STX_ZP_Y[] = { al_read_pc, read_a16_ind_y, stx_a16 }; // 4
-OPCODE_STEPS STX_ABS[] = { al_read_pc, ah_read_pc, stx_a16 }; // 4
+OPCODE_STEPS STX_ZP[]    = { al_read_pc, stx_a16                                                                              }; // 3
+OPCODE_STEPS STX_ZP_Y[]  = { al_read_pc, read_a16_ind_y  , stx_a16                                                            }; // 4
+OPCODE_STEPS STX_ABS[]   = { al_read_pc, ah_read_pc      , stx_a16                                                            }; // 4
 
-OPCODE_STEPS STY_ZP[] = { al_read_pc, sty_a16 };            // 3
-OPCODE_STEPS STY_ZP_X[] = { al_read_pc, read_a16_ind_x, sty_a16 }; // 4
-OPCODE_STEPS STY_ABS[] = { al_read_pc, ah_read_pc, sty_a16 }; // 4
+OPCODE_STEPS STY_ZP[]    = { al_read_pc, sty_a16                                                                              }; // 3
+OPCODE_STEPS STY_ZP_X[]  = { al_read_pc, read_a16_ind_x  , sty_a16                                                            }; // 4
+OPCODE_STEPS STY_ABS[]   = { al_read_pc, ah_read_pc      , sty_a16                                                            }; // 4
 
-OPCODE_STEPS TAX[] = { tax };                               // 2
-OPCODE_STEPS TAY[] = { tay };                               // 2
-OPCODE_STEPS TSX[] = { tsx };                               // 2
-OPCODE_STEPS TXA[] = { txa };                               // 2
-OPCODE_STEPS TXS[] = { txs };                               // 2
-OPCODE_STEPS TYA[] = { tya };                               // 2
+OPCODE_STEPS TAX[]       = { tax                                                                                              }; // 2
+OPCODE_STEPS TAY[]       = { tay                                                                                              }; // 2
+OPCODE_STEPS TSX[]       = { tsx                                                                                              }; // 2
+OPCODE_STEPS TXA[]       = { txa                                                                                              }; // 2
+OPCODE_STEPS TXS[]       = { txs                                                                                              }; // 2
+OPCODE_STEPS TYA[]       = { tya                                                                                              }; // 2
 
 // All cycles not implemented refer to the UNDEFINED stage, which is just an empty cycle for now
 OPCODE_STEPS UNDEFINED[] = { empty_cycle };
