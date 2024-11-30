@@ -346,6 +346,10 @@ This will output `0000: 30 31 32 33` which is "0123".  Where this becomes releva
 `.strcode _ .ge $61 ? _ - $60 : _ .ge $41 ? _ - $40 : _`  
 NOTE: `.strcode` assigns the characters in the string, one after the other, to `_` and then evaluates the `.strcode` expression.  To turn off processing, simply use `.strcode _`. If you use just `_` as a variable in your own code, then `.strcode` will overwrite it.  
   
+### Assembler sample
+The sample folder contains sample code for use with the assembler.  See the [Sample Code README](samples/README.md).  
+There's also a python script to help de-scope ca65 assembler source files.  
+  
 ## The source files and what they do  
 File | Description 
 --- | --- 
