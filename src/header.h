@@ -43,7 +43,6 @@
 
 // SDL related
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
 
 // nuklear GUI includes
 #define NK_INCLUDE_FIXED_TYPES

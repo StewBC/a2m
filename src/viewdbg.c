@@ -161,13 +161,13 @@ int viewdbg_disassemble_line(APPLE2 *m, uint16_t pc, CODE_LINE *line) {
     case 1:
         sprintf(text, "%02X           ", instruction);
         text += 9;
-        sprintf(text, opcode_text[instruction]);
+        strcpy(text, opcode_text[instruction]);
         break;
     case 2:
         address = read_from_memory_debug(m, pc + 1);
         sprintf(text, "%02X %02X      ", instruction, address);
         text += 9;
-        sprintf(text, opcode_text[instruction]);
+        strcpy(text, opcode_text[instruction]);
         text += 4;
         // Decode the class to decide if a symbol lookup is needed
         switch (instruction & 0x0f) {
@@ -203,7 +203,7 @@ int viewdbg_disassemble_line(APPLE2 *m, uint16_t pc, CODE_LINE *line) {
             address = ((ah << 8) | al);
             sprintf(text, "%02X %02X %02X ", instruction, al, ah);
             text += 9;
-            sprintf(text, opcode_text[instruction]);
+            strcpy(text, opcode_text[instruction]);
             text += 4;
             symbol = d->symbol_view & SYMBOL_VIEW_MARGIN ? 0 : viewdbg_find_symbols(d, address);
             if(!symbol) {
@@ -380,8 +380,8 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
             assembler_shutdown();
 
             if(errorlog.log_array.items) {
-                v->viewdlg_modal = 1;
-                v->dlg_assassembler_errors = 1;
+                v->viewdlg_modal = -1;
+                v->dlg_assassembler_errors = -1;
             } else {
                 if(ac->auto_run_after_assemble) {
                     m->cpu.pc = ac->start_address;
@@ -394,22 +394,22 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
     case SDLK_b:
         if(mod & KMOD_CTRL && !v->viewdlg_modal) {
             local_assembler_config = d->assembler_config;
-            v->viewdlg_modal = 1;
-            v->dlg_assassembler_config = 1;
+            v->viewdlg_modal = -1;
+            v->dlg_assassembler_config = -1;
         }
         break;
 
     case SDLK_e:
         if(mod & KMOD_CTRL && !v->viewdlg_modal) {
-            v->viewdlg_modal = 1;
-            v->dlg_assassembler_errors = 1;
+            v->viewdlg_modal = -1;
+            v->dlg_assassembler_errors = -1;
         }
         break;
 
     case SDLK_g:
         if(mod & KMOD_CTRL && !v->viewdlg_modal) {
-            v->viewdlg_modal = 1;
-            v->dlg_dissassembler_go = 1;
+            v->viewdlg_modal = -1;
+            v->dlg_dissassembler_go = -1;
         }
         break;
 
@@ -450,7 +450,7 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
             m->stopped = v->shadow_stopped;
         } else {
             v->shadow_stopped = m->stopped;
-            m->stopped = 1;
+            m->stopped = -1;
         }
         v->show_help ^= 1;
         return 1;
@@ -503,8 +503,8 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
                     m->stopped = 0;                         // Put the emulator back in run mode
                 } else {
                     // Not a step over, just a step
-                    m->stopped = 1;                         // Stop the emulator
-                    m->step = 1;                            // Step one opcode
+                    m->stopped = -1;                         // Stop the emulator
+                    m->step = -1;                            // Step one opcode
                 }
             }
         }
@@ -527,8 +527,8 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
             // If run to rts was active, stop that and reset the counter
             // This is needed so the user can initiate a new run to rts
             d->flowmanager.run_to_rts_set = 0;
-            m->stopped = 1;                                 // Stop the emulator
-            m->step = 1;                                    // Step one opcode
+            m->stopped = -1;                                 // Stop the emulator
+            m->step = -1;                                    // Step one opcode
         }
         break;
 
@@ -703,7 +703,7 @@ void viewdbg_update(APPLE2 *m) {
     if(!m->stopped || m->step) {
         m->step = 0;                                        // Set step off
         if(d->flowmanager.run_to_pc_set && d->flowmanager.run_to_pc == m->cpu.pc) {
-            m->stopped = 1;
+            m->stopped = -1;
             d->flowmanager.run_to_pc_set = 0;
         } else if(d->flowmanager.run_to_rts_set) {
             uint8_t instruction = read_from_memory_debug(m, m->cpu.pc);
@@ -713,15 +713,15 @@ void viewdbg_update(APPLE2 *m) {
                 break;
             case OPCODE_RTS:
                 if(--d->flowmanager.jsr_counter < 0) {
-                    m->stopped = 1;
-                    m->step = 1;                            // Step the RTS
+                    m->stopped = -1;
+                    m->step = -1;                            // Step the RTS
                     d->flowmanager.run_to_rts_set = 0;
                 }
                 break;
             }
         }
         if(breakpoint_at(&d->flowmanager, m->cpu.pc, 1)) {
-            m->stopped = 1;
+            m->stopped = -1;
         }
     }
     if(m->stopped && !m->step) {

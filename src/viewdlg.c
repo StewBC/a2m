@@ -78,7 +78,7 @@ int viewdlg_assembler_config(struct nk_context *ctx, struct nk_rect r, ASSEMBLER
 
 int viewdlg_assembler_errors(struct nk_context *ctx, struct nk_rect r) {
     int ret = 0;
-    static int x_offset = 0, y_offset = 0;
+    static nk_uint x_offset = 0, y_offset = 0;
     if(nk_popup_begin(ctx, NK_POPUP_STATIC, "Assembler errors", 0, r)) {
         nk_layout_row_dynamic(ctx, 360, 1);
         if(nk_group_scrolled_offset_begin(ctx, &x_offset, &y_offset, "Error Messages", NK_WINDOW_BORDER)) {

@@ -61,8 +61,8 @@ void viewmisc_show(APPLE2 *m) {
                                 fb->slot = i;
                                 fb->device = j;
                                 fb->dir_contents.items = 0;
-                                v->viewdlg_modal = 1;
-                                v->dlg_filebrowser = 1;
+                                v->viewdlg_modal = -1;
+                                v->dlg_filebrowser = -1;
                             }
                         }
                         nk_layout_row_push(ctx, 0.74f);
@@ -157,8 +157,8 @@ void viewmisc_show(APPLE2 *m) {
                             bpe->string_address_len[1] = sprintf(bpe->string_address[1], "%04X", bp->address_range_end);
                             bpe->string_counter_len[0] = sprintf(bpe->string_counter[0], "%d", bp->counter_stop_value);
                             bpe->string_counter_len[1] = sprintf(bpe->string_counter[1], "%d", bp->counter_reset);
-                            v->viewdlg_modal = 1;
-                            v->dlg_breakpoint = 1;
+                            v->viewdlg_modal = -1;
+                            v->dlg_breakpoint = -1;
                         }
                         nk_layout_row_push(ctx, 0.15f);
                         if(nk_button_label(ctx, bp->disabled ? "Enable" : "Disable")) {
@@ -304,7 +304,7 @@ void viewmisc_show(APPLE2 *m) {
             if(nk_option_label(ctx, "Read RAM", lc->read_ram_enable ? 1 : 0) && !lc->read_ram_enable) {
                 pages_map(&m->read_pages, 0xD000 / PAGE_SIZE, 0x1000 / PAGE_SIZE, &lc->RAM[lc->bank2_enable ? 0x1000 : 0x0000]);
                 pages_map(&m->read_pages, 0xE000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &lc->RAM[0x2000]);
-                lc->read_ram_enable = 1;
+                lc->read_ram_enable = -1;
             }
             nk_option_label(ctx, "Pre-Write", lc->pre_write ? 1 : 0);
             nk_option_label(ctx, "Write", lc->write_enable ? 1 : 0);

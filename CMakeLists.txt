@@ -72,6 +72,15 @@ if(UNIX AND NOT APPLE)
     )
 endif()
 
+if(APPLE)
+    set(CMAKE_MACOSX_RPATH ON)
+    set(CMAKE_INSTALL_RPATH "@executable_path/../Frameworks;/Library/Frameworks")
+    set_target_properties(apple2 PROPERTIES
+        INSTALL_RPATH "@executable_path/../Frameworks;/Library/Frameworks"
+        BUILD_WITH_INSTALL_RPATH TRUE
+    )
+endif()
+
 target_compile_definitions(apple2
     PRIVATE $<$<PLATFORM_ID:Windows>:-D_CRT_SECURE_NO_WARNINGS>
 )

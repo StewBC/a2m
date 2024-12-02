@@ -127,10 +127,10 @@ int viewport_init(VIEWPORT *v, int w, int h) {
     array_init(&v->viewmisc.file_browser.dir_contents, sizeof(FILE_INFO));
 
     // Currently, all windows are always visible when any are visible
-    v->viewcpu_show = 1;
-    v->viewdbg_show = 1;
-    v->viewmem_show = 1;
-    v->viewmisc_show = 1;
+    v->viewcpu_show = -1;
+    v->viewdbg_show = -1;
+    v->viewmem_show = -1;
+    v->viewmisc_show = -1;
     return A2_OK;
 
   error:

@@ -204,7 +204,7 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
             m->active_page = 0;
             break;
         case HISCR:
-            m->active_page = 1;
+            m->active_page = -1;
             break;
         case LORES:
             m->screen_mode &= ~SCREEN_MODE_HIRES;
