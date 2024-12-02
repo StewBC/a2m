@@ -1300,7 +1300,7 @@ void usage(char *program_name) {
         c--;
     }
 
-    fprintf(stderr, "Usage: %s <-i infile> [-o outfile] [-v]\n", c);
+    fprintf(stderr, "Usage: %s <-i infile> [-o outfile] [-s symbolfile] [-v]\n", c);
     fprintf(stderr, "Where: infile is a 6502 assembly language file\n");
     fprintf(stderr, "       outfile will be a binary file containing the assembled 6502\n");
     fprintf(stderr, "       symbolfile contains a list of the addresses of all the named variables and labels\n");
