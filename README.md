@@ -345,7 +345,39 @@ The sample folder contains sample code for use with the assembler.  See the [Sam
 There's also a python script to help de-scope ca65 assembler source files.  
   
 ## Building from source  
-Currently, building instructions are limited. On Windows, install SDL2 and SDL_mixer and use VS Code with CMake plugins. On Linux (WSL), SDL2 and mixer were installed from source to access find_package scripts. VS Code was used with Clang. Mac support is untested.  
+These instructions should be enough to get a2m compiled on a machine that has cmake and a working compiler installed on the 3 OS's I have tested this on.  
+  
+### Windows  
+Will be added once I work out again what I did.  
+  
+### Linux  
+I had to do these steps to get SDL2 and SDL_mixer (for SDL2) installed:  
+```
+sudo apt-get update
+
+sudo apt-get install libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev 
+sudo apt-get install libopusfile-dev libflac-dev libvorbis-dev libmpg123-dev
+sudo apt-get install libxmp-dev
+sudo apt-get install fluidsynth libfluidsynth-dev
+sudo apt-get install libwavpack-dev
+
+git clone --branch SDL2 https://github.com/libsdl-org/SDL_mixer.git SDL_mixer_sdl2
+cd SDL_mixer_sdl2
+cmake -S . -B build -DCMAKE_INSTALL_PREFIX=/usr
+cmake --build build
+sudo cmake --install build
+```
+  
+After this I could launch VSCode, with the CMake and CMake Tools installed, and it configured the project properly and compiled.  I also verified that these steps, not using VS Code, worked (from the a2m folder):  
+```
+mkdir build
+cd build
+cmake ..
+make
+```
+  
+### macOS  
+Will be added once I work out again what I did.  
   
 ## Something about the code  
 In this project, a typedef struct is referred to as a "class." The main hardware class, APPLE2, manages hardware subcomponents like the speaker and SmartPort. The VIEWPORT class handles rendering, keyboard input, making sounds, and debugging windows. Most API calls use an APPLE2 instance as the first parameter (named m for machine).  
