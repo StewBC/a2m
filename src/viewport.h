@@ -28,19 +28,22 @@ typedef struct VIEWPORT {
 
     // Shadow of machine states
     int shadow_screen_mode;
-
+    int help_page;
+    
     // Flags
     int debug_view:1;
     int dlg_assassembler_config:1;
     int dlg_assassembler_errors:1;
+    int dlg_breakpoint:1;
     int dlg_dissassembler_go:1;
     int dlg_filebrowser:1;
     int dlg_memory_find:1;
     int dlg_memory_go:1;
-    int dlg_breakpoint:1;
+    int dlg_symbol_lookup_dbg:1;
+    int dlg_symbol_lookup_mem:1;
     int shadow_active_page:1;                               // Flags that shadow machine states
-    int shadow_stopped:1;
     int shadow_free_run:1;
+    int shadow_stopped:1;
     int show_help:1;
     int viewcpu_show:1;
     int viewdbg_show:1;

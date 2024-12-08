@@ -274,6 +274,31 @@ int util_qsort_cmp(const void *p1, const void *p2) {
     return stricmp(fip1->name, fip2->name);
 }
 
+const char *util_strinstr(const char *haystack, const char *needle, int needle_length){
+    if(needle_length) {
+        char c = tolower(*haystack);
+        char search = tolower(*needle);
+
+        while(c) {
+            if(c == search) {
+                int index = 0;
+                char s1, h1;
+                do {
+                    index++;
+                    s1 = tolower(needle[index]);
+                    h1 = tolower(haystack[index]);
+                } while(index < needle_length && h1 == s1);
+                if(index == needle_length) {
+                    break;
+                }
+            }
+            haystack++;
+            c = tolower(*haystack);
+        }
+    }
+    return *haystack ? haystack : NULL;
+}
+
 char *util_strrtok(char *str, const char *delim) {
     char *s = str + strlen(str);
     while(s > str) {

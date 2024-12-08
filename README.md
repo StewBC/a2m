@@ -92,11 +92,12 @@ The CPU window, when stopped, has editable boxes for the PC, SP, registers, and 
 ## Using the Disassembly Window  
 The following keys are supported in the disassembly window:  
 ```
-CTRL + B - Configure an assembler source file for use with the built-in Assembler
+CTRL + SHIFT + A - Configure an assembler source file for use with the built-in Assembler
 CTRL + A - Assemble the configured assembler source file (No error message, no errors)
 CTRL + E - Re-show the errors output from the Assemble process
 CTRL + G - Set the address for viewing disassembly (cursor PC)
 CTRL + P - Set the machine PC to the cursor PC
+CTRL + S - Serach the symbols
 TAB - Toggle symbol display between all/functions and labels/labels/none
 CURSOR UP/DOWN - Move the cursor PC up/down an address
 PAGE UP/DOWN - (Try to) Move the cursor PC up/down a page
@@ -111,8 +112,9 @@ CTRL + J - Join a split window with the one below
 CTRL + SHIFT + J - Join a split window with the one above
 CTRL + N - Find next (forward) using the CTRL + F search
 CTRL + SHIFT + N - Find previous (backward) using the CTRL + F search
-CTRL + S - Split the memory display (up to 16 virtual memory windows)
+CTRL + S - Search the symbols
 CTRL + T - Toggle between HEX and ASCII editing
+CTRL + V - Split the memory View (up to 16 virtual memory views)
 ALT + 0-F - Select a virtual memory window
 ```  
 Split views are differentiated by colored with a virtual window ID (e.g., 0:0000). This enables viewing up to 16 distinct memory regions from the one Memory Window.  

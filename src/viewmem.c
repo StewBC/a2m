@@ -330,12 +330,18 @@ int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window) {
             break;
 
         case SDLK_s:                                        // CTRL S - New Range (Split)
-            viewmem_new_range(m);
+            global_entry_length = 0;
+            v->viewdlg_modal = -1;
+            v->dlg_symbol_lookup_mem = -1;
             break;
 
         case SDLK_t:                                        // CTRL T - Toggle between ascii and hex edit
             ms->edit_mode_ascii ^= 1;
             ms->cursor_x = (ms->edit_mode_ascii ? (ms->cursor_x / 2 + 32) : ((ms->cursor_x - 32) * 2));
+            break;
+
+        case SDLK_v:
+            viewmem_new_range(m);
             break;
         }
     } else {
@@ -474,6 +480,18 @@ void viewmem_show(APPLE2 *m) {
             }
             v->viewdlg_modal = 0;
             v->dlg_memory_find = 0;
+        }
+    }
+    if(v->dlg_symbol_lookup_mem) {
+        static uint16_t pc = 0;
+        int ret;
+        DEBUGGER *d = &v->debugger;
+        if((ret = viewdlg_symbol_lookup(ctx, nk_rect(0, 0, 500, 240), &d->symbols_search, global_entry_buffer, &global_entry_length, &pc))) {
+            if(ret == 1) {
+                viewmem_set_range_pc(m, pc);
+            }
+            v->dlg_symbol_lookup_mem = 0;
+            v->viewdlg_modal = 0;
         }
     }
     nk_end(ctx);

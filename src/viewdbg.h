@@ -30,6 +30,7 @@ typedef struct DEBUGGER {
     size_t stop_cycles;
     uint16_t symbol_view:2;
     DYNARRAY *symbols;
+    DYNARRAY symbols_search;
     FLOWMANAGER flowmanager;
     ASSEMBLER_CONFIG assembler_config;
 } DEBUGGER;
@@ -49,4 +50,6 @@ void viewdbg_show(APPLE2 * m);
 void viewdbg_shutdown(DEBUGGER * d);
 void viewdbg_set_run_to_pc(APPLE2 * m, uint16_t pc);
 void viewdbg_step_over_pc(APPLE2 * m, uint16_t pc);
+int viewdbg_symbol_sort(const void *lhs, const void *rhs);
+int viewdbg_symbol_search_update(DEBUGGER * d);
 void viewdbg_update(APPLE2 * m);

@@ -4,6 +4,9 @@
 
 #include "header.h"
 
+char global_entry_buffer[256] = {0};
+int global_entry_length = 0;
+
 int viewdlg_assembler_config(struct nk_context *ctx, struct nk_rect r, ASSEMBLER_CONFIG *ac) {
     int ret = 0;
     FILE_BROWSER *fb = &ac->file_browser;
@@ -401,5 +404,61 @@ int viewdlg_hex_address(struct nk_context *ctx, struct nk_rect r, char *address,
         }
     }
     nk_popup_end(ctx);
+    return ret;
+}
+
+int viewdlg_symbol_lookup(struct nk_context *ctx, struct nk_rect r, DYNARRAY *symbols_search, char *name, int *name_length, uint16_t *pc) {
+    int ret = 0;
+    // if(nk_begin(ctx, "Symbol Lookup", nk_rect(0, 0, 600, 600),
+    //         NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER | NK_WINDOW_MOVABLE)) {
+    if(nk_popup_begin(ctx, NK_POPUP_STATIC, "Enter a symbol name", 0, r)) {
+        nk_layout_row_dynamic(ctx, 28, 2);
+        nk_label(ctx, "Symbol Serach:", NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE);
+        int edit_state = nk_edit_string(ctx, NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, name, name_length, 256, 0);
+        if(!ctx->active->edit.active) {
+            ctx->current->edit.active = 1;
+            ctx->current->edit.mode = NK_TEXT_EDIT_MODE_REPLACE;
+        }
+
+        nk_layout_row_dynamic(ctx, r.h - 85, 1);
+        if(nk_group_begin(ctx, "symbols group", NK_WINDOW_BORDER)) {
+            int i;
+            for(i = 0; i < symbols_search->items; i++) {
+                int insert = 1;
+                SYMBOL *s = *ARRAY_GET(symbols_search, SYMBOL *, i);
+                if(*name_length) {
+                    if(NULL == util_strinstr(s->symbol_name, name, *name_length) && NULL == util_strinstr(s->symbol_source, name, *name_length)) {
+                        insert = 0;
+                    }
+                }
+                if(insert) {
+                    nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 3);
+                    nk_layout_row_push(ctx, 0.64f);
+                    if(nk_select_label(ctx, s->symbol_name, NK_TEXT_ALIGN_LEFT, 0)) {
+                        *pc = s->pc;
+                        ret = 1;
+                    }
+                    nk_layout_row_push(ctx, 0.15f);
+                    nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, "$%04X", s->pc);
+                    nk_layout_row_push(ctx, 0.21f);
+                    nk_label(ctx, s->symbol_source, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_CENTERED);
+                    nk_layout_row_end(ctx);
+                }
+            }
+            nk_group_end(ctx);
+        }
+
+        nk_layout_row_dynamic(ctx, 28, 2);
+        if(edit_state & NK_EDIT_COMMITED || nk_button_label(ctx, "OK")) {
+            nk_popup_close(ctx);
+            ret = 2;
+        }
+        if(nk_button_label(ctx, "Cancel")) {
+            nk_popup_close(ctx);
+            ret = 2;
+        }
+    }
+    nk_popup_end(ctx);
+    // nk_end(ctx);
     return ret;
 }

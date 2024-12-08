@@ -274,6 +274,9 @@ int viewdbg_init(DEBUGGER *d, int num_lines) {
         ARRAY_INIT(s, SYMBOL);
     }
 
+    // Init the search array
+    ARRAY_INIT(&d->symbols_search, SYMBOL *);
+
     // Load the symbols (no error if not loaded)
     UTIL_FILE symbol_file;
     memset(&symbol_file, 0, sizeof(symbol_file));
@@ -287,6 +290,9 @@ int viewdbg_init(DEBUGGER *d, int num_lines) {
     }
     if(A2_OK == util_file_load(&symbol_file, "symbols/USER.SYM", "r")) {
         viewdbg_add_symbols(d, "USER", symbol_file.file_data, symbol_file.file_size, 1);
+    }
+    if(A2_OK != viewdbg_symbol_search_update(d)) {
+        goto error;
     }
 
     // Init the breakpoint structures
@@ -353,49 +359,50 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
 
     switch (e->key.keysym.sym) {
     case SDLK_a:
-        if(!v->viewdlg_modal && d->assembler_config.file_browser.dir_selected.name_length) {
-            ASSEMBLER_CONFIG *ac = &d->assembler_config;
-            ASSEMBLER assembler;
-            as = &assembler;
+        if(!v->viewdlg_modal) {
+            if((mod & KMOD_CTRL) && !(mod & KMOD_SHIFT)) {
+                if(d->assembler_config.file_browser.dir_selected.name_length) {
+                    ASSEMBLER_CONFIG *ac = &d->assembler_config;
+                    ASSEMBLER assembler;
+                    as = &assembler;
 
-            errlog_clean();
-            assembler_init(m);
-            if(A2_OK != assembler_assemble(ac->file_browser.dir_selected.name, 0 /*ac->start_address */ )) {
-                int loglevel = errorlog.log_level;
-                errorlog.log_level = 1;
-                as->pass = 2;
-                errlog("Could not open file %s to assemble", ac->file_browser.dir_selected.name);
-                errorlog.log_level = loglevel;
-            }
-            viewdbg_remove_symbols(d, "assembler");
-            size_t bucket_index;
-            for(bucket_index = 0; bucket_index < 256; bucket_index++) {
-                size_t symbol_index;
-                DYNARRAY *bucket = &as->symbol_table[bucket_index];
-                for(symbol_index = 0; symbol_index < bucket->items; symbol_index++) {
-                    SYMBOL_LABEL *sl = ARRAY_GET(bucket, SYMBOL_LABEL, symbol_index);
-                    viewdbg_add_symbol(d, "assembler", sl->symbol_name, sl->symbol_length, sl->symbol_value, 1);
+                    errlog_clean();
+                    assembler_init(m);
+                    if(A2_OK != assembler_assemble(ac->file_browser.dir_selected.name, 0 /*ac->start_address */ )) {
+                        int loglevel = errorlog.log_level;
+                        errorlog.log_level = 1;
+                        as->pass = 2;
+                        errlog("Could not open file %s to assemble", ac->file_browser.dir_selected.name);
+                        errorlog.log_level = loglevel;
+                    }
+                    viewdbg_remove_symbols(d, "assembler");
+                    size_t bucket_index;
+                    for(bucket_index = 0; bucket_index < 256; bucket_index++) {
+                        size_t symbol_index;
+                        DYNARRAY *bucket = &as->symbol_table[bucket_index];
+                        for(symbol_index = 0; symbol_index < bucket->items; symbol_index++) {
+                            SYMBOL_LABEL *sl = ARRAY_GET(bucket, SYMBOL_LABEL, symbol_index);
+                            viewdbg_add_symbol(d, "assembler", sl->symbol_name, sl->symbol_length, sl->symbol_value, 1);
+                        }
+                    }
+                    assembler_shutdown();
+                    viewdbg_symbol_search_update(d);
+
+                    if(errorlog.log_array.items) {
+                        v->viewdlg_modal = -1;
+                        v->dlg_assassembler_errors = -1;
+                    } else {
+                        if(ac->auto_run_after_assemble) {
+                            m->cpu.pc = ac->start_address;
+                            m->stopped = 0;
+                        }
+                    }
                 }
-            }
-            assembler_shutdown();
-
-            if(errorlog.log_array.items) {
+            } else if ((mod & KMOD_CTRL) && (mod & KMOD_SHIFT)) {
+                local_assembler_config = d->assembler_config;
                 v->viewdlg_modal = -1;
-                v->dlg_assassembler_errors = -1;
-            } else {
-                if(ac->auto_run_after_assemble) {
-                    m->cpu.pc = ac->start_address;
-                    m->stopped = 0;
-                }
+                v->dlg_assassembler_config = -1;
             }
-        }
-        break;
-
-    case SDLK_b:
-        if(mod & KMOD_CTRL && !v->viewdlg_modal) {
-            local_assembler_config = d->assembler_config;
-            v->viewdlg_modal = -1;
-            v->dlg_assassembler_config = -1;
         }
         break;
 
@@ -408,6 +415,7 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
 
     case SDLK_g:
         if(mod & KMOD_CTRL && !v->viewdlg_modal) {
+            global_entry_length = 0;
             v->viewdlg_modal = -1;
             v->dlg_dissassembler_go = -1;
         }
@@ -416,6 +424,14 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
     case SDLK_p:
         if(mod & KMOD_CTRL) {
             m->cpu.pc = v->debugger.cursor_pc;
+        }
+        break;
+
+    case SDLK_s:
+        if(mod & KMOD_CTRL) {
+            global_entry_length = 0;
+            v->viewdlg_modal = -1;
+            v->dlg_symbol_lookup_dbg = -1;
         }
         break;
 
@@ -636,17 +652,25 @@ void viewdbg_show(APPLE2 *m) {
             }
         }
         if(v->dlg_dissassembler_go) {
-            static char address[5] = { 0, 0, 0, 0, 0 };
-            static int address_length = 0;
-            if((ret = viewdlg_hex_address(ctx, nk_rect(60, 10, 280, 80), address, &address_length))) {
+            if((ret = viewdlg_hex_address(ctx, nk_rect(60, 10, 280, 80), global_entry_buffer, &global_entry_length))) {
                 if(ret == 1) {
                     int value;
-                    address[address_length] = 0;
-                    if(1 == sscanf(address, "%x", &value)) {
+                    global_entry_buffer[global_entry_length] = 0;
+                    if(1 == sscanf(global_entry_buffer, "%x", &value)) {
                         d->cursor_pc = value;
                     }
                 }
                 v->dlg_dissassembler_go = 0;
+                v->viewdlg_modal = 0;
+            }
+        }
+        if(v->dlg_symbol_lookup_dbg) {
+            static uint16_t pc = 0;
+            if((ret = viewdlg_symbol_lookup(ctx, nk_rect(0, 0, 360, 430), &d->symbols_search, global_entry_buffer, &global_entry_length, &pc))) {
+                if(ret == 1) {
+                    d->cursor_pc = pc;
+                }
+                v->dlg_symbol_lookup_dbg = 0;
                 v->viewdlg_modal = 0;
             }
         }
@@ -688,6 +712,48 @@ void viewdbg_step_over_pc(APPLE2 *m, uint16_t pc) {
     int length = opcode_lengths[instruction];
     d->flowmanager.run_to_pc = pc + length;
     d->flowmanager.run_to_pc_set = 1;
+}
+
+int viewdbg_symbol_sort(const void *lhs, const void *rhs) {
+    SYMBOL *symb_lhs = *(SYMBOL **)lhs;
+    SYMBOL *symb_rhs = *(SYMBOL **)rhs;
+    int result = stricmp(symb_lhs->symbol_source, symb_rhs->symbol_source);
+    if(!result) {
+        return stricmp(symb_lhs->symbol_name, symb_rhs->symbol_name);
+    }
+    return result;
+}
+
+int viewdbg_symbol_search_update(DEBUGGER *d) {
+    size_t index;
+    int count = 0;
+    DYNARRAY *search = &d->symbols_search;
+
+    // Clear the search (also good if there's an error)
+    search->items = 0;
+    // See how many symbols there are
+    for(index = 0; index < 256; index++) {
+        count += d->symbols[index].items;
+    }
+    // Make room for a list that size
+    if(A2_OK != array_resize(search, count)) {
+        return A2_ERR;
+    }
+    // Populate the search list
+    for(index = 0; index < 256; index++) {
+        size_t bucket_index;
+        DYNARRAY *bucket = &d->symbols[index];
+        for(bucket_index = 0; bucket_index < bucket->items; bucket_index++) {
+            SYMBOL *s = ARRAY_GET(bucket, SYMBOL, bucket_index);
+            if(A2_OK != ARRAY_ADD(search, &s)) {
+                array_free(search);
+                return A2_ERR;
+            }
+        }
+    }
+    // Sort by source, name
+    qsort(search->data, search->items, search->element_size, viewdbg_symbol_sort);
+    return A2_OK;
 }
 
 void viewdbg_update(APPLE2 *m) {

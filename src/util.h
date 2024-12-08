@@ -40,6 +40,7 @@ char *util_ini_get_line(char **start, char *end);
 char *util_ini_next_token(char **start);
 int util_ini_load_file(char *filename, INI_PAIR_CALLBACK callback, void *user_data);
 
+const char *util_strinstr(const char *haystack, const char *needle, int needle_length);
 char *util_strrtok(char *str, const char *delim);
 int util_qsort_cmp(const void *p1, const void *p2);
 void util_file_discard(UTIL_FILE * f);
