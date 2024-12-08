@@ -745,7 +745,7 @@ int viewdbg_symbol_search_update(DEBUGGER *d) {
         DYNARRAY *bucket = &d->symbols[index];
         for(bucket_index = 0; bucket_index < bucket->items; bucket_index++) {
             SYMBOL *s = ARRAY_GET(bucket, SYMBOL, bucket_index);
-            if(A2_OK != ARRAY_ADD(search, &s)) {
+            if(A2_OK != ARRAY_ADD(search, s)) {
                 array_free(search);
                 return A2_ERR;
             }
