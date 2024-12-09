@@ -80,7 +80,7 @@ void viewmisc_show(APPLE2 *m) {
             FLOWMANAGER *fm = &d->flowmanager;
             nk_layout_row_dynamic(ctx, 13, 1);
             nk_label(ctx, "Debug Status", NK_TEXT_LEFT);
-            nk_layout_row_begin(ctx, NK_DYNAMIC, 60, 2);
+            nk_layout_row_begin(ctx, NK_DYNAMIC, 120, 2);
             nk_layout_row_push(ctx, 0.40f);
             if(nk_group_begin(ctx, "run status group", NK_WINDOW_BORDER)) {
                 nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 2);
@@ -91,25 +91,50 @@ void viewmisc_show(APPLE2 *m) {
                 nk_layout_row_end(ctx);
                 nk_layout_row_dynamic(ctx, 18, 1);
                 nk_option_label(ctx, "Step Out", fm->run_to_rts_set);
+                nk_layout_row_dynamic(ctx, 28, 2);
+                nk_label(ctx, "Step Cycles", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_BOTTOM);
+                nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_BOTTOM, "%zd", m->cpu.cycles - d->prev_stop_cycles);
+                nk_layout_row_dynamic(ctx, 18, 2);
+                nk_label(ctx, "Total Cycles", NK_TEXT_LEFT | NK_TEXT_ALIGN_MIDDLE);
+                nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, "%zd", m->cpu.cycles);
                 nk_group_end(ctx);
             }
             nk_layout_row_push(ctx, 0.59999f);
-            if(nk_group_begin(ctx, "cycles group", NK_WINDOW_BORDER)) {
-                nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 2);
-                nk_layout_row_push(ctx, 0.49f);
-                nk_label(ctx, "Step Cycles", NK_TEXT_LEFT | NK_TEXT_ALIGN_MIDDLE);
-                nk_layout_row_push(ctx, 0.49f);
-                nk_label(ctx, "Total Cycles", NK_TEXT_LEFT | NK_TEXT_ALIGN_MIDDLE);
-                nk_layout_row_end(ctx);
-                nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 2);
-                nk_layout_row_push(ctx, 0.49f);
-                nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, "%zd", m->cpu.cycles - d->prev_stop_cycles);
-                nk_layout_row_push(ctx, 0.49f);
-                nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, "%zd", m->cpu.cycles);
-                nk_layout_row_end(ctx);
+            if(nk_group_begin(ctx, "callstack group", NK_WINDOW_BORDER)) {
+                nk_layout_row_dynamic(ctx, 18, 1);
+                nk_label(ctx, "Call Stack", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE);
+                nk_layout_row_dynamic(ctx, 75, 1);
+                if(nk_group_begin(ctx, "Callstack", NK_WINDOW_BORDER)) {
+                    uint16_t address = m->cpu.sp + 1;
+                    while(address < 0x1ff) {
+                        uint16_t stack_addr = read_from_memory_debug(m, address) + read_from_memory_debug(m, address + 1) * 256;
+                        if(read_from_memory_debug(m, stack_addr - 2) == 0x20) {
+                            nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 2);
+                            uint16_t dest_addr = read_from_memory_debug(m, stack_addr-1) + read_from_memory_debug(m, stack_addr) * 256;
+                            char *symbol = viewdbg_find_symbols(d, dest_addr);
+                            sprintf(global_entry_buffer, "%04X", stack_addr-2);
+                            nk_layout_row_push(ctx, 0.1f);
+                            if(nk_select_label(ctx, global_entry_buffer, NK_TEXT_ALIGN_LEFT, 0)) {
+                                d->cursor_pc = strtoul(global_entry_buffer, NULL, 16);
+                            }
+                            if(symbol) {
+                                snprintf(global_entry_buffer, 256, "JSR %04X %s", dest_addr, symbol);
+                            } else {
+                                snprintf(global_entry_buffer, 256, "JSR %04X", dest_addr);
+                            }
+                            nk_layout_row_push(ctx, 0.9f);
+                            if(nk_select_label(ctx, global_entry_buffer, NK_TEXT_ALIGN_LEFT, 0)) {
+                                d->cursor_pc = strtoul(global_entry_buffer + 4, NULL, 16);
+                            }
+                            address += 2;
+                        } else {
+                            address++;
+                        }
+                    }
+                    nk_group_end(ctx);
+                }
                 nk_group_end(ctx);
             }
-            // nk_spacing(ctx, 1);
 
             // Now a list of breakpoints
             if(fm->breakpoints.items) {
@@ -289,8 +314,6 @@ void viewmisc_show(APPLE2 *m) {
                 // stopped and a change was made, so update the Apple II display
                 viewapl2_screen_apple2(m);
             }
-            // nk_layout_row_dynamic(ctx, 13, 1);
-            // nk_spacer(ctx);
             nk_tree_pop(ctx);
         }
         // The Language Card tab

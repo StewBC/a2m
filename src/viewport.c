@@ -326,9 +326,8 @@ void viewport_show_help(APPLE2 *m) {
                 nk_label(ctx, "Note that this window updates while running, but changes can only be made while the emulation is stopped.",
                         NK_TEXT_ALIGN_LEFT);
                 nk_label_colored(ctx, "Miscellaneous SmartPort", NK_TEXT_ALIGN_LEFT, color_help_sub_heading);
-                nk_layout_row_dynamic(ctx, 27, 1);
-                nk_label_wrap(ctx,
-                            "Use the Slot.0 button to boot that disk, when stopped.  Use Eject to eject the disk and Insert will bring up a file chooser to select a new disk.  No validation done on disk files selected.");
+                nk_layout_row_dynamic(ctx, 13, 1);
+                nk_label(ctx,"Use the Slot.0 button to boot that disk, when stopped.  Use Eject to eject the disk and Insert will bring up a file chooser to select a new disk.", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_dynamic(ctx, 13, 1);
                 nk_label_colored(ctx, "Miscellaneous Debug", NK_TEXT_ALIGN_LEFT, color_help_sub_heading);
                 nk_layout_row_dynamic(ctx, 27, 1);
@@ -337,6 +336,8 @@ void viewport_show_help(APPLE2 *m) {
                 nk_layout_row_dynamic(ctx, 40, 1);
                 nk_label_wrap(ctx,
                             "Breakpoints come in 2 forms.  PC or address (or range).  PC shows up as 4 HEX digits.  Address shows up as R(ead) and or W(rite) access with the address or range in ['s.  With both types, there's also an optional access count (current count/trigger count).  Breakpoints can be edited, enabled/disabled, View jumps to PC of breakpoint (disabled for address) and cleared.  If multiple breakpoints, Clear All removes all breakpoints.");
+                nk_layout_row_dynamic(ctx, 13, 1);
+                nk_label(ctx,"The call stack shows where the JSR was called and the destination address (and label if available). Click either to set the cursor to that address.", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_dynamic(ctx, 13, 1);
                 nk_label_colored(ctx, "Miscellaneous Display", NK_TEXT_ALIGN_LEFT, color_help_sub_heading);
                 nk_layout_row_dynamic(ctx, 27, 1);
