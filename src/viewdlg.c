@@ -49,11 +49,13 @@ int viewdlg_assembler_config(struct nk_context *ctx, struct nk_rect r, ASSEMBLER
         nk_layout_row_end(ctx);
 
         nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 3);
-        nk_layout_row_push(ctx, 0.40f);
+        nk_layout_row_push(ctx, 0.30f);
+        nk_checkbox_label_align(ctx, "Reset Stack", &ac->reset_stack, 0, NK_TEXT_LEFT);
+        nk_layout_row_push(ctx, 0.29f);
         nk_checkbox_label_align(ctx, "Auto Run", &ac->auto_run_after_assemble, 0, NK_TEXT_LEFT);
-        nk_layout_row_push(ctx, 0.30f);
-        nk_label(ctx, "Address", NK_TEXT_CENTERED | NK_TEXT_ALIGN_MIDDLE);
-        nk_layout_row_push(ctx, 0.30f);
+        nk_layout_row_push(ctx, 0.20f);
+        nk_label(ctx, "Address", NK_TEXT_RIGHT | NK_TEXT_ALIGN_MIDDLE);
+        nk_layout_row_push(ctx, 0.3f);
         if(NK_EDIT_COMMITED &
            nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER,
                           ac->start_address_text, &ac->start_address_text_len, 5, nk_filter_hex)) {

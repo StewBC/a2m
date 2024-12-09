@@ -392,6 +392,9 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
                         v->viewdlg_modal = -1;
                         v->dlg_assassembler_errors = -1;
                     } else {
+                        if(ac->reset_stack) {
+                            m->cpu.sp = 0x1ff;
+                        }
                         if(ac->auto_run_after_assemble) {
                             m->cpu.pc = ac->start_address;
                             m->stopped = 0;

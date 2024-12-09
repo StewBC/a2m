@@ -24,6 +24,7 @@ typedef struct BREAKPOINT_EDIT {
 typedef struct ASSEMBLER_CONFIG {
     FILE_BROWSER file_browser;
     nk_bool auto_run_after_assemble;
+    nk_bool reset_stack;
     char start_address_text[5];                             // XXXX\0
     int start_address_text_len;
     uint16_t start_address;
