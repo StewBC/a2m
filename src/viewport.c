@@ -266,7 +266,7 @@ void viewport_show_help(APPLE2 *m) {
         nk_layout_row_dynamic(ctx, 30, 1);
         nk_label_colored(ctx, "Apple ][+ emulator by Stefan Wessels, 2024.", NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE,
                         color_help_master);
-        nk_layout_row_dynamic(ctx, r->h-60, 1);
+        nk_layout_row_dynamic(ctx, r->h-55, 1);
         if(nk_group_begin(ctx, "Help Pages", 0)) {
             if(v->help_page == 0) {
                 nk_layout_row_dynamic(ctx, 13, 1);
@@ -321,6 +321,8 @@ void viewport_show_help(APPLE2 *m) {
                 nk_label(ctx, "CURSOR UP/DOWN - Move the cursor a line up or down.", NK_TEXT_ALIGN_LEFT);
                 nk_label(ctx, "CTRL + t - Toggle editing HEX or ASCII at the cursor location.", NK_TEXT_ALIGN_LEFT);
                 nk_label(ctx, "PAGE   UP/DOWN - Move the cursor a page up or down.", NK_TEXT_ALIGN_LEFT);
+                nk_spacer(ctx);
+                nk_label(ctx, "HOME/END{+ctrl}- Move the cursor to start/end of line or view.", NK_TEXT_ALIGN_LEFT);
                 nk_label_colored(ctx, "Miscellaneous window", NK_TEXT_ALIGN_LEFT, color_help_heading);
                 nk_layout_row_dynamic(ctx, 13, 1);
                 nk_label(ctx, "Note that this window updates while running, but changes can only be made while the emulation is stopped.",
@@ -655,8 +657,8 @@ void viewport_show_help(APPLE2 *m) {
                 nk_label(ctx, "Expressions are signed (int64_t) hence .qword or .drowq may emit bad values for numbers greater than $7FFFFFFFFFFFFFFF. An assembler warning will be given.", NK_TEXT_ALIGN_LEFT);
             }
             nk_group_end(ctx);
-            nk_layout_row_static(ctx, 18, 40, 3);
-            nk_label(ctx, "Page:", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE);
+            nk_layout_row_static(ctx, 13, 40, 3);
+            nk_label(ctx, "Page:", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_TOP);
             const struct nk_color active = {0xff, 0xff, 0x00, 0xff};
             struct nk_style_button style = ctx->style.button;
             if(!v->help_page) {

@@ -43,6 +43,24 @@ void viewmem_active_range(APPLE2 *m, int id) {
     }
 }
 
+void viewmem_cursor_home(APPLE2 *m, int mod) {
+    MEMSHOW *ms = &m->viewport->memshow;
+    if(!mod) {
+        ms->cursor_x = (ms->edit_mode_ascii ? 32 : 0);
+    } else {
+        ms->cursor_y = ARRAY_GET(ms->lines, MEMLINE, ms->cursor_y)->first_line;
+    }
+}
+
+void viewmem_cursor_end(APPLE2 *m, int mod) {
+    MEMSHOW *ms = &m->viewport->memshow;
+    if(!mod) {
+        ms->cursor_x = (ms->edit_mode_ascii ? 47 : 30);
+    } else {
+        ms->cursor_y = ARRAY_GET(ms->lines, MEMLINE, ms->cursor_y)->last_line;
+    }
+}
+
 void viewmem_cursor_down(APPLE2 *m) {
     MEMSHOW *ms = &m->viewport->memshow;
     if(ARRAY_GET(ms->lines, MEMLINE, ms->cursor_y)->last_line == ms->cursor_y) {
@@ -343,6 +361,14 @@ int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window) {
         case SDLK_v:
             viewmem_new_range(m);
             break;
+
+        case SDLK_HOME:
+            viewmem_cursor_home(m, 1);
+            break;
+
+        case SDLK_END:
+            viewmem_cursor_end(m, 1);
+            break;
         }
     } else {
         // Regular, unmodified keys
@@ -364,6 +390,14 @@ int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window) {
         }
         // Unmodified special keys
         switch (e->key.keysym.sym) {
+        case SDLK_HOME:
+            viewmem_cursor_home(m, 0);
+            break;
+
+        case SDLK_END:
+            viewmem_cursor_end(m, 0);
+            break;
+
         case SDLK_UP:
             viewmem_cursor_up(m);
             break;
