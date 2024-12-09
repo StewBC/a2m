@@ -420,7 +420,7 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
         if(mod & KMOD_CTRL && !v->viewdlg_modal) {
             global_entry_length = 0;
             v->viewdlg_modal = -1;
-            v->dlg_dissassembler_go = -1;
+            v->dlg_disassembler_go = -1;
         }
         break;
 
@@ -661,7 +661,7 @@ void viewdbg_show(APPLE2 *m) {
                 v->viewdlg_modal = 0;
             }
         }
-        if(v->dlg_dissassembler_go) {
+        if(v->dlg_disassembler_go) {
             if((ret = viewdlg_hex_address(ctx, nk_rect(60, 10, 280, 80), global_entry_buffer, &global_entry_length))) {
                 if(ret == 1) {
                     int value;
@@ -670,7 +670,7 @@ void viewdbg_show(APPLE2 *m) {
                         d->cursor_pc = value;
                     }
                 }
-                v->dlg_dissassembler_go = 0;
+                v->dlg_disassembler_go = 0;
                 v->viewdlg_modal = 0;
             }
         }
