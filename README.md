@@ -130,7 +130,7 @@ The status display shows:
 `Run to PC O XXXX`.  While the emulator is "running to the address XXXX" the `O` is lit.  It is good to know that stepping over a `JSR` for example, is in progress.  `Step Out O` similarly is active when using SHIFT-F11 and the function doesn't "step out" quickly.  
 The `Step Cycles` show the number of cycles that elapsed from the emulator being stopped, till stopped again. So, if the emulator just stepped over a 2-cycle opcode using F11, that will show 2.  This is very handy for profiling since stepping over a `JSR` subroutine shows the all-inclusive number of cycles it took to run the routine.  
 `Total cycles` show the number of cycles executed since the start.  This number will roll over fairly quickly (minutes, not days of running the emulator).  
-The `Call Stack` has the address where the JSR was done, and where the destination address of the JSR.  Click on either column to put the cursor at that address.  It is possible that a PHA will happen to result in a false positive (address at (*(SP+1)-2) == 0x20) but a PLA should restore the call stack.
+The `Call Stack` has the address where the JSR was done, and where the destination address of the JSR. Click on either column to put the cursor at that address.  It is possible that a PHA will happen to result in a false positive (address at (*(SP+1)-2) == 0x20) but a PLA should restore the call stack.  
 Setting a breakpoint (Using `F9`) will add additional rows:  
 `XXXX` `Disable` `View PC` `Clear` and if multiple breakpoints are set `Clear All`.  These are:  
 `XXXX` This is the address to break on, or watch, and optionally on what type of access or on which count/pass to break.  
