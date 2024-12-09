@@ -35,7 +35,7 @@ typedef struct VIEWPORT {
     int dlg_assassembler_config:1;
     int dlg_assassembler_errors:1;
     int dlg_breakpoint:1;
-    int dlg_dissassembler_go:1;
+    int dlg_disassembler_go:1;
     int dlg_filebrowser:1;
     int dlg_memory_find:1;
     int dlg_memory_go:1;
