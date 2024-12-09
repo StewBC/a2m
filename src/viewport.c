@@ -261,12 +261,14 @@ void viewport_show(APPLE2 *m) {
 void viewport_show_help(APPLE2 *m) {
     VIEWPORT *v = m->viewport;
     struct nk_context *ctx = v->ctx;
-    SDL_Rect *r = &v->full_window_rect;
-    if(nk_begin(ctx, "Help", nk_rect(r->x, r->y, r->w, r->h), NK_WINDOW_NO_SCROLLBAR)) {
+    SDL_Rect r = v->full_window_rect;
+    r.w /= sdl_x_scale;
+    r.h /= sdl_y_scale;
+    if(nk_begin(ctx, "Help", nk_rect(r.x, r.y, r.w, r.h), NK_WINDOW_NO_SCROLLBAR)) {
         nk_layout_row_dynamic(ctx, 30, 1);
         nk_label_colored(ctx, "Apple ][+ emulator by Stefan Wessels, 2024.", NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE,
                         color_help_master);
-        nk_layout_row_dynamic(ctx, r->h-55, 1);
+        nk_layout_row_dynamic(ctx, r.h-55, 1);
         if(nk_group_begin(ctx, "Help Pages", 0)) {
             if(v->help_page == 0) {
                 nk_layout_row_dynamic(ctx, 13, 1);
@@ -300,9 +302,11 @@ void viewport_show_help(APPLE2 *m) {
                 nk_label(ctx, "CTRL + p - Set Apple ][+ PC to the cursor PC .", NK_TEXT_ALIGN_LEFT);
                 nk_label(ctx, "PAGE UP/DOWN     - Move the cursor PC by a page.", NK_TEXT_ALIGN_LEFT);
                 nk_label(ctx, "CRTL + s - Search symbols.", NK_TEXT_ALIGN_LEFT);
-                nk_label(ctx, "TAB              - Toggle symbol display (4 possible states).", NK_TEXT_ALIGN_LEFT);
+                nk_label(ctx, "HOME/END         - Move top/bottom visible line to cursor PC.", NK_TEXT_ALIGN_LEFT);
                 nk_label(ctx, "CRTL + a - Assemble the assembler root file.", NK_TEXT_ALIGN_LEFT);
+                nk_label(ctx, "CURSOR LEFT/RIGHT- Reset cursor PC to cpu PC.", NK_TEXT_ALIGN_LEFT);
                 nk_label(ctx, "CRTL + SHIFT + a - Set assembler root file.", NK_TEXT_ALIGN_LEFT);
+                nk_label(ctx, "TAB              - Toggle symbol display (4 possible states).", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_dynamic(ctx, 13, 1);
                 nk_label_colored(ctx, "Memory window", NK_TEXT_ALIGN_LEFT, color_help_heading);
                 nk_layout_row_dynamic(ctx, 27, 1);
@@ -322,7 +326,9 @@ void viewport_show_help(APPLE2 *m) {
                 nk_label(ctx, "CTRL + t - Toggle editing HEX or ASCII at the cursor location.", NK_TEXT_ALIGN_LEFT);
                 nk_label(ctx, "PAGE   UP/DOWN - Move the cursor a page up or down.", NK_TEXT_ALIGN_LEFT);
                 nk_spacer(ctx);
-                nk_label(ctx, "HOME/END{+ctrl}- Move the cursor to start/end of line or view.", NK_TEXT_ALIGN_LEFT);
+                nk_label(ctx, "HOME/END       - Move the cursor to the start/end of the line.", NK_TEXT_ALIGN_LEFT);
+                nk_spacer(ctx);
+                nk_label(ctx, "HOME/END +CTRL - Move the cursor to the start/end of the view.", NK_TEXT_ALIGN_LEFT);
                 nk_label_colored(ctx, "Miscellaneous window", NK_TEXT_ALIGN_LEFT, color_help_heading);
                 nk_layout_row_dynamic(ctx, 13, 1);
                 nk_label(ctx, "Note that this window updates while running, but changes can only be made while the emulation is stopped.",
@@ -351,9 +357,9 @@ void viewport_show_help(APPLE2 *m) {
                 nk_label_wrap(ctx,
                             "Shows the status of the language card soft-switches.  Apart from Read ROM / RAM, this is read-only information.");
                 nk_label_colored(ctx, "Configuration", NK_TEXT_ALIGN_LEFT, color_help_notice);
-                nk_layout_row_dynamic(ctx, 40, 1);
+                nk_layout_row_dynamic(ctx, 60, 1);
                 nk_label_wrap(ctx,
-                            "An optional apple2.ini file in the launch folder can configure option.  The sections are [display] with scale=<scale> for a uniform scaling of the emulator window/display (1.0 default).  [smartoprt] with slot=<0..7>, drive0=<path>, drive1=<path> and boot=<0|anything>, 0 is No.  Note the path does not contain \"'s and all pairs optional.  Slot= must be set for other smartport options.");
+                            "An optional apple2.ini file in the launch folder can configure option.  The sections are [display] with scale=<scale> for a uniform scaling of the emulator window/display (1.0 default).  [smartoprt] with slot=<1..7>, drive0=<path>, drive1=<path> and boot=<0|anything>, 0 is No.  Note the path does not contain \"'s and all entries are optional.  Slot 7 shows up even without an ini file but the Slot= must be set for other smartport drives to show up.  The [Video] section has Slot=<1..7> with 3 being the likely slot, and device = Franklin Ace Display the only accepted setting.");
             } else {
                 nk_layout_row_dynamic(ctx, 13, 1);
                 nk_label_colored(ctx, "The built-in assembler supports these constructs:", NK_TEXT_ALIGN_LEFT, color_help_notice);

@@ -442,6 +442,14 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
         d->symbol_view++;
         break;
 
+    case SDLK_HOME:
+        d->cursor_pc = ARRAY_GET(d->code_lines, CODE_LINE, 0)->pc;
+        break;
+
+    case SDLK_END:
+        d->cursor_pc = ARRAY_GET(d->code_lines, CODE_LINE, CODE_LINES_COUNT-1)->pc;
+        break;
+        
     case SDLK_UP:
         d->cursor_pc = viewdbg_prev_pc(m, d->cursor_pc);
         return 1;
@@ -451,9 +459,8 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
         return 1;
 
     case SDLK_LEFT:
-        break;
-
     case SDLK_RIGHT:
+        d->cursor_pc = m->cpu.pc;
         break;
 
     case SDLK_PAGEUP:
