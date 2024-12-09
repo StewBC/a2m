@@ -566,7 +566,7 @@ void viewapl2_speaker_play(SPEAKER *speaker) {
     // And make the filtered sample prev and also use as left and right for SDL
     speaker->samples[OUTPUT_PREVIOUS] = filter_result;
     speaker->samples[SAMPLE_CURRENT] = filter_result;
-    // Queue the stero samples
+    // Queue the stereo samples
     SDL_QueueAudio(1, &speaker->samples[OUTPUT_PREVIOUS], 2 * sizeof(float));
     // Start a new sample
     speaker->samples[SAMPLE_CURRENT] = 0.0f;

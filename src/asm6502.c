@@ -630,7 +630,7 @@ int is_macro_parse_macro() {
         MACRO *macro = ARRAY_GET(&as->macros, MACRO, i);
         if(name_length == macro->macro_name_length && 0 == strnicmp(as->token_start, macro->macro_name, name_length)) {
             size_t p;
-            // This is a macro to excute - load the parameters into the variables
+            // This is a macro to execute - load the parameters into the variables
             for(p = 0; p < macro->macro_parameters.items; p++) {
                 MACRO_VARIABLE *mv = ARRAY_GET(&macro->macro_parameters, MACRO_VARIABLE, p);
                 uint64_t value = evaluate_expression();
@@ -1125,7 +1125,7 @@ void parse_opcode() {
         int processed = 0;
         switch (as->current_token.op) {
         case '#':
-            // Immidiate
+            // Immediate
             as->opcode_info.value = evaluate_expression();
             as->opcode_info.addressing_mode = ADDRESS_MODE_IMMEDIATE;
             write_opcode();
@@ -1365,7 +1365,7 @@ int main(int argc, char **argv) {
         util_file_discard(&output_file);
     }
 
-    // sort the symbol table by adress and write to a file
+    // sort the symbol table by address and write to a file
     if(symbol_file_name) {
         UTIL_FILE symbol_file;
         memset(&symbol_file, 0, sizeof(UTIL_FILE));

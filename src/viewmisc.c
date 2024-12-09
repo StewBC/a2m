@@ -204,7 +204,7 @@ void viewmisc_show(APPLE2 *m) {
                         }
                         nk_layout_row_push(ctx, 0.15f);
                         if(nk_button_label(ctx, "Clear")) {
-                            // Delet the breakpoint
+                            // Delete the breakpoint
                             array_remove(&fm->breakpoints, bp);
                             // And reset the mask on memory to watch for any remaining address breakpoint
                             breakpoint_reapply_address_masks(m);

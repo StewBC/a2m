@@ -325,7 +325,7 @@ readLevelCol:
     sta tileReadH_24                               ; points at the tile data
     tya                                         ; col to a
     asl                                         ; *2 since each tile is 2 cols on screen
-    tax                                         ; put the sceen col into x
+    tax                                         ; put the screen col into x
     pla                                         ; restore the tileID
     cmp #DATA_COLLAPSE+1                        ; see if the tile is an active collapsing tile (>=$71)
     bcc prepTileDraw                            ; could be $71->$77 for the collapsed state

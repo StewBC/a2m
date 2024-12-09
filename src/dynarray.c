@@ -62,7 +62,7 @@ void array_init(DYNARRAY *array, size_t element_size) {
     array->element_size = element_size;
 }
 
-// Remove the element from the array, moving all higer elements down
+// Remove the element from the array, moving all higher elements down
 int array_remove(DYNARRAY *array, void *element) {
     uint8_t *end = (uint8_t *) array->data + array->element_size * array->items;
     if(array->data <= element && (void *) end > element) {

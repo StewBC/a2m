@@ -230,7 +230,7 @@ void viewport_show(APPLE2 *m) {
     if(v->show_help) {
         global_entry_length = 0;
         viewport_show_help(m);
-        // If help is up, it covers the whole sceen so don't draw anything else
+        // If help is up, it covers the whole screen so don't draw anything else
         return;
     }
 
@@ -243,7 +243,7 @@ void viewport_show(APPLE2 *m) {
         viewmem_show(m);
     }
     // For some reason, if I do this first, hovering the mouse
-    // obver the window will lock up the app till I hover a different
+    // over the window will lock up the app till I hover a different
     // window, therefor this is now second and all seems well
     if(v->viewcpu_show) {
         viewcpu_show(m);
@@ -712,8 +712,8 @@ void viewport_toggle_debug(APPLE2 *m) {
 }
 
 void viewport_update(APPLE2 *m) {
-    // Comit changes to the texture
-    // And updare renderer with the texture
+    // Commit changes to the texture
+    // And update renderer with the texture
     if(m->cols80active) {
         SDL_UpdateTexture(m->viewport->texture640, NULL, m->viewport->surface640->pixels, m->viewport->surface640->pitch);
         SDL_RenderCopy(m->viewport->renderer, m->viewport->texture640, NULL, &m->viewport->target_rect);
@@ -722,7 +722,7 @@ void viewport_update(APPLE2 *m) {
         SDL_RenderCopy(m->viewport->renderer, m->viewport->texture, NULL, &m->viewport->target_rect);
     }
     if(m->viewport->debug_view) {
-        // In debug view, the A2 screen is maube small black on black so outline it
+        // In debug view, the A2 screen is maybe small black on black so outline it
         SDL_SetRenderDrawColor(m->viewport->renderer, 255, 255, 255, 255);
         SDL_RenderDrawRect(m->viewport->renderer, &m->viewport->target_rect);
     }

@@ -17,7 +17,7 @@
 #define HIRES           0xC057                              // Enable Hires graphics (Disable Lores)
 #define BUTN0           0xC061                              // Open-Apple key
 #define BUTN1           0xC062                              // Closed-Apple key
-#define PADDL0          0xC064                              // Paddel / Joystic related
+#define PADDL0          0xC064                              // Paddle / Joystick related
 #define PADDL1          0xC065
 #define PADDL2          0xC066
 #define PADDL3          0xC067

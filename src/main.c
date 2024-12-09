@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
     // Give the Apple II a viewport
     m.viewport = &v;
 
-    // Set up a table to speed up rendeing HGR
+    // Set up a table to speed up rendering HGR
     viewapl2_init_color_table(&m);
 
     // Enable text input since it handles the keys better
@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
 
         // Force an update of the current page at the desired frame rate
         if(++m.screen_updated >= TARGET_FPS || m.stopped) {
-            // Assume hrdware drives the display
+            // Assume hardware drives the display
             v.shadow_screen_mode = m.screen_mode;
             v.shadow_active_page = m.active_page;
             viewport_show(&m);

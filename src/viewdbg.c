@@ -325,7 +325,7 @@ uint16_t viewdbg_next_pc(APPLE2 *m, uint16_t pc) {
 
 uint16_t viewdbg_prev_pc(APPLE2 *m, uint16_t pc) {
     // Go back at least 7 "lines" (assume 3 byte instructions)
-    // 7 is arbitrary but less screwes up more - balance speed with success
+    // 7 is arbitrary but less screws up more - balance speed with success
     uint16_t step_back = 7 * 3;
     while(step_back > 1) {
         uint16_t search_pc = pc - step_back;
@@ -495,7 +495,7 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
 
     case SDLK_F6:
         if(m->cpu.pc != d->cursor_pc) {
-            // This can only happenn if emulator is stopped
+            // This can only happen if emulator is stopped
             viewdbg_set_run_to_pc(m, d->cursor_pc);
             m->stopped = 0;                                 // Put the emulator back in run mode
         }
@@ -544,7 +544,7 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
             d->flowmanager.run_to_rts_set = 1;
             // Reset the counter for this nesting-level
             d->flowmanager.jsr_counter = 0;
-            // If the cuurennt instruction is a JSR the counter needs to be corrected
+            // If the current instruction is a JSR the counter needs to be corrected
             m->stopped = 0;                                 // Clear stopped
             viewdbg_update(m);
             // if on a breakpoint, stopped will now be set, so clear it again

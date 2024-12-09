@@ -7,7 +7,7 @@
 //----------------------------------------------------------------------------
 // Main tokenization routines
 void get_token() {
-    // Expression seperators
+    // Expression separators
     const char c = character_in_characters(*as->input, ",;\n\r");
     if(!(*as->input) || c) {
         // End of file, or a line/token terminating character encountered
@@ -68,7 +68,7 @@ void get_token() {
             } else if(c == ':') {
                 // A label ends with a : so include in token - This does mean that
                 // conditional expressions need a space or bracket before the ':' in
-                // calls to evaluate_expresion
+                // calls to evaluate_expression
                 as->input++;
             }
             as->current_token.op = '\0';
@@ -257,8 +257,8 @@ int64_t parse_primary() {
                 if(op == *as->token_start) {
                     next_token();
                     next_token();
-                    // SQW At this point I can know, in pass 1, that an uninitialised variable
-                    // is going to get used with ++ or -- but sinced pass 1 errors are
+                    // SQW At this point I can know, in pass 1, that an uninitialized variable
+                    // is going to get used with ++ or -- but since pass 1 errors are
                     // ignored, I can't log it :(
                     if(sl->symbol_type == SYMBOL_ADDRESS) {
                         op = 0;

@@ -140,7 +140,7 @@ typedef struct OpcodeInfo {
 } OpcodeInfo;
 
 enum {
-    BYTE_ORDER_LO,                                          // for exmple .word vs .drow
+    BYTE_ORDER_LO,                                          // for example .word vs .drow
     BYTE_ORDER_HI,
 };
 
@@ -167,9 +167,9 @@ typedef struct INCLUDE_FILES {
 typedef struct FOR_LOOP {                                   // For init, condition, adjust
     const char *loop_condition_start;                       // Points at condition
     const char *loop_adjust_start;                          // Points at loop counter adjust expression
-    const char *loop_body_start;                            // Points at text to excute in loop
+    const char *loop_body_start;                            // Points at text to execute in loop
     const char *loop_start_file;                            // .for and .endfor must be in same file
-    size_t body_line;                                       // Line nuber where body loop starts
+    size_t body_line;                                       // Line number where body loop starts
     size_t iterations;                                      // Break out of runaway loops
 } FOR_LOOP;
 

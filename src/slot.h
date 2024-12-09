@@ -4,7 +4,7 @@
 
 #pragma once
 
-typedef void (*MAP_CX_ROM)(APPLE2 * m, uint16_t address);   // Callbak prototype to map C800 ROM
+typedef void (*MAP_CX_ROM)(APPLE2 * m, uint16_t address);   // Callback prototype to map C800 ROM
 
 typedef struct SLOT_CARDS {
     int slot_type;                                          // 1 when a slot contains a card, 0 if not

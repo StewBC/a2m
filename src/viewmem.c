@@ -140,7 +140,7 @@ void viewmem_find_string_reverse(APPLE2 *m) {
 }
 
 int viewmem_init(MEMSHOW *ms, int num_lines) {
-    // Clear the memsho structure
+    // Clear the memshow structure
     memset(ms, 0, sizeof(MEMSHOW));
     // Allocate the dynamic array structure
     ms->lines = (DYNARRAY *) malloc(sizeof(DYNARRAY));
@@ -197,7 +197,7 @@ void viewmem_join_range(APPLE2 *m, int direction) {
                 line++;
             }
             // Set the start of the block to the start of the block that was
-            // actve when the join happened
+            // active when the join happened
             viewmem_set_range_pc(m, address);
             // Renumber all following blocks down by 1
             while(line < ms->num_lines) {

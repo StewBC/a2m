@@ -86,7 +86,7 @@ int apple2_configure(APPLE2 *m) {
 
     // Configure slots from the ini file
     if(A2_OK != util_ini_load_file("./apple2.ini", apple2_ini_load_callback, (void *) m)) {
-        // If apple2.ini doesn't succesfully load, just add a smartport in slot 7
+        // If apple2.ini doesn't successfully load, just add a smartport in slot 7
         slot_add_card(m, 7, SLOT_TYPE_SMARTPORT, &m->sp_device[7], &m->roms.blocks[ROM_SMARTPORT].bytes[0x700], NULL);
     }
 

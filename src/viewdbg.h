@@ -17,9 +17,9 @@ typedef struct SYMBOL {
 
 typedef struct CODE_LINE {
     uint16_t pc;                                            // the program counter at this line
-    uint16_t is_breakpoint:1;                               // Glag indicating there's a breakpoint on this line
+    uint16_t is_breakpoint:1;                               // Flag indicating there's a breakpoint on this line
     int length;                                             // How many bytes is this opcode and parameters
-    char *text;                                             // the text of the code at this PC disassebled
+    char *text;                                             // the text of the code at this PC disassembled
 } CODE_LINE;
 
 typedef struct DEBUGGER {

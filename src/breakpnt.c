@@ -11,7 +11,7 @@ void breakpoints_init(FLOWMANAGER *b) {
     ARRAY_INIT(&b->breakpoints, BREAKPOINT);
 }
 
-// Running is 0 when drawing the dissassembly, but <> 0 when testing for a break running the emulation
+// Running is 0 when drawing the disassembly, but <> 0 when testing for a break running the emulation
 BREAKPOINT *breakpoint_at(FLOWMANAGER *b, uint16_t pc, int running) {
     int items = b->breakpoints.items;
     for(int i = 0; i < items; i++) {
