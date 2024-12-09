@@ -185,6 +185,9 @@ void viewmisc_show(APPLE2 *m) {
                             bpe->string_counter_len[1] = sprintf(bpe->string_counter[1], "%d", bp->counter_reset);
                             v->viewdlg_modal = -1;
                             v->dlg_breakpoint = -1;
+                            // This fixes an issue where selecting edit passes through to the pop-up and
+                            // selects Cancel as well.
+                            ctx->input.mouse.buttons->down = 0;
                         }
                         nk_layout_row_push(ctx, 0.15f);
                         if(nk_button_label(ctx, bp->disabled ? "Enable" : "Disable")) {
@@ -225,19 +228,6 @@ void viewmisc_show(APPLE2 *m) {
                     }
                 }
                 nk_layout_row_end(ctx);
-                if(v->dlg_breakpoint) {
-                    struct nk_rect r = nk_rect(10, 40, 568, 160);
-                    int ret = viewdlg_breakpoint_edit(ctx, r, &v->viewmisc.breakpoint_edit);
-                    if(ret >= 0) {
-                        v->dlg_breakpoint = 0;
-                        v->viewdlg_modal = 0;
-                        if(1 == ret) {
-                            // Apply changes
-                            *bpe->bp_original = bpe->bp_under_edit;
-                            breakpoint_reapply_address_masks(m);
-                        }
-                    }
-                }
             }
             nk_tree_pop(ctx);
         }
@@ -337,7 +327,30 @@ void viewmisc_show(APPLE2 *m) {
             nk_tree_pop(ctx);
         }
     }
+    // Pop-up windows after the main windows
+    if(v->dlg_breakpoint) {
+        struct nk_rect r = nk_rect(10, 40, 568, 160);
+        int ret = viewdlg_breakpoint_edit(ctx, r, &v->viewmisc.breakpoint_edit);
+        if(ret >= 0) {
+            v->dlg_breakpoint = 0;
+            v->viewdlg_modal = 0;
+            if(1 == ret) {
+                // Apply changes
+                *bpe->bp_original = bpe->bp_under_edit;
+                breakpoint_reapply_address_masks(m);
+            }
+            // This is necessary to keep the Misc window active. Why 193?
+            // That's the value ctx->current->flags had coming in and 
+            // ctx->current->layout->flags is assigned to ctx->current->flags in 
+            // nuklear.h line 20330 inside nk_panel_end just before a comment
+            // /* property garbage collector */
+            // Without this, you have to mouse out of the misc window, and back in
+            // for any widgets to be active in the misc window
+            ctx->current->layout->flags = 193;
+        }
+    }
     nk_end(ctx);
+    // Floating windows outside the main misc window
     ctx->style.window.background = ob;
     if(v->dlg_filebrowser) {
         int ret = viewdlg_file_browser(ctx, &v->viewmisc.file_browser);
