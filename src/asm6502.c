@@ -300,21 +300,21 @@ void write_bytes(uint64_t value, int width, int order) {
         if(width == 8) {
             emit(value);
             if(value >= 256) {
-                errlog("Warning: value (%zd) >= 256 output as byte value", value);
+                errlog("Warning: value (%zd) > 255 output as byte value", value);
             }
         } else if(width == 16) {
             emit(value >> 8);
             emit(value);
             if(value >= 65536) {
-                errlog("Warning: value (%zd) >= 65535 output as word value", value);
+                errlog("Warning: value (%zd) > 65535 output as drow value", value);
             }
         } else if(width == 32) {
             emit(value >> 24);
             emit(value >> 16);
             emit(value >> 8);
             emit(value);
-            if(value >= 4294967295) {
-                errlog("Warning: value (%zd) >= 4,294,967,295 output as dword value", value);
+            if(value >= 0X100000000) {
+                errlog("Warning: value ($%zx) > $FFFFFFFF output as drowd value", value);
             }
         } else if(width == 64) {
             emit(value >> 56);
@@ -325,29 +325,29 @@ void write_bytes(uint64_t value, int width, int order) {
             emit(value >> 16);
             emit(value >> 8);
             emit(value);
-            if(value >= 9223372036854775807) {
-                errlog("Warning: value (%zd) >= 4,294,967,295 output as qword value", value);
+            if(value >= 0X8000000000000000) {
+                errlog("Warning: value ($%zx) > $7FFFFFFFFFFFFFFF output as drowq value", value);
             }
         }
     } else {
         if(width == 8) {
             emit(value);
             if(value >= 256) {
-                errlog("Warning: value (%zd) >= 256 output as byte value", value);
+                errlog("Warning: value (%zd) > 255 output as byte value", value);
             }
         } else if(width == 16) {
             emit(value);
             emit(value >> 8);
             if(value >= 65536) {
-                errlog("Warning: value (%zd) >= 65535 output as word value", value);
+                errlog("Warning: value (%zd) > 65535 output as word value", value);
             }
         } else if(width == 32) {
             emit(value);
             emit(value >> 8);
             emit(value >> 16);
             emit(value >> 24);
-            if(value >= 4294967295) {
-                errlog("Warning: value (%zd) >= 4,294,967,295 output as dword value", value);
+            if(value >= 0X100000000) {
+                errlog("Warning: value ($%zx) > $FFFFFFFF output as dword value", value);
             }
         } else if(width == 64) {
             emit(value);
@@ -358,8 +358,8 @@ void write_bytes(uint64_t value, int width, int order) {
             emit(value >> 40);
             emit(value >> 48);
             emit(value >> 56);
-            if(value >= 9223372036854775807) {
-                errlog("Warning: value (%zd) >= 4,294,967,295 output as qword value", value);
+            if(value >= 0X8000000000000000) {
+                errlog("Warning: value ($%zx) > $7FFFFFFFFFFFFFFF output as qword value", value);
             }
         }
     }
@@ -938,8 +938,11 @@ void process_dot_string() {
                         value = strtoll(as->token_start, (char **) &as->token_start, 2);
                     } else if(*as->token_start == '0') {
                         value = strtoll(as->token_start, (char **) &as->token_start, 8);
-                    } else {
+                    } else if(*as->token_start >= '1' && *as->token_start <= '9') {
                         value = strtoll(as->token_start, (char **) &as->token_start, 10);
+                    } else {
+                        // Quote ascii to skip passing it through .strcode
+                        value = *as->token_start++;
                     }
                     if(value >= 256) {
                         errlog("Escape value %ld not between 0 and 255", value);
