@@ -286,7 +286,7 @@ void viewport_show_help(APPLE2 *m) {
                 nk_label(ctx, "F11 + Shift - Step out - Step past RTS at this calling level.", NK_TEXT_ALIGN_LEFT);
                 nk_label(ctx, "F6  - Set Program Counter (PC) to cursor PC.", NK_TEXT_ALIGN_LEFT);
                 nk_label(ctx, "F12 - Switch between color/mono (graphics mode) or 40/80 cols (text mode).", NK_TEXT_ALIGN_LEFT);
-                nk_spacer(ctx);
+                nk_label(ctx, "CTRL + SCRLK/PAUSE - Reset the machine.", NK_TEXT_ALIGN_LEFT);
                 nk_label(ctx, "F12 + Shift - Force switch color/mono and 40/80 col regardless of screen mode.", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_dynamic(ctx, 13, 1);
                 nk_label_colored(ctx, "While emulation is stopped:", NK_TEXT_ALIGN_LEFT, color_help_notice);
