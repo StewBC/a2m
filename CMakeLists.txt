@@ -87,6 +87,9 @@ target_compile_definitions(apple2
 
 # Copy DLLs on Windows if using vcpkg
 if(WIN32)
+    # Make this a Windows
+    set_target_properties(apple2 PROPERTIES WIN32_EXECUTABLE ON)
+
     # Define _VCPKG_INSTALLED_DIR if it is not already set
     if(NOT DEFINED _VCPKG_INSTALLED_DIR)
         set(_VCPKG_INSTALLED_DIR "C:/path/to/vcpkg/installed/x64-windows")
