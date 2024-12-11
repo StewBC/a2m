@@ -5,6 +5,8 @@ This configuration allows booting and running Total Replay or other ProDOS disk 
   
 This repository also contains a stand-alone version of the [6502 Assembler](#6502-assembler) I created and built into the emulator.  
   
+There is a demonstration Video of the emulator at V1.1 here: https://youtu.be/Du3z_kQD5ok
+  
 ![15 FPS Animated Gif of the emulator in action](assets/a2m-15.gif)  
   
 ## Starting the emulator  
@@ -84,7 +86,7 @@ Miscellaneous:
 ```
   
 ## Using the Debugger  
-When running, debug windows update at 60 FPS, but user control only applies to the Apple ][+ machine. Once stopped, you can interact with the debug windows. The window title changes to green when it is "active", with "active" determined by mouse hover and input going to the "active" window.  
+When running, debug windows update at 60 FPS, but user control only applies to the Apple ][+ machine. Once stopped, you can interact with the debug windows. The window title changes to green when it is "active", with "active" determined by mouse hover and input going to the "active" window.  The machine reset is mapped to SCRLK or PAUSE (so CTRL +) and on my Lenovo laptop that's FN + B.  
   
 ## Using the CPU Window  
 The CPU window, when stopped, has editable boxes for the PC, SP, registers, and flags. To edit a value, click in the box, keep the mouse pointer over the CPU window, type a new value, and press ENTER.  
