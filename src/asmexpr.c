@@ -317,6 +317,9 @@ int64_t parse_factor() {
             int64_t value = (parse_factor() >> 8) & 0xFF;
             as->expression_size = 0;
             return value;
+        } else if(as->current_token.op == '!') {            // Unary NOT
+            next_token();
+            return !parse_factor();
         } else if(as->current_token.op == '~') {            // Binary NOT
             next_token();
             return ~parse_factor();
