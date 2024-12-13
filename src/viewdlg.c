@@ -411,8 +411,6 @@ int viewdlg_hex_address(struct nk_context *ctx, struct nk_rect r, char *address,
 
 int viewdlg_symbol_lookup(struct nk_context *ctx, struct nk_rect r, DYNARRAY *symbols_search, char *name, int *name_length, uint16_t *pc) {
     int ret = 0;
-    // if(nk_begin(ctx, "Symbol Lookup", nk_rect(0, 0, 600, 600),
-    //         NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER | NK_WINDOW_MOVABLE)) {
     if(nk_popup_begin(ctx, NK_POPUP_STATIC, "Enter a symbol name", 0, r)) {
         nk_layout_row_dynamic(ctx, 28, 2);
         nk_label(ctx, "Symbol Serach:", NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE);
@@ -461,6 +459,5 @@ int viewdlg_symbol_lookup(struct nk_context *ctx, struct nk_rect r, DYNARRAY *sy
         }
     }
     nk_popup_end(ctx);
-    // nk_end(ctx);
     return ret;
 }
