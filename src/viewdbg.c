@@ -172,7 +172,7 @@ int viewdbg_disassemble_line(APPLE2 *m, uint16_t pc, CODE_LINE *line) {
         // Decode the class to decide if a symbol lookup is needed
         switch (instruction & 0x0f) {
         case 0x00:                                          // Branches, adjusted (destination) lookup
-            if(d->symbol_view) {
+            if(d->symbol_view || instruction == 0xa0 || instruction == 0xc0 || instruction == 0xe0) {
                 symbol = 0;
             } else {
                 symbol = viewdbg_find_symbols(d, pc + 2 + (int8_t) address);
