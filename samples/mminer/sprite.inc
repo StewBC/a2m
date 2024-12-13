@@ -262,7 +262,7 @@ spriteInstanceSpriteFrames: ; .proc spriteInstanceSpriteFrames
 
 :
     ldy instanceIdx_69                             ; get the instance
-    lda spriteColor; SQW - asm6502, y                          ; and get the color for the instance
+    lda spriteColor, y                          ; and get the color for the instance
     tay                                         ; put the color index in y
     lda masksLeft, y                            ; get the color mask
     sta colMaskL_69

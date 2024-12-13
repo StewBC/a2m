@@ -557,7 +557,13 @@ void decode_abs_rel_zp_opcode() {
                 as->opcode_info.addressing_mode++;
                 break;
             case 'y':
-                as->opcode_info.addressing_mode += 2;
+                if(as->opcode_info.width < 16 && as->opcode_info.addressing_mode == ADDRESS_MODE_ZEROPAGE) {
+                    // lda 23, y is valid, but it's 16 bit, not ZP, it's absolute
+                    as->opcode_info.addressing_mode = ADDRESS_MODE_ABSOLUTE_Y;
+                    as->opcode_info.width = 16;
+                } else {
+                    as->opcode_info.addressing_mode += 2;
+                }
                 break;
             default:
                 errlog("Unexpected ,%c", *as->token_start);
