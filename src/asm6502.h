@@ -12,9 +12,12 @@ enum {
     GPERF_DOT_DROWD,
     GPERF_DOT_DROWQ,
     GPERF_DOT_DWORD,
+    GPERF_DOT_ELSE,
     GPERF_DOT_ENDFOR,
+    GPERF_DOT_ENDIF,
     GPERF_DOT_ENDMACRO,
     GPERF_DOT_FOR,
+    GPERF_DOT_IF,
     GPERF_DOT_INCBIN,
     GPERF_DOT_INCLUDE,
     GPERF_DOT_MACRO,
@@ -208,6 +211,7 @@ typedef struct {
     uint16_t current_address;                               // Address where next byte will be emitted
     uint16_t start_address;                                 // First address where the assembler output a byte
     uint16_t last_address;                                  // Last address where the assembler put a byte
+    uint16_t if_active;                                     // Count of if's (or else's) active
 #ifdef IS_ASSEMBLER
     int verbose;
 #endif                                                      // IS_ASSEMBLER

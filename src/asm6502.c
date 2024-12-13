@@ -705,6 +705,20 @@ int is_valid_instruction_only() {
 
 //----------------------------------------------------------------------------
 // Parse DOT commands
+void parse_dot_else() {
+    if(as->if_active) {
+        as->if_active--;
+    } else {
+        errlog(".else without .if");
+    }    
+    do {
+        get_token();
+    } while(*as->input && (as->token_start == as->input || strnicmp(".endif", as->token_start, 6)));
+    if(!*as->input) {
+        errlog(".else without .endif");
+    }
+}
+
 void parse_dot_endfor() {
     if(as->loop_stack.items) {
         const char *post_loop = as->input;
@@ -733,6 +747,14 @@ void parse_dot_endfor() {
     }
 }
 
+void parse_dot_endif() {
+    if(as->if_active) {
+        as->if_active--;
+    } else {
+        errlog(".endif with no .if");
+    }
+}
+
 void parse_dot_endmacro() {
     if(!input_stack_empty()) {
         // Return to the parse point where the macro was called
@@ -750,15 +772,12 @@ void parse_dot_for() {
     for_loop.loop_start_file = as->current_file;
     // evaluate the condition
     if(!evaluate_expression()) {
-        // failed so find .endfor (must be in same file)
         do {
             get_token();
         } while(*as->input && (as->token_start == as->input || strnicmp(".endfor", as->token_start, 7)));
         if(!*as->input) {
+            // failed so find .endfor (must be in same file)
             errlog(".for without .endfor");
-        } else {
-            // skip past .endfor
-            next_token();
         }
     } else {
         // condition success
@@ -772,6 +791,27 @@ void parse_dot_for() {
         for_loop.body_line = as->current_line + as->next_line_count;
     }
     ARRAY_ADD(&as->loop_stack, for_loop);
+}
+
+void parse_dot_if() {
+    if(!evaluate_expression()) {
+        do {
+            get_token();
+        } while(*as->input && (as->token_start == as->input || (strnicmp(".else", as->token_start, 5) && strnicmp(".endif", as->token_start, 6))));
+        if(!*as->input) {
+            // failed so find .else or .endif (must be in same file)
+            errlog(".if without .endif");
+        } else {
+            // If not endif, it's else and that needs an endif
+            if(tolower(as->input[2]) != 'n') {
+                as->if_active++;
+                // I could add a .elseif and call parse_dot_if?
+            }
+        }
+    } else {
+        // condition success
+        as->if_active++;
+    }
 }
 
 void process_dot_incbin() {
@@ -1072,14 +1112,23 @@ void parse_dot_command() {
     case GPERF_DOT_DWORD:
         write_values(32, BYTE_ORDER_LO);
         break;
+    case GPERF_DOT_ELSE:
+        parse_dot_else();
+        break;
     case GPERF_DOT_ENDFOR:
         parse_dot_endfor();
+        break;
+    case GPERF_DOT_ENDIF:
+        parse_dot_endif();
         break;
     case GPERF_DOT_ENDMACRO:
         parse_dot_endmacro();
         break;
     case GPERF_DOT_FOR:
         parse_dot_for();
+        break;
+    case GPERF_DOT_IF:
+        parse_dot_if();
         break;
     case GPERF_DOT_INCBIN:
         process_dot_incbin();
@@ -1236,6 +1285,15 @@ int assembler_assemble(const char *input_file, uint16_t address) {
             } while(as->token_start == as->input && *as->input);
 
             if(as->token_start == as->input) {
+                // Make sure all opened constructs were closed as well
+                if(as->if_active) {
+                    as->if_active = 0;
+                    errlog(".if without .endif");
+                }
+                if(as->loop_stack.items) {
+                    as->loop_stack.items = 0;
+                    errlog(".for without .endfor");
+                }
                 // The end of the file has been reached so if it was an included file
                 // pop to the parent, or end
                 if(A2_OK == include_files_pop()) {

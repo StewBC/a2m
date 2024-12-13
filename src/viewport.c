@@ -434,9 +434,9 @@ void viewport_show_help(APPLE2 *m) {
                 nk_layout_row_push(ctx, 0.30f);
                 nk_label(ctx, "Outputs value as 8 bits", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_push(ctx, 0.20f);
-                nk_label(ctx, "'+' '-' '<' '>' '~'", NK_TEXT_ALIGN_LEFT);
+                nk_label(ctx, "'+' '-' '<' '>' '!' '~'", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_push(ctx, 0.30f);
-                nk_label(ctx, "Unary plus, minus, lo byte, hi byte and not", NK_TEXT_ALIGN_LEFT);
+                nk_label(ctx, "Unary +, -, lo & hi byte, not and binary not", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_end(ctx);
 
                 nk_layout_row_begin(ctx, NK_DYNAMIC, 13, 4);
@@ -529,9 +529,9 @@ void viewport_show_help(APPLE2 *m) {
 
                 nk_layout_row_begin(ctx, NK_DYNAMIC, 13, 4);
                 nk_layout_row_push(ctx, 0.20f);
-                nk_label(ctx, ".macro \"name\" [.*[, .*]*]*", NK_TEXT_ALIGN_LEFT);
+                nk_label(ctx, ".if <condition>", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_push(ctx, 0.30f);
-                nk_label(ctx, "Start a macro with optional arguments", NK_TEXT_ALIGN_LEFT);
+                nk_label(ctx, "Start & true part of a conditional code path", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_push(ctx, 0.20f);
                 nk_label(ctx, "'|'", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_push(ctx, 0.30f);
@@ -540,9 +540,9 @@ void viewport_show_help(APPLE2 *m) {
 
                 nk_layout_row_begin(ctx, NK_DYNAMIC, 13, 4);
                 nk_layout_row_push(ctx, 0.20f);
-                nk_label(ctx, ".endmacro", NK_TEXT_ALIGN_LEFT);
+                nk_label(ctx, ".else", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_push(ctx, 0.30f);
-                nk_label(ctx, "Ends a macro", NK_TEXT_ALIGN_LEFT);
+                nk_label(ctx, "False part of a conditional .if code path", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_push(ctx, 0.20f);
                 nk_label(ctx, "'&&' '||'", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_push(ctx, 0.30f);
@@ -551,9 +551,9 @@ void viewport_show_help(APPLE2 *m) {
 
                 nk_layout_row_begin(ctx, NK_DYNAMIC, 13, 4);
                 nk_layout_row_push(ctx, 0.20f);
-                nk_label(ctx, ".string string[,string]*", NK_TEXT_ALIGN_LEFT);
+                nk_label(ctx, ".endif", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_push(ctx, 0.30f);
-                nk_label(ctx, "string is a value or characters in \"'s", NK_TEXT_ALIGN_LEFT);
+                nk_label(ctx, "Close conditional .if / .else code path", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_push(ctx, 0.20f);
                 nk_label(ctx, "'?' ':'", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_push(ctx, 0.30f);
@@ -562,13 +562,40 @@ void viewport_show_help(APPLE2 *m) {
 
                 nk_layout_row_begin(ctx, NK_DYNAMIC, 13, 4);
                 nk_layout_row_push(ctx, 0.20f);
-                nk_label(ctx, ".strcode", NK_TEXT_ALIGN_LEFT);
+                nk_label(ctx, ".macro \"name\" [.*[, .*]*]*", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_push(ctx, 0.30f);
-                nk_label(ctx, "Sets a string character transform expression", NK_TEXT_ALIGN_LEFT);
+                nk_label(ctx, "Start a macro with optional arguments", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_push(ctx, 0.20f);
                 nk_spacer(ctx);
                 nk_layout_row_push(ctx, 0.30f);
                 nk_spacer(ctx);
+                nk_layout_row_end(ctx);
+
+                nk_layout_row_begin(ctx, NK_DYNAMIC, 13, 4);
+                nk_layout_row_push(ctx, 0.20f);
+                nk_label(ctx, ".endmacro", NK_TEXT_ALIGN_LEFT);
+                nk_layout_row_push(ctx, 0.30f);
+                nk_label(ctx, "Ends a macro", NK_TEXT_ALIGN_LEFT);
+                nk_layout_row_push(ctx, 0.50f);
+                nk_label(ctx, "Operator precedence is top down in the table above", NK_TEXT_ALIGN_LEFT);
+                nk_layout_row_end(ctx);
+
+                nk_layout_row_begin(ctx, NK_DYNAMIC, 13, 4);
+                nk_layout_row_push(ctx, 0.20f);
+                nk_label(ctx, ".string string[,string]*", NK_TEXT_ALIGN_LEFT);
+                nk_layout_row_push(ctx, 0.30f);
+                nk_label(ctx, "string is a value or characters in \"'s", NK_TEXT_ALIGN_LEFT);
+                nk_layout_row_push(ctx, 0.50f);
+                nk_label(ctx, "Variables also take = <expression>, ++ and --", NK_TEXT_ALIGN_LEFT);
+                nk_layout_row_end(ctx);
+
+                nk_layout_row_begin(ctx, NK_DYNAMIC, 13, 4);
+                nk_layout_row_push(ctx, 0.20f);
+                nk_label(ctx, ".strcode", NK_TEXT_ALIGN_LEFT);
+                nk_layout_row_push(ctx, 0.30f);
+                nk_label(ctx, "Sets a string character transform expression", NK_TEXT_ALIGN_LEFT);
+                nk_layout_row_push(ctx, 0.50f);
+                nk_label(ctx, "++ and -- are pre operations, even though they have post syntax", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_end(ctx);
 
                 nk_layout_row_begin(ctx, NK_DYNAMIC, 13, 4);
@@ -576,8 +603,10 @@ void viewport_show_help(APPLE2 *m) {
                 nk_label(ctx, ".include \"filename\"", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_push(ctx, 0.30f);
                 nk_label(ctx, "Includes the file, filename, at this address", NK_TEXT_ALIGN_LEFT);
-                nk_layout_row_push(ctx, 0.50f);
-                nk_label(ctx, "Operator precedence is top down in the table above", NK_TEXT_ALIGN_LEFT);
+                nk_layout_row_push(ctx, 0.20f);
+                nk_spacer(ctx);
+                nk_layout_row_push(ctx, 0.30f);
+                nk_spacer(ctx);
                 nk_layout_row_end(ctx);
 
                 nk_layout_row_begin(ctx, NK_DYNAMIC, 13, 4);
@@ -585,8 +614,10 @@ void viewport_show_help(APPLE2 *m) {
                 nk_label(ctx, ".incbin \"filename\"", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_push(ctx, 0.30f);
                 nk_label(ctx, "Include a binary file at this address", NK_TEXT_ALIGN_LEFT);
-                nk_layout_row_push(ctx, 0.50f);
-                nk_label(ctx, "Variables also take = <expression>, ++ and --", NK_TEXT_ALIGN_LEFT);
+                nk_layout_row_push(ctx, 0.20f);
+                nk_spacer(ctx);
+                nk_layout_row_push(ctx, 0.30f);
+                nk_spacer(ctx);
                 nk_layout_row_end(ctx);
 
                 nk_layout_row_begin(ctx, NK_DYNAMIC, 13, 4);
@@ -594,8 +625,10 @@ void viewport_show_help(APPLE2 *m) {
                 nk_label(ctx, ".org value", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_push(ctx, 0.30f);
                 nk_label(ctx, "Another way to set the current address", NK_TEXT_ALIGN_LEFT);
-                nk_layout_row_push(ctx, 0.50f);
-                nk_label(ctx, "++ and -- are pre operations, even though they have post syntax", NK_TEXT_ALIGN_LEFT);
+                nk_layout_row_push(ctx, 0.20f);
+                nk_spacer(ctx);
+                nk_layout_row_push(ctx, 0.30f);
+                nk_spacer(ctx);
                 nk_layout_row_end(ctx);
 
                 nk_layout_row_dynamic(ctx, 26, 2);

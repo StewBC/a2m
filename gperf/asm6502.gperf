@@ -13,9 +13,12 @@ struct OpcodeInfo
 .drowd,     GPERF_DOT_DROWD, 0, 0, 0
 .drowq,     GPERF_DOT_DROWQ, 0, 0, 0
 .dword,     GPERF_DOT_DWORD, 0, 0, 0
+.else,      GPERF_DOT_ELSE, 0, 0, 0
 .endfor,    GPERF_DOT_ENDFOR, 0, 0, 0
+.endif,     GPERF_DOT_ENDIF, 0, 0, 0
 .endmacro,  GPERF_DOT_ENDMACRO, 0, 0, 0
 .for,       GPERF_DOT_FOR, 0, 0, 0
+.if,        GPERF_DOT_IF, 0, 0, 0
 .incbin,    GPERF_DOT_INCBIN, 0, 0, 0
 .include,   GPERF_DOT_INCLUDE, 0, 0, 0
 .macro,     GPERF_DOT_MACRO, 0, 0, 0
