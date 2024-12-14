@@ -429,6 +429,28 @@ int anonymous_symbol_lookup(uint16_t *address, int direction) {
     return 1;
 }
 
+void symbol_clear(const char *symbol_name, uint32_t symbol_name_length) {
+    uint32_t name_hash = fnv_1a_hash(symbol_name, symbol_name_length);
+    uint8_t bucket = name_hash & 0xff;
+    DYNARRAY *bucket_array = &as->symbol_table[bucket];
+    SYMBOL_LABEL *sl = symbol_lookup(name_hash, symbol_name, symbol_name_length);
+    if(sl) {
+        array_remove(bucket_array, sl);
+    }
+}
+
+SYMBOL_LABEL *symbol_lookup(uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length) {
+    uint8_t bucket = name_hash & 0xff;
+    DYNARRAY *bucket_array = &as->symbol_table[bucket];
+    for(size_t i = 0; i < bucket_array->items; i++) {
+        SYMBOL_LABEL *sl = ARRAY_GET(bucket_array, SYMBOL_LABEL, i);
+        if(sl->symbol_hash == name_hash && !strnicmp(symbol_name, sl->symbol_name, symbol_name_length)) {
+            return sl;
+        }
+    }
+    return 0;
+}
+
 int symbol_sort(const void *lhs, const void *rhs) {
     return (uint16_t) (((SYMBOL_LABEL *) lhs)->symbol_value) - (uint16_t) (((SYMBOL_LABEL *) rhs)->symbol_value);
 }
@@ -468,18 +490,6 @@ SYMBOL_LABEL *symbol_store(const char *symbol_name, uint32_t symbol_name_length,
         sl = ARRAY_GET(bucket_array, SYMBOL_LABEL, bucket_array->items - 1);
     }
     return sl;
-}
-
-SYMBOL_LABEL *symbol_lookup(uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length) {
-    uint8_t bucket = name_hash & 0xff;
-    DYNARRAY *bucket_array = &as->symbol_table[bucket];
-    for(size_t i = 0; i < bucket_array->items; i++) {
-        SYMBOL_LABEL *sl = ARRAY_GET(bucket_array, SYMBOL_LABEL, i);
-        if(sl->symbol_hash == name_hash && !strnicmp(symbol_name, sl->symbol_name, symbol_name_length)) {
-            return sl;
-        }
-    }
-    return 0;
 }
 
 //----------------------------------------------------------------------------
@@ -637,10 +647,15 @@ int is_macro_parse_macro() {
         if(name_length == macro->macro_name_length && 0 == strnicmp(as->token_start, macro->macro_name, name_length)) {
             size_t p;
             // This is a macro to execute - load the parameters into the variables
+            as->current_token.op = ',';
             for(p = 0; p < macro->macro_parameters.items; p++) {
                 MACRO_VARIABLE *mv = ARRAY_GET(&macro->macro_parameters, MACRO_VARIABLE, p);
-                uint64_t value = evaluate_expression();
-                symbol_store(mv->variable_name, mv->variable_name_length, SYMBOL_VARIABLE, value);
+                if(as->current_token.op == ',') {
+                    uint64_t value = evaluate_expression();
+                    symbol_store(mv->variable_name, mv->variable_name_length, SYMBOL_VARIABLE, value);
+                } else {
+                    symbol_clear(mv->variable_name, mv->variable_name_length);
+                }
             }
             // Then make the macro active
             input_stack_push(); // save current parse point
@@ -803,7 +818,7 @@ void parse_dot_if() {
             errlog(".if without .endif");
         } else {
             // If not endif, it's else and that needs an endif
-            if(tolower(as->input[2]) != 'n') {
+            if(tolower(as->token_start[2]) != 'n') {
                 as->if_active++;
                 // I could add a .elseif and call parse_dot_if?
             }
@@ -920,10 +935,11 @@ void process_dot_macro() {
             errlog(".macro with no .endmacro\n");
             break;
         }
-        if(stricmp(as->input, ".endmacro")) {
+        if(0 == strnicmp(as->input, ".endmacro", 9)) {
             get_token();
             break;
         }
+        get_token();
     }
     // If there were no errors, add the macro to the list of macros
     if(macro_okay) {

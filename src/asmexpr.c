@@ -61,7 +61,7 @@ void get_token() {
         } else {
             if(instring) {
                 if(c != '"') {
-                    errlog("String missing a closeing \"");
+                    errlog("String missing a closing \"");
                 } else {
                     as->input++;
                 }
@@ -148,32 +148,39 @@ void next_token() {
     } else if(*as->token_start == '.') {                    // .lt, .le, .gt, .ge, .ne & .eq
         as->token_start++;
         char first = toupper(*as->token_start);
-        as->current_token.type = TOKEN_OP;
-        as->current_token.op = first;
-        as->token_start++;
-        char second = toupper(*as->token_start);
-        switch (first) {
-        case 'L':
-        case 'G':
-            if(second == 'E') {
-                as->current_token.op = tolower(first);
-            } else if(second != 'T') {
-                errlog("Expected .%cT or %cE", first, first);
+        if(0 != strnicmp(as->token_start, "defined", 7)) {
+            as->current_token.type = TOKEN_OP;
+            as->current_token.op = first;
+            as->token_start++;
+            char second = toupper(*as->token_start);
+            switch (first) {
+            case 'L':
+            case 'G':
+                if(second == 'E') {
+                    as->current_token.op = tolower(first);
+                } else if(second != 'T') {
+                    errlog("Expected .%cT or %cE", first, first);
+                }
+                break;
+            case 'E':
+                if(second != 'Q') {
+                    errlog("Expected .EQ");
+                }
+                break;
+            case 'N':
+                if(second != 'E') {
+                    errlog("Expected .NE");
+                }
+                break;
+            default:
+                errlog("Expected .LT, .LE, .GT, .GE, .EQ or .NE");
             }
-            break;
-        case 'E':
-            if(second != 'Q') {
-                errlog("Expected .EQ");
-            }
-            break;
-        case 'N':
-            if(second != 'E') {
-                errlog("Expected .NE");
-            }
-            break;
-        default:
-            errlog("Expected .LT, .LE, .GT, .GE, .EQ or .NE");
+        } else {
+            // 'D' is now the token for defined
+            as->current_token.op = first;
+            as->current_token.type = TOKEN_OP;
         }
+
     } else if(isdigit(*as->token_start)) {
         as->current_token.type = TOKEN_NUM;                 // Decimal Number
         as->current_token.value = strtoll(as->token_start, (char **) &as->token_start, 10);
@@ -223,6 +230,18 @@ int64_t parse_primary() {
         value = 1 + as->current_address;
     } else if(as->current_token.type == TOKEN_OP && as->current_token.op == ':') {
         value = parse_anonymous_address();
+    } else if(as->current_token.type == TOKEN_OP && as->current_token.op == 'D') {
+        value = 0;
+        next_token();
+        if(as->current_token.type == TOKEN_VAR) {
+            SYMBOL_LABEL *sl = symbol_lookup(as->current_token.name_hash, as->current_token.name, as->current_token.name_length);
+            if(sl) {
+                value = 1;
+            }
+            next_token();
+        } else {
+            errlog(".defined expects a variable to follow");
+        }
     } else if(as->current_token.type == TOKEN_NUM) {
         value = as->current_token.value;
         next_token();
