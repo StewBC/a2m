@@ -67,7 +67,7 @@ void viewmisc_show(APPLE2 *m) {
                         }
                         nk_layout_row_push(ctx, 0.74f);
                         if(spd[i].sp_files[j].is_file_open) {
-                            nk_label(ctx, spd[i].sp_files[j].file_display_name, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE);
+                            nk_label(ctx, spd[i].sp_files[j].file_display_name, NK_TEXT_LEFT);
                         }
                         nk_layout_row_end(ctx);
                     }
@@ -87,7 +87,7 @@ void viewmisc_show(APPLE2 *m) {
                 nk_layout_row_push(ctx, 0.49f);
                 nk_option_label(ctx, "Run to PC", fm->run_to_pc_set);
                 nk_layout_row_push(ctx, 0.49f);
-                nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, "%04X", fm->run_to_pc);
+                nk_labelf(ctx, NK_TEXT_LEFT, "%04X", fm->run_to_pc);
                 nk_layout_row_end(ctx);
                 nk_layout_row_dynamic(ctx, 18, 1);
                 nk_option_label(ctx, "Step Out", fm->run_to_rts_set);
@@ -95,14 +95,14 @@ void viewmisc_show(APPLE2 *m) {
                 nk_label(ctx, "Step Cycles", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_BOTTOM);
                 nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_BOTTOM, "%zd", m->cpu.cycles - d->prev_stop_cycles);
                 nk_layout_row_dynamic(ctx, 18, 2);
-                nk_label(ctx, "Total Cycles", NK_TEXT_LEFT | NK_TEXT_ALIGN_MIDDLE);
-                nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, "%zd", m->cpu.cycles);
+                nk_label(ctx, "Total Cycles", NK_TEXT_LEFT);
+                nk_labelf(ctx, NK_TEXT_LEFT, "%zd", m->cpu.cycles);
                 nk_group_end(ctx);
             }
             nk_layout_row_push(ctx, 0.59999f);
             if(nk_group_begin(ctx, "callstack group", NK_WINDOW_BORDER)) {
                 nk_layout_row_dynamic(ctx, 18, 1);
-                nk_label(ctx, "Call Stack", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE);
+                nk_label(ctx, "Call Stack", NK_TEXT_LEFT);
                 nk_layout_row_dynamic(ctx, 75, 1);
                 if(nk_group_begin(ctx, "Callstack", NK_WINDOW_BORDER)) {
                     char callstack_display[256];
@@ -159,7 +159,7 @@ void viewmisc_show(APPLE2 *m) {
                             int access = (bp->access >> 1) - 1;
                             if(bp->use_range) {
                                 if(bp->use_counter) {
-                                    nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, "%s[%04X-%04X] (%d/%d)", access_mode[access],
+                                    nk_labelf(ctx, NK_TEXT_LEFT, "%s[%04X-%04X] (%d/%d)", access_mode[access],
                                               bp->address, bp->address_range_end, bp->counter_count, bp->counter_stop_value);
                                 } else {
                                     nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%s[%04X-%04X]", access_mode[access],

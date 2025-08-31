@@ -74,10 +74,6 @@ int apple2_configure(APPLE2 *m) {
     // Init the CPU to cold-start by jumping to ROM at 0xfffc
     cpu_init(&m->cpu);
 
-    // Should be obtained_spec.freq instead of SAMPLE_RATE, I think, but that doesn't work on macOS
-    // The 1.5 is a fudge number to make sure the audio doesn't lag
-    m->speaker.sample_rate = (CPU_FREQUENCY / SAMPLE_RATE) + 1.5f;
-    m->speaker.current_rate = m->speaker.sample_rate;
 
     // Configure the LC using the same function the soft switches would, so the
     // same way, meaning call 2x to enable ROM and WRITE
@@ -136,6 +132,7 @@ void apple2_ini_load_callback(void *user_data, char *section, char *key, char *v
 
 // Clean up the Apple II
 void apple2_shutdown(APPLE2 *m) {
+    speaker_shutdown(&m->speaker);
     ram_card_shutdown(&m->ram_card);
     free(m->RAM_MAIN);
     m->RAM_MAIN = 0;
@@ -186,7 +183,7 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
             m->write_pages.pages[KBD / PAGE_SIZE].bytes[KBD % PAGE_SIZE] &= 0x7F;
             break;
         case A2SPEAKER:
-            m->speaker.speaker_state = 1.0f - m->speaker.speaker_state;
+            speaker_toggle(&m->speaker);
             break;
         case TXTCLR:
             m->screen_mode |= SCREEN_MODE_GRAPHICS;

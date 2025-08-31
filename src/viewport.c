@@ -4,10 +4,19 @@
 
 #include "header.h"
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:5287)  // different enum types
+#endif
+
 #define NK_IMPLEMENTATION
 #include "nuklear.h"
 #define NK_SDL_RENDERER_IMPLEMENTATION
 #include "nuklrsdl.h"
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #define color_active_win        nk_rgb( 50,100, 50)
 #define color_popup_border      nk_rgb(255,  0,  0)
@@ -59,29 +68,36 @@ int viewport_init(VIEWPORT *v, int w, int h) {
         printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
         goto error;
     }
+
     // Create window
     v->window = SDL_CreateWindow("Apple ][+ Emulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, w, h, SDL_WINDOW_SHOWN);
     if(v->window == NULL) {
         printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
         goto error;
     }
+
+    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");  // before SDL_CreateRenderer
     // Create renderer
-    v->renderer = SDL_CreateRenderer(v->window, -1, SDL_RENDERER_ACCELERATED);
+    v->renderer = SDL_CreateRenderer(v->window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if(v->renderer == NULL) {
         printf("Renderer could not be created! SDL_Error: %s\n", SDL_GetError());
         goto error;
     }
     // Create RGB surface
-    v->surface = SDL_CreateRGBSurface(0, 40 * 7, 24 * 8, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+    v->surface = SDL_CreateRGBSurfaceWithFormat(0, 40*7, 24*8, 32, SDL_PIXELFORMAT_ARGB8888);
     if(v->surface == NULL) {
         printf("Surface could not be created! SDL_Error: %s\n", SDL_GetError());
         goto error;
     }
-    v->surface640 = SDL_CreateRGBSurface(0, 80 * 8, 24 * 8, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+    SDL_FillRect(v->surface, NULL, SDL_MapRGB(v->surface->format, 0,0,0));
+
+    v->surface640 = SDL_CreateRGBSurfaceWithFormat(0, 80*8, 24*8, 32, SDL_PIXELFORMAT_ARGB8888);
     if(v->surface640 == NULL) {
         printf("Surface640 could not be created! SDL_Error: %s\n", SDL_GetError());
         goto error;
     }
+    SDL_FillRect(v->surface640, NULL, SDL_MapRGB(v->surface640->format, 0,0,0));
+
     // Create texture for pixel rendering
     v->texture = SDL_CreateTextureFromSurface(v->renderer, v->surface);
     if(v->texture == NULL) {
@@ -92,10 +108,6 @@ int viewport_init(VIEWPORT *v, int w, int h) {
     v->texture640 = SDL_CreateTextureFromSurface(v->renderer, v->surface640);
     if(v->texture640 == NULL) {
         printf("Texture could not be created! SDL_Error: %s\n", SDL_GetError());
-        goto error;
-    }
-    // The speaker is in the machine but only a machine in view makes sounds
-    if(A2_OK != viewapl2_speaker_init()) {
         goto error;
     }
 

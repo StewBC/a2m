@@ -52,8 +52,17 @@
 #define NK_INCLUDE_VERTEX_BUFFER_OUTPUT
 #define NK_INCLUDE_FONT_BAKING
 #define NK_INCLUDE_DEFAULT_FONT
+
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:5287)  // different enum types
+#endif
+
 // #define NK_IMPLEMENTATION
 #include "nuklear.h"
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #endif                                                      // IS_EMULATOR
 
@@ -85,6 +94,7 @@ typedef struct DEBUGGER DEBUGGER;
 #include "roms.h"
 #include "sftswtch.h"
 #include "slot.h"
+#include "speaker.h"
 #include "smrtprt.h"
 
 // Debugger/Viewer

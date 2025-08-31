@@ -29,13 +29,6 @@ enum {
     NUM_SAMPLES,
 };
 
-typedef struct SPEAKER {
-    float speaker_state;
-    float sample_rate;
-    float current_rate;
-    float samples[NUM_SAMPLES];
-} SPEAKER;
-
 void viewapl2_init_color_table(APPLE2 * m);
 void viewapl2_process_event(APPLE2 * m, SDL_Event * e);
 void viewapl2_screen_apple2(APPLE2 * m);
@@ -45,6 +38,3 @@ void viewapl2_screen_hgr(APPLE2 * m, int start, int end);
 void viewapl2_screen_hgr_mono(APPLE2 * m, int start, int end);
 void viewapl2_screen_txt(APPLE2 * m, int start, int end);
 void viewapl2_screen_80col(APPLE2 * m, int start, int end);
-int viewapl2_speaker_init();
-void viewapl2_speaker_play(SPEAKER * speaker);
-void viewapl2_speaker_update(APPLE2 * m);

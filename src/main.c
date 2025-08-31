@@ -37,6 +37,11 @@ int main(int argc, char *argv[]) {
     // Enable text input since it handles the keys better
     SDL_StartTextInput();
 
+    // The speaker is in the machine but only a machine in view makes sounds
+    if(A2_OK != speaker_init(&m.speaker, 1020484.4, 48000, 2, 40.0f, 256)) {
+        return A2_ERR;
+    }
+
     // Start the audio (ie, un-pause)
     SDL_PauseAudio(0);
 
@@ -53,9 +58,11 @@ int main(int argc, char *argv[]) {
         do {
             machine_step(&m);
             cycles++;
-            viewapl2_speaker_update(&m);
         } while(m.cpu.instruction_cycle != -1);
-
+        // Add speaker - in loop for 1 cycle or here for "instruction's" cycles
+        speaker_on_cycles(&m.speaker, cycles);
+        speaker_pump(&m.speaker);
+		
         // Give debugger a chance to process the new state and set m->step
         viewdbg_update(&m);
 

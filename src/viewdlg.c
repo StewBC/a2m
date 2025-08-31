@@ -13,7 +13,7 @@ int viewdlg_assembler_config(struct nk_context *ctx, struct nk_rect r, ASSEMBLER
     if(nk_popup_begin(ctx, NK_POPUP_STATIC, "Assembler Config", 0, r)) {
         nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 3);
         nk_layout_row_push(ctx, 0.20f);
-        nk_label(ctx, "Path", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE);
+        nk_label(ctx, "Path", NK_TEXT_LEFT);
         nk_layout_row_push(ctx, 0.60f);
         ctx->current->edit.mode = NK_TEXT_EDIT_MODE_REPLACE;
         if(NK_EDIT_COMMITED &
@@ -54,7 +54,7 @@ int viewdlg_assembler_config(struct nk_context *ctx, struct nk_rect r, ASSEMBLER
         nk_layout_row_push(ctx, 0.29f);
         nk_checkbox_label_align(ctx, "Auto Run", &ac->auto_run_after_assemble, 0, NK_TEXT_LEFT);
         nk_layout_row_push(ctx, 0.20f);
-        nk_label(ctx, "Address", NK_TEXT_RIGHT | NK_TEXT_ALIGN_MIDDLE);
+        nk_label(ctx, "Address", NK_TEXT_RIGHT);
         nk_layout_row_push(ctx, 0.3f);
         if(NK_EDIT_COMMITED &
            nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER,
@@ -111,7 +111,7 @@ int viewdlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
         if(nk_group_begin(ctx, "address", 0)) {
             nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 5);
             nk_layout_row_push(ctx, 0.12f);
-            nk_label(ctx, "Break At", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE);
+            nk_label(ctx, "Break At", NK_TEXT_LEFT);
             nk_layout_row_push(ctx, 0.10f);
             if(NK_EDIT_COMMITED &
                nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_address[0],
@@ -178,13 +178,13 @@ int viewdlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
             if(!bpe->bp_under_edit.use_counter) {
                 nk_widget_disable_begin(ctx);
             }
-            nk_label(ctx, "Initial Counter", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE);
+            nk_label(ctx, "Initial Counter", NK_TEXT_LEFT);
             if(NK_EDIT_COMMITED &
                nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_counter[0],
                               &bpe->string_counter_len[0], 8, nk_filter_decimal)) {
                 ctx->active->popup.win->edit.active = 0;
             }
-            nk_label(ctx, "Reset Counter", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE);
+            nk_label(ctx, "Reset Counter", NK_TEXT_LEFT);
             if(NK_EDIT_COMMITED &
                nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_counter[1],
                               &bpe->string_counter_len[1], 8, nk_filter_decimal)) {
@@ -273,7 +273,7 @@ int viewdlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
                 NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER | NK_WINDOW_MOVABLE)) {
         nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 2);
         nk_layout_row_push(ctx, 0.10f);
-        nk_label(ctx, "Path", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE);
+        nk_label(ctx, "Path", NK_TEXT_LEFT);
         nk_layout_row_push(ctx, 0.90f);
         if(NK_EDIT_COMMITED &
            nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, fb->dir_selected.name,
@@ -320,7 +320,7 @@ int viewdlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
                     break;
                 }
                 nk_layout_row_push(ctx, 0.1f);
-                nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, "%zd", fi->size);
+                nk_labelf(ctx, NK_TEXT_LEFT, "%zd", fi->size);
                 nk_layout_row_push(ctx, 0.09f);
                 nk_label(ctx, fi->is_directory ? "Dir" : "File", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_CENTERED);
                 nk_layout_row_end(ctx);
@@ -439,7 +439,7 @@ int viewdlg_symbol_lookup(struct nk_context *ctx, struct nk_rect r, DYNARRAY *sy
                         ret = 1;
                     }
                     nk_layout_row_push(ctx, 0.15f);
-                    nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, "$%04X", s->pc);
+                    nk_labelf(ctx, NK_TEXT_LEFT, "$%04X", s->pc);
                     nk_layout_row_push(ctx, 0.21f);
                     nk_label(ctx, s->symbol_source, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_CENTERED);
                     nk_layout_row_end(ctx);

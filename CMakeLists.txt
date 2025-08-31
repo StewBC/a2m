@@ -40,6 +40,7 @@ add_executable(apple2
     src/roms.c
     src/slot.c
     src/smrtprt.c
+    src/speaker.c
     src/util.c
     src/viewapl2.c
     src/viewcpu.c
