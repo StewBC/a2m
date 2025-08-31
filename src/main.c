@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
     SDL_StartTextInput();
 
     // The speaker is in the machine but only a machine in view makes sounds
-    if(A2_OK != speaker_init(&m.speaker, 1020484.4, 48000, 2, 40.0f, 256)) {
+    if(A2_OK != speaker_init(&m.speaker, CPU_FREQUENCY, 48000, 2, 40.0f, 256)) {
         return A2_ERR;
     }
 

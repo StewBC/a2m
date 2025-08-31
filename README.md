@@ -419,7 +419,7 @@ viewmisc.c | Key and display handling of the miscellaneous window
 viewport.c | SDL2 initialization and manage all the other views, update the display
   
 ## Known issues  
-Audio: Audio may not work great and at Max Speed (F3), not at all.  
+Audio: Audio could be better, but it now keeps up (doesn't drift anymore)
 Memory Cleanup: Not all malloc allocations are freed on exit.  
 Other bugs may be present, as testing has been limited.  
   

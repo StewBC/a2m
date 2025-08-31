@@ -68,17 +68,14 @@ int viewport_init(VIEWPORT *v, int w, int h) {
         printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
         goto error;
     }
-
     // Create window
     v->window = SDL_CreateWindow("Apple ][+ Emulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, w, h, SDL_WINDOW_SHOWN);
     if(v->window == NULL) {
         printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
         goto error;
     }
-
-    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");  // before SDL_CreateRenderer
     // Create renderer
-    v->renderer = SDL_CreateRenderer(v->window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    v->renderer = SDL_CreateRenderer(v->window, -1, SDL_RENDERER_ACCELERATED);
     if(v->renderer == NULL) {
         printf("Renderer could not be created! SDL_Error: %s\n", SDL_GetError());
         goto error;
