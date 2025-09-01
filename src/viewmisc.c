@@ -49,7 +49,7 @@ void viewmisc_show(APPLE2 *m) {
                                 m->stopped = 0;
                             }
                         } else {
-                            nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%d.%d", i, j);
+                            nk_labelf(ctx, NK_TEXT_CENTERED, "%d.%d", i, j);
                         }
                         nk_layout_row_push(ctx, 0.08f);
                         if(nk_button_label(ctx, "Eject")) {
@@ -150,10 +150,10 @@ void viewmisc_show(APPLE2 *m) {
                         nk_layout_row_push(ctx, 0.399f);
                         if(bp->use_pc) {
                             if(bp->use_counter) {
-                                nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%04X (%d/%d)", bp->address,
+                                nk_labelf(ctx, NK_TEXT_CENTERED, "%04X (%d/%d)", bp->address,
                                           bp->counter_count, bp->counter_stop_value);
                             } else {
-                                nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%04X", bp->address);
+                                nk_labelf(ctx, NK_TEXT_CENTERED, "%04X", bp->address);
                             }
                         } else {
                             int access = (bp->access >> 1) - 1;
@@ -162,15 +162,15 @@ void viewmisc_show(APPLE2 *m) {
                                     nk_labelf(ctx, NK_TEXT_LEFT, "%s[%04X-%04X] (%d/%d)", access_mode[access],
                                               bp->address, bp->address_range_end, bp->counter_count, bp->counter_stop_value);
                                 } else {
-                                    nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%s[%04X-%04X]", access_mode[access],
+                                    nk_labelf(ctx, NK_TEXT_CENTERED, "%s[%04X-%04X]", access_mode[access],
                                               bp->address, bp->address_range_end);
                                 }
                             } else {
                                 if(bp->use_counter) {
-                                    nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%s[%04X] (%d/%d)", access_mode[access],
+                                    nk_labelf(ctx, NK_TEXT_CENTERED, "%s[%04X] (%d/%d)", access_mode[access],
                                               bp->address, bp->counter_count, bp->counter_stop_value);
                                 } else {
-                                    nk_labelf(ctx, NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE, "%s[%04X]", access_mode[access],
+                                    nk_labelf(ctx, NK_TEXT_CENTERED, "%s[%04X]", access_mode[access],
                                               bp->address);
                                 }
                             }

@@ -119,7 +119,7 @@ int viewdlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
                 ctx->active->popup.win->edit.active = 0;
             }
             nk_layout_row_push(ctx, 0.05f);
-            nk_label(ctx, "on", NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE);
+            nk_label(ctx, "on", NK_TEXT_CENTERED);
             nk_layout_row_push(ctx, 0.10f);
             bpe->bp_under_edit.use_pc = nk_option_label(ctx, "PC", bpe->bp_under_edit.use_pc ? 1 : 0) ? 1 : 0;
             nk_layout_row_push(ctx, 0.25f);
@@ -322,7 +322,7 @@ int viewdlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
                 nk_layout_row_push(ctx, 0.1f);
                 nk_labelf(ctx, NK_TEXT_LEFT, "%zd", fi->size);
                 nk_layout_row_push(ctx, 0.09f);
-                nk_label(ctx, fi->is_directory ? "Dir" : "File", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_CENTERED);
+                nk_label(ctx, fi->is_directory ? "Dir" : "File", NK_TEXT_LEFT);
                 nk_layout_row_end(ctx);
             }
             nk_group_end(ctx);
@@ -353,7 +353,7 @@ int viewdlg_find(struct nk_context *ctx, struct nk_rect r, char *data, int *data
         }
         nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 2);
         nk_layout_row_push(ctx, 0.20f);
-        nk_label(ctx, find_mode ? "HEX" : "String", NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE);
+        nk_label(ctx, find_mode ? "HEX" : "String", NK_TEXT_CENTERED);
         nk_layout_row_push(ctx, 0.80f);
         int edit_state = nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, data, data_length, max_len,
                                         find_mode ? nk_filter_hex : nk_filter_default);
@@ -413,7 +413,7 @@ int viewdlg_symbol_lookup(struct nk_context *ctx, struct nk_rect r, DYNARRAY *sy
     int ret = 0;
     if(nk_popup_begin(ctx, NK_POPUP_STATIC, "Enter a symbol name", 0, r)) {
         nk_layout_row_dynamic(ctx, 28, 2);
-        nk_label(ctx, "Symbol Serach:", NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE);
+        nk_label(ctx, "Symbol Serach:", NK_TEXT_CENTERED);
         int edit_state = nk_edit_string(ctx, NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, name, name_length, 256, 0);
         if(!ctx->active->edit.active) {
             ctx->current->edit.active = 1;
@@ -441,7 +441,7 @@ int viewdlg_symbol_lookup(struct nk_context *ctx, struct nk_rect r, DYNARRAY *sy
                     nk_layout_row_push(ctx, 0.15f);
                     nk_labelf(ctx, NK_TEXT_LEFT, "$%04X", s->pc);
                     nk_layout_row_push(ctx, 0.21f);
-                    nk_label(ctx, s->symbol_source, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_CENTERED);
+                    nk_label(ctx, s->symbol_source, NK_TEXT_LEFT);
                     nk_layout_row_end(ctx);
                 }
             }

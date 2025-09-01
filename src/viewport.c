@@ -275,7 +275,7 @@ void viewport_show_help(APPLE2 *m) {
     r.h /= sdl_y_scale;
     if(nk_begin(ctx, "Help", nk_rect(r.x, r.y, r.w, r.h), NK_WINDOW_NO_SCROLLBAR)) {
         nk_layout_row_dynamic(ctx, 30, 1);
-        nk_label_colored(ctx, "Apple ][+ emulator by Stefan Wessels, 2024.", NK_TEXT_ALIGN_CENTERED | NK_TEXT_ALIGN_MIDDLE,
+        nk_label_colored(ctx, "Apple ][+ emulator by Stefan Wessels, 2024.", NK_TEXT_CENTERED,
                         color_help_master);
         nk_layout_row_dynamic(ctx, r.h-55, 1);
         if(nk_group_begin(ctx, "Help Pages", 0)) {
