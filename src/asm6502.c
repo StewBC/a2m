@@ -547,6 +547,35 @@ int match(int number, ...) {
     return -1;
 }
 
+void find_ab_passing_over_c(const char *a, const char *b, const char *c) {
+    int nest_level = 1;
+    size_t a_len = strlen(a);
+    size_t b_len = b ? strlen(b) : 0;
+    size_t c_len = strlen(c);
+    do {
+        get_token();
+        if(*as->input && !strnicmp(c, as->token_start, c_len)) {
+            find_ab_passing_over_c(a, NULL, c);
+            continue;
+        }
+        if(nest_level && !strnicmp(a, as->token_start, a_len)) {
+            if(!(--nest_level)) {
+                break;
+            }
+            continue;
+        }
+        if(nest_level && b_len && !strnicmp(b, as->token_start, b_len)) {
+            if(!(--nest_level)) {
+                break;
+            }
+            continue;
+        }
+    } while(*as->input);
+    if(as->input == as->token_start) {
+        get_token();
+    }
+}
+
 //----------------------------------------------------------------------------
 // Assembly generator helpers
 void decode_abs_rel_zp_opcode() {
@@ -725,10 +754,8 @@ void parse_dot_else() {
         as->if_active--;
     } else {
         errlog(".else without .if");
-    }    
-    do {
-        get_token();
-    } while(*as->input && (as->token_start == as->input || strnicmp(".endif", as->token_start, 6)));
+    }
+    find_ab_passing_over_c(".endif", NULL, ".if");
     if(!*as->input) {
         errlog(".else without .endif");
     }
@@ -787,9 +814,7 @@ void parse_dot_for() {
     for_loop.loop_start_file = as->current_file;
     // evaluate the condition
     if(!evaluate_expression()) {
-        do {
-            get_token();
-        } while(*as->input && (as->token_start == as->input || strnicmp(".endfor", as->token_start, 7)));
+        find_ab_passing_over_c(".endfor", NULL, ".for");
         if(!*as->input) {
             // failed so find .endfor (must be in same file)
             errlog(".for without .endfor");
@@ -804,15 +829,13 @@ void parse_dot_for() {
         // to find the loop body
         for_loop.loop_body_start = as->input;
         for_loop.body_line = as->current_line + as->next_line_count;
+        ARRAY_ADD(&as->loop_stack, for_loop);
     }
-    ARRAY_ADD(&as->loop_stack, for_loop);
 }
 
 void parse_dot_if() {
     if(!evaluate_expression()) {
-        do {
-            get_token();
-        } while(*as->input && (as->token_start == as->input || (strnicmp(".else", as->token_start, 5) && strnicmp(".endif", as->token_start, 6))));
+        find_ab_passing_over_c(".endif", ".else", ".if");
         if(!*as->input) {
             // failed so find .else or .endif (must be in same file)
             errlog(".if without .endif");
@@ -926,20 +949,10 @@ void process_dot_macro() {
     macro.macro_body_input = *ARRAY_GET(&as->input_stack, INPUT_STACK, as->input_stack.items - 1);
     input_stack_pop();
     // Look for .endmacro, ignoring the macro body
-    while(*as->input) {
-        while(*as->input && *as->input != '.') {
-            get_token();
-        }
-        if(!(*as->input)) {
-            macro_okay = 0;
-            errlog(".macro with no .endmacro\n");
-            break;
-        }
-        if(0 == strnicmp(as->input, ".endmacro", 9)) {
-            get_token();
-            break;
-        }
-        get_token();
+    find_ab_passing_over_c(".endmacro", NULL, ".macro");
+    if(!(*as->input)) {
+        macro_okay = 0;
+        errlog(".macro %.*s L%05zu, with no .endmacro\n", macro.macro_name_length, macro.macro_name, macro.macro_body_input.current_line);
     }
     // If there were no errors, add the macro to the list of macros
     if(macro_okay) {
@@ -1307,8 +1320,8 @@ int assembler_assemble(const char *input_file, uint16_t address) {
                     errlog(".if without .endif");
                 }
                 if(as->loop_stack.items) {
+                    errlog(".for L:%05zu, without .endfor", ARRAY_GET(&as->loop_stack, FOR_LOOP, as->loop_stack.items-1)->body_line-1);
                     as->loop_stack.items = 0;
-                    errlog(".for without .endfor");
                 }
                 // The end of the file has been reached so if it was an included file
                 // pop to the parent, or end
