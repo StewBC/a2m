@@ -143,6 +143,7 @@ void viewapl2_process_event(APPLE2 *m, SDL_Event *e) {
                 case SDLK_SCROLLLOCK:                       // CTRL+PAUSE generates SDLK_SCROLLLOCK on my PC
                 case SDLK_PAUSE:
                     cpu_init(&m->cpu);
+                    diskii_reset(m);
                     break;
                 default:
                     // CTRL+A = 1, etc.

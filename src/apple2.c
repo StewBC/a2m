@@ -32,6 +32,7 @@ int apple2_configure(APPLE2 *m) {
     }
     memory_add(&m->roms, ROM_APPLE, 0xD000, apple2_rom_size, apple2_rom);
     memory_add(&m->roms, ROM_CHARACTER, 0x0000, apple_character_rom_size, apple_character_rom);
+    memory_add(&m->roms, ROM_DISKII, 0xC000, disk2_rom_size, disk2_rom);
     memory_add(&m->roms, ROM_SMARTPORT, 0xC000, smartport_rom_size, smartport_rom);
     memory_add(&m->roms, ROM_FRANKLIN_ACE_DISPLAY, 0x0000, franklin_ace_display_rom_size, franklin_ace_display_rom);
     memory_add(&m->roms, ROM_FRANKLIN_ACE_CHARACTER, 0x0000, franklin_ace_character_rom_size, franklin_ace_character_rom);
@@ -74,7 +75,6 @@ int apple2_configure(APPLE2 *m) {
     // Init the CPU to cold-start by jumping to ROM at 0xfffc
     cpu_init(&m->cpu);
 
-
     // Configure the LC using the same function the soft switches would, so the
     // same way, meaning call 2x to enable ROM and WRITE
     ram_card(m, 0xC081, 0x100);
@@ -84,6 +84,7 @@ int apple2_configure(APPLE2 *m) {
     if(A2_OK != util_ini_load_file("./apple2.ini", apple2_ini_load_callback, (void *) m)) {
         // If apple2.ini doesn't successfully load, just add a smartport in slot 7
         slot_add_card(m, 7, SLOT_TYPE_SMARTPORT, &m->sp_device[7], &m->roms.blocks[ROM_SMARTPORT].bytes[0x700], NULL);
+        slot_add_card(m, 6, SLOT_TYPE_DISKII, &m->diskii_controller[6], &m->roms.blocks[ROM_DISKII].bytes[0x700], NULL);
     }
 
     return A2_OK;
@@ -92,6 +93,23 @@ int apple2_configure(APPLE2 *m) {
 void apple2_ini_load_callback(void *user_data, char *section, char *key, char *value) {
     APPLE2 *m = (APPLE2 *) user_data;
     static int slot_number = -1;
+    if(0 == stricmp(section, "diskii")) {
+        if(0 == stricmp(key, "slot")) {
+            sscanf(value, "%d", &slot_number);
+            if(slot_number >= 1 && slot_number < 8) {
+                slot_add_card(m, slot_number, SLOT_TYPE_DISKII, &m->diskii_controller[slot_number],
+                              m->roms.blocks[ROM_DISKII].bytes, NULL);
+                m->diskii_controller[slot_number].diskii_drive[0].quater_track_pos = rand() % DISKII_QUATERTRACKS;
+                m->diskii_controller[slot_number].diskii_drive[1].quater_track_pos = rand() % DISKII_QUATERTRACKS;
+            }
+        } else if(slot_number >= 0 && slot_number < 8) {
+            if(0 == stricmp(key, "disk0")) {
+                diskii_mount(m, slot_number, 0, value);
+            } else if(0 == stricmp(key, "disk1")) {
+                diskii_mount(m, slot_number, 1, value);
+            }
+        }
+    }
     if(0 == stricmp(section, "smartport")) {
         if(0 == stricmp(key, "slot")) {
             sscanf(value, "%d", &slot_number);
@@ -134,6 +152,7 @@ void apple2_ini_load_callback(void *user_data, char *section, char *key, char *v
 void apple2_shutdown(APPLE2 *m) {
     speaker_shutdown(&m->speaker);
     ram_card_shutdown(&m->ram_card);
+    diskii_shutdown(m);
     free(m->RAM_MAIN);
     m->RAM_MAIN = 0;
     free(m->RAM_WATCH);
@@ -149,24 +168,53 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
     } else if(address >= 0xc090 && address <= 0xc0FF) {
         int slot = (address >> 4) & 0x7;
         switch (m->slot_cards[slot].slot_type) {
-        case SLOT_TYPE_SMARTPORT:
-            switch (address & 0x0f) {
-            case SP_DATA:
-                return m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_read_offset++];
-                break;
-            case SP_STATUS:
-                return m->sp_device[slot].sp_status;
-                break;
+            case SLOT_TYPE_DISKII: {
+                uint8_t soft_switch = address & 0x0f;
+                if(soft_switch <= IWM_PH3_ON) {
+                    diskii_step_head(m, slot, soft_switch);
+                    return 0xff;
+                }
+                switch (soft_switch){
+                    case IWM_MOTOR_ON:
+                    case IWM_MOTOR_OFF:
+                        diskii_motor(m, slot, soft_switch);
+                        break;
+
+                    case IWM_SEL_DRIVE_1:
+                    case IWM_SEL_DRIVE_2:
+                        diskii_drive_select(m, slot, soft_switch);
+                        break;
+
+                    case IWM_Q6_OFF:
+                    case IWM_Q6_ON:
+                        return diskii_q6_access(m, slot, soft_switch & 1);
+                        
+                    case IWM_Q7_OFF:
+                    case IWM_Q7_ON:
+                        return diskii_q7_access(m, slot, soft_switch & 1);
+                }                
             }
             break;
 
-        case SLOT_TYPE_VIDEX_API:{
-                FRANKLIN_DISPLAY *fd80 = &m->franklin_display;
-                fd80->bank = (address & 0x0C) >> 2;
-                return fd80->registers[address & 0x0F];
+            case SLOT_TYPE_SMARTPORT:
+                switch (address & 0x0f) {
+                    case SP_DATA:
+                        return m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_read_offset++];
+                        break;
+
+                    case SP_STATUS:
+                        return m->sp_device[slot].sp_status;
+                        break;
+                    }
+                break;
+
+            case SLOT_TYPE_VIDEX_API:{
+                    FRANKLIN_DISPLAY *fd80 = &m->franklin_display;
+                    fd80->bank = (address & 0x0C) >> 2;
+                    return fd80->registers[address & 0x0F];
+                }
+                break;
             }
-            break;
-        }
     } else if(address >= 0xc100 && address <= 0xcFFE) {
         // Map the C800 ROM based on access to Cs00, if card provides a C800 ROM
         int slot = (address >> 8) & 0x7;

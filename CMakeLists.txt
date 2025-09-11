@@ -24,17 +24,15 @@ add_executable(apple2
     src/6502.c
     src/apple2.c
     src/asm6502.c
-    src/asm6502.h
     src/asmexpr.c
-    src/asmexpr.h
     src/asmgperf.c
-    src/asmgperf.h
     src/breakpnt.c
     src/dbgopcds.c
+    src/diskii.c
     src/dynarray.c
     src/errorlog.c
-    src/errorlog.h
     src/frankdisp.c
+    src/image.c
     src/main.c
     src/ramcard.c
     src/roms.c
@@ -52,6 +50,8 @@ add_executable(apple2
 )
 
 target_compile_definitions(apple2 PRIVATE IS_EMULATOR)
+# Add this to be able to use printf
+# target_link_options(apple2 PRIVATE $<$<CONFIG:Debug>:/SUBSYSTEM:CONSOLE>)
 
 # Link SDL2, SDL2main, and SDL2_mixer libraries
 target_link_libraries(apple2

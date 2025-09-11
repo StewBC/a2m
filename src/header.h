@@ -15,12 +15,13 @@
 #include <math.h>
 
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <direct.h>                                         // For _getcwd and _chdir
 #define stricmp _stricmp
 #define strnicmp _strnicmp
 #ifndef PATH_MAX
-#define PATH_MAX MAX_PATH
+#define PATH_MAX 4096                                       // Match Linux defenition
 #define PATH_SEPARATOR '\\'
 #endif
 #else
@@ -89,6 +90,7 @@ typedef struct DEBUGGER DEBUGGER;
 
 // Machine
 #include "6502.h"
+#include "diskii.h"
 #include "frankdisp.h"
 #include "ramcard.h"
 #include "roms.h"

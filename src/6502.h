@@ -69,7 +69,7 @@ typedef struct CPU {
     };
     uint8_t instruction;                                    // Current instruction being executed
     int16_t instruction_cycle;                              // Stage (value 0, instruction fetched, is cycle 1 of execution, -1 need instruction)
-    size_t cycles;                                          // Total count of cycles the cpu has executed
+    uint64_t cycles;                                        // Total count of cycles the cpu has executed
 } CPU;
 
 // Forward declarations
