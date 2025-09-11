@@ -1,5 +1,5 @@
 # Apple ][+ Emulator  
-This is an Apple ][+ emulator written in "C" using SDL and the Nuklear immediate mode GUI.  The emulator includes a cycle-accurate 6502 CPU (does not support undocumented opcodes), a Language Card a Franklin Ace 80col display card, and a SmartPort block device.  No Disk II support.  
+This is an Apple ][+ emulator written in "C" using SDL and the Nuklear immediate mode GUI.  The emulator includes a cycle-accurate 6502 CPU (does not support undocumented opcodes), a Language Card a Franklin Ace 80col display card, and a SmartPort block device.  Disk II support is limited to only .nib files, and is very slow - a first pass implementation has been added.  
   
 This configuration allows booting and running Total Replay or other ProDOS disk volumes.  
   
@@ -18,6 +18,11 @@ scale = 1.0                   ; Uniformly scale Application Window
 [Video]
 slot = 3
 device = Franklin Ace Display ; 80 Column Videx like card
+
+[DiskII]
+slot = 6                      ; This says slot 6 contains a disk ii controller
+disk0 = ./disks/mminer.nib
+disk1 = ./disks/pen.nib
 
 [SmartPort]
 slot = 7                      ; This says a slot contains a smartport
@@ -48,7 +53,7 @@ A2_BASIC.SYM and APPLE2E.SYM are from `AppleWin`. USER.SYM is a custom symbol fi
 0066A7 allDrawn
 006657 setupSwitch
 ```  
-This USER.SYM file is generated for me by transforming the ca65 output (I used cc65's assembler, ca65, to write Manic Miner) using this SED command in the Makefile:  
+This USER.SYM file is generated for me by transforming the ca65 output (I used cc65's assembler, ca65, to write Manic Miner initially, before I made it work with the built-in assembler - see below) using this SED command in the Makefile:  
 ```
 sed "s/^al \([[0-9A-F]\+\)\ \./\1 /g" $(NAME).apple2.lbl > USER.SYM
 ```  
