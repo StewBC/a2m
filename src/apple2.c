@@ -99,8 +99,8 @@ void apple2_ini_load_callback(void *user_data, char *section, char *key, char *v
             if(slot_number >= 1 && slot_number < 8) {
                 slot_add_card(m, slot_number, SLOT_TYPE_DISKII, &m->diskii_controller[slot_number],
                               m->roms.blocks[ROM_DISKII].bytes, NULL);
-                m->diskii_controller[slot_number].diskii_drive[0].quater_track_pos = rand() % DISKII_QUATERTRACKS;
-                m->diskii_controller[slot_number].diskii_drive[1].quater_track_pos = rand() % DISKII_QUATERTRACKS;
+                m->diskii_controller[slot_number].diskii_drive[0].quarter_track_pos = rand() % DISKII_QUATERTRACKS;
+                m->diskii_controller[slot_number].diskii_drive[1].quarter_track_pos = rand() % DISKII_QUATERTRACKS;
             }
         } else if(slot_number >= 0 && slot_number < 8) {
             if(0 == stricmp(key, "disk0")) {

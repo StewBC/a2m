@@ -1,5 +1,5 @@
 # Apple ][+ Emulator  
-This is an Apple ][+ emulator written in "C" using SDL and the Nuklear immediate mode GUI.  The emulator includes a cycle-accurate 6502 CPU (does not support undocumented opcodes), a Language Card a Franklin Ace 80col display card, and a SmartPort block device.  Disk II support is limited to only .nib files, and is very slow - a first pass implementation has been added.  
+This is an Apple ][+ emulator written in "C" using SDL and the Nuklear immediate mode GUI.  The emulator includes a cycle-accurate 6502 CPU (does not support undocumented opcodes), a Language Card a Franklin Ace 80col display card, and a SmartPort block device.  Disk II support is limited to only .nib files for now.  
   
 This configuration allows booting and running Total Replay or other ProDOS disk volumes.  
   
@@ -53,7 +53,7 @@ A2_BASIC.SYM and APPLE2E.SYM are from `AppleWin`. USER.SYM is a custom symbol fi
 0066A7 allDrawn
 006657 setupSwitch
 ```  
-This USER.SYM file is generated for me by transforming the ca65 output (I used cc65's assembler, ca65, to write Manic Miner initially, before I made it work with the built-in assembler - see below) using this SED command in the Makefile:  
+This USER.SYM file was generated for me by transforming the ca65 output (I used cc65's assembler, ca65, to write Manic Miner initially, before I made it work with the built-in assembler - see below) using this SED command in the Makefile:  
 ```
 sed "s/^al \([[0-9A-F]\+\)\ \./\1 /g" $(NAME).apple2.lbl > USER.SYM
 ```  
@@ -424,7 +424,7 @@ viewmisc.c | Key and display handling of the miscellaneous window
 viewport.c | SDL2 initialization and manage all the other views, update the display
   
 ## Known issues  
-Audio: Audio could be better, but it now keeps up (doesn't drift anymore)
+Audio: Audio could be better, but it now keeps up (doesn't drift anymore).  
 Memory Cleanup: Not all malloc allocations are freed on exit.  
 Other bugs may be present, as testing has been limited.  
   

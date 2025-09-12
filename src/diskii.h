@@ -10,16 +10,15 @@
 typedef struct _diskii_drive {
     // Spindle Motor
     uint64_t motor_event_cycles;               // when motor was turned on/off
-    uint64_t motor_spinup_cycles;              // ~400ms to fully spin up/down 
+    double motor_rpm;                          // 0..300
     uint8_t motor_on;                          // 1 = spindle motor energised; 0 = not
 
     // Head
     uint64_t head_event_cycles;                // when head was moved
     uint8_t phase_mask;                        // bit on = phase on - active
     uint8_t last_on_phase_mask;                // bit on = phase on - to track direction
-    int16_t quater_track_pos;                  // quarter-track units (0..139 = 35 tracks)
+    int16_t quarter_track_pos;                 // quarter-track units (0..139 = 35 tracks)
     uint64_t head_settle_cycles;               // ~3ms per quater track seek
-    uint8_t head_locked;                       // 1 = locked and ready; 0 = not locked
 
     // selection & lines
     uint8_t q6;
