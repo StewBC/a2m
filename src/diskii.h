@@ -16,9 +16,9 @@ typedef struct _diskii_drive {
     // Head
     uint64_t head_event_cycles;                // when head was moved
     uint8_t phase_mask;                        // bit on = phase on - active
-    uint8_t last_on_phase_mask;                // bit on = phase on - to track direction
+    uint8_t last_on_phase_mask;                // bit on = phase on - for direction tracking
     int16_t quarter_track_pos;                 // quarter-track units (0..139 = 35 tracks)
-    uint64_t head_settle_cycles;               // ~3ms per quater track seek
+    uint64_t head_settle_cycles;               // ~3ms per seek
 
     // selection & lines
     uint8_t q6;
@@ -34,17 +34,14 @@ typedef struct _diskii_drive {
 typedef struct DISKII_CONTROLLER {
     diskii_drive_t diskii_drive[2];
     uint64_t cycles_at_update;
-    uint8_t active;                            // 0 or 1
+    uint8_t active;                            // 0 or 1 for which drive is active
 } DISKII_CONTROLLER;
 
-// System wide
-void diskii_reset(APPLE2 *m);
-void diskii_shutdown(APPLE2 *m);
-
-// Drive
-int diskii_mount(APPLE2 *m, const int slot, const int device, const char *file_name);
 void diskii_drive_select(APPLE2 *m, const int slot, int soft_switch);
 void diskii_motor(APPLE2 *m, const int slot, int soft_switch);
-void diskii_step_head(APPLE2 *m, const int slot, int soft_switch);
+int diskii_mount(APPLE2 *m, const int slot, const int device, const char *file_name);
 uint8_t diskii_q6_access(APPLE2 *m, int slot, uint8_t on_off);
 uint8_t diskii_q7_access(APPLE2 *m, int slot, uint8_t on_off);
+void diskii_reset(APPLE2 *m);
+void diskii_shutdown(APPLE2 *m);
+void diskii_step_head(APPLE2 *m, const int slot, int soft_switch);

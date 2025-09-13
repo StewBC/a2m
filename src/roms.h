@@ -12,9 +12,8 @@ extern const int apple2_rom_size;
 extern uint8_t apple_character_rom[];
 extern const int apple_character_rom_size;
 
-// Not used - maybe in the future?
-extern uint8_t disk2_rom[];
-extern const int disk2_rom_size;
+// 2 disk ii roms - 13 sector and 16 sector
+extern uint8_t disk2_rom[2][256];
 
 // 80 Col auto soft switch display card ROM
 extern uint8_t franklin_ace_display_rom[];

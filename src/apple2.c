@@ -32,7 +32,8 @@ int apple2_configure(APPLE2 *m) {
     }
     memory_add(&m->roms, ROM_APPLE, 0xD000, apple2_rom_size, apple2_rom);
     memory_add(&m->roms, ROM_CHARACTER, 0x0000, apple_character_rom_size, apple_character_rom);
-    memory_add(&m->roms, ROM_DISKII, 0xC000, disk2_rom_size, disk2_rom);
+    memory_add(&m->roms, ROM_DISKII_13SECTOR, 0xC000, 256, disk2_rom[DSK_ENCODING_13SECTOR]);
+    memory_add(&m->roms, ROM_DISKII_16SECTOR, 0xC000, 256, disk2_rom[DSK_ENCODING_16SECTOR]);
     memory_add(&m->roms, ROM_SMARTPORT, 0xC000, smartport_rom_size, smartport_rom);
     memory_add(&m->roms, ROM_FRANKLIN_ACE_DISPLAY, 0x0000, franklin_ace_display_rom_size, franklin_ace_display_rom);
     memory_add(&m->roms, ROM_FRANKLIN_ACE_CHARACTER, 0x0000, franklin_ace_character_rom_size, franklin_ace_character_rom);
@@ -84,7 +85,7 @@ int apple2_configure(APPLE2 *m) {
     if(A2_OK != util_ini_load_file("./apple2.ini", apple2_ini_load_callback, (void *) m)) {
         // If apple2.ini doesn't successfully load, just add a smartport in slot 7
         slot_add_card(m, 7, SLOT_TYPE_SMARTPORT, &m->sp_device[7], &m->roms.blocks[ROM_SMARTPORT].bytes[0x700], NULL);
-        slot_add_card(m, 6, SLOT_TYPE_DISKII, &m->diskii_controller[6], &m->roms.blocks[ROM_DISKII].bytes[0x700], NULL);
+        slot_add_card(m, 6, SLOT_TYPE_DISKII, &m->diskii_controller[6], &m->roms.blocks[ROM_DISKII_16SECTOR].bytes[0x700], NULL);
     }
 
     return A2_OK;
@@ -98,7 +99,7 @@ void apple2_ini_load_callback(void *user_data, char *section, char *key, char *v
             sscanf(value, "%d", &slot_number);
             if(slot_number >= 1 && slot_number < 8) {
                 slot_add_card(m, slot_number, SLOT_TYPE_DISKII, &m->diskii_controller[slot_number],
-                              m->roms.blocks[ROM_DISKII].bytes, NULL);
+                              m->roms.blocks[ROM_DISKII_16SECTOR].bytes, NULL);
                 m->diskii_controller[slot_number].diskii_drive[0].quarter_track_pos = rand() % DISKII_QUATERTRACKS;
                 m->diskii_controller[slot_number].diskii_drive[1].quarter_track_pos = rand() % DISKII_QUATERTRACKS;
             }
@@ -167,37 +168,37 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
         ram_card(m, address, 0x100);
     } else if(address >= 0xc090 && address <= 0xc0FF) {
         int slot = (address >> 4) & 0x7;
-        switch (m->slot_cards[slot].slot_type) {
+        switch(m->slot_cards[slot].slot_type) {
             case SLOT_TYPE_DISKII: {
-                uint8_t soft_switch = address & 0x0f;
-                if(soft_switch <= IWM_PH3_ON) {
-                    diskii_step_head(m, slot, soft_switch);
-                    return 0xff;
+                    uint8_t soft_switch = address & 0x0f;
+                    if(soft_switch <= IWM_PH3_ON) {
+                        diskii_step_head(m, slot, soft_switch);
+                        return 0xff;
+                    }
+                    switch(soft_switch) {
+                        case IWM_MOTOR_ON:
+                        case IWM_MOTOR_OFF:
+                            diskii_motor(m, slot, soft_switch);
+                            break;
+
+                        case IWM_SEL_DRIVE_1:
+                        case IWM_SEL_DRIVE_2:
+                            diskii_drive_select(m, slot, soft_switch);
+                            break;
+
+                        case IWM_Q6_OFF:
+                        case IWM_Q6_ON:
+                            return diskii_q6_access(m, slot, soft_switch & 1);
+
+                        case IWM_Q7_OFF:
+                        case IWM_Q7_ON:
+                            return diskii_q7_access(m, slot, soft_switch & 1);
+                    }
                 }
-                switch (soft_switch){
-                    case IWM_MOTOR_ON:
-                    case IWM_MOTOR_OFF:
-                        diskii_motor(m, slot, soft_switch);
-                        break;
-
-                    case IWM_SEL_DRIVE_1:
-                    case IWM_SEL_DRIVE_2:
-                        diskii_drive_select(m, slot, soft_switch);
-                        break;
-
-                    case IWM_Q6_OFF:
-                    case IWM_Q6_ON:
-                        return diskii_q6_access(m, slot, soft_switch & 1);
-                        
-                    case IWM_Q7_OFF:
-                    case IWM_Q7_ON:
-                        return diskii_q7_access(m, slot, soft_switch & 1);
-                }                
-            }
-            break;
+                break;
 
             case SLOT_TYPE_SMARTPORT:
-                switch (address & 0x0f) {
+                switch(address & 0x0f) {
                     case SP_DATA:
                         return m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_read_offset++];
                         break;
@@ -205,16 +206,16 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
                     case SP_STATUS:
                         return m->sp_device[slot].sp_status;
                         break;
-                    }
+                }
                 break;
 
-            case SLOT_TYPE_VIDEX_API:{
+            case SLOT_TYPE_VIDEX_API: {
                     FRANKLIN_DISPLAY *fd80 = &m->franklin_display;
                     fd80->bank = (address & 0x0C) >> 2;
                     return fd80->registers[address & 0x0F];
                 }
                 break;
-            }
+        }
     } else if(address >= 0xc100 && address <= 0xcFFE) {
         // Map the C800 ROM based on access to Cs00, if card provides a C800 ROM
         int slot = (address >> 8) & 0x7;
@@ -224,60 +225,60 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
         }
     } else {
         // Everything else
-        switch (address) {
-        case KBD:
-            break;
-        case KBDSTRB:
-            m->write_pages.pages[KBD / PAGE_SIZE].bytes[KBD % PAGE_SIZE] &= 0x7F;
-            break;
-        case A2SPEAKER:
-            speaker_toggle(&m->speaker);
-            break;
-        case TXTCLR:
-            m->screen_mode |= SCREEN_MODE_GRAPHICS;
-            break;
-        case TXTSET:
-            m->screen_mode &= ~SCREEN_MODE_GRAPHICS;
-            break;
-        case MIXCLR:
-            m->screen_mode &= ~SCREEN_MODE_MIXED;
-            break;
-        case MIXSET:
-            m->screen_mode |= SCREEN_MODE_MIXED;
-            break;
-        case LOWSCR:
-            m->active_page = 0;
-            break;
-        case HISCR:
-            m->active_page = -1;
-            break;
-        case LORES:
-            m->screen_mode &= ~SCREEN_MODE_HIRES;
-            break;
-        case HIRES:
-            m->screen_mode |= SCREEN_MODE_HIRES;
-            break;
-        case BUTN0:
-            return m->open_apple;
-            break;
-        case BUTN1:
-            return m->closed_apple;
-            break;
-        case PADDL0:
-        case PADDL1:
-        case PADDL2:
-        case PADDL3:
-        case PTRIG:
-            return 255;
-        case CLRROM:{
-                for(int i = 1; i < 8; i++) {
-                    m->slot_cards[i].cx_rom_mapped = 0;
+        switch(address) {
+            case KBD:
+                break;
+            case KBDSTRB:
+                m->write_pages.pages[KBD / PAGE_SIZE].bytes[KBD % PAGE_SIZE] &= 0x7F;
+                break;
+            case A2SPEAKER:
+                speaker_toggle(&m->speaker);
+                break;
+            case TXTCLR:
+                m->screen_mode |= SCREEN_MODE_GRAPHICS;
+                break;
+            case TXTSET:
+                m->screen_mode &= ~SCREEN_MODE_GRAPHICS;
+                break;
+            case MIXCLR:
+                m->screen_mode &= ~SCREEN_MODE_MIXED;
+                break;
+            case MIXSET:
+                m->screen_mode |= SCREEN_MODE_MIXED;
+                break;
+            case LOWSCR:
+                m->active_page = 0;
+                break;
+            case HISCR:
+                m->active_page = -1;
+                break;
+            case LORES:
+                m->screen_mode &= ~SCREEN_MODE_HIRES;
+                break;
+            case HIRES:
+                m->screen_mode |= SCREEN_MODE_HIRES;
+                break;
+            case BUTN0:
+                return m->open_apple;
+                break;
+            case BUTN1:
+                return m->closed_apple;
+                break;
+            case PADDL0:
+            case PADDL1:
+            case PADDL2:
+            case PADDL3:
+            case PTRIG:
+                return 255;
+            case CLRROM: {
+                    for(int i = 1; i < 8; i++) {
+                        m->slot_cards[i].cx_rom_mapped = 0;
+                    }
+                    pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, 0x800 / PAGE_SIZE, &m->RAM_MAIN[0xC800]);
                 }
-                pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, 0x800 / PAGE_SIZE, &m->RAM_MAIN[0xC800]);
-            }
-            break;
-        default:
-            break;
+                break;
+            default:
+                break;
         }
     }
     return m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
@@ -291,35 +292,35 @@ void apple2_softswitch_write_callback(APPLE2 *m, uint16_t address, uint8_t value
         return;
     } else if(address >= 0xc080 && address <= 0xc0FF) {
         int slot = (address >> 4) & 0x7;
-        switch (m->slot_cards[slot].slot_type) {
-        case SLOT_TYPE_SMARTPORT:
-            switch (address & 0x0F) {
-            case SP_DATA:
-                m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_write_offset++] = value;
-                return;
-            case SP_STATUS:
-                m->sp_device[slot].sp_read_offset = 0;
-                m->sp_device[slot].sp_write_offset = 0;
+        switch(m->slot_cards[slot].slot_type) {
+            case SLOT_TYPE_SMARTPORT:
+                switch(address & 0x0F) {
+                    case SP_DATA:
+                        m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_write_offset++] = value;
+                        return;
+                    case SP_STATUS:
+                        m->sp_device[slot].sp_read_offset = 0;
+                        m->sp_device[slot].sp_write_offset = 0;
 
-                switch (m->sp_device[slot].sp_buffer[0]) {
-                case 0:
-                    sp_status(m, slot);
-                    break;
-                case 1:
-                    sp_read(m, slot);
-                    break;
-                case 2:
-                    sp_write(m, slot);
-                    break;
+                        switch(m->sp_device[slot].sp_buffer[0]) {
+                            case 0:
+                                sp_status(m, slot);
+                                break;
+                            case 1:
+                                sp_read(m, slot);
+                                break;
+                            case 2:
+                                sp_write(m, slot);
+                                break;
+                        }
+                        m->sp_device[slot].sp_status = 0x80;
+                        return;
                 }
-                m->sp_device[slot].sp_status = 0x80;
-                return;
-            }
-            break;
+                break;
 
-        case SLOT_TYPE_VIDEX_API:
-            franklin_display_set(m, address, value);
-            break;
+            case SLOT_TYPE_VIDEX_API:
+                franklin_display_set(m, address, value);
+                break;
         }
     } else if(address >= 0xCC00 && address < 0xCE00) {
         m->franklin_display.display_ram[(address & 0x01ff) + m->franklin_display.bank * 0x200] = value;
