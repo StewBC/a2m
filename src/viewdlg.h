@@ -8,7 +8,8 @@ typedef struct FILE_BROWSER {
     FILE_INFO file_selected;
     FILE_INFO dir_selected;
     int slot;
-    int device;
+    int device;                                         // drive 0 or 1
+    int device_type;                                    // SLOT_TYPE_SMARTPORT | SLOT_TYPE_DISKII
     DYNARRAY dir_contents;
 } FILE_BROWSER;
 

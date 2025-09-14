@@ -45,6 +45,7 @@ void viewmisc_show(APPLE2 *m) {
                             char label[4];
                             sprintf(label, "%d.%d", i, j);
                             if(nk_button_label(ctx, label)) {
+                                ram_card(m, 1, 0);  // Make sure the ROM is active
                                 m->cpu.pc = 0xc000 + i * 0x100;
                                 m->stopped = 0;
                             }
@@ -60,6 +61,7 @@ void viewmisc_show(APPLE2 *m) {
                             if(!v->viewdlg_modal) {
                                 fb->slot = i;
                                 fb->device = j;
+                                fb->device_type = SLOT_TYPE_SMARTPORT;
                                 fb->dir_contents.items = 0;
                                 v->viewdlg_modal = -1;
                                 v->dlg_filebrowser = -1;
@@ -68,6 +70,52 @@ void viewmisc_show(APPLE2 *m) {
                         nk_layout_row_push(ctx, 0.74f);
                         if(spd[i].sp_files[j].is_file_open) {
                             nk_label(ctx, spd[i].sp_files[j].file_display_name, NK_TEXT_LEFT);
+                        }
+                        nk_layout_row_end(ctx);
+                    }
+                }
+            }
+            nk_tree_pop(ctx);
+        }
+        // The Disk II
+        if(nk_tree_push(ctx, NK_TREE_TAB, "Disk II", NK_MAXIMIZED)) {
+            DISKII_CONTROLLER *d = m->diskii_controller;
+            nk_layout_row_dynamic(ctx, 13, 1);
+            nk_label(ctx, "Controllers", NK_TEXT_LEFT);
+            for(int i = 0; i < 8; i++) {
+                if(m->slot_cards[i].slot_type == SLOT_TYPE_DISKII) {
+                    for(int j = 0; j < 2; j++) {
+                        nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 5);
+                        nk_layout_row_push(ctx, 0.08f);
+                        if(!j) {
+                            char label[4];
+                            sprintf(label, "%d.%d", i, j);
+                            if(nk_button_label(ctx, label)) {
+                                ram_card(m, 1, 0);  // Make sure the ROM is active
+                                m->cpu.pc = 0xc000 + i * 0x100;
+                                m->stopped = 0;
+                            }
+                        } else {
+                            nk_labelf(ctx, NK_TEXT_CENTERED, "%d.%d", i, j);
+                        }
+                        nk_layout_row_push(ctx, 0.08f);
+                        if(nk_button_label(ctx, "Eject")) {
+                            image_shutdown(&d[i].diskii_drive[j].image);
+                        }
+                        nk_layout_row_push(ctx, 0.1f);
+                        if(nk_button_label(ctx, "Insert")) {
+                            if(!v->viewdlg_modal) {
+                                fb->slot = i;
+                                fb->device = j;
+                                fb->device_type = SLOT_TYPE_DISKII;
+                                fb->dir_contents.items = 0;
+                                v->viewdlg_modal = -1;
+                                v->dlg_filebrowser = -1;
+                            }
+                        }
+                        nk_layout_row_push(ctx, 0.74f);
+                        if(d[i].diskii_drive[j].image.file.is_file_loaded) {
+                            nk_label(ctx, d[i].diskii_drive[j].image.file.file_display_name, NK_TEXT_LEFT);
                         }
                         nk_layout_row_end(ctx);
                     }
@@ -361,11 +409,21 @@ void viewmisc_show(APPLE2 *m) {
                 // A file was selected, so get a FQN
                 strncat(fb->dir_selected.name, "/", PATH_MAX);
                 strncat(fb->dir_selected.name, fb->file_selected.name, PATH_MAX);
-                util_file_discard(&m->sp_device[fb->slot].sp_files[fb->device]);
-                // Eject the file that's active, if there is one, and mount the new one
-                if(A2_ERR == sp_mount(m, fb->slot, fb->device, fb->dir_selected.name)) {
-                    // If it fails, just discard the file
+                if(v->viewmisc.file_browser.device_type == SLOT_TYPE_SMARTPORT) {
                     util_file_discard(&m->sp_device[fb->slot].sp_files[fb->device]);
+                    // Eject the file that's active, if there is one, and mount the new one
+                    if(A2_ERR == sp_mount(m, fb->slot, fb->device, fb->dir_selected.name)) {
+                        // If it fails, just discard the file
+                        util_file_discard(&m->sp_device[fb->slot].sp_files[fb->device]);
+                    }
+                } else {
+                    // SLOT_TYPE_DISKII
+                    // Eject the file that's active, if there is one, and mount the new one
+                    util_file_discard(&m->diskii_controller[fb->slot].diskii_drive[fb->device].image.file);
+                    if(A2_ERR == diskii_mount(m, fb->slot, fb->device, fb->dir_selected.name)) {
+                        // If it fails, just discard the file
+                        util_file_discard(&m->diskii_controller[fb->slot].diskii_drive[fb->device].image.file);
+                    }
                 }
             }
         }
