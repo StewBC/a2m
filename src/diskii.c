@@ -88,6 +88,7 @@ int diskii_mount(APPLE2 *m, const int slot, const int device, const char *file_n
 
 uint8_t diskii_q6_access(APPLE2 *m, int slot, uint8_t on_off) {
     diskii_drive_t *d = &m->diskii_controller[slot].diskii_drive[m->diskii_controller[slot].active];
+    m->disk_activity_read = -1;
     diskii_timer_update(m->cpu.cycles, &d->head_event_cycles, &d->head_settle_cycles);
     if(m->cpu.cycles - d->q6_last_read_cycles < 32 || rpm_now(m->cpu.cycles, d) < DISKII_READABLE_RPM || !d->image.image_specifics || d->head_settle_cycles) {
         return 0x7f;

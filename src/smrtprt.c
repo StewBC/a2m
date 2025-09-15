@@ -52,7 +52,7 @@ void sp_read(APPLE2 *m, const int slot) {
         spd->sp_buffer[0] = SP_IO_ERROR;
         return;
     }
-
+    m->disk_activity_read = -1;
     spd->sp_buffer[0] = SP_SUCCESS;
 }
 
@@ -80,7 +80,7 @@ void sp_write(APPLE2 *m, const int slot) {
     const uint8_t *data = (uint8_t *) & m->sp_device[slot].sp_buffer[4];
 
     if(!(f->is_file_open && block < spd->sp_files[device].file_size / SP_BLOCK_SIZE &&
-         fseek(spd->sp_files[device].fp, spd->file_header_size[device] + (block * SP_BLOCK_SIZE), SEEK_SET) == 0)) {
+            fseek(spd->sp_files[device].fp, spd->file_header_size[device] + (block * SP_BLOCK_SIZE), SEEK_SET) == 0)) {
         spd->sp_buffer[0] = SP_IO_ERROR;
         return;
     }
@@ -90,5 +90,6 @@ void sp_write(APPLE2 *m, const int slot) {
         return;
     }
 
+    m->disk_activity_write = -1;
     spd->sp_buffer[0] = SP_SUCCESS;
 }

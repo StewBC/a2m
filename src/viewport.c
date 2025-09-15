@@ -14,6 +14,8 @@
 #define NK_SDL_RENDERER_IMPLEMENTATION
 #include "nuklrsdl.h"
 
+#include "leds.h"
+
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
@@ -31,16 +33,39 @@ float sdl_x_scale, sdl_y_scale;
 
 void viewport_ini_load_callback(void *user_data, char *section, char *key, char *value) {
     VIEWPORT *v = (VIEWPORT *) user_data;
-    static float scale = 1.0f;
     // Uniform scale factor for the display
     if(0 == stricmp(section, "display")) {
         if(0 == stricmp(key, "scale")) {
+            float scale = 1.0f;
             sscanf(value, "%f", &scale);
             if(scale > 0.0f) {
                 v->display_scale = scale;
             }
+        } else if(0 == stricmp(key, "disk_leds")) {
+            int state = 0;
+            sscanf(value, "%d", &state);
+            if(state == 1) {
+                v->show_leds = 1;
+            }
         }
     }
+}
+
+static SDL_Texture *load_png_texture_from_ram(SDL_Renderer *r, uint8_t *image, int image_size) {
+    SDL_RWops *rw = SDL_RWFromConstMem(image, image_size);
+    if(!rw) {
+        return NULL;
+    }
+
+    SDL_Surface *surf = IMG_Load_RW(rw, 1);
+    if(!surf) {
+        return NULL;
+    }
+
+    SDL_Texture *tex = SDL_CreateTextureFromSurface(r, surf);
+    SDL_FreeSurface(surf);
+
+    return tex;
 }
 
 int viewport_init(VIEWPORT *v, int w, int h) {
@@ -68,6 +93,10 @@ int viewport_init(VIEWPORT *v, int w, int h) {
         printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
         goto error;
     }
+    if((IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG) == 0) {
+        printf("SDL image could not initialize! SDL_Error: %s\n", IMG_GetError());
+        goto error;
+    }
     // Create window
     v->window = SDL_CreateWindow("Apple ][+ Emulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, w, h, SDL_WINDOW_SHOWN);
     if(v->window == NULL) {
@@ -81,19 +110,19 @@ int viewport_init(VIEWPORT *v, int w, int h) {
         goto error;
     }
     // Create RGB surface
-    v->surface = SDL_CreateRGBSurfaceWithFormat(0, 40*7, 24*8, 32, SDL_PIXELFORMAT_ARGB8888);
+    v->surface = SDL_CreateRGBSurfaceWithFormat(0, 40 * 7, 24 * 8, 32, SDL_PIXELFORMAT_ARGB8888);
     if(v->surface == NULL) {
         printf("Surface could not be created! SDL_Error: %s\n", SDL_GetError());
         goto error;
     }
-    SDL_FillRect(v->surface, NULL, SDL_MapRGB(v->surface->format, 0,0,0));
+    SDL_FillRect(v->surface, NULL, SDL_MapRGB(v->surface->format, 0, 0, 0));
 
-    v->surface640 = SDL_CreateRGBSurfaceWithFormat(0, 80*8, 24*8, 32, SDL_PIXELFORMAT_ARGB8888);
+    v->surface640 = SDL_CreateRGBSurfaceWithFormat(0, 80 * 8, 24 * 8, 32, SDL_PIXELFORMAT_ARGB8888);
     if(v->surface640 == NULL) {
         printf("Surface640 could not be created! SDL_Error: %s\n", SDL_GetError());
         goto error;
     }
-    SDL_FillRect(v->surface640, NULL, SDL_MapRGB(v->surface640->format, 0,0,0));
+    SDL_FillRect(v->surface640, NULL, SDL_MapRGB(v->surface640->format, 0, 0, 0));
 
     // Create texture for pixel rendering
     v->texture = SDL_CreateTextureFromSurface(v->renderer, v->surface);
@@ -105,6 +134,20 @@ int viewport_init(VIEWPORT *v, int w, int h) {
     v->texture640 = SDL_CreateTextureFromSurface(v->renderer, v->surface640);
     if(v->texture640 == NULL) {
         printf("Texture could not be created! SDL_Error: %s\n", SDL_GetError());
+        goto error;
+    }
+    // Create the green led for shoing disk read activity
+    SDL_RWops *rw = SDL_RWFromConstMem(green_led, (int)green_led_len);
+    if(!rw) {
+        goto error;
+    }
+    SDL_Surface *surf = IMG_Load_RW(rw, 1);
+    if(!surf) {
+        goto error;
+    }
+    v->greenLED = load_png_texture_from_ram(v->renderer, green_led, green_led_len);
+    v->redLED = load_png_texture_from_ram(v->renderer, red_led, red_led_len);
+    if(!v->greenLED || !v->redLED) {
         goto error;
     }
 
@@ -143,7 +186,7 @@ int viewport_init(VIEWPORT *v, int w, int h) {
     v->viewmisc_show = -1;
     return A2_OK;
 
-  error:
+error:
     SDL_Quit();
     return A2_ERR;
 }
@@ -192,22 +235,22 @@ int viewport_process_events(APPLE2 *m) {
                 // A view must be open to receive input, and no modal dialog open
                 if(!v->viewdlg_modal && v->ctx->active) {
                     // Active view is known by the name hash
-                    switch (v->ctx->active->name) {
-                    case 0XE5EA0BC3:                        // CPU view
-                        viewcpu_process_event(m, &e);
-                        break;
+                    switch(v->ctx->active->name) {
+                        case 0XE5EA0BC3:                        // CPU view
+                            viewcpu_process_event(m, &e);
+                            break;
 
-                    case 0X81101438:                        // Disassembly view
-                        viewdbg_process_event(m, &e);
-                        break;
+                        case 0X81101438:                        // Disassembly view
+                            viewdbg_process_event(m, &e);
+                            break;
 
-                    case 0XB9A77E29:                        // Memory view
-                        viewmem_process_event(m, &e, 0);
-                        break;
+                        case 0XB9A77E29:                        // Memory view
+                            viewmem_process_event(m, &e, 0);
+                            break;
 
-                    case 0X97446A22:                        // Miscellaneous view
-                        viewmem_process_event(m, &e, 1);
-                        break;
+                        case 0X97446A22:                        // Miscellaneous view
+                            viewmem_process_event(m, &e, 1);
+                            break;
                     }
                 }
             }
@@ -276,8 +319,8 @@ void viewport_show_help(APPLE2 *m) {
     if(nk_begin(ctx, "Help", nk_rect(r.x, r.y, r.w, r.h), NK_WINDOW_NO_SCROLLBAR)) {
         nk_layout_row_dynamic(ctx, 30, 1);
         nk_label_colored(ctx, "Apple ][+ emulator by Stefan Wessels, 2024.", NK_TEXT_CENTERED,
-                        color_help_master);
-        nk_layout_row_dynamic(ctx, r.h-55, 1);
+                         color_help_master);
+        nk_layout_row_dynamic(ctx, r.h - 55, 1);
         if(nk_group_begin(ctx, "Help Pages", 0)) {
             if(v->help_page == 0) {
                 nk_layout_row_dynamic(ctx, 13, 1);
@@ -302,8 +345,8 @@ void viewport_show_help(APPLE2 *m) {
                 nk_label_colored(ctx, "If the debug view is visible, all keys go to the debug window over which the mouse is hovered.", NK_TEXT_ALIGN_LEFT, color_help_key_heading);
                 nk_label_colored(ctx, "CPU Window", NK_TEXT_ALIGN_LEFT, color_help_heading);
                 nk_label(ctx,
-                        "Click into a box to edit, i.e. PC, SP, a register or flag and change the value.  Press ENTER to make the change effective.",
-                        NK_TEXT_ALIGN_LEFT);
+                         "Click into a box to edit, i.e. PC, SP, a register or flag and change the value.  Press ENTER to make the change effective.",
+                         NK_TEXT_ALIGN_LEFT);
                 nk_label_colored(ctx, "Disassembly window", NK_TEXT_ALIGN_LEFT, color_help_heading);
                 nk_layout_row_dynamic(ctx, 13, 2);
                 nk_label(ctx, "CTRL + g - Set cursor PC to address.", NK_TEXT_ALIGN_LEFT);
@@ -320,7 +363,7 @@ void viewport_show_help(APPLE2 *m) {
                 nk_label_colored(ctx, "Memory window", NK_TEXT_ALIGN_LEFT, color_help_heading);
                 nk_layout_row_dynamic(ctx, 27, 1);
                 nk_label_wrap(ctx,
-                            "Type HEX digits to edit the memory in HEX edit mode, or type any key when editing in ASCII mode.  The address that will be edited is shown at the bottom of the window.");
+                              "Type HEX digits to edit the memory in HEX edit mode, or type any key when editing in ASCII mode.  The address that will be edited is shown at the bottom of the window.");
                 nk_layout_row_dynamic(ctx, 13, 2);
                 nk_label(ctx, "CRTL + g - Set view start to address.", NK_TEXT_ALIGN_LEFT);
                 nk_label(ctx, "CRTL + s - Search symbols.", NK_TEXT_ALIGN_LEFT);
@@ -341,38 +384,38 @@ void viewport_show_help(APPLE2 *m) {
                 nk_label_colored(ctx, "Miscellaneous window", NK_TEXT_ALIGN_LEFT, color_help_heading);
                 nk_layout_row_dynamic(ctx, 13, 1);
                 nk_label(ctx, "Note that this window updates while running, but changes can only be made while the emulation is stopped.",
-                        NK_TEXT_ALIGN_LEFT);
+                         NK_TEXT_ALIGN_LEFT);
                 nk_label_colored(ctx, "Miscellaneous SmartPort", NK_TEXT_ALIGN_LEFT, color_help_sub_heading);
                 nk_layout_row_dynamic(ctx, 13, 1);
-                nk_label(ctx,"Use the Slot.0 button to boot that disk, when stopped.  Use Eject to eject the disk and Insert will bring up a file chooser to select a new disk.", NK_TEXT_ALIGN_LEFT);
+                nk_label(ctx, "Use the Slot.0 button to boot that disk, when stopped.  Use Eject to eject the disk and Insert will bring up a file chooser to select a new disk.", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_dynamic(ctx, 13, 1);
                 nk_label_colored(ctx, "Miscellaneous Debug", NK_TEXT_ALIGN_LEFT, color_help_sub_heading);
                 nk_layout_row_dynamic(ctx, 27, 1);
                 nk_label_wrap(ctx,
-                            "The status shows when a Step Over or Step out is actively running.  The Step Cycles show how many cycles the last step took (for profiling) and Total Cycles show all cycles since start (will wrap).");
+                              "The status shows when a Step Over or Step out is actively running.  The Step Cycles show how many cycles the last step took (for profiling) and Total Cycles show all cycles since start (will wrap).");
                 nk_layout_row_dynamic(ctx, 40, 1);
                 nk_label_wrap(ctx,
-                            "Breakpoints come in 2 forms.  PC or address (or range).  PC shows up as 4 HEX digits.  Address shows up as R(ead) and or W(rite) access with the address or range in ['s.  With both types, there's also an optional access count (current count/trigger count).  Breakpoints can be edited, enabled/disabled, View jumps to PC of breakpoint (disabled for address) and cleared.  If multiple breakpoints, Clear All removes all breakpoints.");
+                              "Breakpoints come in 2 forms.  PC or address (or range).  PC shows up as 4 HEX digits.  Address shows up as R(ead) and or W(rite) access with the address or range in ['s.  With both types, there's also an optional access count (current count/trigger count).  Breakpoints can be edited, enabled/disabled, View jumps to PC of breakpoint (disabled for address) and cleared.  If multiple breakpoints, Clear All removes all breakpoints.");
                 nk_layout_row_dynamic(ctx, 13, 1);
-                nk_label(ctx,"The call stack shows where the JSR was called and the destination address (and label if available). Click either to set the cursor to that address.", NK_TEXT_ALIGN_LEFT);
+                nk_label(ctx, "The call stack shows where the JSR was called and the destination address (and label if available). Click either to set the cursor to that address.", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_dynamic(ctx, 13, 1);
                 nk_label_colored(ctx, "Miscellaneous Display", NK_TEXT_ALIGN_LEFT, color_help_sub_heading);
                 nk_layout_row_dynamic(ctx, 27, 1);
                 nk_label_wrap(ctx,
-                            "Shows the status of the display soft-switches.  Can be overridden to, for example, see the off-screen page where the application or game may be making changes if page flipping is used.  Turning Override off will reset back to the actual machine status.");
+                              "Shows the status of the display soft-switches.  Can be overridden to, for example, see the off-screen page where the application or game may be making changes if page flipping is used.  Turning Override off will reset back to the actual machine status.");
                 nk_layout_row_dynamic(ctx, 13, 1);
                 nk_label_colored(ctx, "Miscellaneous Language Card", NK_TEXT_ALIGN_LEFT, color_help_sub_heading);
                 nk_layout_row_dynamic(ctx, 14, 1);
                 nk_label_wrap(ctx,
-                            "Shows the status of the language card soft-switches.  Apart from Read ROM / RAM, this is read-only information.");
+                              "Shows the status of the language card soft-switches.  Apart from Read ROM / RAM, this is read-only information.");
                 nk_label_colored(ctx, "Configuration", NK_TEXT_ALIGN_LEFT, color_help_notice);
                 nk_layout_row_dynamic(ctx, 60, 1);
                 nk_label_wrap(ctx,
-                            "An optional apple2.ini file in the launch folder can configure option.  The sections are [display] with scale=<scale> for a uniform scaling of the emulator window/display (1.0 default).  [smartoprt] with slot=<1..7>, drive0=<path>, drive1=<path> and boot=<0|anything>, 0 is No.  Note the path does not contain \"'s and all entries are optional.  Slot 7 shows up even without an ini file but the Slot= must be set for other smartport drives to show up.  The [Video] section has Slot=<1..7> with 3 being the likely slot, and device = Franklin Ace Display the only accepted setting.");
+                              "An optional apple2.ini file in the launch folder can configure option.  The sections are [display] with scale=<scale> for a uniform scaling of the emulator window/display (1.0 default).  [smartoprt] with slot=<1..7>, drive0=<path>, drive1=<path> and boot=<0|anything>, 0 is No.  Note the path does not contain \"'s and all entries are optional.  Slot 7 shows up even without an ini file but the Slot= must be set for other smartport drives to show up.  The [Video] section has Slot=<1..7> with 3 being the likely slot, and device = Franklin Ace Display the only accepted setting.");
             } else {
                 nk_layout_row_dynamic(ctx, 13, 1);
                 nk_label_colored(ctx, "The built-in assembler supports these constructs:", NK_TEXT_ALIGN_LEFT, color_help_notice);
-                
+
                 nk_layout_row_begin(ctx, NK_DYNAMIC, 13, 2);
                 nk_layout_row_push(ctx, 0.20f);
                 nk_label(ctx, "6502 Mnemonics", NK_TEXT_ALIGN_LEFT);
@@ -724,7 +767,6 @@ void viewport_show_help(APPLE2 *m) {
                 v->help_page = 1;
             }
         }
-    
     }
     nk_end(ctx);
 }
@@ -756,18 +798,31 @@ void viewport_toggle_debug(APPLE2 *m) {
 void viewport_update(APPLE2 *m) {
     // Commit changes to the texture
     // And update renderer with the texture
+    VIEWPORT *v = m->viewport;
     if(m->cols80active) {
-        SDL_UpdateTexture(m->viewport->texture640, NULL, m->viewport->surface640->pixels, m->viewport->surface640->pitch);
-        SDL_RenderCopy(m->viewport->renderer, m->viewport->texture640, NULL, &m->viewport->target_rect);
+        SDL_UpdateTexture(v->texture640, NULL, v->surface640->pixels, v->surface640->pitch);
+        SDL_RenderCopy(v->renderer, v->texture640, NULL, &v->target_rect);
     } else {
-        SDL_UpdateTexture(m->viewport->texture, NULL, m->viewport->surface->pixels, m->viewport->surface->pitch);
-        SDL_RenderCopy(m->viewport->renderer, m->viewport->texture, NULL, &m->viewport->target_rect);
+        SDL_UpdateTexture(v->texture, NULL, v->surface->pixels, v->surface->pitch);
+        SDL_RenderCopy(v->renderer, v->texture, NULL, &v->target_rect);
     }
-    if(m->viewport->debug_view) {
+    if(v->debug_view) {
         // In debug view, the A2 screen is maybe small black on black so outline it
-        SDL_SetRenderDrawColor(m->viewport->renderer, 255, 255, 255, 255);
-        SDL_RenderDrawRect(m->viewport->renderer, &m->viewport->target_rect);
+        SDL_SetRenderDrawColor(v->renderer, 255, 255, 255, 255);
+        SDL_RenderDrawRect(v->renderer, &v->target_rect);
     }
     nk_sdl_render(NK_ANTI_ALIASING_ON);
-    SDL_RenderPresent(m->viewport->renderer);
+    if(v->show_leds) {
+        if(m->disk_activity_read) {
+            SDL_Rect led = {v->full_window_rect.w - 16, v->full_window_rect.h - 16, 16, 16};
+            SDL_RenderCopy(v->renderer, v->greenLED, NULL, &led);
+            m->disk_activity_read = 0;
+        }
+        if(m->disk_activity_write) {
+            SDL_Rect led = {v->full_window_rect.w - 32, v->full_window_rect.h - 16, 16, 16};
+            SDL_RenderCopy(v->renderer, v->redLED, NULL, &led);
+            m->disk_activity_write = 0;
+        }
+    }
+    SDL_RenderPresent(v->renderer);
 }

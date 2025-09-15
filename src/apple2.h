@@ -82,6 +82,8 @@ typedef struct APPLE2 {
     int debug_view: 1;                                      // Apple ][ is not full-screen, debugger visible
     int stopped: 1;                                         // Emulation is halted
     int step: 1;                                            // Emulation halted but one instruction is "stepped"
+    int disk_activity_read: 1;                              // 0 = no read/write (here for convenience)
+    int disk_activity_write: 1;                             // 0 = no read/write
 
     // Additiona Info
     VIEWPORT *viewport;                                     // 0 (no view) or active view for this instance

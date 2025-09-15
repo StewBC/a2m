@@ -14,6 +14,7 @@ All you need to start is the apple2 executable. An optional configuration file, 
 ```
 [Display]
 scale = 1.0                   ; Uniformly scale Application Window
+disk_leds = 1                 ; Show disk activity LEDs
 
 [Video]
 slot = 3
@@ -132,6 +133,8 @@ This window currently has 4 sections.  Each section can be shown/hidden by click
 ### SmartPort  
 This shows which slot has a SmartPort interface.  In each slot, slot 0 display (example `7.0`) is a button.  Pressing that button will boot disk0 (if mounted).  The `Eject` button "removes" the disk from the slot and the `Insert` button brings up a file browser through which a disk can be mounted.  Note: Selecting a file that is not a disk image will work as _no_ validation is done.  The only check is if a file has `2IMG` in the header, the offset for the start in the file is set to 64 bytes from the start of the file (ignoring/skipping the header).  
 This section is populated based on the apple2.ini file.  Making changes in the UI will _not_ update the apple2.ini file.  The apple2.ini file needs to be edited by hand.  
+### Disk II  
+This shows which slot has a Disk II controller.  The usage/interface is the same as for the SMartPort.
 ### Debugger  
 The status display shows:  
 `Run to PC O XXXX`.  While the emulator is "running to the address XXXX" the `O` is lit.  It is good to know that stepping over a `JSR` for example, is in progress.  `Step Out O` similarly is active when using SHIFT-F11 and the function doesn't "step out" quickly.  
@@ -408,6 +411,7 @@ errorloh.c | Assembler error logging mechanism
 frankdisp.c | Franklin Ace Display 80 Col card
 header.h | One header file to include all needed header files
 image.c | Disk II floppy images containers/support
+leds.h | Green and red png images used for disk activity
 main.c | Define the Apple ][+ machine and view (Display) and main emulation loop
 nuklear.h | GUI - see header (Modified very slightly for text background coloring)
 nuklrsdl.h | SDL draw of Nuklear GUI - comes with nuklear.h
