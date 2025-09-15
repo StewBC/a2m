@@ -31,13 +31,15 @@ void viewmisc_show(APPLE2 *m) {
     int x = 512;
     int w = m->viewport->full_window_rect.w - x;
     if(nk_begin(ctx, "Miscellaneous", nk_rect(512, 560, 608, 280), NK_WINDOW_SCROLL_AUTO_HIDE | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
-        // The Smartport
-        if(nk_tree_push(ctx, NK_TREE_TAB, "SmartPort", NK_MAXIMIZED)) {
-            SP_DEVICE *spd = m->sp_device;
-            nk_layout_row_dynamic(ctx, 13, 1);
-            nk_label(ctx, "Devices", NK_TEXT_LEFT);
-            for(int i = 0; i < 8; i++) {
+        // Show the slot if it has a card in it
+        if(nk_tree_push(ctx, NK_TREE_TAB, "Slots", NK_MAXIMIZED)) {
+            for(int i = 2; i < 8; i++) {
+                if(m->slot_cards[i].slot_type != SLOT_TYPE_EMPTY) {
+                    nk_layout_row_dynamic(ctx, 13, 1);
+                }
                 if(m->slot_cards[i].slot_type == SLOT_TYPE_SMARTPORT) {
+                    SP_DEVICE *spd = m->sp_device;
+                    nk_labelf(ctx, NK_TEXT_LEFT, "Slot %d: SmartPort", i);
                     for(int j = 0; j < 2; j++) {
                         nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 5);
                         nk_layout_row_push(ctx, 0.08f);
@@ -73,17 +75,9 @@ void viewmisc_show(APPLE2 *m) {
                         }
                         nk_layout_row_end(ctx);
                     }
-                }
-            }
-            nk_tree_pop(ctx);
-        }
-        // The Disk II
-        if(nk_tree_push(ctx, NK_TREE_TAB, "Disk II", NK_MAXIMIZED)) {
-            DISKII_CONTROLLER *d = m->diskii_controller;
-            nk_layout_row_dynamic(ctx, 13, 1);
-            nk_label(ctx, "Controllers", NK_TEXT_LEFT);
-            for(int i = 0; i < 8; i++) {
-                if(m->slot_cards[i].slot_type == SLOT_TYPE_DISKII) {
+                } else if(m->slot_cards[i].slot_type == SLOT_TYPE_DISKII) {
+                    DISKII_CONTROLLER *d = m->diskii_controller;
+                    nk_labelf(ctx, NK_TEXT_LEFT, "Slot %d: Disk II", i);
                     for(int j = 0; j < 2; j++) {
                         nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 5);
                         nk_layout_row_push(ctx, 0.08f);
@@ -119,10 +113,15 @@ void viewmisc_show(APPLE2 *m) {
                         }
                         nk_layout_row_end(ctx);
                     }
+                } else if(m->slot_cards[i].slot_type == SLOT_TYPE_VIDEX_API) {
+                    nk_labelf(ctx, NK_TEXT_LEFT, "Slot %d: Franklin Ace Display", i);
+                } else if(m->slot_cards[i].slot_type != SLOT_TYPE_EMPTY) {
+                    nk_labelf(ctx, NK_TEXT_LEFT, "Slot %d: Undefined Card", i);
                 }
             }
             nk_tree_pop(ctx);
         }
+        // The Disk II
         // The Breakpoints tab
         if(nk_tree_push(ctx, NK_TREE_TAB, "Debugger", NK_MAXIMIZED)) {
             FLOWMANAGER *fm = &d->flowmanager;
