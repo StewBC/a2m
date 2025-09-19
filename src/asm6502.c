@@ -12,7 +12,7 @@ void write_to_memory(APPLE2 *m, uint16_t address, uint8_t value) {
     m->RAM_MAIN[address] = value;
 }
 
-APPLE2 m;
+APPLE2 m = {0};
 #endif
 // The assembler object and the pointer through which it is accessed
 ASSEMBLER assembler;

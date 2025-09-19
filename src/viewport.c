@@ -45,7 +45,7 @@ void viewport_ini_load_callback(void *user_data, char *section, char *key, char 
             int state = 0;
             sscanf(value, "%d", &state);
             if(state == 1) {
-                v->show_leds = 1;
+                v->show_leds = -1;
             }
         }
     }

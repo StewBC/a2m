@@ -57,6 +57,7 @@ static int fs_stat_utf8(const char *path, struct _stat64 *st) {
 }
 
 #else
+#include <errno.h>
 static int fs_stat_utf8(const char *path, struct stat *st) {
     return (stat(path, st) == 0) ? 0 : -(errno ? errno : EIO);
 }

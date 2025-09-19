@@ -140,10 +140,10 @@ void viewmisc_show(APPLE2 *m) {
                 nk_option_label(ctx, "Step Out", fm->run_to_rts_set);
                 nk_layout_row_dynamic(ctx, 28, 2);
                 nk_label(ctx, "Step Cycles", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_BOTTOM);
-                nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_BOTTOM, "%zd", m->cpu.cycles - d->prev_stop_cycles);
+                nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_BOTTOM, "%llu", m->cpu.cycles - d->prev_stop_cycles);
                 nk_layout_row_dynamic(ctx, 18, 2);
                 nk_label(ctx, "Total Cycles", NK_TEXT_LEFT);
-                nk_labelf(ctx, NK_TEXT_LEFT, "%zd", m->cpu.cycles);
+                nk_labelf(ctx, NK_TEXT_LEFT, "%llu", m->cpu.cycles);
                 nk_group_end(ctx);
             }
             nk_layout_row_push(ctx, 0.59999f);
