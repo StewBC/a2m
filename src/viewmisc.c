@@ -406,8 +406,8 @@ void viewmisc_show(APPLE2 *m) {
             v->viewdlg_modal = 0;
             if(1 == ret) {
                 // A file was selected, so get a FQN
-                strncat(fb->dir_selected.name, "/", PATH_MAX);
-                strncat(fb->dir_selected.name, fb->file_selected.name, PATH_MAX);
+                strncat(fb->dir_selected.name, "/", PATH_MAX-1);
+                strncat(fb->dir_selected.name, fb->file_selected.name, PATH_MAX-1);
                 if(v->viewmisc.file_browser.device_type == SLOT_TYPE_SMARTPORT) {
                     util_file_discard(&m->sp_device[fb->slot].sp_files[fb->device]);
                     // Eject the file that's active, if there is one, and mount the new one

@@ -693,8 +693,8 @@ void viewdbg_show(APPLE2 *m) {
             local_assembler_config.dlg_asm_filebrowser = 0;
             if(1 == ret) {
                 // A file was selected, so get a FQN
-                strncat(fb->dir_selected.name, "/", PATH_MAX);
-                strncat(fb->dir_selected.name, fb->file_selected.name, PATH_MAX);
+                strncat(fb->dir_selected.name, "/", PATH_MAX-1);
+                strncat(fb->dir_selected.name, fb->file_selected.name, PATH_MAX-1);
             }
         }
     }
