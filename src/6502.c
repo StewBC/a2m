@@ -4,1622 +4,286 @@
 
 #include "header.h"
 
-// Helper functions
-void add_value_to_accumulator(APPLE2 * m, uint8_t value);
-void compare_bytes(APPLE2 * m, uint8_t lhs, uint8_t rhs);
-uint8_t pull(APPLE2 * m);
-void push(APPLE2 * m, uint8_t value);
-void set_register_to_value(APPLE2 * m, uint8_t * reg, uint8_t value);
-void subtract_value_from_accumulator(APPLE2 * m, uint8_t value);
-
-// Stage instructions
-void ah_from_stack(APPLE2 * m);
-void ah_read_a16_sl2al(APPLE2 * m);
-void ah_read_pc(APPLE2 * m);
-void al_from_stack(APPLE2 * m);
-void al_read_pc(APPLE2 * m);
-void branch(APPLE2 * m);
-void brk_pc(APPLE2 * m);
-void empty_cycle(APPLE2 * m);
-void p_from_stack(APPLE2 * m);
-void p_to_stack(APPLE2 * m);
-void oc_read_pc(APPLE2 * m);
-void pc_hi_to_stack(APPLE2 * m);
-void pc_lo_to_stack(APPLE2 * m);
-void read_a16_ind_x(APPLE2 * m);
-void read_a16_ind_y(APPLE2 * m);
-void read_pc(APPLE2 * m);
-void read_sp(APPLE2 * m);
-void sl_read_a16(APPLE2 * m);
-void sl_read_xpf_a16(APPLE2 * m);
-void sl_read_ypf_a16(APPLE2 * m);
-void sl_read_x_a16(APPLE2 * m);
-void sl_write_a16(APPLE2 * m);
-
-// 6502 Instructions
-void adc_a16(APPLE2 * m);     /* 65 */
-// void adc_a16_x(APPLE2 *m); /* 75 */ same as adc_a16
-// void adc_abs(APPLE2 *m);   /* 6D */ same as adc_a16
-void adc_abs_x(APPLE2 * m);   /* 7D */
-void adc_abs_y(APPLE2 * m);   /* 79 */
-void adc_imm(APPLE2 * m);     /* 69 */
-// void adc_ind_x(APPLE2 *m); /* 61 */ same as adc_a16
-//void adc_ind_y(APPLE2 *m);  /* 71 */ same as adc_abs_y
-
-void and_imm(APPLE2 * m);     /* 29 */
-void and_a16(APPLE2 * m);     /* 25 */
-// void and_a16_x(APPLE2 *m); /* 35 */ same as and_a16
-void and_abs(APPLE2 * m);     /* 2D */
-void and_abs_x(APPLE2 * m);   /* 3D */
-void and_abs_y(APPLE2 * m);   /* 39 */
-void and_ind_x(APPLE2 * m);   /* 21 */
-// void and_ind_y(APPLE2 *m); /* 31 */ same as and_abs_y
-
-void asl_a(APPLE2 * m);       /* 0A */
-void asl_a16(APPLE2 * m);     /* 06 */
-// void asl_a16_x(APPLE2 *m); /* 16 */ same as asl_a16
-// void asl_abs(APPLE2 *m);   /* 0E */ same as asl_a16
-// void asl_abs_x(APPLE2 *m); /* 1E */ same as asl_a16
-
-void bcc(APPLE2 * m);         /* 90 */
-void bcs(APPLE2 * m);         /* B0 */
-void beq(APPLE2 * m);         /* F0 */
-void bit_a16(APPLE2 * m);     /* 24 */
-// void bit_abs(APPLE2 *m);   /* 2C */ same as bit_a16
-void bmi(APPLE2 * m);         /* 30 */
-void bne(APPLE2 * m);         /* D0 */
-void bpl(APPLE2 * m);         /* 10 */
-void a2brk(APPLE2 * m);       /* 00 */                      // brk conflicts on Linux
-void bvc(APPLE2 * m);         /* 50 */
-void bvs(APPLE2 * m);         /* 70 */
-
-void clc(APPLE2 * m);         /* 18 */
-void cld(APPLE2 * m);         /* D8 */
-void cli(APPLE2 * m);         /* 58 */
-void clv(APPLE2 * m);         /* B8 */
-
-void cmp_imm(APPLE2 * m);     /* C9 */
-void cmp_a16(APPLE2 * m);     /* C5 */
-// void cmp_a16_x(APPLE2 *m); /* D5 */ same as cmp_a16
-// void cmp_abs(APPLE2 *m);   /* CD */ same as cmp_a16
-void cmp_abs_x(APPLE2 * m);   /* DD */
-void cmp_abs_y(APPLE2 * m);   /* D9 */
-// void cmp_ind_x(APPLE2 *m); /* C1 */ same as cmp_a16
-// void cmp_ind_y(APPLE2 *m); /* D1 */ same as cmp_abs_y
-
-void cpx_imm(APPLE2 * m);     /* E0 */
-void cpx_a16(APPLE2 * m);     /* E4 */
-// void cpx_abs(APPLE2 *m);   /* EC */ same as cpx_a16
-
-void cpy_imm(APPLE2 * m);     /* C0 */
-void cpy_a16(APPLE2 * m);     /* C4 */
-// void cpy_abs(APPLE2 *m);   /* CC */ same as cpy_a16
-
-void dec_a16(APPLE2 * m);     /* C6 */
-// void dec_a16_x(APPLE2 *m); /* D6 */ same as dec_a16
-// void dec_abs(APPLE2 *m);   /* CE */ same as dec_a16
-// void dec_abs_x(APPLE2 *m); /* DE */ same as dec_a16
-
-void dex(APPLE2 * m);         /* CA */
-void dey(APPLE2 * m);         /* 88 */
-
-void eor_imm(APPLE2 * m);     /* 49 */
-void eor_a16(APPLE2 * m);     /* 45 */
-// void eor_a16_x(APPLE2 *m); /* 55 */ same as eor_a16
-// void eor_abs(APPLE2 *m);   /* 4D */ same as eor_a16
-void eor_abs_x(APPLE2 * m);   /* 5D */
-void eor_abs_y(APPLE2 * m);   /* 59 */
-// void eor_ind_x(APPLE2 *m); /* 41 */ same as eor_a16
-// void eor_ind_y(APPLE2 *m); /* 51 */ same as eor_abs_y
-
-void inc_a16(APPLE2 * m);     /* E6 */
-// void inc_a16_x(APPLE2 *m); /* F6 */ same as inc_a16
-// void inc_abs(APPLE2 *m);   /* EE */ same as inc_a16
-// void inc_abs_x(APPLE2 *m); /* FE */ same as inc_a16
-
-void inx(APPLE2 * m);         /* E8 */
-void iny(APPLE2 * m);         /* C8 */
-
-void jmp_abs(APPLE2 * m);     /* 4C */
-void jmp_ind(APPLE2 * m);     /* 6C */
-void jsr_abs(APPLE2 * m);     /* 20 */
-
-void lda_imm(APPLE2 * m);     /* A9 */
-void lda_a16(APPLE2 * m);     /* A5 */
-// void lda_a16_x(APPLE2 *m); /* B5 */ same as lda_a16
-// void lda_abs(APPLE2 *m);   /* AD */ same as lda_a16
-void lda_abs_x(APPLE2 * m);   /* BD */
-void lda_abs_y(APPLE2 * m);   /* B9 */
-// void lda_ind_x(APPLE2 *m); /* A1 */ same as lda_a16
-// void lda_ind_y(APPLE2 *m); /* B1 */ same as lda_abs_y
-
-void ldx_imm(APPLE2 * m);     /* A2 */
-void ldx_a16(APPLE2 * m);     /* A6 */
-// void ldx_a16_y(APPLE2 *m); /* B6 */ same as ldx_a16
-// void ldx_abs(APPLE2 *m);   /* AE */ same as ldx_a16
-void ldx_abs_y(APPLE2 * m);   /* BE */
-
-void ldy_imm(APPLE2 * m);     /* A0 */
-void ldy_a16(APPLE2 * m);     /* A4 */
-// void ldy_a16_x(APPLE2 *m); /* B4 */ same as ldy_a16
-// void ldy_abs(APPLE2 *m);   /* AC */ same as ldy_a16
-void ldy_abs_x(APPLE2 * m);   /* BC */
-
-void lsr_a(APPLE2 * m);       /* 4A */
-void lsr_a16(APPLE2 * m);     /* 46 */
-// void lsr_a16_x(APPLE2 *m); /* 56 */ same as lsr_a16
-// void lsr_abs(APPLE2 *m);   /* 4E */ same as lsr_a16
-// void lsr_abs_x(APPLE2 *m); /* 5E */ same as lsr_a16
-
-void nop(APPLE2 * m);         /* EA */
-
-void ora_imm(APPLE2 * m);     /* 09 */
-void ora_a16(APPLE2 * m);     /* 05 */
-// void ora_a16_x(APPLE2 *m); /* 15 */ same as ora_a16
-// void ora_abs(APPLE2 *m);   /* 0D */ same as ora_a16
-void ora_abs_x(APPLE2 * m);   /* 1D */
-void ora_abs_y(APPLE2 * m);   /* 19 */
-// void ora_ind_x(APPLE2 *m); /* 01 */ same as ora_a16
-// void ora_ind_y(APPLE2 *m); /* 11 */ same as ora_abs_y
-
-void pha(APPLE2 * m);         /* 48 */
-void php(APPLE2 * m);         /* 08 */
-void pla(APPLE2 * m);         /* 68 */
-void plp(APPLE2 * m);         /* 28 */
-
-void rol_a(APPLE2 * m);       /* 2A */
-void rol_a16(APPLE2 * m);     /* 26 */
-// void rol_a16_x(APPLE2 *m); /* 36 */ same as rol_a16
-// void rol_abs(APPLE2 *m);   /* 2E */ same as rol_a16
-// void rol_abs_x(APPLE2 *m); /* 3E */ same as rol_a16
-
-void ror_a(APPLE2 * m);       /* 6A */
-void ror_a16(APPLE2 * m);     /* 66 */
-// void ror_a16_x(APPLE2 *m); /* 76 */ same as ror_a16
-// void ror_abs(APPLE2 *m);   /* 6E */ same as ror_a16
-// void ror_abs_x(APPLE2 *m); /* 7E */ same as ror_a16
-
-void rti(APPLE2 * m);         /* 40 */
-void rts(APPLE2 * m);         /* 60 */
-
-void sbc_imm(APPLE2 * m);     /* E9 */
-void sbc_a16(APPLE2 * m);     /* E5 */
-// void sbc_a16_x(APPLE2 *m); /* F5 */ same as sbc_a16
-// void sbc_abs(APPLE2 *m);   /* ED */ same as sbc_a16
-void sbc_abs_x(APPLE2 * m);   /* FD */
-void sbc_abs_y(APPLE2 * m);   /* F9 */
-// void sbc_ind_x(APPLE2 *m); /* E1 */ same as sbc_a16
-// void sbc_ind_y(APPLE2 *m); /* F1 */ same as sbc_abs_y
-
-void sec(APPLE2 * m);         /* 38 */
-void sed(APPLE2 * m);         /* F8 */
-void sei(APPLE2 * m);         /* 78 */
-
-void sta_a16(APPLE2 * m);     /* 85 */
-// void sta_a16_x(APPLE2 *m); /* 95 */ same as sta_a16
-// void sta_abs(APPLE2 *m);   /* 8D */ same as sta_a16
-void sta_abs_x(APPLE2 * m);   /* 9D */
-void sta_abs_y(APPLE2 * m);   /* 99 */
-// void sta_ind_x(APPLE2 *m); /* 81 */ same as sta_a16
-// void sta_ind_y(APPLE2 *m); /* 91 */ same as sta_abs_y
-
-void stx_a16(APPLE2 * m);     /* 86 */
-// void stx_a16_y(APPLE2 *m); /* 96 */ same as stx_a16
-// void stx_abs(APPLE2 *m);   /* 8E */ same as stx_a16
-
-void sty_a16(APPLE2 * m);     /* 84 */
-// void sty_a16_x(APPLE2 *m); /* 94 */ same as sty_a16
-// void sty_abs(APPLE2 *m);   /* 8C */ same as sty_a16
-
-void tax(APPLE2 * m);         /* AA */
-void tay(APPLE2 * m);         /* A8 */
-void tsx(APPLE2 * m);         /* BA */
-void txa(APPLE2 * m);         /* 8A */
-void txs(APPLE2 * m);         /* 9A */
-void tya(APPLE2 * m);         /* 98 */
-
-// All cycle stages for all instructions
-OPCODE_STEPS ADC_IMM[]   = { adc_imm                                                                                          }; // 2
-OPCODE_STEPS ADC_ZP[]    = { al_read_pc, adc_a16                                                                              }; // 3
-OPCODE_STEPS ADC_ZP_X[]  = { al_read_pc, read_a16_ind_x  , adc_a16                                                            }; // 4
-OPCODE_STEPS ADC_ABS[]   = { al_read_pc, ah_read_pc      , adc_a16                                                            }; // 4
-OPCODE_STEPS ADC_ABS_X[] = { al_read_pc, ah_read_pc      , adc_abs_x                                                          }; // 4*
-OPCODE_STEPS ADC_ABS_Y[] = { al_read_pc, ah_read_pc      , adc_abs_y                                                          }; // 4*
-OPCODE_STEPS ADC_IND_X[] = { al_read_pc, read_a16_ind_x  , sl_read_a16       , ah_read_a16_sl2al , adc_a16                    }; // 6
-OPCODE_STEPS ADC_IND_Y[] = { al_read_pc, sl_read_a16     , ah_read_a16_sl2al , adc_abs_y                                      }; // 5*
-
-OPCODE_STEPS AND_IMM[]   = { and_imm                                                                                          }; // 2
-OPCODE_STEPS AND_ZP[]    = { al_read_pc, and_a16                                                                              }; // 3
-OPCODE_STEPS AND_ZP_X[]  = { al_read_pc, read_a16_ind_x  , and_a16                                                            }; // 4
-OPCODE_STEPS AND_ABS[]   = { al_read_pc, ah_read_pc      , and_abs                                                            }; // 4
-OPCODE_STEPS AND_ABS_X[] = { al_read_pc, ah_read_pc      , and_abs_x                                                          }; // 4*
-OPCODE_STEPS AND_ABS_Y[] = { al_read_pc, ah_read_pc      , and_abs_y                                                          }; // 4*
-OPCODE_STEPS AND_IND_X[] = { al_read_pc, read_a16_ind_x  , sl_read_a16       , ah_read_a16_sl2al , and_ind_x                  }; // 6
-OPCODE_STEPS AND_IND_Y[] = { al_read_pc, sl_read_a16     , ah_read_a16_sl2al , and_abs_y                                      }; // 5*
-
-OPCODE_STEPS ASL_A[]     = { asl_a                                                                                            }; // 2
-OPCODE_STEPS ASL_ZP[]    = { al_read_pc, sl_read_a16     , sl_write_a16      , asl_a16                                        }; // 5
-OPCODE_STEPS ASL_ZP_X[]  = { al_read_pc, read_a16_ind_x  , sl_read_a16       , sl_write_a16      , asl_a16                    }; // 6
-OPCODE_STEPS ASL_ABS[]   = { al_read_pc, ah_read_pc      , sl_read_a16       , sl_write_a16      , asl_a16                    }; // 6
-OPCODE_STEPS ASL_ABS_X[] = { al_read_pc, ah_read_pc      , sl_read_xpf_a16   , sl_read_x_a16     , sl_write_a16     , asl_a16 }; // 7
-
-OPCODE_STEPS BCC[]       = { bcc       , branch                                                                               }; // 2**
-OPCODE_STEPS BCS[]       = { bcs       , branch                                                                               }; // 2**
-OPCODE_STEPS BEQ[]       = { beq       , branch                                                                               }; // 2**
-
-OPCODE_STEPS BIT_ZP[]    = { al_read_pc, bit_a16                                                                              }; // 3
-OPCODE_STEPS BIT_ABS[]   = { al_read_pc, ah_read_pc      , bit_a16                                                            }; // 4
-
-OPCODE_STEPS BMI[]       = { bmi       , branch                                                                               }; // 2**
-OPCODE_STEPS BNE[]       = { bne       , branch                                                                               }; // 2**
-OPCODE_STEPS BPL[]       = { bpl       , branch                                                                               }; // 2**
-OPCODE_STEPS BRK[]       = { al_read_pc, pc_hi_to_stack  , pc_lo_to_stack    , p_to_stack        , brk_pc           , a2brk   }; // 7
-OPCODE_STEPS BVC[]       = { bvc       , branch                                                                               }; // 2**
-OPCODE_STEPS BVS[]       = { bvs       , branch                                                                               }; // 2**
-
-OPCODE_STEPS CLC[]       = { clc                                                                                              }; // 2
-OPCODE_STEPS CLD[]       = { cld                                                                                              }; // 2
-OPCODE_STEPS CLI[]       = { cli                                                                                              }; // 2
-OPCODE_STEPS CLV[]       = { clv                                                                                              }; // 2
-
-OPCODE_STEPS CMP_IMM[]   = { cmp_imm                                                                                          }; // 2
-OPCODE_STEPS CMP_ZP[]    = { al_read_pc, cmp_a16                                                                              }; // 3
-OPCODE_STEPS CMP_ZP_X[]  = { al_read_pc, read_a16_ind_x  , cmp_a16                                                            }; // 4
-OPCODE_STEPS CMP_ABS[]   = { al_read_pc, ah_read_pc      , cmp_a16                                                            }; // 4
-OPCODE_STEPS CMP_ABS_X[] = { al_read_pc, ah_read_pc      , cmp_abs_x                                                          }; // 4*
-OPCODE_STEPS CMP_ABS_Y[] = { al_read_pc, ah_read_pc      , cmp_abs_y                                                          }; // 4*
-OPCODE_STEPS CMP_IND_X[] = { al_read_pc, read_a16_ind_x  , sl_read_a16       , ah_read_a16_sl2al , cmp_a16                    }; // 6
-OPCODE_STEPS CMP_IND_Y[] = { al_read_pc, sl_read_a16     , ah_read_a16_sl2al , cmp_abs_y                                      }; // 5*
-
-OPCODE_STEPS CPX_IMM[]   = { cpx_imm                                                                                          }; // 2
-OPCODE_STEPS CPX_ZP[]    = { al_read_pc, cpx_a16                                                                              }; // 3
-OPCODE_STEPS CPX_ABS[]   = { al_read_pc, ah_read_pc      , cpx_a16                                                            }; // 4
-
-OPCODE_STEPS CPY_IMM[]   = { cpy_imm                                                                                          }; // 2
-OPCODE_STEPS CPY_ZP[]    = { al_read_pc, cpy_a16                                                                              }; // 3
-OPCODE_STEPS CPY_ABS[]   = { al_read_pc, ah_read_pc      , cpy_a16                                                            }; // 4
-
-OPCODE_STEPS DEC_ZP[]    = { al_read_pc, sl_read_a16     , sl_write_a16      , dec_a16                                        }; // 5
-OPCODE_STEPS DEC_ZP_X[]  = { al_read_pc, read_a16_ind_x  , sl_read_a16       , sl_write_a16      , dec_a16                    }; // 6
-OPCODE_STEPS DEC_ABS[]   = { al_read_pc, ah_read_pc      , sl_read_a16       , sl_write_a16      , dec_a16                    }; // 6
-OPCODE_STEPS DEC_ABS_X[] = { al_read_pc, ah_read_pc      , sl_read_xpf_a16   , sl_read_x_a16     , sl_write_a16     , dec_a16 }; // 7
-
-OPCODE_STEPS DEX[]       = { dex                                                                                              }; // 2
-OPCODE_STEPS DEY[]       = { dey                                                                                              }; // 2
-
-OPCODE_STEPS EOR_IMM[]   = { eor_imm                                                                                          }; // 2
-OPCODE_STEPS EOR_ZP[]    = { al_read_pc, eor_a16                                                                              }; // 3
-OPCODE_STEPS EOR_ZP_X[]  = { al_read_pc, read_a16_ind_x  , eor_a16                                                            }; // 4
-OPCODE_STEPS EOR_ABS[]   = { al_read_pc, ah_read_pc      , eor_a16                                                            }; // 4
-OPCODE_STEPS EOR_ABS_X[] = { al_read_pc, ah_read_pc      , eor_abs_x                                                          }; // 4*
-OPCODE_STEPS EOR_ABS_Y[] = { al_read_pc, ah_read_pc      , eor_abs_y                                                          }; // 4*
-OPCODE_STEPS EOR_IND_X[] = { al_read_pc, read_a16_ind_x  , sl_read_a16       , ah_read_a16_sl2al , eor_a16                    }; // 6
-OPCODE_STEPS EOR_IND_Y[] = { al_read_pc, sl_read_a16     , ah_read_a16_sl2al , eor_abs_y                                      }; // 5*
-
-OPCODE_STEPS INC_ZP[]    = { al_read_pc, sl_read_a16     , sl_write_a16      , inc_a16                                        }; // 5
-OPCODE_STEPS INC_ZP_X[]  = { al_read_pc, read_a16_ind_x  , sl_read_a16       , sl_write_a16      , inc_a16                    }; // 6
-OPCODE_STEPS INC_ABS[]   = { al_read_pc, ah_read_pc      , sl_read_a16       , sl_write_a16      , inc_a16                    }; // 6
-OPCODE_STEPS INC_ABS_X[] = { al_read_pc, ah_read_pc      , sl_read_xpf_a16   , sl_read_x_a16     , sl_write_a16     , inc_a16 }; // 7
-
-OPCODE_STEPS INX[]       = { inx                                                                                              }; // 2
-OPCODE_STEPS INY[]       = { iny                                                                                              }; // 2
-
-OPCODE_STEPS JMP_ABS[]   = { al_read_pc, jmp_abs                                                                              }; // 3
-OPCODE_STEPS JMP_IND[]   = { al_read_pc, ah_read_pc      , sl_read_a16       , jmp_ind                                        }; // 5
-OPCODE_STEPS JSR_ABS[]   = { al_read_pc, read_sp         , pc_hi_to_stack    , pc_lo_to_stack    , jsr_abs                    }; // 6
-
-OPCODE_STEPS LDA_IMM[]   = { lda_imm                                                                                          }; // 2
-OPCODE_STEPS LDA_ZP[]    = { al_read_pc, lda_a16                                                                              }; // 3
-OPCODE_STEPS LDA_ZP_X[]  = { al_read_pc, read_a16_ind_x  , lda_a16                                                            }; // 4
-OPCODE_STEPS LDA_ABS[]   = { al_read_pc, ah_read_pc      , lda_a16                                                            }; // 4
-OPCODE_STEPS LDA_ABS_X[] = { al_read_pc, ah_read_pc      , lda_abs_x                                                          }; // 4*
-OPCODE_STEPS LDA_ABS_Y[] = { al_read_pc, ah_read_pc      , lda_abs_y                                                          }; // 4*
-OPCODE_STEPS LDA_IND_X[] = { al_read_pc, read_a16_ind_x  , sl_read_a16       , ah_read_a16_sl2al , lda_a16                    }; // 6
-OPCODE_STEPS LDA_IND_Y[] = { al_read_pc, sl_read_a16     , ah_read_a16_sl2al , lda_abs_y                                      }; // 5*
-
-OPCODE_STEPS LDX_IMM[]   = { ldx_imm                                                                                          }; // 2
-OPCODE_STEPS LDX_ZP[]    = { al_read_pc, ldx_a16                                                                              }; // 3
-OPCODE_STEPS LDX_ZP_Y[]  = { al_read_pc, read_a16_ind_y  , ldx_a16                                                            }; // 4
-OPCODE_STEPS LDX_ABS[]   = { al_read_pc, ah_read_pc      , ldx_a16                                                            }; // 4
-OPCODE_STEPS LDX_ABS_Y[] = { al_read_pc, ah_read_pc      , ldx_abs_y                                                          }; // 4*
-
-OPCODE_STEPS LDY_IMM[]   = { ldy_imm                                                                                          }; // 2
-OPCODE_STEPS LDY_ZP[]    = { al_read_pc, ldy_a16                                                                              }; // 3
-OPCODE_STEPS LDY_ZP_X[]  = { al_read_pc, read_a16_ind_x  , ldy_a16                                                            }; // 4
-OPCODE_STEPS LDY_ABS[]   = { al_read_pc, ah_read_pc      , ldy_a16                                                            }; // 4
-OPCODE_STEPS LDY_ABS_X[] = { al_read_pc, ah_read_pc      , ldy_abs_x                                                          }; // 4*
-
-OPCODE_STEPS LSR_A[]     = { lsr_a                                                                                            }; // 2
-OPCODE_STEPS LSR_ZP[]    = { al_read_pc, sl_read_a16     , sl_write_a16      , lsr_a16                                        }; // 5
-OPCODE_STEPS LSR_ZP_X[]  = { al_read_pc, read_a16_ind_x  , sl_read_a16       , sl_write_a16      , lsr_a16                    }; // 6
-OPCODE_STEPS LSR_ABS[]   = { al_read_pc, ah_read_pc      , sl_read_a16       , sl_write_a16      , lsr_a16                    }; // 6
-OPCODE_STEPS LSR_ABS_X[] = { al_read_pc, ah_read_pc      , sl_read_xpf_a16   , sl_read_x_a16     , sl_write_a16     , lsr_a16 }; // 7
-
-OPCODE_STEPS NOP[]       = { nop                                                                                              }; // 2
-
-OPCODE_STEPS ORA_IMM[]   = { ora_imm                                                                                          }; // 2
-OPCODE_STEPS ORA_ZP[]    = { al_read_pc, ora_a16                                                                              }; // 3
-OPCODE_STEPS ORA_ZP_X[]  = { al_read_pc, read_a16_ind_x  , ora_a16                                                            }; // 4
-OPCODE_STEPS ORA_ABS[]   = { al_read_pc, ah_read_pc      , ora_a16                                                            }; // 4
-OPCODE_STEPS ORA_ABS_X[] = { al_read_pc, ah_read_pc      , ora_abs_x                                                          }; // 4*
-OPCODE_STEPS ORA_ABS_Y[] = { al_read_pc, ah_read_pc      , ora_abs_y                                                          }; // 4*
-OPCODE_STEPS ORA_IND_X[] = { al_read_pc, read_a16_ind_x  , sl_read_a16       , ah_read_a16_sl2al , ora_a16                    }; // 6
-OPCODE_STEPS ORA_IND_Y[] = { al_read_pc, sl_read_a16     , ah_read_a16_sl2al , ora_abs_y                                      }; // 5*
-
-OPCODE_STEPS PHA[]       = { read_pc   , pha                                                                                  }; // 3
-OPCODE_STEPS PHP[]       = { read_pc   , php                                                                                  }; // 3
-OPCODE_STEPS PLA[]       = { read_pc   , read_sp         , pla                                                                }; // 4
-OPCODE_STEPS PLP[]       = { read_pc   , read_sp         , plp                                                                }; // 4
-
-OPCODE_STEPS ROL_A[]     = { rol_a                                                                                            }; // 2
-OPCODE_STEPS ROL_ZP[]    = { al_read_pc, sl_read_a16     , sl_write_a16      , rol_a16                                        }; // 5
-OPCODE_STEPS ROL_ZP_X[]  = { al_read_pc, read_a16_ind_x  , sl_read_a16       , sl_write_a16      , rol_a16                    }; // 6
-OPCODE_STEPS ROL_ABS[]   = { al_read_pc, ah_read_pc      , sl_read_a16       , sl_write_a16      , rol_a16                    }; // 6
-OPCODE_STEPS ROL_ABS_X[] = { al_read_pc, ah_read_pc      , sl_read_xpf_a16   , sl_read_x_a16     , sl_write_a16     , rol_a16 }; // 7
-
-OPCODE_STEPS ROR_A[]     = { ror_a                                                                                            }; // 2
-OPCODE_STEPS ROR_ZP[]    = { al_read_pc, sl_read_a16     , sl_write_a16      , ror_a16                                        }; // 5
-OPCODE_STEPS ROR_ZP_X[]  = { al_read_pc, read_a16_ind_x  , sl_read_a16       , sl_write_a16      , ror_a16                    }; // 6
-OPCODE_STEPS ROR_ABS[]   = { al_read_pc, ah_read_pc      , sl_read_a16       , sl_write_a16      , ror_a16                    }; // 6
-OPCODE_STEPS ROR_ABS_X[] = { al_read_pc, ah_read_pc      , sl_read_xpf_a16   , sl_read_x_a16     , sl_write_a16     , ror_a16 }; // 7
-
-OPCODE_STEPS RTI[]       = { read_pc   , read_sp         , p_from_stack      , al_from_stack     , rti                        }; // 6
-OPCODE_STEPS RTS[]       = { read_pc   , read_sp         , al_from_stack     , ah_from_stack     , rts                        }; // 6
-
-OPCODE_STEPS SBC_IMM[]   = { sbc_imm                                                                                          }; // 2
-OPCODE_STEPS SBC_ZP[]    = { al_read_pc, sbc_a16                                                                              }; // 3
-OPCODE_STEPS SBC_ZP_X[]  = { al_read_pc, read_a16_ind_x  , sbc_a16                                                            }; // 4
-OPCODE_STEPS SBC_ABS[]   = { al_read_pc, ah_read_pc      , sbc_a16                                                            }; // 4
-OPCODE_STEPS SBC_ABS_X[] = { al_read_pc, ah_read_pc      , sbc_abs_x                                                          }; // 4*
-OPCODE_STEPS SBC_ABS_Y[] = { al_read_pc, ah_read_pc      , sbc_abs_y                                                          }; // 4*
-OPCODE_STEPS SBC_IND_X[] = { al_read_pc, read_a16_ind_x  , sl_read_a16       , ah_read_a16_sl2al , sbc_a16                    }; // 6
-OPCODE_STEPS SBC_IND_Y[] = { al_read_pc, sl_read_a16     , ah_read_a16_sl2al , sbc_abs_y                                      }; // 5*
-
-OPCODE_STEPS SEC[]       = { sec                                                                                              }; // 2
-OPCODE_STEPS SED[]       = { sed                                                                                              }; // 2
-OPCODE_STEPS SEI[]       = { sei                                                                                              }; // 2
-
-OPCODE_STEPS STA_ZP[]    = { al_read_pc, sta_a16                                                                              }; // 3
-OPCODE_STEPS STA_ZP_X[]  = { al_read_pc, read_a16_ind_x  , sta_a16                                                            }; // 4
-OPCODE_STEPS STA_ABS[]   = { al_read_pc, ah_read_pc      , sta_a16                                                            }; // 4
-OPCODE_STEPS STA_ABS_X[] = { al_read_pc, ah_read_pc      , sl_read_xpf_a16   , sta_abs_x                                      }; // 5
-OPCODE_STEPS STA_ABS_Y[] = { al_read_pc, ah_read_pc      , sl_read_ypf_a16   , sta_abs_y                                      }; // 5
-OPCODE_STEPS STA_IND_X[] = { al_read_pc, read_a16_ind_x  , sl_read_a16       , ah_read_a16_sl2al , sta_a16                    }; // 6
-OPCODE_STEPS STA_IND_Y[] = { al_read_pc, sl_read_a16     , ah_read_a16_sl2al , sl_read_ypf_a16   , sta_abs_y                  }; // 6
-
-OPCODE_STEPS STX_ZP[]    = { al_read_pc, stx_a16                                                                              }; // 3
-OPCODE_STEPS STX_ZP_Y[]  = { al_read_pc, read_a16_ind_y  , stx_a16                                                            }; // 4
-OPCODE_STEPS STX_ABS[]   = { al_read_pc, ah_read_pc      , stx_a16                                                            }; // 4
-
-OPCODE_STEPS STY_ZP[]    = { al_read_pc, sty_a16                                                                              }; // 3
-OPCODE_STEPS STY_ZP_X[]  = { al_read_pc, read_a16_ind_x  , sty_a16                                                            }; // 4
-OPCODE_STEPS STY_ABS[]   = { al_read_pc, ah_read_pc      , sty_a16                                                            }; // 4
-
-OPCODE_STEPS TAX[]       = { tax                                                                                              }; // 2
-OPCODE_STEPS TAY[]       = { tay                                                                                              }; // 2
-OPCODE_STEPS TSX[]       = { tsx                                                                                              }; // 2
-OPCODE_STEPS TXA[]       = { txa                                                                                              }; // 2
-OPCODE_STEPS TXS[]       = { txs                                                                                              }; // 2
-OPCODE_STEPS TYA[]       = { tya                                                                                              }; // 2
-
-// All cycles not implemented refer to the UNDEFINED stage, which is just an empty cycle for now
-OPCODE_STEPS UNDEFINED[] = { empty_cycle };
-
-// The 256 opcodes, as their stage (cycle) function pointer arrays
-OPCODE_STEPS *opcodes[256] = {
-    [0x00] = BRK,
-    [0x01] = ORA_IND_X,
-    [0x02] = UNDEFINED,
-    [0x03] = UNDEFINED,
-    [0x04] = UNDEFINED,
-    [0x05] = ORA_ZP,
-    [0x06] = ASL_ZP,
-    [0x07] = UNDEFINED,
-    [0x08] = PHP,
-    [0x09] = ORA_IMM,
-    [0x0A] = ASL_A,
-    [0x0B] = UNDEFINED,
-    [0x0C] = UNDEFINED,
-    [0x0D] = ORA_ABS,
-    [0x0E] = ASL_ABS,
-    [0x0F] = UNDEFINED,
-    [0x10] = BPL,
-    [0x11] = ORA_IND_Y,
-    [0x12] = UNDEFINED,
-    [0x13] = UNDEFINED,
-    [0x14] = UNDEFINED,
-    [0x15] = ORA_ZP_X,
-    [0x16] = ASL_ZP_X,
-    [0x17] = UNDEFINED,
-    [0x18] = CLC,
-    [0x19] = ORA_ABS_Y,
-    [0x1A] = UNDEFINED,
-    [0x1B] = UNDEFINED,
-    [0x1C] = UNDEFINED,
-    [0x1D] = ORA_ABS_X,
-    [0x1E] = ASL_ABS_X,
-    [0x1F] = UNDEFINED,
-    [0x20] = JSR_ABS,
-    [0x21] = AND_IND_X,
-    [0x22] = UNDEFINED,
-    [0x23] = UNDEFINED,
-    [0x24] = BIT_ZP,
-    [0x25] = AND_ZP,
-    [0x26] = ROL_ZP,
-    [0x27] = UNDEFINED,
-    [0x28] = PLP,
-    [0x29] = AND_IMM,
-    [0x2A] = ROL_A,
-    [0x2B] = UNDEFINED,
-    [0x2C] = BIT_ABS,
-    [0x2D] = AND_ABS,
-    [0x2E] = ROL_ABS,
-    [0x2F] = UNDEFINED,
-    [0x30] = BMI,
-    [0x31] = AND_IND_Y,
-    [0x32] = UNDEFINED,
-    [0x33] = UNDEFINED,
-    [0x34] = UNDEFINED,
-    [0x35] = AND_ZP_X,
-    [0x36] = ROL_ZP_X,
-    [0x37] = UNDEFINED,
-    [0x38] = SEC,
-    [0x39] = AND_ABS_Y,
-    [0x3A] = UNDEFINED,
-    [0x3B] = UNDEFINED,
-    [0x3C] = UNDEFINED,
-    [0x3D] = AND_ABS_X,
-    [0x3E] = ROL_ABS_X,
-    [0x3F] = UNDEFINED,
-    [0x40] = RTI,
-    [0x41] = EOR_IND_X,
-    [0x42] = UNDEFINED,
-    [0x43] = UNDEFINED,
-    [0x44] = UNDEFINED,
-    [0x45] = EOR_ZP,
-    [0x46] = LSR_ZP,
-    [0x47] = UNDEFINED,
-    [0x48] = PHA,
-    [0x49] = EOR_IMM,
-    [0x4A] = LSR_A,
-    [0x4B] = UNDEFINED,
-    [0x4C] = JMP_ABS,
-    [0x4D] = EOR_ABS,
-    [0x4E] = LSR_ABS,
-    [0x4F] = UNDEFINED,
-    [0x50] = BVC,
-    [0x51] = EOR_IND_Y,
-    [0x52] = UNDEFINED,
-    [0x53] = UNDEFINED,
-    [0x54] = UNDEFINED,
-    [0x55] = EOR_ZP_X,
-    [0x56] = LSR_ZP_X,
-    [0x57] = UNDEFINED,
-    [0x58] = CLI,
-    [0x59] = EOR_ABS_Y,
-    [0x5A] = UNDEFINED,
-    [0x5B] = UNDEFINED,
-    [0x5C] = UNDEFINED,
-    [0x5D] = EOR_ABS_X,
-    [0x5E] = LSR_ABS_X,
-    [0x5F] = UNDEFINED,
-    [0x60] = RTS,
-    [0x61] = ADC_IND_X,
-    [0x62] = UNDEFINED,
-    [0x63] = UNDEFINED,
-    [0x64] = UNDEFINED,
-    [0x65] = ADC_ZP,
-    [0x66] = ROR_ZP,
-    [0x67] = UNDEFINED,
-    [0x68] = PLA,
-    [0x69] = ADC_IMM,
-    [0x6A] = ROR_A,
-    [0x6B] = UNDEFINED,
-    [0x6C] = JMP_IND,
-    [0x6D] = ADC_ABS,
-    [0x6E] = ROR_ABS,
-    [0x6F] = UNDEFINED,
-    [0x70] = BVS,
-    [0x71] = ADC_IND_Y,
-    [0x72] = UNDEFINED,
-    [0x73] = UNDEFINED,
-    [0x74] = UNDEFINED,
-    [0x75] = ADC_ZP_X,
-    [0x76] = ROR_ZP_X,
-    [0x77] = UNDEFINED,
-    [0x78] = SEI,
-    [0x79] = ADC_ABS_Y,
-    [0x7A] = UNDEFINED,
-    [0x7B] = UNDEFINED,
-    [0x7C] = UNDEFINED,
-    [0x7D] = ADC_ABS_X,
-    [0x7E] = ROR_ABS_X,
-    [0x7F] = UNDEFINED,
-    [0x80] = UNDEFINED,
-    [0x81] = STA_IND_X,
-    [0x82] = UNDEFINED,
-    [0x83] = UNDEFINED,
-    [0x84] = STY_ZP,
-    [0x85] = STA_ZP,
-    [0x86] = STX_ZP,
-    [0x87] = UNDEFINED,
-    [0x88] = DEY,
-    [0x89] = UNDEFINED,
-    [0x8A] = TXA,
-    [0x8B] = UNDEFINED,
-    [0x8C] = STY_ABS,
-    [0x8D] = STA_ABS,
-    [0x8E] = STX_ABS,
-    [0x8F] = UNDEFINED,
-    [0x90] = BCC,
-    [0x91] = STA_IND_Y,
-    [0x92] = UNDEFINED,
-    [0x93] = UNDEFINED,
-    [0x94] = STY_ZP_X,
-    [0x95] = STA_ZP_X,
-    [0x96] = STX_ZP_Y,
-    [0x97] = UNDEFINED,
-    [0x98] = TYA,
-    [0x99] = STA_ABS_Y,
-    [0x9A] = TXS,
-    [0x9B] = UNDEFINED,
-    [0x9C] = UNDEFINED,
-    [0x9D] = STA_ABS_X,
-    [0x9E] = UNDEFINED,
-    [0x9F] = UNDEFINED,
-    [0xA0] = LDY_IMM,
-    [0xA1] = LDA_IND_X,
-    [0xA2] = LDX_IMM,
-    [0xA3] = UNDEFINED,
-    [0xA4] = LDY_ZP,
-    [0xA5] = LDA_ZP,
-    [0xA6] = LDX_ZP,
-    [0xA7] = UNDEFINED,
-    [0xA8] = TAY,
-    [0xA9] = LDA_IMM,
-    [0xAA] = TAX,
-    [0xAB] = UNDEFINED,
-    [0xAC] = LDY_ABS,
-    [0xAD] = LDA_ABS,
-    [0xAE] = LDX_ABS,
-    [0xAF] = UNDEFINED,
-    [0xB0] = BCS,
-    [0xB1] = LDA_IND_Y,
-    [0xB2] = UNDEFINED,
-    [0xB3] = UNDEFINED,
-    [0xB4] = LDY_ZP_X,
-    [0xB5] = LDA_ZP_X,
-    [0xB6] = LDX_ZP_Y,
-    [0xB7] = UNDEFINED,
-    [0xB8] = CLV,
-    [0xB9] = LDA_ABS_Y,
-    [0xBA] = TSX,
-    [0xBB] = UNDEFINED,
-    [0xBC] = LDY_ABS_X,
-    [0xBD] = LDA_ABS_X,
-    [0xBE] = LDX_ABS_Y,
-    [0xBF] = UNDEFINED,
-    [0xC0] = CPY_IMM,
-    [0xC1] = CMP_IND_X,
-    [0xC2] = UNDEFINED,
-    [0xC3] = UNDEFINED,
-    [0xC4] = CPY_ZP,
-    [0xC5] = CMP_ZP,
-    [0xC6] = DEC_ZP,
-    [0xC7] = UNDEFINED,
-    [0xC8] = INY,
-    [0xC9] = CMP_IMM,
-    [0xCA] = DEX,
-    [0xCB] = UNDEFINED,
-    [0xCC] = CPY_ABS,
-    [0xCD] = CMP_ABS,
-    [0xCE] = DEC_ABS,
-    [0xCF] = UNDEFINED,
-    [0xD0] = BNE,
-    [0xD1] = CMP_IND_Y,
-    [0xD2] = UNDEFINED,
-    [0xD3] = UNDEFINED,
-    [0xD4] = UNDEFINED,
-    [0xD5] = CMP_ZP_X,
-    [0xD6] = DEC_ZP_X,
-    [0xD7] = UNDEFINED,
-    [0xD8] = CLD,
-    [0xD9] = CMP_ABS_Y,
-    [0xDA] = UNDEFINED,
-    [0xDB] = UNDEFINED,
-    [0xDC] = UNDEFINED,
-    [0xDD] = CMP_ABS_X,
-    [0xDE] = DEC_ABS_X,
-    [0xDF] = UNDEFINED,
-    [0xE0] = CPX_IMM,
-    [0xE1] = SBC_IND_X,
-    [0xE2] = UNDEFINED,
-    [0xE3] = UNDEFINED,
-    [0xE4] = CPX_ZP,
-    [0xE5] = SBC_ZP,
-    [0xE6] = INC_ZP,
-    [0xE7] = UNDEFINED,
-    [0xE8] = INX,
-    [0xE9] = SBC_IMM,
-    [0xEA] = NOP,
-    [0xEB] = UNDEFINED,
-    [0xEC] = CPX_ABS,
-    [0xED] = SBC_ABS,
-    [0xEE] = INC_ABS,
-    [0xEF] = UNDEFINED,
-    [0xF0] = BEQ,
-    [0xF1] = SBC_IND_Y,
-    [0xF2] = UNDEFINED,
-    [0xF3] = UNDEFINED,
-    [0xF4] = UNDEFINED,
-    [0xF5] = SBC_ZP_X,
-    [0xF6] = INC_ZP_X,
-    [0xF7] = UNDEFINED,
-    [0xF8] = SED,
-    [0xF9] = SBC_ABS_Y,
-    [0xFA] = UNDEFINED,
-    [0xFB] = UNDEFINED,
-    [0xFC] = UNDEFINED,
-    [0xFD] = SBC_ABS_X,
-    [0xFE] = INC_ABS_X,
-    [0xFF] = UNDEFINED,
-};
-
-// Configure a MEMORY
-uint8_t memory_init(MEMORY *memory, uint16_t num_blocks) {
-    int block;
-    if(!(memory->blocks = (MEMORY_BLOCK *) malloc(sizeof(MEMORY_BLOCK) * num_blocks))) {
-        return (memory->num_blocks = 0);
-    }
-    memory->num_blocks = num_blocks;
-    for(block = 0; block < num_blocks; block++) {
-        memory->blocks[block].address = 0;
-        memory->blocks[block].length = 0;
-        memory->blocks[block].bytes = NULL;
-    }
-    return 1;
-}
-
-void memory_add(MEMORY *memory, uint8_t block_num, uint32_t address, uint32_t length, uint8_t *bytes) {
-    assert(block_num < memory->num_blocks);
-    MEMORY_BLOCK *b = &memory->blocks[block_num];
-    b->address = address;
-    b->length = length;
-    b->bytes = bytes;
-}
-
-// Configure PAGES
-uint8_t pages_init(PAGES *pages, uint16_t num_pages) {
-    int page;
-    if(!(pages->pages = (PAGE *) malloc(sizeof(PAGE) * num_pages))) {
-        return (pages->num_pages = 0);
-    }
-    pages->num_pages = num_pages;
-    for(page = 0; page < num_pages; page++) {
-        pages->pages[page].bytes = NULL;
-    }
-    return 1;
-}
-
-void pages_map(PAGES *pages, uint32_t start_page, uint32_t num_pages, uint8_t *bytes) {
-    assert(start_page + num_pages <= pages->num_pages);
-    while(num_pages) {
-        pages->pages[start_page++].bytes = bytes;
-        bytes += PAGE_SIZE;
-        num_pages--;
-    }
-}
-
-void pages_map_memory_block(PAGES *pages, MEMORY_BLOCK *block) {
-    uint16_t start_page = block->address / PAGE_SIZE;
-    uint16_t num_pages = block->length / PAGE_SIZE;
-    uint8_t *bytes = block->bytes;
-    assert(start_page + num_pages <= pages->num_pages);
-    while(num_pages) {
-        pages->pages[start_page++].bytes = bytes;
-        bytes += PAGE_SIZE;
-        num_pages--;
-    }
-}
-
-// Init the 6502
-void cpu_init(CPU *cpu) {
-    cpu->pc = 0xfffc;
-    cpu->sp = 0x100;
-    cpu->A = cpu->X = cpu->Y = 0;
-    cpu->flags = 0;
-    cpu->page_fault = 0;
-    cpu->instruction = 0x4C;                                // JMP oper
-    cpu->instruction_cycle = 0;
-    cpu->cycles = 1;
-    cpu->address_16 = cpu->scratch_16 = 0;
-}
-
-// Step the 6502 a single cycle
-void machine_step(APPLE2 *m) {
-    if(m->cpu.instruction_cycle < 0) {
-        oc_read_pc(m);
-    } else {
-        opcodes[m->cpu.instruction][m->cpu.instruction_cycle] (m);
-    }
-    ++m->cpu.cycles;
-}
-
-// Helper Functions
-void add_value_to_accumulator(APPLE2 *m, uint8_t value) {
-    uint8_t a = m->cpu.A;
-    m->cpu.scratch_16 = m->cpu.A + value + m->cpu.C;
-    set_register_to_value(m, &m->cpu.A, m->cpu.scratch_lo);
-    m->cpu.scratch_lo = (a & 0x0F) + (value & 0x0F) + m->cpu.C;
-    m->cpu.V = ((a ^ m->cpu.A) & ~(a ^ value) & 0x80) != 0 ? 1 : 0;
-    m->cpu.C = m->cpu.scratch_hi;
-    if(m->cpu.D) {
-        m->cpu.scratch_hi = (a >> 4) + (value >> 4);
-        if(m->cpu.scratch_lo > 9) {
-            m->cpu.scratch_lo += 6;
-            m->cpu.scratch_hi++;
-        }
-        if(m->cpu.scratch_hi > 9) {
-            m->cpu.scratch_hi += 6;
-            m->cpu.C = 1;
-        }
-        m->cpu.A = (m->cpu.scratch_hi << 4) | (m->cpu.scratch_lo & 0x0F);
-    }
-}
-
-void compare_bytes(APPLE2 *m, uint8_t lhs, uint8_t rhs) {
-    m->cpu.Z = (lhs == rhs) ? 1 : 0;
-    m->cpu.C = (lhs >= rhs) ? 1 : 0;
-    m->cpu.N = ((lhs - rhs) & 0x80) ? 1 : 0;
-}
-
-uint8_t pull(APPLE2 *m) {
-    if(++m->cpu.sp >= 0x200) {
-        m->cpu.sp = 0x100;
-    }
-    return read_from_memory(m, m->cpu.sp);
-}
-
-void push(APPLE2 *m, uint8_t value) {
-    write_to_memory(m, m->cpu.sp, value);
-    if(--m->cpu.sp < 0x100) {
-        m->cpu.sp += 0x100;
-    }
-}
-
-uint8_t read_from_memory(APPLE2 *m, uint16_t address) {
-    assert(address / PAGE_SIZE < m->read_pages.num_pages);
-    uint8_t cb_mask = m->watch_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
-    if(cb_mask) {
-        if(cb_mask & 2) {
-            m->callback_breakpoint(m, address);
-        }
-        if(cb_mask & 1) {
-            return m->callback_read(m, address);
-        }
-    }
-    return m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
-}
-
-uint8_t read_from_memory_debug(APPLE2 *m, uint16_t address) {
-    assert(address / PAGE_SIZE < m->read_pages.num_pages);
-    return m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
-}
-
-void set_register_to_value(APPLE2 *m, uint8_t *reg, uint8_t value) {
-    *reg = value;
-    m->cpu.N = *reg & 0x80 ? 1 : 0;
-    m->cpu.Z = *reg ? 0 : 1;
-}
-
-void write_to_memory(APPLE2 *m, uint16_t address, uint8_t value) {
-    uint16_t page = address / PAGE_SIZE;
-    uint16_t offset = address % PAGE_SIZE;
-    assert(page < m->write_pages.num_pages);
-    uint8_t cb_mask = m->watch_pages.pages[page].bytes[offset];
-    if(cb_mask) {
-        if(cb_mask & 1) {
-            m->callback_write(m, address, value);
-        }
-        if(cb_mask & 4) {
-            m->callback_breakpoint(m, address);
-        }
-    }
-    if(!(cb_mask & 1)) {
-        m->write_pages.pages[page].bytes[offset] = value;
-    }
-}
-
-// Stage instructions
-void ah_from_stack(APPLE2 *m) {
-    m->cpu.address_hi = pull(m);
-    m->cpu.instruction_cycle++;
-}
-
-void ah_read_a16_sl2al(APPLE2 *m) {
-    m->cpu.address_lo++;
-    m->cpu.address_hi = read_from_memory(m, m->cpu.address_16);
-    m->cpu.address_lo = m->cpu.scratch_lo;
-    m->cpu.instruction_cycle++;
-}
-
-void ah_read_pc(APPLE2 *m) {
-    m->cpu.address_hi = read_from_memory(m, m->cpu.pc);
+typedef enum {
+//  0         1          2        3       4          5          6          7       8         9          A         B       C          D          E          F
+    BRK     , ORA_X_ind, UND_02 , UND_03, UND_04   , ORA_zpg  , ASL_zpg  , UND_07, PHP     , ORA_imm  , ASL_A   , UND_0B, UND_0C   , ORA_abs  , ASL_abs  , UND_0F, // 0
+    BPL_rel , ORA_ind_Y, UND_12 , UND_13, UND_14   , ORA_zpg_X, ASL_zpg_X, UND_17, CLC     , ORA_abs_Y, UND_1A  , UND_1B, UND_1C   , ORA_abs_X, ASL_abs_X, UND_1F, // 1
+    JSR_abs , AND_X_ind, UND_22 , UND_23, BIT_zpg  , AND_zpg  , ROL_zpg  , UND_27, PLP     , AND_imm  , ROL_A   , UND_2B, BIT_abs  , AND_abs  , ROL_abs  , UND_2F, // 2
+    BMI_rel , AND_ind_Y, UND_32 , UND_33, UND_34   , AND_zpg_X, ROL_zpg_X, UND_37, SEC     , AND_abs_Y, UND_3A  , UND_3B, UND_3C   , AND_abs_X, ROL_abs_X, UND_3F, // 3
+    RTI     , EOR_X_ind, UND_42 , UND_43, UND_44   , EOR_zpg  , LSR_zpg  , UND_47, PHA     , EOR_imm  , LSR_A   , UND_4B, JMP_abs  , EOR_abs  , LSR_abs  , UND_4F, // 4
+    BVC_rel , EOR_ind_Y, UND_52 , UND_53, UND_54   , EOR_zpg_X, LSR_zpg_X, UND_57, CLI     , EOR_abs_Y, UND_5A  , UND_5B, UND_5C   , EOR_abs_X, LSR_abs_X, UND_5F, // 5
+    RTS     , ADC_X_ind, UND_62 , UND_63, UND_64   , ADC_zpg  , ROR_zpg  , UND_67, PLA     , ADC_imm  , ROR_A   , UND_6B, JMP_ind  , ADC_abs  , ROR_abs  , UND_6F, // 6
+    BVS_rel , ADC_ind_Y, UND_72 , UND_73, UND_74   , ADC_zpg_X, ROR_zpg_X, UND_77, SEI     , ADC_abs_Y, UND_7A  , UND_7B, UND_7C   , ADC_abs_X, ROR_abs_X, UND_7F, // 7
+    UND_80  , STA_X_ind, UND_82 , UND_83, STY_zpg  , STA_zpg  , STX_zpg  , UND_87, DEY     , UND_3D   , TXA     , UND_8B, STY_abs  , STA_abs  , STX_abs  , UND_8F, // 8
+    BCC_rel , STA_ind_Y, UND_92 , UND_93, STY_zpg_X, STA_zpg_X, STX_zpg_Y, UND_97, TYA     , STA_abs_Y, TXS     , UND_9B, UND_9C   , STA_abs_X, UND_45   , UND_9F, // 9
+    LDY_imm , LDA_X_ind, LDX_imm, UND_A3, LDY_zpg  , LDA_zpg  , LDX_zpg  , UND_A7, TAY     , LDA_imm  , TAX     , UND_AB, LDY_abs  , LDA_abs  , LDX_abs  , UND_AF, // A
+    BCS_rel , LDA_ind_Y, UND_B2 , UND_B3, LDY_zpg_X, LDA_zpg_X, LDX_zpg_Y, UND_B7, CLV     , LDA_abs_Y, TSX     , UND_BB, LDY_abs_X, LDA_abs_X, LDX_abs_Y, UND_BF, // B
+    CPY_imm , CMP_X_ind, UND_C2 , UND_C3, CPY_zpg  , CMP_zpg  , DEC_zpg  , UND_C7, INY     , CMP_imm  , DEX     , UND_CB, CPY_abs  , CMP_abs  , DEC_abs  , UND_CF, // C
+    BNE_rel , CMP_ind_Y, UND_D2 , UND_D3, UND_D4   , CMP_zpg_X, DEC_zpg_X, UND_D7, CLD     , CMP_abs_Y, UND_DA  , UND_DB, UND_DC   , CMP_abs_X, DEC_abs_X, UND_DF, // D
+    CPX_imm , SBC_X_ind, UND_E2 , UND_E3, CPX_zpg  , SBC_zpg  , INC_zpg  , UND_E7, INX     , SBC_imm  , NOP     , UND_EB, CPX_abs  , SBC_abs  , INC_abs  , UND_EF, // E
+    BEQ_rel , SBC_ind_Y, UND_F2 , UND_F3, UND_F4   , SBC_zpg_X, INC_zpg_X, UND_F7, SED     , SBC_abs_Y, UND_FA  , UND_FB, UND_FC   , SBC_abs_X, INC_abs_X, UND_FF, // F
+} OP_6502;
+
+void machine_run_opcode_6502(APPLE2 *m) {
+    uint8_t opcode = read_from_memory(m, m->cpu.pc);
+    CYCLE(m);
     m->cpu.pc++;
-    m->cpu.instruction_cycle++;
-}
-
-void al_from_stack(APPLE2 *m) {
-    m->cpu.address_lo = pull(m);
-    m->cpu.instruction_cycle++;
-}
-
-void al_read_pc(APPLE2 *m) {
-    m->cpu.address_lo = read_from_memory(m, m->cpu.pc);
-    m->cpu.address_hi = 0;
-    m->cpu.pc++;
-    m->cpu.instruction_cycle++;
-}
-
-void branch(APPLE2 *m) {
-    read_from_memory(m, m->cpu.address_16);
-    if(!m->cpu.page_fault && (m->cpu.address_lo + (int8_t) m->cpu.scratch_lo) & 0x100) {
-        m->cpu.page_fault = 1;
-        m->cpu.address_lo += m->cpu.scratch_lo;
-    } else {
-        m->cpu.pc += (int8_t) m->cpu.scratch_lo;
-        m->cpu.page_fault = 0;
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void brk_pc(APPLE2 *m) {
-    m->cpu.pc = 0xFFFE;
-    al_read_pc(m);
-}
-
-int check_page_fault(APPLE2 *m, uint8_t to_add) {
-    if(!m->cpu.page_fault) {
-        if(((m->cpu.address_16 + to_add) & 0xff00) != (m->cpu.address_16 & 0xff00)) {
-            m->cpu.page_fault = 1;
-        }
-        m->cpu.address_lo += to_add;
-    } else {
-        m->cpu.address_hi++;
-        m->cpu.page_fault = 0;
-    }
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.address_16);
-    return m->cpu.page_fault;
-}
-
-void empty_cycle(APPLE2 *m) {
-    m->cpu.instruction_cycle++;
-    m->cpu.instruction_cycle = -1;
-}
-
-void p_from_stack(APPLE2 *m) {
-    m->cpu.flags = (pull(m) & ~0b00010000) | 0b00100000;
-    m->cpu.instruction_cycle++;
-}
-
-void p_to_stack(APPLE2 *m) {
-    push(m, m->cpu.flags | 0b00010000);
-    m->cpu.instruction_cycle++;
-}
-
-void oc_read_pc(APPLE2 *m) {
-    m->cpu.instruction = read_from_memory(m, m->cpu.pc);
-    m->cpu.pc++;
-    m->cpu.instruction_cycle = 0;
-}
-
-void pc_hi_to_stack(APPLE2 *m) {
-    push(m, (m->cpu.pc >> 8) & 0xFF);
-    m->cpu.instruction_cycle++;
-}
-
-void pc_lo_to_stack(APPLE2 *m) {
-    push(m, m->cpu.pc & 0xFF);
-    m->cpu.instruction_cycle++;
-}
-
-void read_a16_ind_x(APPLE2 *m) {
-    read_from_memory(m, m->cpu.address_16);
-    m->cpu.address_lo += m->cpu.X;
-    m->cpu.instruction_cycle++;
-}
-
-void read_a16_ind_y(APPLE2 *m) {
-    read_from_memory(m, m->cpu.address_16);
-    m->cpu.address_lo += m->cpu.Y;
-    m->cpu.instruction_cycle++;
-}
-
-void read_pc(APPLE2 *m) {
-    read_from_memory(m, m->cpu.pc);
-    m->cpu.instruction_cycle++;
-}
-
-void read_sp(APPLE2 *m) {
-    read_from_memory(m, m->cpu.sp);
-    m->cpu.instruction_cycle++;
-}
-
-void sl_read_a16(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.address_16);
-    m->cpu.instruction_cycle++;
-}
-
-void sl_read_xpf_a16(APPLE2 *m) {
-    if(m->cpu.address_lo + m->cpu.X >= 0x100) {
-        m->cpu.page_fault = 1;
-    }
-    m->cpu.address_lo += m->cpu.X;
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.address_16);
-    m->cpu.instruction_cycle++;
-}
-
-void sl_read_ypf_a16(APPLE2 *m) {
-    if(m->cpu.address_lo + m->cpu.Y >= 0x100) {
-        m->cpu.page_fault = 1;
-    }
-    m->cpu.address_lo += m->cpu.Y;
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.address_16);
-    m->cpu.instruction_cycle++;
-}
-
-void sl_read_x_a16(APPLE2 *m) {
-    m->cpu.address_hi += m->cpu.page_fault;
-    m->cpu.page_fault = 0;
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.address_16);
-    m->cpu.instruction_cycle++;
-}
-
-void sl_write_a16(APPLE2 *m) {
-    write_to_memory(m, m->cpu.address_16, m->cpu.scratch_lo);
-    m->cpu.instruction_cycle++;
-}
-
-void subtract_value_from_accumulator(APPLE2 *m, uint8_t value) {
-    uint8_t a = m->cpu.A;
-    m->cpu.C = 1 - m->cpu.C;
-    m->cpu.scratch_16 = a - value - m->cpu.C;
-    set_register_to_value(m, &m->cpu.A, m->cpu.scratch_lo);
-    m->cpu.V = ((a ^ value) & (a ^ m->cpu.A) & 0x80) != 0 ? 1 : 0;
-    if(m->cpu.D) {
-        m->cpu.address_lo = (a & 0x0F) - (value & 0x0F) - m->cpu.C;
-        m->cpu.address_hi = (a >> 4) - (value >> 4);
-        if(m->cpu.address_lo & 0x10) {
-            m->cpu.address_lo -= 6;
-            m->cpu.address_hi--;
-        }
-        if(m->cpu.address_hi & 0xF0) {
-            m->cpu.address_hi -= 6;
-        }
-        m->cpu.A = (m->cpu.address_hi << 4) | (m->cpu.address_lo & 0x0F);
-    }
-    m->cpu.C = m->cpu.scratch_16 < 0x100 ? 1 : 0;
-}
-
-// 6502 end of chain instructions - were the work happens and
-// terminates with m->cpu.instruction_cycle = -1;
-void adc_imm(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
-    add_value_to_accumulator(m, m->cpu.scratch_lo);
-    m->cpu.pc++;
-    m->cpu.instruction_cycle = -1;
-}
-
-void adc_a16(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.address_16);
-    add_value_to_accumulator(m, m->cpu.scratch_lo);
-    m->cpu.instruction_cycle = -1;
-}
-
-void adc_abs_x(APPLE2 *m) {
-    if(!check_page_fault(m, m->cpu.X)) {
-        add_value_to_accumulator(m, m->cpu.scratch_lo);
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void adc_abs_y(APPLE2 *m) {
-    if(!check_page_fault(m, m->cpu.Y)) {
-        add_value_to_accumulator(m, m->cpu.scratch_lo);
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void and_imm(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
-    set_register_to_value(m, &m->cpu.A, m->cpu.A & m->cpu.scratch_lo);
-    m->cpu.pc++;
-    m->cpu.instruction_cycle = -1;
-}
-
-void and_a16(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.address_16);
-    set_register_to_value(m, &m->cpu.A, m->cpu.A & m->cpu.scratch_lo);
-    m->cpu.instruction_cycle = -1;
-}
-
-void and_abs(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.address_16);
-    set_register_to_value(m, &m->cpu.A, m->cpu.A & m->cpu.scratch_lo);
-    m->cpu.instruction_cycle = -1;
-}
-
-void and_abs_x(APPLE2 *m) {
-    if(!check_page_fault(m, m->cpu.X)) {
-        set_register_to_value(m, &m->cpu.A, m->cpu.A & m->cpu.scratch_lo);
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void and_abs_y(APPLE2 *m) {
-    if(!check_page_fault(m, m->cpu.Y)) {
-        set_register_to_value(m, &m->cpu.A, m->cpu.A & m->cpu.scratch_lo);
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void and_ind_x(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.address_16);
-    set_register_to_value(m, &m->cpu.A, m->cpu.A & m->cpu.scratch_lo);
-    m->cpu.instruction_cycle = -1;
-}
-
-void asl_a(APPLE2 *m) {
-    read_from_memory(m, m->cpu.pc);
-    m->cpu.C = m->cpu.A & 0x80 ? 1 : 0;
-    set_register_to_value(m, &m->cpu.A, m->cpu.A <<= 1);
-    m->cpu.instruction_cycle = -1;
-}
-
-void asl_a16(APPLE2 *m) {
-    m->cpu.C = m->cpu.scratch_lo & 0x80 ? 1 : 0;
-    set_register_to_value(m, &m->cpu.scratch_hi, m->cpu.scratch_lo << 1);
-    write_to_memory(m, m->cpu.address_16, m->cpu.scratch_hi);
-    m->cpu.instruction_cycle = -1;
-}
-
-void bcc(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
-    m->cpu.address_16 = ++m->cpu.pc;
-    if(!m->cpu.C) {
-        m->cpu.instruction_cycle++;
-    } else {
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void bcs(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
-    m->cpu.address_16 = ++m->cpu.pc;
-    if(m->cpu.C) {
-        m->cpu.instruction_cycle++;
-    } else {
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void beq(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
-    m->cpu.address_16 = ++m->cpu.pc;
-    if(m->cpu.Z) {
-        m->cpu.instruction_cycle++;
-    } else {
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void bit_a16(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.address_16);
-    set_register_to_value(m, &m->cpu.scratch_hi, m->cpu.A & m->cpu.scratch_lo);
-    m->cpu.flags &= 0b00111111;
-    m->cpu.flags |= (m->cpu.scratch_lo & 0b11000000);
-    m->cpu.instruction_cycle = -1;
-}
-
-void bmi(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
-    m->cpu.address_16 = ++m->cpu.pc;
-    if(m->cpu.N) {
-        m->cpu.instruction_cycle++;
-    } else {
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void bne(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
-    m->cpu.address_16 = ++m->cpu.pc;
-    if(!m->cpu.Z) {
-        m->cpu.instruction_cycle++;
-    } else {
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void bpl(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
-    m->cpu.address_16 = ++m->cpu.pc;
-    if(!m->cpu.N) {
-        m->cpu.instruction_cycle++;
-    } else {
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void a2brk(APPLE2 *m) {
-    ah_read_pc(m);
-    m->cpu.pc = m->cpu.address_16;
-    // Interrupt flag on at break
-    m->cpu.flags |= 0b00000100;
-    m->cpu.instruction_cycle = -1;
-}
-
-void bvc(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
-    m->cpu.address_16 = ++m->cpu.pc;
-    if(!m->cpu.V) {
-        m->cpu.instruction_cycle++;
-    } else {
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void bvs(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
-    m->cpu.address_16 = ++m->cpu.pc;
-    if(m->cpu.V) {
-        m->cpu.instruction_cycle++;
-    } else {
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void clc(APPLE2 *m) {
-    read_from_memory(m, m->cpu.pc);
-    m->cpu.C = 0;
-    m->cpu.instruction_cycle = -1;
-}
-
-void cld(APPLE2 *m) {
-    read_from_memory(m, m->cpu.pc);
-    m->cpu.D = 0;
-    m->cpu.instruction_cycle = -1;
-}
-
-void cli(APPLE2 *m) {
-    read_from_memory(m, m->cpu.pc);
-    m->cpu.I = 0;
-    m->cpu.instruction_cycle = -1;
-}
-
-void clv(APPLE2 *m) {
-    read_from_memory(m, m->cpu.pc);
-    m->cpu.V = 0;
-    m->cpu.instruction_cycle = -1;
-}
-
-void cmp_imm(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
-    compare_bytes(m, m->cpu.A, m->cpu.scratch_lo);
-    m->cpu.pc++;
-    m->cpu.instruction_cycle = -1;
-}
-
-void cmp_a16(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.address_16);
-    compare_bytes(m, m->cpu.A, m->cpu.scratch_lo);
-    m->cpu.instruction_cycle = -1;
-}
-
-void cmp_abs_x(APPLE2 *m) {
-    if(!check_page_fault(m, m->cpu.X)) {
-        compare_bytes(m, m->cpu.A, m->cpu.scratch_lo);
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void cmp_abs_y(APPLE2 *m) {
-    if(!check_page_fault(m, m->cpu.Y)) {
-        compare_bytes(m, m->cpu.A, m->cpu.scratch_lo);
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void cpx_imm(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
-    compare_bytes(m, m->cpu.X, m->cpu.scratch_lo);
-    m->cpu.pc++;
-    m->cpu.instruction_cycle = -1;
-}
-
-void cpx_a16(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.address_16);
-    compare_bytes(m, m->cpu.X, m->cpu.scratch_lo);
-    m->cpu.instruction_cycle = -1;
-}
-
-void cpy_imm(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
-    compare_bytes(m, m->cpu.Y, m->cpu.scratch_lo);
-    m->cpu.pc++;
-    m->cpu.instruction_cycle = -1;
-}
-
-void cpy_a16(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.address_16);
-    compare_bytes(m, m->cpu.Y, m->cpu.scratch_lo);
-    m->cpu.instruction_cycle = -1;
-}
-
-void dec_a16(APPLE2 *m) {
-    set_register_to_value(m, &m->cpu.scratch_hi, m->cpu.scratch_lo - 1);
-    write_to_memory(m, m->cpu.address_16, m->cpu.scratch_hi);
-    m->cpu.instruction_cycle = -1;
-}
-
-void dex(APPLE2 *m) {
-    read_from_memory(m, m->cpu.pc);
-    set_register_to_value(m, &m->cpu.X, m->cpu.X - 1);
-    m->cpu.instruction_cycle = -1;
-}
-
-void dey(APPLE2 *m) {
-    read_from_memory(m, m->cpu.pc);
-    set_register_to_value(m, &m->cpu.Y, m->cpu.Y - 1);
-    m->cpu.instruction_cycle = -1;
-}
-
-void eor_imm(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
-    set_register_to_value(m, &m->cpu.A, m->cpu.A ^ m->cpu.scratch_lo);
-    m->cpu.pc++;
-    m->cpu.instruction_cycle = -1;
-}
-
-void eor_a16(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.address_16);
-    set_register_to_value(m, &m->cpu.A, m->cpu.A ^ m->cpu.scratch_lo);
-    m->cpu.instruction_cycle = -1;
-}
-
-void eor_abs_x(APPLE2 *m) {
-    if(!check_page_fault(m, m->cpu.X)) {
-        set_register_to_value(m, &m->cpu.A, m->cpu.A ^ m->cpu.scratch_lo);
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void eor_abs_y(APPLE2 *m) {
-    if(!check_page_fault(m, m->cpu.Y)) {
-        set_register_to_value(m, &m->cpu.A, m->cpu.A ^ m->cpu.scratch_lo);
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void inc_a16(APPLE2 *m) {
-    set_register_to_value(m, &m->cpu.scratch_hi, m->cpu.scratch_lo + 1);
-    write_to_memory(m, m->cpu.address_16, m->cpu.scratch_hi);
-    m->cpu.instruction_cycle = -1;
-}
-
-void inx(APPLE2 *m) {
-    read_from_memory(m, m->cpu.pc);
-    set_register_to_value(m, &m->cpu.X, m->cpu.X + 1);
-    m->cpu.instruction_cycle = -1;
-}
-
-void iny(APPLE2 *m) {
-    read_from_memory(m, m->cpu.pc);
-    set_register_to_value(m, &m->cpu.Y, m->cpu.Y + 1);
-    m->cpu.instruction_cycle = -1;
-}
-
-void jmp_abs(APPLE2 *m) {
-    ah_read_pc(m);
-    m->cpu.pc = m->cpu.address_16;
-    m->cpu.instruction_cycle = -1;
-}
-
-void jmp_ind(APPLE2 *m) {
-    ah_read_a16_sl2al(m);
-    m->cpu.pc = m->cpu.address_16;
-    m->cpu.instruction_cycle = -1;
-}
-
-void jsr_abs(APPLE2 *m) {
-    ah_read_pc(m);
-    m->cpu.pc = m->cpu.address_16;
-    m->cpu.instruction_cycle = -1;
-}
-
-void lda_imm(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
-    set_register_to_value(m, &m->cpu.A, m->cpu.scratch_lo);
-    m->cpu.pc++;
-    m->cpu.instruction_cycle = -1;
-}
-
-void lda_a16(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.address_16);
-    set_register_to_value(m, &m->cpu.A, m->cpu.scratch_lo);
-    m->cpu.instruction_cycle = -1;
-}
-
-void lda_abs_x(APPLE2 *m) {
-    if(!check_page_fault(m, m->cpu.X)) {
-        set_register_to_value(m, &m->cpu.A, m->cpu.scratch_lo);
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void lda_abs_y(APPLE2 *m) {
-    if(!check_page_fault(m, m->cpu.Y)) {
-        set_register_to_value(m, &m->cpu.A, m->cpu.scratch_lo);
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void ldx_imm(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
-    set_register_to_value(m, &m->cpu.X, m->cpu.scratch_lo);
-    m->cpu.pc++;
-    m->cpu.instruction_cycle = -1;
-}
-
-void ldx_a16(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.address_16);
-    set_register_to_value(m, &m->cpu.X, m->cpu.scratch_lo);
-    m->cpu.instruction_cycle = -1;
-}
-
-void ldx_abs_y(APPLE2 *m) {
-    if(!check_page_fault(m, m->cpu.Y)) {
-        set_register_to_value(m, &m->cpu.X, m->cpu.scratch_lo);
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void ldy_imm(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
-    set_register_to_value(m, &m->cpu.Y, m->cpu.scratch_lo);
-    m->cpu.pc++;
-    m->cpu.instruction_cycle = -1;
-}
-
-void ldy_a16(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.address_16);
-    set_register_to_value(m, &m->cpu.Y, m->cpu.scratch_lo);
-    m->cpu.instruction_cycle = -1;
-}
-
-void ldy_abs_x(APPLE2 *m) {
-    if(!check_page_fault(m, m->cpu.X)) {
-        set_register_to_value(m, &m->cpu.Y, m->cpu.scratch_lo);
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void lsr_a(APPLE2 *m) {
-    read_from_memory(m, m->cpu.pc);
-    m->cpu.C = m->cpu.A & 0x01 ? 1 : 0;
-    set_register_to_value(m, &m->cpu.A, m->cpu.A >>= 1);
-    m->cpu.instruction_cycle = -1;
-}
-
-void lsr_a16(APPLE2 *m) {
-    m->cpu.C = m->cpu.scratch_lo & 0x01 ? 1 : 0;
-    set_register_to_value(m, &m->cpu.scratch_hi, m->cpu.scratch_lo >> 1);
-    write_to_memory(m, m->cpu.address_16, m->cpu.scratch_hi);
-    m->cpu.instruction_cycle = -1;
-}
-
-void nop(APPLE2 *m) {
-    read_from_memory(m, m->cpu.pc);
-    m->cpu.instruction_cycle = -1;
-}
-
-void ora_imm(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
-    set_register_to_value(m, &m->cpu.A, m->cpu.A | m->cpu.scratch_lo);
-    m->cpu.pc++;
-    m->cpu.instruction_cycle = -1;
-}
-
-void ora_a16(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.address_16);
-    set_register_to_value(m, &m->cpu.A, m->cpu.A | m->cpu.scratch_lo);
-    m->cpu.instruction_cycle = -1;
-}
-
-void ora_abs_x(APPLE2 *m) {
-    if(!check_page_fault(m, m->cpu.X)) {
-        set_register_to_value(m, &m->cpu.A, m->cpu.A | m->cpu.scratch_lo);
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void ora_abs_y(APPLE2 *m) {
-    if(!check_page_fault(m, m->cpu.Y)) {
-        set_register_to_value(m, &m->cpu.A, m->cpu.A | m->cpu.scratch_lo);
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void pha(APPLE2 *m) {
-    push(m, m->cpu.A);
-    m->cpu.instruction_cycle = -1;
-}
-
-void php(APPLE2 *m) {
-    push(m, m->cpu.flags | 0b00010000);                     // Break flag on flags push
-    m->cpu.instruction_cycle = -1;
-}
-
-void pla(APPLE2 *m) {
-    set_register_to_value(m, &m->cpu.A, pull(m));
-    m->cpu.instruction_cycle = -1;
-}
-
-void plp(APPLE2 *m) {
-    m->cpu.flags = (pull(m) & ~0b00010000) | 0b00100000;    // Break flag off, but - flag on
-    m->cpu.instruction_cycle = -1;
-}
-
-void rol_a(APPLE2 *m) {
-    uint8_t c = m->cpu.A & 0x80;
-    read_pc(m);
-    set_register_to_value(m, &m->cpu.A, (m->cpu.A << 1) | m->cpu.C);
-    m->cpu.C = c ? 1 : 0;
-    m->cpu.instruction_cycle = -1;
-}
-
-void rol_a16(APPLE2 *m) {
-    uint8_t c = m->cpu.scratch_lo & 0x80;
-    set_register_to_value(m, &m->cpu.scratch_lo, (m->cpu.scratch_lo << 1) | m->cpu.C);
-    write_to_memory(m, m->cpu.address_16, m->cpu.scratch_lo);
-    m->cpu.C = c ? 1 : 0;
-    m->cpu.instruction_cycle = -1;
-}
-
-void ror_a(APPLE2 *m) {
-    uint8_t c = m->cpu.A & 0x01;
-    read_pc(m);
-    set_register_to_value(m, &m->cpu.A, (m->cpu.A >> 1) | (m->cpu.C << 7));
-    m->cpu.C = c;
-    m->cpu.instruction_cycle = -1;
-}
-
-void ror_a16(APPLE2 *m) {
-    uint8_t c = m->cpu.scratch_lo & 0x01;
-    set_register_to_value(m, &m->cpu.scratch_lo, (m->cpu.scratch_lo >> 1) | (m->cpu.C << 7));
-    write_to_memory(m, m->cpu.address_16, m->cpu.scratch_lo);
-    m->cpu.C = c;
-    m->cpu.instruction_cycle = -1;
-}
-
-void rti(APPLE2 *m) {
-    ah_from_stack(m);
-    m->cpu.pc = m->cpu.address_16;
-    m->cpu.instruction_cycle = -1;
-}
-
-void rts(APPLE2 *m) {
-    m->cpu.pc = m->cpu.address_16;
-    al_read_pc(m);
-    m->cpu.instruction_cycle = -1;
-}
-
-void sbc_imm(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
-    subtract_value_from_accumulator(m, m->cpu.scratch_lo);
-    m->cpu.pc++;
-    m->cpu.instruction_cycle = -1;
-}
-
-void sbc_a16(APPLE2 *m) {
-    m->cpu.scratch_lo = read_from_memory(m, m->cpu.address_16);
-    subtract_value_from_accumulator(m, m->cpu.scratch_lo);
-    m->cpu.instruction_cycle = -1;
-}
-
-void sbc_abs_x(APPLE2 *m) {
-    if(!check_page_fault(m, m->cpu.X)) {
-        subtract_value_from_accumulator(m, m->cpu.scratch_lo);
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void sbc_abs_y(APPLE2 *m) {
-    if(!check_page_fault(m, m->cpu.Y)) {
-        subtract_value_from_accumulator(m, m->cpu.scratch_lo);
-        m->cpu.instruction_cycle = -1;
-    }
-}
-
-void sec(APPLE2 *m) {
-    read_pc(m);
-    m->cpu.C = 1;
-    m->cpu.instruction_cycle = -1;
-}
-
-void sed(APPLE2 *m) {
-    read_pc(m);
-    m->cpu.D = 1;
-    m->cpu.instruction_cycle = -1;
-}
-
-void sei(APPLE2 *m) {
-    read_pc(m);
-    m->cpu.I = 1;
-    m->cpu.instruction_cycle = -1;
-}
-
-void sta_a16(APPLE2 *m) {
-    write_to_memory(m, m->cpu.address_16, m->cpu.A);
-    m->cpu.instruction_cycle = -1;
-}
-
-void sta_abs_x(APPLE2 *m) {
-    m->cpu.address_hi += m->cpu.page_fault;
-    m->cpu.page_fault = 0;
-    write_to_memory(m, m->cpu.address_16, m->cpu.A);
-    m->cpu.instruction_cycle = -1;
-}
-
-void sta_abs_y(APPLE2 *m) {
-    m->cpu.address_hi += m->cpu.page_fault;
-    m->cpu.page_fault = 0;
-    write_to_memory(m, m->cpu.address_16, m->cpu.A);
-    m->cpu.instruction_cycle = -1;
-}
-
-void stx_a16(APPLE2 *m) {
-    write_to_memory(m, m->cpu.address_16, m->cpu.X);
-    m->cpu.instruction_cycle = -1;
-}
-
-void sty_a16(APPLE2 *m) {
-    write_to_memory(m, m->cpu.address_16, m->cpu.Y);
-    m->cpu.instruction_cycle = -1;
-}
-
-void tax(APPLE2 *m) {
-    read_pc(m);
-    set_register_to_value(m, &m->cpu.X, m->cpu.A);
-    m->cpu.instruction_cycle = -1;
-}
-
-void tay(APPLE2 *m) {
-    read_pc(m);
-    set_register_to_value(m, &m->cpu.Y, m->cpu.A);
-    m->cpu.instruction_cycle = -1;
-}
-
-void tsx(APPLE2 *m) {
-    read_pc(m);
-    set_register_to_value(m, &m->cpu.X, m->cpu.sp - 0x100);
-    m->cpu.instruction_cycle = -1;
-}
-
-void txa(APPLE2 *m) {
-    read_pc(m);
-    set_register_to_value(m, &m->cpu.A, m->cpu.X);
-    m->cpu.instruction_cycle = -1;
-}
-
-void txs(APPLE2 *m) {
-    read_pc(m);
-    m->cpu.sp = 0x100 + m->cpu.X;
-    m->cpu.instruction_cycle = -1;
-}
-
-void tya(APPLE2 *m) {
-    read_pc(m);
-    set_register_to_value(m, &m->cpu.A, m->cpu.Y);
-    m->cpu.instruction_cycle = -1;
+    switch(opcode) {
+        case BRK:       { al_read_pc(m); pc_hi_to_stack(m); pc_lo_to_stack(m); php(m); brk_6502(m); } break; // 00
+        case ORA_X_ind: { mixa(m); ora_a16(m); } break; // 01
+        case UND_02:    { read_pc(m); } break; // 02
+        case UND_03:    { read_pc(m); } break; // 03
+        case UND_04:    { read_pc(m); } break; // 04
+        case ORA_zpg:   { al_read_pc(m); ora_a16(m); } break; // 05
+        case ASL_zpg:   { mrw(m); asl_a16(m); } break; // 06
+        case UND_07:    { read_pc(m); } break; // 07
+        case PHP:       { read_pc(m); php(m); } break; // 08
+        case ORA_imm:   { ora_imm(m); } break; // 09
+        case ASL_A:     { asl_a(m); } break; // 0A
+        case UND_0B:    { read_pc(m); } break; // 0B
+        case UND_0C:    { read_pc(m); } break; // 0C
+        case ORA_abs:   { arw(m); ora_a16(m); } break; // 0D
+        case ASL_abs:   { arw(m); asl_a16(m); } break; // 0E
+        case UND_0F:    { read_pc(m); } break; // 0F
+        case BPL_rel:   { bpl(m); } break; // 10
+        case ORA_ind_Y: { miy(m); ora_a16(m); } break; // 11
+        case UND_12:    { read_pc(m); } break; // 12
+        case UND_13:    { read_pc(m); } break; // 13
+        case UND_14:    { read_pc(m); } break; // 14
+        case ORA_zpg_X: { mix(m); ora_a16(m); } break; // 15
+        case ASL_zpg_X: { mixrw(m); asl_a16(m); } break; // 16
+        case UND_17:    { read_pc(m); } break; // 17
+        case CLC:       { clc(m); } break; // 18
+        case ORA_abs_Y: { aiy(m); ora_a16(m); } break; // 19
+        case UND_1A:    { read_pc(m); } break; // 1A
+        case UND_1B:    { read_pc(m); } break; // 1B
+        case UND_1C:    { read_pc(m); } break; // 1C
+        case ORA_abs_X: { aix(m); ora_a16(m); } break; // 1D
+        case ASL_abs_X: { aipxrw(m); asl_a16(m); } break; // 1E
+        case UND_1F:    { read_pc(m); } break; // 1F
+        case JSR_abs:   { al_read_pc(m); read_sp(m); pc_hi_to_stack(m); pc_lo_to_stack(m); jsr_a16(m); } break; // 20
+        case AND_X_ind: { mixa(m); and_a16(m); } break; // 21
+        case UND_22:    { read_pc(m); } break; // 22
+        case UND_23:    { read_pc(m); } break; // 23
+        case BIT_zpg:   { al_read_pc(m); bit_a16(m); } break; // 24
+        case AND_zpg:   { al_read_pc(m); and_a16(m); } break; // 25
+        case ROL_zpg:   { mrw(m); rol_a16(m); } break; // 26
+        case UND_27:    { read_pc(m); } break; // 27
+        case PLP:       { read_pc(m); read_sp(m); plp(m); } break; // 28
+        case AND_imm:   { and_imm(m); } break; // 29
+        case ROL_A:     { rol_a(m); } break; // 2A
+        case UND_2B:    { read_pc(m); } break; // 2B
+        case BIT_abs:   { arw(m); bit_a16(m); } break; // 2C
+        case AND_abs:   { arw(m); and_a16(m); } break; // 2D
+        case ROL_abs:   { arw(m); rol_a16(m); } break; // 2E
+        case UND_2F:    { read_pc(m); } break; // 2F
+        case BMI_rel:   { bmi(m); } break; // 30
+        case AND_ind_Y: { miy(m); and_a16(m); } break; // 31
+        case UND_32:    { read_pc(m); } break; // 32
+        case UND_33:    { read_pc(m); } break; // 33
+        case UND_34:    { read_pc(m); } break; // 34
+        case AND_zpg_X: { mix(m); and_a16(m); } break; // 35
+        case ROL_zpg_X: { mixrw(m); rol_a16(m); } break; // 36
+        case UND_37:    { read_pc(m); } break; // 37
+        case SEC:       { sec(m); } break; // 38
+        case AND_abs_Y: { aiy(m); and_a16(m); } break; // 39
+        case UND_3A:    { read_pc(m); } break; // 3A
+        case UND_3B:    { read_pc(m); } break; // 3B
+        case UND_3C:    { read_pc(m); } break; // 3C
+        case AND_abs_X: { aix(m); and_a16(m); } break; // 3D
+        case ROL_abs_X: { aipxrw(m); rol_a16(m); } break; // 3E
+        case UND_3F:    { read_pc(m); } break; // 3F
+        case RTI:       { read_pc(m); read_sp(m); p_from_stack(m); al_from_stack(m); rti(m); } break; // 40
+        case EOR_X_ind: { mixa(m); eor_a16(m); } break; // 41
+        case UND_42:    { read_pc(m); } break; // 42
+        case UND_43:    { read_pc(m); } break; // 43
+        case UND_44:    { read_pc(m); } break; // 44
+        case EOR_zpg:   { al_read_pc(m); eor_a16(m); } break; // 45
+        case LSR_zpg:   { mrw(m); lsr_a16(m); } break; // 46
+        case UND_47:    { read_pc(m); } break; // 47
+        case PHA:       { read_pc(m); pha(m); } break; // 48
+        case EOR_imm:   { eor_imm(m); } break; // 49
+        case LSR_A:     { lsr_a(m); } break; // 4A
+        case UND_4B:    { read_pc(m); } break; // 4B
+        case JMP_abs:   { a(m); jmp_a16(m); } break; // 4C
+        case EOR_abs:   { arw(m); eor_a16(m); } break; // 4D
+        case LSR_abs:   { arw(m); lsr_a16(m); } break; // 4E
+        case UND_4F:    { read_pc(m); } break; // 4F
+        case BVC_rel:   { bvc(m); } break; // 50
+        case EOR_ind_Y: { miy(m); eor_a16(m); } break; // 51
+        case UND_52:    { read_pc(m); } break; // 52
+        case UND_53:    { read_pc(m); } break; // 53
+        case UND_54:    { read_pc(m); } break; // 54
+        case EOR_zpg_X: { mix(m); eor_a16(m); } break; // 55
+        case LSR_zpg_X: { mixrw(m); lsr_a16(m); } break; // 56
+        case UND_57:    { read_pc(m); } break; // 57
+        case CLI:       { cli(m); } break; // 58
+        case EOR_abs_Y: { aiy(m); eor_a16(m); } break; // 59
+        case UND_5A:    { read_pc(m); } break; // 5A
+        case UND_5B:    { read_pc(m); } break; // 5B
+        case UND_5C:    { read_pc(m); } break; // 5C
+        case EOR_abs_X: { aix(m); eor_a16(m); } break; // 5D
+        case LSR_abs_X: { aipxrw(m); lsr_a16(m); } break; // 5E
+        case UND_5F:    { read_pc(m); } break; // 5F
+        case RTS:       { read_pc(m); read_sp(m); al_from_stack(m); ah_from_stack(m); rts(m); } break; // 60
+        case ADC_X_ind: { mixa(m); adc_a16(m); } break; // 61
+        case UND_62:    { read_pc(m); } break; // 62
+        case UND_63:    { read_pc(m); } break; // 63
+        case UND_64:    { read_pc(m); } break; // 64
+        case ADC_zpg:   { al_read_pc(m); adc_a16(m); } break; // 65
+        case ROR_zpg:   { mrw(m); ror_a16(m); } break; // 66
+        case UND_67:    { read_pc(m); } break; // 67
+        case PLA:       { read_pc(m); read_sp(m); pla(m); } break; // 68
+        case ADC_imm:   { adc_imm(m); } break; // 69
+        case ROR_A:     { ror_a(m); } break; // 6A
+        case UND_6B:    { read_pc(m); } break; // 6B
+        case JMP_ind:   { ar(m); jmp_ind(m); } break; // 6C
+        case ADC_abs:   { arw(m); adc_a16(m); } break; // 6D
+        case ROR_abs:   { arw(m); ror_a16(m); } break; // 6E
+        case UND_6F:    { read_pc(m); } break; // 6F
+        case BVS_rel:   { bvs(m); } break; // 70
+        case ADC_ind_Y: { miy(m); adc_a16(m); } break; // 71
+        case UND_72:    { read_pc(m); } break; // 72
+        case UND_73:    { read_pc(m); } break; // 73
+        case UND_74:    { read_pc(m); } break; // 74
+        case ADC_zpg_X: { mix(m); adc_a16(m); } break; // 75
+        case ROR_zpg_X: { mixrw(m); ror_a16(m); } break; // 76
+        case UND_77:    { read_pc(m); } break; // 77
+        case SEI:       { sei(m); } break; // 78
+        case ADC_abs_Y: { aiy(m); adc_a16(m);} break; // 79
+        case UND_7A:    { read_pc(m); } break; // 7A
+        case UND_7B:    { read_pc(m); } break; // 7B
+        case UND_7C:    { read_pc(m); } break; // 7C
+        case ADC_abs_X: { aix(m); adc_a16(m); } break; // 7D
+        case ROR_abs_X: { aipxrw(m); ror_a16(m); } break; // 7E
+        case UND_7F:    { read_pc(m); } break; // 7F
+        case UND_80:    { read_pc(m); } break; // 80
+        case STA_X_ind: { mixa(m); sta_a16(m); } break; // 81
+        case UND_82:    { read_pc(m); } break; // 82
+        case UND_83:    { read_pc(m); } break; // 83
+        case STY_zpg:   { al_read_pc(m); sty_a16(m); } break; // 84
+        case STA_zpg:   { al_read_pc(m); sta_a16(m); } break; // 85
+        case STX_zpg:   { al_read_pc(m); stx_a16(m); } break; // 86
+        case UND_87:    { read_pc(m); } break; // 87
+        case DEY:       { dey(m); } break; // 88
+        case UND_3D:    { read_pc(m); } break; // 89
+        case TXA:       { txa(m); } break; // 8A
+        case UND_8B:    { read_pc(m); } break; // 8B
+        case STY_abs:   { arw(m); sty_a16(m); } break; // 8C
+        case STA_abs:   { arw(m); sta_a16(m); } break; // 8D
+        case STX_abs:   { arw(m); stx_a16(m); } break; // 8E
+        case UND_8F:    { read_pc(m); } break; // 8F
+        case BCC_rel:   { bcc(m); } break; // 90
+        case STA_ind_Y: { miyr(m); sta_a16(m); } break; // 91
+        case UND_92:    { read_pc(m); } break; // 92
+        case UND_93:    { read_pc(m); } break; // 93
+        case STY_zpg_X: { mix(m); sty_a16(m); } break; // 94
+        case STA_zpg_X: { mixrw(m); sta_a16(m); } break; // 95
+        case STX_zpg_Y: { mizy(m); stx_a16(m); } break; // 96
+        case UND_97:    { read_pc(m); } break; // 97
+        case TYA:       { tya(m); } break; // 98
+        case STA_abs_Y: { aiyr(m); sta_a16(m); } break; // 99
+        case TXS:       { txs(m); } break; // 9A
+        case UND_9B:    { read_pc(m); } break; // 9B
+        case UND_9C:    { read_pc(m); } break; // 9C
+        case STA_abs_X: { aipxrw(m); sta_a16(m); } break; // 9D
+        case UND_45:    { read_pc(m); } break; // 9E
+        case UND_9F:    { read_pc(m); } break; // 9F
+        case LDY_imm:   { ldy_imm(m); } break; // A0
+        case LDA_X_ind: { mixa(m); lda_a16(m); } break; // A1
+        case LDX_imm:   { ldx_imm(m); } break; // A2
+        case UND_A3:    { read_pc(m); } break; // A3
+        case LDY_zpg:   { al_read_pc(m); ldy_a16(m); } break; // A4
+        case LDA_zpg:   { al_read_pc(m); lda_a16(m); } break; // A5
+        case LDX_zpg:   { al_read_pc(m); ldx_a16(m); } break; // A6
+        case UND_A7:    { read_pc(m); } break; // A7
+        case TAY:       { tay(m); } break; // A8
+        case LDA_imm:   { lda_imm(m); } break; // A9
+        case TAX:       { tax(m); } break; // AA
+        case UND_AB:    { read_pc(m); } break; // AB
+        case LDY_abs:   { arw(m); ldy_a16(m); } break; // AC
+        case LDA_abs:   { arw(m); lda_a16(m); } break; // AD
+        case LDX_abs:   { arw(m); ldx_a16(m); } break; // AE
+        case UND_AF:    { read_pc(m); } break; // AF
+        case BCS_rel:   { bcs(m); } break; // B0
+        case LDA_ind_Y: { miy(m); lda_a16(m); } break; // B1
+        case UND_B2:    { read_pc(m); } break; // B2
+        case UND_B3:    { read_pc(m); } break; // B3
+        case LDY_zpg_X: { mix(m); ldy_a16(m); } break; // B4
+        case LDA_zpg_X: { mix(m); lda_a16(m); } break; // B5
+        case LDX_zpg_Y: { mizy(m); ldx_a16(m); } break; // B6
+        case UND_B7:    { read_pc(m); } break; // B7
+        case CLV:       { clv(m); } break; // B8
+        case LDA_abs_Y: { aiy(m); lda_a16(m); } break; // B9
+        case TSX:       { tsx(m); } break; // BA
+        case UND_BB:    { read_pc(m); } break; // BB
+        case LDY_abs_X: { aix(m); ldy_a16(m); } break; // BC
+        case LDA_abs_X: { aix(m); lda_a16(m); } break; // BD
+        case LDX_abs_Y: { aiy(m); ldx_a16(m); } break; // BE
+        case UND_BF:    { read_pc(m); } break; // BF
+        case CPY_imm:   { cpy_imm(m); } break; // C0
+        case CMP_X_ind: { mixa(m); cmp_a16(m); } break; // C1
+        case UND_C2:    { read_pc(m); } break; // C2
+        case UND_C3:    { read_pc(m); } break; // C3
+        case CPY_zpg:   { al_read_pc(m); cpy_a16(m); } break; // C4
+        case CMP_zpg:   { al_read_pc(m); cmp_a16(m); } break; // C5
+        case DEC_zpg:   { mrw(m); dec_a16(m); } break; // C6
+        case UND_C7:    { read_pc(m); } break; // C7
+        case INY:       { iny(m); } break; // C8
+        case CMP_imm:   { cmp_imm(m); } break; // C9
+        case DEX:       { dex(m); } break; // CA
+        case UND_CB:    { read_pc(m); } break; // CB
+        case CPY_abs:   { arw(m); cpy_a16(m); } break; // CC
+        case CMP_abs:   { arw(m); cmp_a16(m); } break; // CD
+        case DEC_abs:   { arw(m); dec_a16(m); } break; // CE
+        case UND_CF:    { read_pc(m); } break; // CF
+        case BNE_rel:   { bne(m); } break; // D0
+        case CMP_ind_Y: { miy(m); cmp_a16(m); } break; // D1
+        case UND_D2:    { read_pc(m); } break; // D2
+        case UND_D3:    { read_pc(m); } break; // D3
+        case UND_D4:    { read_pc(m); } break; // D4
+        case CMP_zpg_X: { mix(m); cmp_a16(m); } break; // D5
+        case DEC_zpg_X: { mixrw(m); dec_a16(m); } break; // D6
+        case UND_D7:    { read_pc(m); } break; // D7
+        case CLD:       { cld(m); } break; // D8
+        case CMP_abs_Y: { aiy(m); cmp_a16(m); } break; // D9
+        case UND_DA:    { read_pc(m); } break; // DA
+        case UND_DB:    { read_pc(m); } break; // DB
+        case UND_DC:    { read_pc(m); } break; // DC
+        case CMP_abs_X: { aix(m); cmp_a16(m); } break; // DD
+        case DEC_abs_X: { aipxrw(m); dec_a16(m); } break; // DE
+        case UND_DF:    { read_pc(m); } break; // DF
+        case CPX_imm:   { cpx_imm(m); } break; // E0
+        case SBC_X_ind: { mixa(m); sbc_a16(m); } break; // E1
+        case UND_E2:    { read_pc(m); } break; // E2
+        case UND_E3:    { read_pc(m); } break; // E3
+        case CPX_zpg:   { al_read_pc(m); cpx_a16(m); } break; // E4
+        case SBC_zpg:   { al_read_pc(m); sbc_a16(m); } break; // E5
+        case INC_zpg:   { mrw(m); inc_a16(m); } break; // E6
+        case UND_E7:    { read_pc(m); } break; // E7
+        case INX:       { inx(m); } break; // E8
+        case SBC_imm:   { sbc_imm(m); } break; // E9
+        case NOP:       { read_pc(m); } break; // EA
+        case UND_EB:    { read_pc(m); } break; // EB
+        case CPX_abs:   { arw(m); cpx_a16(m); } break; // EC
+        case SBC_abs:   { arw(m); sbc_a16(m); } break; // ED
+        case INC_abs:   { arw(m); inc_a16(m); } break; // EE
+        case UND_EF:    { read_pc(m); } break; // EF
+        case BEQ_rel:   { beq(m); } break; // F0
+        case SBC_ind_Y: { miy(m); sbc_a16(m); } break; // F1
+        case UND_F2:    { read_pc(m); } break; // F2
+        case UND_F3:    { read_pc(m); } break; // F3
+        case UND_F4:    { read_pc(m); } break; // F4
+        case SBC_zpg_X: { mix(m); sbc_a16(m); } break; // F5
+        case INC_zpg_X: { mixrw(m); inc_a16(m); } break; // F6
+        case UND_F7:    { read_pc(m); } break; // F7
+        case SED:       { sed(m); } break; // F8
+        case SBC_abs_Y: { aiy(m); sbc_a16(m); } break; // F9
+        case UND_FA:    { read_pc(m); } break; // FA
+        case UND_FB:    { read_pc(m); } break; // FB
+        case UND_FC:    { read_pc(m); } break; // FC
+        case SBC_abs_X: { aix(m); sbc_a16(m); } break; // FD
+        case INC_abs_X: { aipxrw(m); inc_a16(m); } break; // FE
+        case UND_FF:    { read_pc(m); } break; // FF
+   }
 }

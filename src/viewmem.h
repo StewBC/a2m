@@ -21,7 +21,7 @@ typedef struct MEMSHOW {
     int cursor_x;
     int cursor_y;
     uint16_t cursor_address;
-    char *find_string;
+    uint8_t *find_string;
     int find_string_len;
     int last_found_address;
     int edit_mode_ascii:1;

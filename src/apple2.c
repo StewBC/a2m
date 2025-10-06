@@ -73,9 +73,6 @@ int apple2_configure(APPLE2 *m) {
     // Set up the Watch Pages (RAM_WATCH can be changed without re-doing the map)
     pages_map(&m->watch_pages, 0, RAM_SIZE / PAGE_SIZE, m->RAM_WATCH);
 
-    // Init the CPU to cold-start by jumping to ROM at 0xfffc
-    cpu_init(&m->cpu);
-
     // Configure the LC using the same function the soft switches would, so the
     // same way, meaning call 2x to enable ROM and WRITE
     ram_card(m, 0xC081, 0x100);
@@ -87,6 +84,9 @@ int apple2_configure(APPLE2 *m) {
         slot_add_card(m, 7, SLOT_TYPE_SMARTPORT, &m->sp_device[7], &m->roms.blocks[ROM_SMARTPORT].bytes[0x700], NULL);
         slot_add_card(m, 6, SLOT_TYPE_DISKII, &m->diskii_controller[6], &m->roms.blocks[ROM_DISKII_16SECTOR].bytes[0x700], NULL);
     }
+
+    // Init the CPU to cold-start by jumping to ROM address at 0xfffc
+    cpu_init(m);
 
     return A2_OK;
 }
@@ -127,7 +127,7 @@ void apple2_ini_load_callback(void *user_data, char *section, char *key, char *v
                 if(0 != strcmp(value, "0") && m->sp_device[slot_number].sp_files[0].is_file_open) {
                     // The rom doesn't get a chance to run but fortunately ProDOS does just fine
                     m->cpu.pc = 0xc000 + slot_number * 0x100;
-                    m->cpu.instruction_cycle = -1;
+                    // m->cpu.instruction_cycle = -1; // SQW 6 Oct 2025
                 }
             }
         }

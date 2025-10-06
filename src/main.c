@@ -54,11 +54,10 @@ int main(int argc, char *argv[]) {
         quit = viewport_process_events(&m);
 
         // Step the sim one full instruction - several cycles
-        int cycles = 0;
-        do {
-            machine_step(&m);
-            cycles++;
-        } while(m.cpu.instruction_cycle != -1);
+        int cycles = m.cpu.cycles;
+        machine_run_opcode_6502(&m);
+        cycles = m.cpu.cycles - cycles;
+        
         // Add speaker - in loop for 1 cycle or here for "instruction's" cycles
         speaker_on_cycles(&m.speaker, cycles);
         speaker_pump(&m.speaker);

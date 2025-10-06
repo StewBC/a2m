@@ -32,9 +32,14 @@ typedef struct PAGES {
     uint16_t num_pages;
 } PAGES;
 
+enum {
+    CPU_6502,
+    CPU_65c02,
+};
+
 /* The 6502 internals*/
 typedef struct CPU {
-    uint16_t pc;                                            // Program write_enable
+    uint16_t pc;                                            // Program counter
     uint16_t sp;                                            // Stack pointer
     uint8_t A, X, Y;                                        // 8 bit registers
     union {
@@ -67,21 +72,13 @@ typedef struct CPU {
     struct {
         uint8_t page_fault:1;                               // During stages where a page-fault could happen, denotes fault
     };
-    uint8_t instruction;                                    // Current instruction being executed
-    int16_t instruction_cycle;                              // Stage (value 0, instruction fetched, is cycle 1 of execution, -1 need instruction)
+    // uint8_t instruction;                                    // Current instruction being executed
+    uint32_t class;             							// CPU_6502 or CPU_65c02
     uint64_t cycles;                                        // Total count of cycles the cpu has executed
 } CPU;
 
 // Forward declarations
 typedef struct APPLE2 APPLE2;
-
-// Function pointer prototype that point at the steps, each individual cycle, of a 6502 instruction
-typedef void (*OPCODE_STEPS)(APPLE2 * m);
-
-// The 256 possible opcodes
-extern OPCODE_STEPS *opcodes[256];
-// The UNDEFINED step (cycle) is for the unimplemented opcodes
-extern OPCODE_STEPS UNDEFINED[];
 
 // Configure the ram, MEMORY and bytes setup (what is mapped in)
 uint8_t memory_init(MEMORY * memory, uint16_t num_blocks);
@@ -91,10 +88,10 @@ void pages_map(PAGES * pages, uint32_t start_page, uint32_t num_pages, uint8_t *
 void pages_map_memory_block(PAGES * pages, MEMORY_BLOCK * block);
 
 // 1 time init
-void cpu_init(CPU * cpu);
+void cpu_init(APPLE2 *m);
 
-// Step the apple2 a single CPU cycle
-void machine_step(APPLE2 * m);
+// Step the apple2 a single opcode
+void machine_run_opcode_6502(APPLE2 *m);
 
 // Helper calls that access the mapped in memory
 uint8_t read_from_memory(APPLE2 * m, uint16_t address);

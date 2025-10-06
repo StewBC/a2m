@@ -115,6 +115,7 @@ typedef struct DEBUGGER DEBUGGER;
 
 // It all comes together
 #include "apple2.h"
+#include "6502_inln.h"
 
 #endif                                                      // IS_EMULATOR
 
