@@ -1,6 +1,6 @@
 # Apple ][+ Emulator  
-This is an Apple ][+ emulator written in "C" using SDL and the Nuklear immediate mode GUI.  The emulator includes a cycle-accurate <sup>*</sup> 6502 CPU (does not support undocumented opcodes), a Language Card a Franklin Ace 80col display card, and a SmartPort block device.  Disk II support is limited to only .nib files for now.  
-<sup>*</sup> Now uses V2 of my cpu core that has code execution inlined and steps an instruction at a time, not a cycle at a time, for better performance, but is still cycle accurate.  
+This is an Apple ][+ emulator written in "C" using SDL and the Nuklear immediate mode GUI.  The emulator includes a cycle-accurate[^asterisk] 6502 CPU (does not support undocumented opcodes), a Language Card a Franklin Ace 80col display card, and a SmartPort block device.  Disk II support is limited to only .nib files for now.  
+[^asterisk]: Now uses V2 of my cpu core that has code execution inlined and steps an instruction at a time, not a cycle at a time, for better performance, but is still cycle accurate.  
 
 This configuration allows booting and running Total Replay or other ProDOS disk volumes.  
   
