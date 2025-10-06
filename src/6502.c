@@ -169,16 +169,16 @@ void machine_run_opcode_6502(APPLE2 *m) {
         case UND_3D:    { read_pc(m); } break; // 89
         case TXA:       { txa(m); } break; // 8A
         case UND_8B:    { read_pc(m); } break; // 8B
-        case STY_abs:   { arw(m); sty_a16(m); } break; // 8C
-        case STA_abs:   { arw(m); sta_a16(m); } break; // 8D
-        case STX_abs:   { arw(m); stx_a16(m); } break; // 8E
+        case STY_abs:   { a(m); sty_a16(m); } break; // 8C
+        case STA_abs:   { a(m); sta_a16(m); } break; // 8D
+        case STX_abs:   { a(m); stx_a16(m); } break; // 8E
         case UND_8F:    { read_pc(m); } break; // 8F
         case BCC_rel:   { bcc(m); } break; // 90
         case STA_ind_Y: { miyr(m); sta_a16(m); } break; // 91
         case UND_92:    { read_pc(m); } break; // 92
         case UND_93:    { read_pc(m); } break; // 93
         case STY_zpg_X: { mix(m); sty_a16(m); } break; // 94
-        case STA_zpg_X: { mixrw(m); sta_a16(m); } break; // 95
+        case STA_zpg_X: { mix(m); sta_a16(m); } break; // 95
         case STX_zpg_Y: { mizy(m); stx_a16(m); } break; // 96
         case UND_97:    { read_pc(m); } break; // 97
         case TYA:       { tya(m); } break; // 98
@@ -186,7 +186,7 @@ void machine_run_opcode_6502(APPLE2 *m) {
         case TXS:       { txs(m); } break; // 9A
         case UND_9B:    { read_pc(m); } break; // 9B
         case UND_9C:    { read_pc(m); } break; // 9C
-        case STA_abs_X: { aipxrw(m); sta_a16(m); } break; // 9D
+        case STA_abs_X: { aipxr(m); sta_a16(m); } break; // 9D
         case UND_45:    { read_pc(m); } break; // 9E
         case UND_9F:    { read_pc(m); } break; // 9F
         case LDY_imm:   { ldy_imm(m); } break; // A0

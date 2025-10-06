@@ -235,7 +235,7 @@ static inline void aix(APPLE2 *m) {
     }
 }
 
-static inline void aixr(APPLE2 *m) {
+static inline void aipxr(APPLE2 *m) {
     a(m);
     uint8_t lo = m->cpu.address_lo;
     m->cpu.address_lo += m->cpu.X;
@@ -251,7 +251,7 @@ static inline void aixr(APPLE2 *m) {
 }
 
 static inline void aipxrw(APPLE2 *m) {
-    aixr(m);
+    aipxr(m);
     sl_read_a16(m);
     sl_write_a16(m);
 }
