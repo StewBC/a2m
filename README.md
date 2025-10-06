@@ -1,6 +1,7 @@
 # Apple ][+ Emulator  
-This is an Apple ][+ emulator written in "C" using SDL and the Nuklear immediate mode GUI.  The emulator includes a cycle-accurate 6502 CPU (does not support undocumented opcodes), a Language Card a Franklin Ace 80col display card, and a SmartPort block device.  Disk II support is limited to only .nib files for now.  
-  
+This is an Apple ][+ emulator written in "C" using SDL and the Nuklear immediate mode GUI.  The emulator includes a cycle-accurate <sup>*</sup> 6502 CPU (does not support undocumented opcodes), a Language Card a Franklin Ace 80col display card, and a SmartPort block device.  Disk II support is limited to only .nib files for now.  
+<sup>*</sup> Now uses V2 of my cpu core that has code execution inlined and steps an instruction at a time, not a cycle at a time, for better performance, but is still cycle accurate.  
+
 This configuration allows booting and running Total Replay or other ProDOS disk volumes.  
   
 This repository also contains a stand-alone version of the [6502 Assembler](#6502-assembler) I created and built into the emulator.  
@@ -398,7 +399,9 @@ The APPLE2 structure is designed to be compact, with dynamic allocation for cert
 ## The source files and what they do  
 File | Description 
 --- | --- 
-6502.c | Cycle accurate 6502 implementation
+6502_core.c | Memory and page functions
+6502_inln.h | CPU implementation - inline in release for speed
+6502.c | Opcode dispatch (switch statement) 
 apple2.c | Apple ][+ hardware config & softswitch implementation
 asm6502.c | The "front end" of the assembler
 asmexpr.c | The recursive expression parser
