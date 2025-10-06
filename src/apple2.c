@@ -78,15 +78,15 @@ int apple2_configure(APPLE2 *m) {
     ram_card(m, 0xC081, 0x100);
     ram_card(m, 0xC081, 0x100);
 
-    // Configure slots from the ini file
+    // Init the CPU to cold-start by jumping to ROM address at 0xfffc
+    cpu_init(m);
+
+    // Configure slots from the ini file (after cpu init as this could set cpu.sp so smartport can boot on a II+)
     if(A2_OK != util_ini_load_file("./apple2.ini", apple2_ini_load_callback, (void *) m)) {
         // If apple2.ini doesn't successfully load, just add a smartport in slot 7
         slot_add_card(m, 7, SLOT_TYPE_SMARTPORT, &m->sp_device[7], &m->roms.blocks[ROM_SMARTPORT].bytes[0x700], NULL);
         slot_add_card(m, 6, SLOT_TYPE_DISKII, &m->diskii_controller[6], &m->roms.blocks[ROM_DISKII_16SECTOR].bytes[0x700], NULL);
     }
-
-    // Init the CPU to cold-start by jumping to ROM address at 0xfffc
-    cpu_init(m);
 
     return A2_OK;
 }
