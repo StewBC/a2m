@@ -72,6 +72,11 @@ static inline void add_value_to_accumulator(APPLE2 *m, uint8_t value) {
             m->cpu.C = 1;
         }
         m->cpu.A = (m->cpu.scratch_hi << 4) | (m->cpu.scratch_lo & 0x0F);
+        if(m->cpu.class == CPU_65c02) {            
+            read_from_memory(m, m->cpu.address_16);
+            CYCLE(m);
+            set_register_to_value(m, &m->cpu.A, m->cpu.A);
+        }
     }
 }
 
@@ -97,23 +102,41 @@ static inline void push(APPLE2 *m, uint8_t value) {
 
 static inline void subtract_value_from_accumulator(APPLE2 *m, uint8_t value) {
     uint8_t a = m->cpu.A;
-    m->cpu.C = 1 - m->cpu.C;
+    m->cpu.C ^= 1;
     m->cpu.scratch_16 = a - value - m->cpu.C;
-    set_register_to_value(m, &m->cpu.A, m->cpu.scratch_lo);
-    m->cpu.V = ((a ^ value) & (a ^ m->cpu.A) & 0x80) != 0 ? 1 : 0;
-    if(m->cpu.D) {
-        uint8_t lo = (a & 0x0F) - (value & 0x0F) - m->cpu.C;
-        uint8_t hi = (a >> 4) - (value >> 4);
-        if (lo & 0x10) {
-            lo -= 6;
-            hi--;
+    
+    if(m->cpu.class == CPU_6502) {
+        set_register_to_value(m, &m->cpu.A, m->cpu.scratch_lo);
+        m->cpu.V = ((a ^ value) & (a ^ m->cpu.A) & 0x80) != 0 ? 1 : 0;
+        if(m->cpu.D) {
+            uint8_t lo = (a & 0x0F) - (value & 0x0F) - m->cpu.C;
+            uint8_t hi = (a >> 4) - (value >> 4);
+            if (lo & 0x10) {
+                lo -= 6;
+                hi--;
+            }
+            if (hi & 0xF0) {
+                hi -= 6;
+            }
+            m->cpu.A = (hi << 4) | (lo & 0x0F);
         }
-        if (hi & 0xF0) {
-            hi -= 6;
+        m->cpu.C = m->cpu.scratch_16 < 0x100 ? 1 : 0;
+    } else {
+        m->cpu.A = m->cpu.scratch_lo;
+        m->cpu.V = ((a ^ m->cpu.A) & (a ^ value) & 0x80) ? 1 : 0;
+        if(m->cpu.D) {
+            if ((a & 0x0F) < ((value & 0x0F) + m->cpu.C)) {
+                m->cpu.scratch_lo -= 0x06;
+            }
+            if (a < value + m->cpu.C) {
+                m->cpu.scratch_lo -= 0x60;
+            }
+            read_from_memory(m, m->cpu.address_16);
+            CYCLE(m);
         }
-        m->cpu.A = (hi << 4) | (lo & 0x0F);
+        m->cpu.C = m->cpu.scratch_hi ? 0 : 1;
+        set_register_to_value(m, &m->cpu.A, m->cpu.scratch_lo);
     }
-    m->cpu.C = m->cpu.scratch_16 < 0x100 ? 1 : 0;
 }
 
 // Stage Helpers
@@ -157,6 +180,11 @@ static inline void branch(APPLE2 *m) {
         CYCLE(m);
     }
     m->cpu.pc += (int8_t)m->cpu.scratch_lo;
+}
+
+static inline void brk_pc(APPLE2 *m) {
+    m->cpu.pc = 0xFFFE;
+    al_read_pc(m);
 }
 
 static inline void p_from_stack(APPLE2 *m) {
@@ -208,14 +236,18 @@ static inline void a(APPLE2 *m) {
 }
 
 static inline void ar(APPLE2 *m) {
-    al_read_pc(m);
-    ah_read_pc(m);
+    a(m);
+    sl_read_a16(m);
+}
+
+static inline void arr(APPLE2 *m) {
+    a(m);
+    sl_read_a16(m);
     sl_read_a16(m);
 }
 
 static inline void arw(APPLE2 *m) {
-    al_read_pc(m);
-    ah_read_pc(m);
+    a(m);
     sl_read_a16(m);
     sl_write_a16(m);
 }
@@ -248,6 +280,18 @@ static inline void aipxr(APPLE2 *m) {
     if(m->cpu.address_lo < lo) {
         m->cpu.address_hi++;
     }
+}
+
+static inline void aixrr(APPLE2 *m) {
+    aix(m);
+    sl_read_a16(m);
+    sl_read_a16(m);
+}
+
+static inline void aipxrr(APPLE2 *m) {
+    aipxr(m);
+    sl_read_a16(m);
+    sl_read_a16(m);
 }
 
 static inline void aipxrw(APPLE2 *m) {
@@ -297,6 +341,18 @@ static inline void mixa(APPLE2 *m) {
     ah_read_a16_sl2al(m);
 }
 
+static inline void mixrr(APPLE2 *m) {
+    mix(m);
+    sl_read_a16(m);
+    sl_read_a16(m);
+}
+
+static inline void mixrw(APPLE2 *m) {
+    mix(m);
+    sl_read_a16(m);
+    sl_write_a16(m);
+}
+
 static inline void miy(APPLE2 *m) {
     al_read_pc(m);
     sl_read_a16(m);
@@ -331,9 +387,21 @@ static inline void miyr(APPLE2 *m) {
     }
 }
 
+static inline void miz(APPLE2 *m) {
+    al_read_pc(m);
+    sl_read_a16(m);
+    ah_read_a16_sl2al(m);
+}
+
 static inline void mizy(APPLE2 *m) {
     al_read_pc(m);
     read_a16_ind_y(m);
+}
+
+static inline void mrr(APPLE2 *m) {
+    al_read_pc(m);
+    sl_read_a16(m);
+    sl_read_a16(m);
 }
 
 static inline void mrw(APPLE2 *m) {
@@ -342,10 +410,18 @@ static inline void mrw(APPLE2 *m) {
     sl_write_a16(m);
 }
 
-static inline void mixrw(APPLE2 *m) {
-    mix(m);
-    sl_read_a16(m);
-    sl_write_a16(m);
+static inline void nop_pc(APPLE2 *m, int offset) {
+    read_from_memory(m, m->cpu.pc + offset);
+    CYCLE(m);
+}
+
+static inline void read_pc(APPLE2 *m) {
+    read_from_memory(m, m->cpu.pc);
+    CYCLE(m);
+}
+
+static inline void unimplemented(APPLE2 *m) {
+    m->cpu.cycles = -1;
 }
 
 // Instructions
@@ -357,9 +433,12 @@ static inline void adc_a16(APPLE2 *m) {
 
 static inline void adc_imm(APPLE2 *m) {
     m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
-    add_value_to_accumulator(m, m->cpu.scratch_lo);
     m->cpu.pc++;
     CYCLE(m);
+    add_value_to_accumulator(m, m->cpu.scratch_lo);
+    if(m->cpu.class == CPU_65c02 && m->cpu.D) {
+        m->cpu.address_16 = 0x56;
+    }
 }
 
 static inline void and_a16(APPLE2 *m) {
@@ -424,6 +503,13 @@ static inline void bit_a16(APPLE2 *m) {
     CYCLE(m);
 }
 
+static inline void bit_imm(APPLE2 *m) {
+    m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
+    CYCLE(m);
+    m->cpu.Z = (m->cpu.A & m->cpu.scratch_lo) == 0 ? -1 : 0;
+    m->cpu.pc++;
+}
+
 static inline void bmi(APPLE2 *m) {
     m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
     CYCLE(m);
@@ -451,6 +537,13 @@ static inline void bpl(APPLE2 *m) {
     }
 }
 
+static inline void bra(APPLE2 *m) {
+    m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
+    CYCLE(m);
+    m->cpu.address_16 = ++m->cpu.pc;
+    branch(m);
+}
+
 static inline void bvc(APPLE2 *m) {
     m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
     CYCLE(m);
@@ -475,7 +568,17 @@ static inline void brk_6502(APPLE2 *m) {
     m->cpu.pc = m->cpu.address_16;
     // Interrupt flag on at break
     m->cpu.flags |= 0b00000100;
-    CYCLE(m);
+}
+
+static inline void brk_65c02(APPLE2 *m) {
+    ah_read_pc(m);
+    m->cpu.pc = m->cpu.address_16;
+    // BCD flag off at break
+    m->cpu.flags &= ~0b00001000;
+    if(m->cpu.flags & 0b00100000) {
+        // Interrupt flag on at break, if '-' flag is set
+        m->cpu.flags |= 0b00000100;
+    }
 }
 
 static inline void clc(APPLE2 *m) {
@@ -541,6 +644,12 @@ static inline void cpy_imm(APPLE2 *m) {
     CYCLE(m);
 }
 
+static inline void dea(APPLE2 * m) {
+    read_from_memory(m, m->cpu.pc);
+    set_register_to_value(m, &m->cpu.A, m->cpu.A - 1);
+    CYCLE(m);
+}
+
 static inline void dec_a16(APPLE2 *m) {
     set_register_to_value(m, &m->cpu.scratch_hi, m->cpu.scratch_lo - 1);
     write_to_memory(m, m->cpu.address_16, m->cpu.scratch_hi);
@@ -578,6 +687,12 @@ static inline void inc_a16(APPLE2 *m) {
     CYCLE(m);
 }
 
+static inline void ina(APPLE2 * m) {
+    read_from_memory(m, m->cpu.pc);
+    set_register_to_value(m, &m->cpu.A, m->cpu.A + 1);
+    CYCLE(m);
+}
+
 static inline void inx(APPLE2 *m) {
     read_from_memory(m, m->cpu.pc);
     set_register_to_value(m, &m->cpu.X, m->cpu.X + 1);
@@ -592,19 +707,37 @@ static inline void iny(APPLE2 *m) {
 
 static inline void jmp_a16(APPLE2 *m) {
     m->cpu.pc = m->cpu.address_16;
-    CYCLE(m);
 }
 
 static inline void jmp_ind(APPLE2 *m) {
-    ah_read_a16_sl2al(m);
-    m->cpu.pc = m->cpu.address_16;
+    m->cpu.address_lo++;
+    m->cpu.scratch_hi = read_from_memory(m, m->cpu.address_16);
     CYCLE(m);
+    if(m->cpu.class == CPU_65c02) {
+        if(!m->cpu.address_lo) {
+            m->cpu.address_hi++;
+        }
+        m->cpu.scratch_hi = read_from_memory(m, m->cpu.address_16);
+        CYCLE(m);
+    }
+    m->cpu.pc = m->cpu.scratch_16;
+}
+
+static inline void jmp_ind_x(APPLE2 *m) {
+    a(m);
+    read_from_memory(m, m->cpu.pc - 2);
+    m->cpu.address_16 += m->cpu.X;
+    CYCLE(m);
+    sl_read_a16(m);
+    m->cpu.address_16++;
+    m->cpu.scratch_hi = read_from_memory(m, m->cpu.address_16);
+    CYCLE(m);
+    m->cpu.pc = m->cpu.scratch_16;
 }
 
 static inline void jsr_a16(APPLE2 *m) {
     ah_read_pc(m);
     m->cpu.pc = m->cpu.address_16;
-    CYCLE(m);
 }
 
 static inline void lda_a16(APPLE2 *m) {
@@ -673,6 +806,16 @@ static inline void ora_imm(APPLE2 *m) {
     CYCLE(m);
 }
 
+static inline void phx(APPLE2 *m) {
+    push(m, m->cpu.X);
+    CYCLE(m);
+}
+
+static inline void phy(APPLE2 *m) {
+    push(m, m->cpu.Y);
+    CYCLE(m);
+}
+
 static inline void pla(APPLE2 *m) {
     set_register_to_value(m, &m->cpu.A, pull(m));
     CYCLE(m);
@@ -680,6 +823,16 @@ static inline void pla(APPLE2 *m) {
 
 static inline void plp(APPLE2 *m) {
     m->cpu.flags = (pull(m) & ~0b00010000) | 0b00100000;            // Break flag off, but - flag on
+    CYCLE(m);
+}
+
+static inline void plx(APPLE2 *m) {
+    set_register_to_value(m, &m->cpu.X, pull(m));
+    CYCLE(m);
+}
+
+static inline void ply(APPLE2 *m) {
+    set_register_to_value(m, &m->cpu.Y, pull(m));
     CYCLE(m);
 }
 
@@ -694,17 +847,11 @@ static inline void php(APPLE2 *m) {
     CYCLE(m);
 }
 
-static inline void read_pc(APPLE2 *m) {
-    read_from_memory(m, m->cpu.pc);
-    CYCLE(m);
-}
-
 static inline void rol_a(APPLE2 *m) {
     uint8_t c = m->cpu.A & 0x80;
     read_pc(m);
     set_register_to_value(m, &m->cpu.A, (m->cpu.A << 1) | m->cpu.C);
     m->cpu.C = c ? 1 : 0;
-    CYCLE(m);
 }
 
 static inline void rol_a16(APPLE2 *m) {
@@ -720,7 +867,6 @@ static inline void ror_a(APPLE2 *m) {
     read_pc(m);
     set_register_to_value(m, &m->cpu.A, (m->cpu.A >> 1) | (m->cpu.C << 7));
     m->cpu.C = c;
-    CYCLE(m);
 }
 
 static inline void ror_a16(APPLE2 *m) {
@@ -734,44 +880,40 @@ static inline void ror_a16(APPLE2 *m) {
 static inline void rti(APPLE2 *m) {
     ah_from_stack(m);
     m->cpu.pc = m->cpu.address_16;
-    CYCLE(m);
 }
 
 static inline void rts(APPLE2 *m) {
     m->cpu.pc = m->cpu.address_16;
     al_read_pc(m);
-    CYCLE(m);
 }
 
 static inline void sbc_a16(APPLE2 *m) {
     m->cpu.scratch_lo = read_from_memory(m, m->cpu.address_16);
-    subtract_value_from_accumulator(m, m->cpu.scratch_lo);
     CYCLE(m);
+    subtract_value_from_accumulator(m, m->cpu.scratch_lo);
 }
 
 static inline void sbc_imm(APPLE2 *m) {
     m->cpu.scratch_lo = read_from_memory(m, m->cpu.pc);
-    subtract_value_from_accumulator(m, m->cpu.scratch_lo);
     m->cpu.pc++;
     CYCLE(m);
+    subtract_value_from_accumulator(m, m->cpu.scratch_lo);
+
 }
 
 static inline void sec(APPLE2 *m) {
     read_pc(m);
     m->cpu.C = 1;
-    CYCLE(m);
 }
 
 static inline void sed(APPLE2 *m) {
     read_pc(m);
     m->cpu.D = 1;
-    CYCLE(m);
 }
 
 static inline void sei(APPLE2 *m) {
     read_pc(m);
     m->cpu.I = 1;
-    CYCLE(m);
 }
 
 static inline void sta_a16(APPLE2 *m) {
@@ -789,38 +931,51 @@ static inline void sty_a16(APPLE2 *m) {
     CYCLE(m);
 }
 
+static inline void stz_a16(APPLE2 *m, uint8_t value) {
+    write_to_memory(m, m->cpu.address_16, value);
+    CYCLE(m);
+}
+
 static inline void tax(APPLE2 *m) {
     read_pc(m);
     set_register_to_value(m, &m->cpu.X, m->cpu.A);
-    CYCLE(m);
 }
 
 static inline void tay(APPLE2 *m) {
     read_pc(m);
     set_register_to_value(m, &m->cpu.Y, m->cpu.A);
+}
+
+static inline void trb(APPLE2 *m) {
+    m->cpu.Z = (m->cpu.A & m->cpu.scratch_lo) == 0;
+    m->cpu.scratch_lo = (m->cpu.A ^ 0xff) & m->cpu.scratch_lo;
+    write_to_memory(m, m->cpu.address_16, m->cpu.scratch_lo);
+    CYCLE(m);
+}
+
+static inline void tsb(APPLE2 *m) {
+    m->cpu.Z = (m->cpu.A & m->cpu.scratch_lo) == 0;
+    m->cpu.scratch_lo |= m->cpu.A;
+    write_to_memory(m, m->cpu.address_16, m->cpu.scratch_lo);
     CYCLE(m);
 }
 
 static inline void tsx(APPLE2 *m) {
     read_pc(m);
     set_register_to_value(m, &m->cpu.X, m->cpu.sp - 0x100);
-    CYCLE(m);
 }
 
 static inline void txa(APPLE2 *m) {
     read_pc(m);
     set_register_to_value(m, &m->cpu.A, m->cpu.X);
-    CYCLE(m);
 }
 
 static inline void txs(APPLE2 *m) {
     read_pc(m);
     m->cpu.sp = 0x100 + m->cpu.X;
-    CYCLE(m);
 }
 
 static inline void tya(APPLE2 *m) {
     read_pc(m);
     set_register_to_value(m, &m->cpu.A, m->cpu.Y);
-    CYCLE(m);
 }
