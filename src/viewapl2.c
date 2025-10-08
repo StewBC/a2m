@@ -234,9 +234,6 @@ void viewapl2_screen_apple2(APPLE2 *m) {
         }
         break;
     }
-
-    // Mark screen as updated now
-    m->screen_updated = 0;
 }
 
 // Display the lores screen in color

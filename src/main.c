@@ -4,13 +4,13 @@
 
 #include "header.h"
 
-#define TARGET_FPS      (1000000/60)                        // (cycles/sec) / (updates/sec) = cycles/update
+#define TARGET_FPS      60                                  // (cycles/sec) / (updates/sec) = cycles/update
 
 int main(int argc, char *argv[]) {
     int quit = 0;
     APPLE2 m;                                               // The Apple II machine
     VIEWPORT v;                                             // The view that will display the Apple II machine
-    Uint64 start_time, end_time;
+    Uint64 start_time, end_time, update_time = 0;
     Uint64 ticks_per_clock_cycle = SDL_GetPerformanceFrequency() / CPU_FREQUENCY; // Ticks per microsecond
 
     // Init the assembler error log
@@ -66,13 +66,13 @@ int main(int argc, char *argv[]) {
         viewdbg_update(&m);
 
         // Force an update of the current page at the desired frame rate
-        if(++m.screen_updated >= TARGET_FPS || m.stopped) {
-            // Assume hardware drives the display
+        if(SDL_GetPerformanceCounter() >= update_time || m.stopped) {
             v.shadow_screen_mode = m.screen_mode;
             v.shadow_active_page = m.active_page;
             viewport_show(&m);
             viewapl2_screen_apple2(&m);
             viewport_update(&m);
+            update_time = SDL_GetPerformanceCounter() + SDL_GetPerformanceFrequency() / TARGET_FPS;
         }
 
         if(!m.free_run) {

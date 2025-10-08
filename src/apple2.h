@@ -70,7 +70,6 @@ typedef struct APPLE2 {
     uint8_t closed_apple;
 
     // Screen State
-    int screen_updated;                                     // Counter - at TARGET_FPS forces screen update
     int screen_mode;
     int monitor_type;
 
