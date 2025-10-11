@@ -240,16 +240,14 @@ static inline void ar(APPLE2 *m) {
     sl_read_a16(m);
 }
 
-static inline void arr(APPLE2 *m) {
-    a(m);
-    sl_read_a16(m);
-    sl_read_a16(m);
-}
-
 static inline void arw(APPLE2 *m) {
     a(m);
     sl_read_a16(m);
-    sl_write_a16(m);
+    if(m->cpu.class == CPU_6502) {
+        sl_write_a16(m);
+    } else {
+        sl_read_a16(m);
+    }
 }
 
 static inline void aix(APPLE2 *m) {
@@ -288,16 +286,14 @@ static inline void aixrr(APPLE2 *m) {
     sl_read_a16(m);
 }
 
-static inline void aipxrr(APPLE2 *m) {
-    aipxr(m);
-    sl_read_a16(m);
-    sl_read_a16(m);
-}
-
 static inline void aipxrw(APPLE2 *m) {
     aipxr(m);
     sl_read_a16(m);
-    sl_write_a16(m);
+    if(m->cpu.class == CPU_6502) {
+        sl_write_a16(m);
+    } else {
+        sl_read_a16(m);
+    }
 }
 
 static inline void aiy(APPLE2 *m) {
@@ -341,16 +337,14 @@ static inline void mixa(APPLE2 *m) {
     ah_read_a16_sl2al(m);
 }
 
-static inline void mixrr(APPLE2 *m) {
-    mix(m);
-    sl_read_a16(m);
-    sl_read_a16(m);
-}
-
 static inline void mixrw(APPLE2 *m) {
     mix(m);
     sl_read_a16(m);
-    sl_write_a16(m);
+    if(m->cpu.class == CPU_6502) {
+        sl_write_a16(m);
+    } else {
+        sl_read_a16(m);
+    }
 }
 
 static inline void miy(APPLE2 *m) {
@@ -398,20 +392,18 @@ static inline void mizy(APPLE2 *m) {
     read_a16_ind_y(m);
 }
 
-static inline void mrr(APPLE2 *m) {
-    al_read_pc(m);
-    sl_read_a16(m);
-    sl_read_a16(m);
-}
-
 static inline void mrw(APPLE2 *m) {
     al_read_pc(m);
     sl_read_a16(m);
-    sl_write_a16(m);
+    if(m->cpu.class == CPU_6502) {
+        sl_write_a16(m);
+    } else {
+        sl_read_a16(m);
+    }
 }
 
-static inline void nop_pc(APPLE2 *m, int offset) {
-    read_from_memory(m, m->cpu.pc + offset);
+static inline void read_pc_1(APPLE2 *m) {
+    read_from_memory(m, m->cpu.pc - 1);
     CYCLE(m);
 }
 
@@ -422,6 +414,14 @@ static inline void read_pc(APPLE2 *m) {
 
 static inline void unimplemented(APPLE2 *m) {
     m->cpu.cycles = -1;
+}
+
+// Pipeline selectors
+static inline void aixr_sel(APPLE2 *m) {
+    if (m->cpu.class == CPU_6502)
+        aipxrw(m);
+    else
+        aixrr(m);
 }
 
 // Instructions
@@ -562,22 +562,19 @@ static inline void bvs(APPLE2 *m) {
     }
 }
 
-static inline void brk_6502(APPLE2 *m) {
+static inline void brk(APPLE2 *m) {
     m->cpu.pc = 0xFFFE;
     a(m);
     m->cpu.pc = m->cpu.address_16;
-    // Interrupt flag on at break
-    m->cpu.flags |= 0b00000100;
-}
-
-static inline void brk_65c02(APPLE2 *m) {
-    ah_read_pc(m);
-    m->cpu.pc = m->cpu.address_16;
-    // BCD flag off at break
-    m->cpu.flags &= ~0b00001000;
-    if(m->cpu.flags & 0b00100000) {
-        // Interrupt flag on at break, if '-' flag is set
+    if(m->cpu.class == CPU_6502) {
+        // Interrupt flag on at break
         m->cpu.flags |= 0b00000100;
+    } else {
+        m->cpu.flags &= ~0b00001000;
+        if(m->cpu.flags & 0b00100000) {
+            // Interrupt flag on at break, if '-' flag is set
+            m->cpu.flags |= 0b00000100;
+        }
     }
 }
 

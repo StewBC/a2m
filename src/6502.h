@@ -91,7 +91,7 @@ void pages_map_memory_block(PAGES * pages, MEMORY_BLOCK * block);
 void cpu_init(APPLE2 *m);
 
 // Step the apple2 a single opcode
-void machine_run_opcode_6502(APPLE2 *m);
+void machine_run_opcode(APPLE2 *m);
 
 // Helper calls that access the mapped in memory
 uint8_t read_from_memory(APPLE2 * m, uint16_t address);

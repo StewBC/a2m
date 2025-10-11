@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
 
         // Step the sim one full instruction - several cycles
         int cycles = m.cpu.cycles;
-        machine_run_opcode_6502(&m);
+        machine_run_opcode(&m);
         cycles = m.cpu.cycles - cycles;
         
         // Add speaker - in loop for 1 cycle or here for "instruction's" cycles
