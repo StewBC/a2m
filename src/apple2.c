@@ -10,9 +10,14 @@ int apple2_configure(APPLE2 *m) {
     // Clear the whole emulated machine
     memset(m, 0, sizeof(APPLE2));
 
+    m->model = MODEL_APPLE_IIEE;
+    m->cpu.class = CPU_65c02;
+    m->ram_size = 1024 * (m->model ? 128 : 64);
+
     // Allocate the RAM
-    m->RAM_MAIN = (uint8_t *) malloc(RAM_SIZE);
-    m->RAM_WATCH = (uint8_t *) malloc(RAM_SIZE);
+    m->RAM_MAIN = (uint8_t *) malloc(m->ram_size);
+    memset(&m->RAM_MAIN[0xc000], 0, 0x100); // SQW Hack till I get all softswitches working
+    m->RAM_WATCH = (uint8_t *) malloc(m->ram_size);
     if(!m->RAM_MAIN || !m->RAM_WATCH) {
         return A2_ERR;
     }
@@ -21,17 +26,25 @@ int apple2_configure(APPLE2 *m) {
         return A2_ERR;
     }
     // RAM
-    if(!memory_init(&m->ram, 1)) {
+    if(!memory_init(&m->ram, m->model ? 2 : 1)) {
         return A2_ERR;
     }
-    memory_add(&m->ram, 0, 0x0000, RAM_SIZE, m->RAM_MAIN);
-
+    memory_add(&m->ram, 0, 0x0000, BANK_SIZE, &m->RAM_MAIN[0]);
+    if(m->model) {
+        memory_add(&m->ram, 1, 0x0000, BANK_SIZE, &m->RAM_MAIN[BANK_SIZE]);
+    }
     // ROMS
     if(!memory_init(&m->roms, ROM_NUM_ROMS)) {
         return A2_ERR;
     }
-    memory_add(&m->roms, ROM_APPLE, 0xD000, apple2_rom_size, apple2_rom);
-    memory_add(&m->roms, ROM_CHARACTER, 0x0000, apple_character_rom_size, apple_character_rom);
+    if(!m->model) {
+        memory_add(&m->roms, ROM_APPLE2, 0xD000, a2p_rom_size, a2p_rom);
+        memory_add(&m->roms, ROM_APPLE2_CHARACTER, 0x0000, a2p_character_rom_size, a2p_character_rom);
+    } else {
+        memory_add(&m->roms, ROM_APPLE2, 0xD000, 0x3000, &a2ee_rom[0X1000]);
+        memory_add(&m->roms, ROM_APPLE2_SLOTS, 0xC100, 0xF00, &a2ee_rom[0X100]);
+        memory_add(&m->roms, ROM_APPLE2_CHARACTER, 0x0000, a2ee_character_rom_size, a2ee_character_rom);
+    }
     memory_add(&m->roms, ROM_DISKII_13SECTOR, 0xC000, 256, disk2_rom[DSK_ENCODING_13SECTOR]);
     memory_add(&m->roms, ROM_DISKII_16SECTOR, 0xC000, 256, disk2_rom[DSK_ENCODING_16SECTOR]);
     memory_add(&m->roms, ROM_SMARTPORT, 0xC000, smartport_rom_size, smartport_rom);
@@ -39,23 +52,23 @@ int apple2_configure(APPLE2 *m) {
     memory_add(&m->roms, ROM_FRANKLIN_ACE_CHARACTER, 0x0000, franklin_ace_character_rom_size, franklin_ace_character_rom);
 
     // PAGES
-    if(!pages_init(&m->read_pages, RAM_SIZE / PAGE_SIZE)) {
+    if(!pages_init(&m->read_pages, BANK_SIZE / PAGE_SIZE)) {
         return A2_ERR;
     }
-    if(!pages_init(&m->write_pages, RAM_SIZE / PAGE_SIZE)) {
+    if(!pages_init(&m->write_pages, BANK_SIZE / PAGE_SIZE)) {
         return A2_ERR;
     }
-    if(!pages_init(&m->watch_pages, RAM_SIZE / PAGE_SIZE)) {
+    if(!pages_init(&m->watch_pages, BANK_SIZE / PAGE_SIZE)) {
         return A2_ERR;
     }
     // Map main write ram
-    pages_map_memory_block(&m->write_pages, &m->ram.blocks[MAIN_RAM]);
+    pages_map(&m->write_pages, 0, BANK_SIZE / PAGE_SIZE, m->ram.blocks[MAIN_RAM].bytes);
 
     // Map read ram (same as write ram in this case)
-    pages_map_memory_block(&m->read_pages, &m->ram.blocks[MAIN_RAM]);
+    pages_map(&m->read_pages, 0, BANK_SIZE / PAGE_SIZE, m->ram.blocks[MAIN_RAM].bytes);
 
-    // Map the roms as read pages
-    pages_map_memory_block(&m->read_pages, &m->roms.blocks[ROM_APPLE]);
+    // Map the rom ($D000-$FFFF) as read pages
+    pages_map_memory_block(&m->read_pages, &m->roms.blocks[ROM_APPLE2]);
 
     // Install the watch callbacks
     m->callback_write = apple2_softswitch_write_callback;
@@ -63,7 +76,7 @@ int apple2_configure(APPLE2 *m) {
     m->callback_breakpoint = breakpoint_callback;
 
     // Map watch area checks - start with no watch
-    memset(m->RAM_WATCH, 0, RAM_SIZE);
+    memset(m->RAM_WATCH, 0, BANK_SIZE);
 
     // Add the IO ports by flagging them as 1 in the RAM watch
     memset(m->RAM_WATCH + 0xC001, 1, 0xFE);                 // Skip KBD
@@ -71,7 +84,7 @@ int apple2_configure(APPLE2 *m) {
     m->RAM_WATCH[CLRROM] = 1;
 
     // Set up the Watch Pages (RAM_WATCH can be changed without re-doing the map)
-    pages_map(&m->watch_pages, 0, RAM_SIZE / PAGE_SIZE, m->RAM_WATCH);
+    pages_map(&m->watch_pages, 0, BANK_SIZE / PAGE_SIZE, m->RAM_WATCH);
 
     // Configure the LC using the same function the soft switches would, so the
     // same way, meaning call 2x to enable ROM and WRITE
@@ -81,11 +94,11 @@ int apple2_configure(APPLE2 *m) {
     // Init the CPU to cold-start by jumping to ROM address at 0xfffc
     cpu_init(m);
 
-    // Configure slots from the ini file (after cpu init as this could set cpu.sp so smartport can boot on a II+)
+    // Configure slots from the ini file (after cpu init as this could set cpu.pc so smartport can boot on a II+)
     if(A2_OK != util_ini_load_file("./apple2.ini", apple2_ini_load_callback, (void *) m)) {
         // If apple2.ini doesn't successfully load, just add a smartport in slot 7
-        slot_add_card(m, 7, SLOT_TYPE_SMARTPORT, &m->sp_device[7], &m->roms.blocks[ROM_SMARTPORT].bytes[0x700], NULL);
-        slot_add_card(m, 6, SLOT_TYPE_DISKII, &m->diskii_controller[6], &m->roms.blocks[ROM_DISKII_16SECTOR].bytes[0x700], NULL);
+        // slot_add_card(m, 7, SLOT_TYPE_SMARTPORT, &m->sp_device[7], &m->roms.blocks[ROM_SMARTPORT].bytes[0x700], NULL);
+        // slot_add_card(m, 6, SLOT_TYPE_DISKII, &m->diskii_controller[6], &m->roms.blocks[ROM_DISKII_16SECTOR].bytes[0x700], NULL);
     }
 
     return A2_OK;
@@ -127,7 +140,6 @@ void apple2_ini_load_callback(void *user_data, char *section, char *key, char *v
                 if(0 != strcmp(value, "0") && m->sp_device[slot_number].sp_files[0].is_file_open) {
                     // The rom doesn't get a chance to run but fortunately ProDOS does just fine
                     m->cpu.pc = 0xc000 + slot_number * 0x100;
-                    // m->cpu.instruction_cycle = -1; // SQW 6 Oct 2025
                 }
             }
         }
@@ -219,17 +231,50 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
     } else if(address >= 0xc100 && address <= 0xcFFE) {
         // Map the C800 ROM based on access to Cs00, if card provides a C800 ROM
         int slot = (address >> 8) & 0x7;
-        if(!m->slot_cards[slot].cx_rom_mapped && m->slot_cards[slot].slot_map_cx_rom) {
-            m->slot_cards[slot].slot_map_cx_rom(m, address);
-            m->slot_cards[slot].cx_rom_mapped = 1;
+        if(!((slot != 3 && m->cxromset) || (slot == 3 && m->c3romset))) {
+            if(!m->slot_cards[slot].cx_rom_mapped && m->slot_cards[slot].slot_map_cx_rom) {
+                m->slot_cards[slot].slot_map_cx_rom(m, address);
+                m->slot_cards[slot].cx_rom_mapped = 1;
+            }
         }
     } else {
         // Everything else
         switch(address) {
             case KBD:
                 break;
+            case SET80COL:  //e
+                break;
+            case CLRCXROM:  //e
+                m->cxromset = 0;
+                pages_map(&m->read_pages, 0xC100 / PAGE_SIZE, 0x200 / PAGE_SIZE, &m->RAM_MAIN[0xC100]);
+                pages_map(&m->read_pages, 0xC400 / PAGE_SIZE, 0xC00 / PAGE_SIZE, &m->RAM_MAIN[0xC400]);
+                break;
+            case SETCXROM:  //e
+                m->cxromset = 1;
+                pages_map(&m->read_pages, 0xC100 / PAGE_SIZE, 0x200 / PAGE_SIZE, m->roms.blocks[ROM_APPLE2_SLOTS].bytes);
+                pages_map(&m->read_pages, 0xC400 / PAGE_SIZE, 0xC00 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x300]);
+                break;
+            case CLRC3ROM:
+                m->c3romset = 0;
+                pages_map(&m->read_pages, 0xC300 / PAGE_SIZE, 0x100 / PAGE_SIZE, &m->RAM_MAIN[0xC300]);
+                break;
+            case SETC3ROM:
+                m->c3romset = 1;
+                // The slot starts at 0xc100 so + 0x200 = 0xc300
+                pages_map(&m->read_pages, 0xC300 / PAGE_SIZE, 0x100 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x200]);
+                break;
             case KBDSTRB:
                 m->write_pages.pages[KBD / PAGE_SIZE].bytes[KBD % PAGE_SIZE] &= 0x7F;
+                break;
+            case RDCXROM:   //e
+                return (m->cxromset << 7);
+                break;
+            case RDC3ROM:   //e
+                return (m->c3romset << 7);
+                break;
+            case RD80COL:   //e
+                break;
+            case RDPAGE2:   //e
                 break;
             case A2SPEAKER:
                 speaker_toggle(&m->speaker);
@@ -258,6 +303,14 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
             case HIRES:
                 m->screen_mode |= SCREEN_MODE_HIRES;
                 break;
+            case SETAN0: //e
+                break;
+            case SETAN1: //e
+                break;
+            case CLRAN2: //e
+                break;
+            case CLRAN3: //e
+                break;
             case BUTN0:
                 return m->open_apple;
                 break;
@@ -268,7 +321,7 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
             case PADDL1:
             case PADDL2:
             case PADDL3:
-            case PTRIG:
+            case PTRIG: // read SDL joystick here and record cycle counter
                 return 255;
             case CLRROM: {
                     for(int i = 1; i < 8; i++) {

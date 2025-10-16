@@ -4,9 +4,11 @@
 
 #pragma once
 
-#define RAM_SIZE        (64*1024)
+// These values are for the 65x02 address space - so 64K.  
+// This is not the RAM the machine has, just what the CPU can see at any one time
+#define BANK_SIZE       (64*1024)
 #define PAGE_SIZE       (256)
-#define NUM_PAGES       ((RAM_SIZE)/(PAGE_SIZE))
+#define NUM_PAGES       ((BANK_SIZE)/(PAGE_SIZE))
 
 /* A MEMORY_BLOCK tracks a block of bytes, be that ROM, MEMORY or IO Port*/
 typedef struct MEMORY_BLOCK {

@@ -5,7 +5,16 @@
 #pragma once
 
 #define KBD             0xC000                              // Port where the Apple II reads what keys are down
+#define SET80COL        0xC001
+#define CLRCXROM        0xC006
+#define SETCXROM        0xC007
+#define CLRC3ROM        0xC00A
+#define SETC3ROM        0xC00B
 #define KBDSTRB         0xC010                              // Port where the Apple II acknowledges a key press (clears it)
+#define RDCXROM         0xC015
+#define RDC3ROM         0xc017
+#define RD80COL         0xC018
+#define RDPAGE2         0xC01C
 #define A2SPEAKER       0xC030                              // Port that toggles the speaker
 #define TXTCLR          0xC050                              // Enable graphics (lores or hires)
 #define TXTSET          0xC051                              // Enable text
@@ -15,6 +24,10 @@
 #define HISCR           0xC055                              // Page 2
 #define LORES           0xC056                              // Enable Lores graphics (Disable Hires)
 #define HIRES           0xC057                              // Enable Hires graphics (Disable Lores)
+#define SETAN0          0xC058
+#define SETAN1          0xC05A
+#define CLRAN2          0xC05D
+#define CLRAN3          0xC05F
 #define BUTN0           0xC061                              // Open-Apple key
 #define BUTN1           0xC062                              // Closed-Apple key
 #define PADDL0          0xC064                              // Paddle / Joystick related

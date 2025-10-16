@@ -1,0 +1,22 @@
+[Display]
+scale = 1.0                   ; Uniformly scale Application Window
+disk_leds = 1                 ; Show disk activity LEDs
+
+[Video]
+slot = 3
+device = Franklin Ace Display ; 80 Column Videx like card
+
+[DiskII]
+slot = 6                      ; This says a slot contains a disk ii controller
+disk0 = ./disks/World Class Leaderboard side A program disk.nib
+disk1 = ./disks/World Class Leaderboard side B course disk.nib
+
+[SmartPort]
+slot = 5                      ; This says a slot contains a smartport
+disk0 = ./disks/Total Replay v5.2.hdv
+disk1 = ./disks/pixel.parade.po
+boot = 0
+slot = 7                      ; This says a slot contains a smartport
+disk0 = ./disks/ProDOS_2_4_2.po
+disk1 = ./disks/Total Replay II v1.0-alpha.4.hdv
+boot = 0                      ; any value other than 0 will cause a boot of disk0

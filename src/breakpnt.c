@@ -80,7 +80,7 @@ void breakpoint_reapply_address_masks(APPLE2 *m) {
     FLOWMANAGER *b = &m->viewport->debugger.flowmanager;
     int items = b->breakpoints.items;
     // Clear all the callback masks for access breakpoints
-    for(size_t i = 0; i < RAM_SIZE; i++) {
+    for(size_t i = 0; i < BANK_SIZE; i++) {
         m->RAM_WATCH[i] &= ~6;                              // See BREAKPOINT access for reason
     }
     // re-install the masks for the active breakpoints

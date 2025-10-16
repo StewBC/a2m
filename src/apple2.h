@@ -10,6 +10,12 @@
 // The calc is 14,318,181 Hz crystal / 912 ticks per scanline (65 PH0 *14 ticks + 2 tick stretched clock) *65 PH0 per scanline.
 #define CPU_FREQUENCY   1020484.4
 
+// Supported Apple II Models
+enum {
+    MODEL_APPLE_II_PLUS,
+    MODEL_APPLE_IIEE,
+};
+
 // RAM
 enum {
     MAIN_RAM,
@@ -18,8 +24,9 @@ enum {
 
 // ROM
 enum {
-    ROM_APPLE,
-    ROM_CHARACTER,
+    ROM_APPLE2,
+    ROM_APPLE2_SLOTS,
+    ROM_APPLE2_CHARACTER,
     ROM_DISKII_13SECTOR,
     ROM_DISKII_16SECTOR,
     ROM_FRANKLIN_ACE_DISPLAY,
@@ -62,7 +69,8 @@ typedef struct APPLE2 {
     FRANKLIN_DISPLAY franklin_display;                      // Franklin Display 80 col card
 
     // Base setup
-    uint8_t *RAM_MAIN;                                      // The 64K MEMORY
+    uint32_t ram_size;                                      // How much ram this machine has
+    uint8_t *RAM_MAIN;                                      // The ram_size MEMORY - addressable in max 64k chunks
     uint8_t *RAM_WATCH;                                     // 64K of IO port "mask" (0 = is not a port)
 
     // keyboard
@@ -74,6 +82,9 @@ typedef struct APPLE2 {
     int monitor_type;
 
     // Status flags
+    int cxromset: 1;
+    int c3romset: 1;
+    int model: 2;                                           // (0) II+ or (1) //e
     int original_del: 1;                                    // backspace key does crsr left if 0
     int cols80active: 1;                                    // Videx/Franklin Ace Display active
     int active_page: 1;                                     // 0x2000 or 0x4000 - active hires bytes page

@@ -256,6 +256,7 @@ int util_file_open(UTIL_FILE *f, const char *file_name, const char *file_mode) {
     f->file_mode = strdup(file_mode);
     f->file_display_name = util_strrtok(f->file_path, "\\/");
     f->file_display_name = f->file_display_name ? (f->file_display_name + 1) : f->file_path;
+    f->is_used = 1;
 
     // Get size (and validate regular file) via stat
     uint64_t fsz = 0, mt = 0;

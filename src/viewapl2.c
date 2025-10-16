@@ -451,22 +451,22 @@ void viewapl2_screen_txt(APPLE2 *m, int start, int end) {
             // Get the character on screen
             int character = m->RAM_MAIN[address + x];
             // See if inverse
-            uint8_t inv = (~character >> 7) & 1;
+            uint8_t inv = ~(~character >> 7) & 1;
             // Get the font offset in the font blocks
-            uint8_t *character_font = &m->roms.blocks[ROM_CHARACTER].bytes[character * 8];
+            uint8_t *character_font = &m->roms.blocks[ROM_APPLE2_CHARACTER].bytes[character * 8];
             // "Plot" the character to the SDL graphics screen
             uint32_t *pr = p;
             for(r = 0; r < 8; r++) {
                 uint8_t pixels = *character_font++;
-                for(int i = 6; i >= 0; i--) {
-                    pr[i] = c[inv ^ (pixels & 1)];
-                    pixels >>= 1;
-                }
-                // This is for //e font
-                // for(int i=0; i < 7 ; i++) {
+                // for(int i = 6; i >= 0; i--) {
                 //     pr[i] = c[inv ^ (pixels & 1)];
                 //     pixels >>= 1;
                 // }
+                // This is for //e font
+                for(int i=0; i < 7 ; i++) {
+                    pr[i] = c[inv ^ (pixels & 1)];
+                    pixels >>= 1;
+                }
                 pr += surface->w;
             }
             p += 7;

@@ -359,7 +359,7 @@ void viewmisc_show(APPLE2 *m) {
             RAM_CARD *lc = &m->ram_card;
             nk_layout_row_dynamic(ctx, 26, 4);
             if(nk_option_label(ctx, "Read ROM", lc->read_ram_enable ? 0 : 1) && lc->read_ram_enable) {
-                pages_map_memory_block(&m->read_pages, &m->roms.blocks[ROM_APPLE]);
+                pages_map_memory_block(&m->read_pages, &m->roms.blocks[ROM_APPLE2]);
                 lc->read_ram_enable = 0;
             }
             if(nk_option_label(ctx, "Read RAM", lc->read_ram_enable ? 1 : 0) && !lc->read_ram_enable) {

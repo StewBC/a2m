@@ -806,11 +806,11 @@ void viewport_update(APPLE2 *m) {
         SDL_UpdateTexture(v->texture, NULL, v->surface->pixels, v->surface->pitch);
         SDL_RenderCopy(v->renderer, v->texture, NULL, &v->target_rect);
     }
-    if(v->debug_view) {
-        // In debug view, the A2 screen is maybe small black on black so outline it
-        SDL_SetRenderDrawColor(v->renderer, 255, 255, 255, 255);
-        SDL_RenderDrawRect(v->renderer, &v->target_rect);
-    }
+    // if(v->debug_view) {
+    //     // In debug view, the A2 screen is maybe small black on black so outline it
+    //     SDL_SetRenderDrawColor(v->renderer, 255, 255, 255, 255);
+    //     SDL_RenderDrawRect(v->renderer, &v->target_rect);
+    // }
     nk_sdl_render(NK_ANTI_ALIASING_ON);
     if(v->show_leds) {
         if(m->disk_activity_read) {

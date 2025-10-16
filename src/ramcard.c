@@ -32,7 +32,7 @@ uint8_t ram_card(APPLE2 *m, uint16_t address, uint16_t value) {
         pages_map(&m->read_pages, 0xD000 / PAGE_SIZE, 0x1000 / PAGE_SIZE, &lc->RAM[lc->bank2_enable ? 0x1000 : 0x0000]);
         pages_map(&m->read_pages, 0xE000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &lc->RAM[0x2000]);
     } else {
-        pages_map_memory_block(&m->read_pages, &m->roms.blocks[ROM_APPLE]);
+        pages_map_memory_block(&m->read_pages, &m->roms.blocks[ROM_APPLE2]);
     }
 
     if(lc->write_enable) {
