@@ -42,6 +42,17 @@ int txt_row_start[] = {
 
 // Use the Holger Picker sliding window method
 // https://groups.google.com/g/comp.sys.apple2.programmer/c/iSmIAVA95WA/m/KKsYkTgfWSEJ
+//
+// 000 = black
+// 001 = black
+// 010 = purple/blue
+// 011 = white
+// 100 = black
+// 101 = green/orange
+// 110 = white
+// 111 = white
+// 2 x with phase selecting alternate color
+
 mRGB palette[16] = {
     { 0X00, 0X00, 0X00 },                                   // HGR_BLACK
     { 0X00, 0X00, 0X00 },                                   // HGR_BLACK
@@ -99,7 +110,44 @@ mRGB lores_palette_mono[16] = {
     { 0xFF, 0xFF, 0xFF },
 };
 
-uint32_t color_table[8][2][2];                              // [bit_stream][column][phase]
+// color_table
+uint32_t color_table[8][2][2]; // [bit_stream, 3 bits][column, even/odd][phase]
+
+// Look Up Table with all cobinations of pixel values for color
+typedef struct {
+    uint32_t pixel[7];   // final RGBA pixels for p[px..px+6]
+} HGRLUTENTRY;
+// byte      : 0..127   (128) - byte & 0x7F (the 7 pixel bits)
+// next_lsb  : 0..1     (2)   - next_byte & 1
+// prev_bit  : 0..1     (2)   - previous bit from the prior column
+// phase     : 0..1     (2)   - (byte >> 7) & 1
+// start_bit : 0..1     (2)   - bit_column & 1
+// --------------------------------
+// total entries = 128 * 2 * 2 * 2 * 2 = 2048
+static HGRLUTENTRY hgr_lut[128][2][2][2][2];
+// Look Up Table with monochrome
+typedef struct {
+    uint32_t pixel[7];
+} HGRMONOLUTENTRY;
+static HGRMONOLUTENTRY hgr_mono_lut[128];
+// Lookup tables for lores
+static uint32_t gr_lut[16];
+static uint32_t gr_mono_lut[16];
+// A character width line of pixels for lores
+static uint32_t gr_line[16][7];
+static uint32_t gr_mono_line[16][7];
+
+// Reverse the bytes of the 2ee character rom so I can use the II+ render code
+void viewapl2_init_character_rom_2e(APPLE2 *m) {
+    for(int byte = 0; byte < a2ee_character_rom_size; ++byte) {
+        uint8_t x = a2ee_character_rom[byte];
+        x = (x >> 4) | (x << 4);
+        x = ((x & 0xCC) >> 2) | ((x & 0x33) << 2);
+        x = ((x & 0xAA) >> 1) | ((x & 0x55) << 1);
+        x = ~x;
+        a2ee_character_rom[byte] = x;
+    }
+}
 
 // Initialize the color_table once, outside the rendering function
 void viewapl2_init_color_table(APPLE2 *m) {
@@ -116,6 +164,48 @@ void viewapl2_init_color_table(APPLE2 *m) {
             }
         }
     }
+
+    // Init the hgr_lut table
+    for (int byte = 0; byte < 128; ++byte) {
+        for (int next_lsb = 0; next_lsb < 2; ++next_lsb) {
+            for (int prev_bit = 0; prev_bit < 2; ++prev_bit) {
+                for (int phase = 0; phase < 2; ++phase) {
+                    for (int start_bit = 0; start_bit < 2; ++start_bit) {
+                        int stream = (next_lsb << 8) | (byte << 1) | prev_bit;
+                        int parity = start_bit;
+
+                        for (int b = 0; b < 7; ++b) {
+                            int bit_stream = stream & 0b111;                 // same 3-bit window
+                            hgr_lut[byte][next_lsb][prev_bit][phase][start_bit].pixel[b] =
+                                color_table[bit_stream][parity][phase];
+                            stream >>= 1;                                    // slide window
+                            parity ^= 1;                                     // flip each pixel
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Init the hgr_mono_lut table
+    for (int byte = 0; byte < 128; ++byte) {
+        uint8_t x = byte;
+        for (int i = 0; i < 7; ++i) {
+            hgr_mono_lut[byte].pixel[i] = (x & 1) ? color_table[0][0][0] : color_table[7][0][0];
+            x >>= 1;
+        }
+    }
+
+    // Init lores
+    for(int byte = 0; byte < 16; ++byte) {
+        gr_lut[byte] = SDL_MapRGB(format, lores_palette[byte].r, lores_palette[byte].g, lores_palette[byte].b);
+        gr_mono_lut[byte] = SDL_MapRGB(format, lores_palette_mono[byte].r, lores_palette_mono[byte].g, lores_palette_mono[byte].b);
+        for(int i = 0; i < 7; ++i) {
+            gr_line[byte][i] = gr_lut[byte];
+            gr_mono_line[byte][i] = gr_mono_lut[byte];
+        }
+    }
+
 }
 
 void viewapl2_process_event(APPLE2 *m, SDL_Event *e) {
@@ -262,28 +352,12 @@ void viewapl2_screen_lores(APPLE2 *m, int start, int end) {
             uint8_t upper = character & 0x0f;
             uint8_t lower = (character >> 4) & 0X0F;
             uint32_t *pr = p;
-            uint32_t pu = SDL_MapRGB(surface->format, lores_palette[upper].r, lores_palette[upper].g, lores_palette[upper].b);
-            uint32_t pl = SDL_MapRGB(surface->format, lores_palette[lower].r, lores_palette[lower].g, lores_palette[lower].b);
-
             for(r = 0; r < 4; r++) {
-                pr[0] = pu;
-                pr[1] = pu;
-                pr[2] = pu;
-                pr[3] = pu;
-                pr[4] = pu;
-                pr[5] = pu;
-                pr[6] = pu;
+                memcpy(pr, gr_line[upper], sizeof(gr_line[upper]));
                 pr += surface->w;
             }
-
             for(r = 0; r < 4; r++) {
-                pr[0] = pl;
-                pr[1] = pl;
-                pr[2] = pl;
-                pr[3] = pl;
-                pr[4] = pl;
-                pr[5] = pl;
-                pr[6] = pl;
+                memcpy(pr, gr_line[lower], sizeof(gr_line[lower]));
                 pr += surface->w;
             }
             p += 7;
@@ -312,30 +386,12 @@ void viewapl2_screen_lores_mono(APPLE2 *m, int start, int end) {
             uint8_t upper = character & 0x0f;
             uint8_t lower = (character >> 4) & 0X0F;
             uint32_t *pr = p;
-            uint32_t pu =
-                SDL_MapRGB(surface->format, lores_palette_mono[upper].r, lores_palette_mono[upper].g, lores_palette_mono[upper].b);
-            uint32_t pl =
-                SDL_MapRGB(surface->format, lores_palette_mono[lower].r, lores_palette_mono[lower].g, lores_palette_mono[lower].b);
-
             for(r = 0; r < 4; r++) {
-                pr[0] = pu;
-                pr[1] = pu;
-                pr[2] = pu;
-                pr[3] = pu;
-                pr[4] = pu;
-                pr[5] = pu;
-                pr[6] = pu;
+                memcpy(pr, gr_mono_line[upper], sizeof(gr_mono_line[upper]));
                 pr += surface->w;
             }
-
             for(r = 0; r < 4; r++) {
-                pr[0] = pl;
-                pr[1] = pl;
-                pr[2] = pl;
-                pr[3] = pl;
-                pr[4] = pl;
-                pr[5] = pl;
-                pr[6] = pl;
+                memcpy(pr, gr_mono_line[lower], sizeof(gr_mono_line[lower]));
                 pr += surface->w;
             }
             p += 7;
@@ -362,34 +418,29 @@ void viewapl2_screen_hgr(APPLE2 *m, int start, int end) {
         uint16_t address = page + hgr_row_start[y];
         uint8_t byte = m->RAM_MAIN[address];
 
-        int current_stream = 0;
-        for(int column = 0, bit_column = 0; column < 40; column++) {
-            // Extract the phase from the byte
-            int phase = (byte & 0x80) >> 7;
+        int bit_column = 0;                // start of scanline
+        int prev_bit    = 0;               // first column "left neighbor" is 0
 
-            // Read the next byte
-            uint8_t next_byte = 0;
-            if(column + 1 < 40) {
-                next_byte = m->RAM_MAIN[address + column + 1];
-            }
-            // Prepare the current stream as the next byte (for lsb), the current byte and the last
-            // current bit (now prev bit)
-            current_stream = ((next_byte & 0x01) << 8) | ((byte & 0x7F) << 1) | (current_stream & 1);
+        for (int col = 0; col < 40; ++col) {
+            uint8_t next_byte = (col + 1 < 40) ? m->RAM_MAIN[address + col + 1] : 0;
+            int next_lsb = next_byte & 1;
+            int phase   = (byte >> 7) & 1;
 
-            // Process the 7 bits
-            for(int bit_position = 0; bit_position < 7; bit_position++) {
-                // Get the 3 bits that matter
-                int bit_stream = current_stream & 0b111;
-                // and shift right so that the current bit becomes the prev bit
-                current_stream >>= 1;
+            const HGRLUTENTRY* e = &hgr_lut[byte & 0x7F][next_lsb][prev_bit][phase][bit_column];
 
-                // Find the pixel color, and plot it
-                uint32_t pixel_rgb = color_table[bit_stream][bit_column][phase];
-                p[px++] = pixel_rgb;
-                bit_column ^= 1;
-            }
+            // emit the 7 pixels already expanded in the LUT
+            p[px+0] = e->pixel[0]; 
+            p[px+1] = e->pixel[1]; 
+            p[px+2] = e->pixel[2];
+            p[px+3] = e->pixel[3]; 
+            p[px+4] = e->pixel[4]; 
+            p[px+5] = e->pixel[5];
+            p[px+6] = e->pixel[6];
+            px += 7;
 
-            // Prepare for the next iteration
+            // prepare for next column
+            bit_column ^= 1;                // 7 flips net to one flip per column
+            prev_bit = (byte >> 6) & 1;     // current byte's bit 6 (msb ignoring phase bit)
             byte = next_byte;
         }
     }
@@ -409,23 +460,17 @@ void viewapl2_screen_hgr_mono(APPLE2 *m, int start, int end) {
         uint32_t *p = &pixels[y * surface->w];
         int address = page + hgr_row_start[y];
 
-        // Loop through every bytes (40 iterations for each 280-pixel row)
+        // Loop through every column (40 iterations for each 280-pixel row)
         uint8_t *bytes = &m->RAM_MAIN[address];
         for(int x = 0; x < 40; x++) {
-            uint8_t pixels = *bytes++;
-            p[0] = c[pixels & 1];
-            pixels >>= 1;
-            p[1] = c[pixels & 1];
-            pixels >>= 1;
-            p[2] = c[pixels & 1];
-            pixels >>= 1;
-            p[3] = c[pixels & 1];
-            pixels >>= 1;
-            p[4] = c[pixels & 1];
-            pixels >>= 1;
-            p[5] = c[pixels & 1];
-            pixels >>= 1;
-            p[6] = c[pixels & 1];
+            const HGRMONOLUTENTRY *e = &hgr_mono_lut[*bytes++ & 0x7F];
+            p[0]=e->pixel[0]; 
+            p[1]=e->pixel[1]; 
+            p[2]=e->pixel[2]; 
+            p[3]=e->pixel[3];
+            p[4]=e->pixel[4]; 
+            p[5]=e->pixel[5]; 
+            p[6]=e->pixel[6];
             p += 7;
         }
     }
@@ -437,7 +482,6 @@ void viewapl2_screen_txt(APPLE2 *m, int start, int end) {
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
     int page = m->viewport->shadow_active_page ? 0x0800 : 0x0400;
-    uint32_t c[2] = { color_table[0][0][0], color_table[7][0][0] };
 
     // Loop through each row
     for(y = start; y < end; y++) {
@@ -451,20 +495,15 @@ void viewapl2_screen_txt(APPLE2 *m, int start, int end) {
             // Get the character on screen
             int character = m->RAM_MAIN[address + x];
             // See if inverse
-            uint8_t inv = ~(~character >> 7) & 1;
+            uint8_t inv = (~character >> 7) & 1;
             // Get the font offset in the font blocks
             uint8_t *character_font = &m->roms.blocks[ROM_APPLE2_CHARACTER].bytes[character * 8];
             // "Plot" the character to the SDL graphics screen
             uint32_t *pr = p;
             for(r = 0; r < 8; r++) {
                 uint8_t pixels = *character_font++;
-                // for(int i = 6; i >= 0; i--) {
-                //     pr[i] = c[inv ^ (pixels & 1)];
-                //     pixels >>= 1;
-                // }
-                // This is for //e font
-                for(int i=0; i < 7 ; i++) {
-                    pr[i] = c[inv ^ (pixels & 1)];
+                for(int i = 6; i >= 0; i--) {
+                    pr[i] = gr_lut[(inv ^ (pixels & 1)) ? 15 : 0];
                     pixels >>= 1;
                 }
                 pr += surface->w;

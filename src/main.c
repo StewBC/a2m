@@ -31,6 +31,9 @@ int main(int argc, char *argv[]) {
     // Give the Apple II a viewport
     m.viewport = &v;
 
+    // Reverse and inverse the //e character rom, so it matches the II+ rom style
+    viewapl2_init_character_rom_2e(&m);
+
     // Set up a table to speed up rendering HGR
     viewapl2_init_color_table(&m);
 

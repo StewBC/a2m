@@ -17,6 +17,9 @@ int apple2_configure(APPLE2 *m) {
     // Allocate the RAM
     m->RAM_MAIN = (uint8_t *) malloc(m->ram_size);
     memset(&m->RAM_MAIN[0xc000], 0, 0x100); // SQW Hack till I get all softswitches working
+    // $E4 (at least) needs to be FF and doesn't seem to be set so I am setting all of 
+    // zero page to FF instead of random memory
+    memset(&m->RAM_MAIN[0x0], 0xff, 0x100);
     m->RAM_WATCH = (uint8_t *) malloc(m->ram_size);
     if(!m->RAM_MAIN || !m->RAM_WATCH) {
         return A2_ERR;

@@ -29,6 +29,7 @@ enum {
     NUM_SAMPLES,
 };
 
+void viewapl2_init_character_rom_2e(APPLE2 * m);
 void viewapl2_init_color_table(APPLE2 * m);
 void viewapl2_process_event(APPLE2 * m, SDL_Event * e);
 void viewapl2_screen_apple2(APPLE2 * m);

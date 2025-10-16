@@ -811,7 +811,9 @@ void viewport_update(APPLE2 *m) {
     //     SDL_SetRenderDrawColor(v->renderer, 255, 255, 255, 255);
     //     SDL_RenderDrawRect(v->renderer, &v->target_rect);
     // }
-    nk_sdl_render(NK_ANTI_ALIASING_ON);
+    if(v->debug_view) {
+        nk_sdl_render(NK_ANTI_ALIASING_ON);
+    }
     if(v->show_leds) {
         if(m->disk_activity_read) {
             SDL_Rect led = {v->full_window_rect.w - 16, v->full_window_rect.h - 16, 16, 16};
