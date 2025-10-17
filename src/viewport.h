@@ -55,7 +55,7 @@ typedef struct VIEWPORT {
     int viewmisc_show: 1;
 } VIEWPORT;
 
-int viewport_init(VIEWPORT *v, int w, int h);
+int viewport_init(APPLE2 *m, int w, int h);
 void viewport_init_nuklear(VIEWPORT *v);
 int viewport_process_events(APPLE2 *m);
 void viewport_show(APPLE2 *m);

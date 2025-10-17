@@ -9,8 +9,9 @@ int apple2_configure(APPLE2 *m) {
 
     // Clear the whole emulated machine
     memset(m, 0, sizeof(APPLE2));
-
+    // Init the ini config storage
     ini_init(&m->ini_store);
+    // Load config from ini file
     if(A2_OK != util_ini_load_file("./apple2.ini", ini_add, (void *)&m->ini_store)) {
         ini_set(&m->ini_store, "SmartPort", "slot", "5");
         ini_set(&m->ini_store, "DiskII", "slot", "6");

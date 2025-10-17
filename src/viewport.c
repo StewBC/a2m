@@ -31,21 +31,27 @@
 // These values are picked up in nuklrsdl.h
 float sdl_x_scale, sdl_y_scale;
 
-void viewport_ini_load_callback(void *user_data, char *section, char *key, char *value) {
-    VIEWPORT *v = (VIEWPORT *) user_data;
-    // Uniform scale factor for the display
-    if(0 == stricmp(section, "display")) {
-        if(0 == stricmp(key, "scale")) {
-            float scale = 1.0f;
-            sscanf(value, "%f", &scale);
-            if(scale > 0.0f) {
-                v->display_scale = scale;
-            }
-        } else if(0 == stricmp(key, "disk_leds")) {
-            int state = 0;
-            sscanf(value, "%d", &state);
-            if(state == 1) {
-                v->show_leds = -1;
+void viewport_config(APPLE2 *m) {
+    INI_SECTION *s;
+    VIEWPORT *v = (VIEWPORT *)m->viewport;
+    s = ini_find_section(&m->ini_store, "display");
+    if(s) {
+        for(int i = 0; i < s->kv.items; i++) {
+            INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
+            const char *key = kv->key;
+            const char *val = kv->val;
+            if(0 == stricmp(key, "scale")) {
+                float scale = 1.0f;
+                sscanf(val, "%f", &scale);
+                if(scale > 0.0f) {
+                    v->display_scale = scale;
+                }
+            } else if(0 == stricmp(key, "disk_leds")) {
+                int state = 0;
+                sscanf(val, "%d", &state);
+                if(state == 1) {
+                    v->show_leds = -1;
+                }
             }
         }
     }
@@ -68,15 +74,17 @@ static SDL_Texture *load_png_texture_from_ram(SDL_Renderer *r, uint8_t *image, i
     return tex;
 }
 
-int viewport_init(VIEWPORT *v, int w, int h) {
+int viewport_init(APPLE2 *m, int w, int h) {
+
+    VIEWPORT *v = m->viewport;
 
     // Clear the whole viewport struct to 0's
     memset(v, 0, sizeof(VIEWPORT));
 
     v->display_scale = 1.0f;
 
-    // Configure display_scale from the ini file -- SQW ini file now read/parsed multiple times
-    util_ini_load_file("./apple2.ini", viewport_ini_load_callback, (void *) v);
+    // Configure display_scale from the ini file
+    viewport_config(m);
 
     // Scale the window, and set the SDL render scale accordingly
     w *= v->display_scale;

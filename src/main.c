@@ -16,11 +16,6 @@ int main(int argc, char *argv[]) {
     // Init the assembler error log
     errlog_init();
 
-    // Init the viewport
-    if(A2_OK != viewport_init(&v, 1120, 840)) {
-        return A2_ERR;
-    }
-
     // Make this machine an Apple II
     if(A2_OK != apple2_configure(&m)) {
         free(m.RAM_MAIN);
@@ -30,6 +25,12 @@ int main(int argc, char *argv[]) {
 
     // Give the Apple II a viewport
     m.viewport = &v;
+
+    // Init the viewport
+    if(A2_OK != viewport_init(&m, 1120, 840)) {
+        return A2_ERR;
+    }
+
 
     // Reverse and inverse the //e character rom, so it matches the II+ rom style
     viewapl2_init_character_rom_2e(&m);
