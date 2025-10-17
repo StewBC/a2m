@@ -10,10 +10,13 @@ int apple2_configure(APPLE2 *m) {
     // Clear the whole emulated machine
     memset(m, 0, sizeof(APPLE2));
 
-    m->model = MODEL_APPLE_IIEE;
-    m->cpu.class = CPU_65c02;
-    m->ram_size = 1024 * (m->model ? 128 : 64);
-
+    ini_init(&m->ini_store);
+    if(A2_OK != util_ini_load_file("./apple2.ini", ini_add, (void *)&m->ini_store)) {
+        ini_set(&m->ini_store, "SmartPort", "slot", "5");
+        ini_set(&m->ini_store, "DiskII", "slot", "6");
+    }
+    // Configure the type of machine (II+ or //e Enhanced, based on ini_store)
+    apple2_machine_setup(m);
     // Allocate the RAM
     m->RAM_MAIN = (uint8_t *) malloc(m->ram_size);
     memset(&m->RAM_MAIN[0xc000], 0, 0x100); // SQW Hack till I get all softswitches working
@@ -97,67 +100,108 @@ int apple2_configure(APPLE2 *m) {
     // Init the CPU to cold-start by jumping to ROM address at 0xfffc
     cpu_init(m);
 
-    // Configure slots from the ini file (after cpu init as this could set cpu.pc so smartport can boot on a II+)
-    if(A2_OK != util_ini_load_file("./apple2.ini", apple2_ini_load_callback, (void *) m)) {
-        // If apple2.ini doesn't successfully load, just add a smartport in slot 7
-        // slot_add_card(m, 7, SLOT_TYPE_SMARTPORT, &m->sp_device[7], &m->roms.blocks[ROM_SMARTPORT].bytes[0x700], NULL);
-        // slot_add_card(m, 6, SLOT_TYPE_DISKII, &m->diskii_controller[6], &m->roms.blocks[ROM_DISKII_16SECTOR].bytes[0x700], NULL);
-    }
+    // Configure the slots (based on ini_store)
+    apple2_slot_setup(m);
 
     return A2_OK;
 }
 
-void apple2_ini_load_callback(void *user_data, char *section, char *key, char *value) {
-    APPLE2 *m = (APPLE2 *) user_data;
-    static int slot_number = -1;
-    if(0 == stricmp(section, "diskii")) {
-        if(0 == stricmp(key, "slot")) {
-            sscanf(value, "%d", &slot_number);
-            if(slot_number >= 1 && slot_number < 8) {
-                slot_add_card(m, slot_number, SLOT_TYPE_DISKII, &m->diskii_controller[slot_number],
-                              m->roms.blocks[ROM_DISKII_16SECTOR].bytes, NULL);
-                m->diskii_controller[slot_number].diskii_drive[0].quarter_track_pos = rand() % DISKII_QUATERTRACKS;
-                m->diskii_controller[slot_number].diskii_drive[1].quarter_track_pos = rand() % DISKII_QUATERTRACKS;
-            }
-        } else if(slot_number >= 0 && slot_number < 8) {
-            if(0 == stricmp(key, "disk0")) {
-                diskii_mount(m, slot_number, 0, value);
-            } else if(0 == stricmp(key, "disk1")) {
-                diskii_mount(m, slot_number, 1, value);
-            }
-        }
-    }
-    if(0 == stricmp(section, "smartport")) {
-        if(0 == stricmp(key, "slot")) {
-            sscanf(value, "%d", &slot_number);
-            if(slot_number >= 1 && slot_number < 8) {
-                slot_add_card(m, slot_number, SLOT_TYPE_SMARTPORT, &m->sp_device[slot_number],
-                              &m->roms.blocks[ROM_SMARTPORT].bytes[slot_number * 0x100], NULL);
-            }
-        } else if(slot_number >= 0 && slot_number < 8) {
-            if(0 == stricmp(key, "disk0")) {
-                sp_mount(m, slot_number, 0, value);
-            } else if(0 == stricmp(key, "disk1")) {
-                sp_mount(m, slot_number, 1, value);
-            } else if(0 == stricmp(key, "boot")) {
-                if(0 != strcmp(value, "0") && m->sp_device[slot_number].sp_files[0].is_file_open) {
-                    // The rom doesn't get a chance to run but fortunately ProDOS does just fine
-                    m->cpu.pc = 0xc000 + slot_number * 0x100;
+void apple2_machine_setup(APPLE2 *m) {
+    INI_SECTION *s;
+    int slot_number = -1;
+
+    m->model = MODEL_APPLE_II_PLUS;
+    m->cpu.class = CPU_6502;
+    m->ram_size = 64 * 1024;
+
+    s = ini_find_section(&m->ini_store, "machine");
+    if(s) {
+        for(int i = 0; i < s->kv.items; i++) {
+            INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
+            const char *key = kv->key;
+            const char *val = kv->val;
+            if(0 == stricmp(key, "model")) {
+                if(0 == stricmp(val, "apple2_ee")) {
+                    m->model = MODEL_APPLE_IIEE;
+                    m->cpu.class = CPU_65c02;
+                    m->ram_size = 128 * 1024;
                 }
             }
         }
     }
-    // The 80 col display card
-    if(0 == stricmp(section, "video")) {
-        if(0 == stricmp(key, "slot")) {
-            sscanf(value, "%d", &slot_number);
+}
+
+void apple2_slot_setup(APPLE2 *m) {
+    INI_SECTION *s;
+    int slot_number = -1;
+
+    s = ini_find_section(&m->ini_store, "diskii");
+    if(s) {
+        for(int i = 0; i < s->kv.items; i++) {
+            INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
+            const char *key = kv->key;
+            const char *val = kv->val;
+            if(0 == stricmp(key, "slot")) {
+                sscanf(val, "%d", &slot_number);
+                if(slot_number >= 1 && slot_number < 8) {
+                    slot_add_card(m, slot_number, SLOT_TYPE_DISKII, &m->diskii_controller[slot_number],
+                                m->roms.blocks[ROM_DISKII_16SECTOR].bytes, NULL);
+                    m->diskii_controller[slot_number].diskii_drive[0].quarter_track_pos = rand() % DISKII_QUATERTRACKS;
+                    m->diskii_controller[slot_number].diskii_drive[1].quarter_track_pos = rand() % DISKII_QUATERTRACKS;
+                }
+            } else if(slot_number >= 0 && slot_number < 8) {
+                if(0 == stricmp(key, "disk0")) {
+                    diskii_mount(m, slot_number, 0, val);
+                } else if(0 == stricmp(key, "disk1")) {
+                    diskii_mount(m, slot_number, 1, val);
+                }
+            }
         }
-        if(0 == stricmp(key, "device")) {
-            if(slot_number >= 1 && slot_number < 8) {
-                if(A2_OK == franklin_display_init(&m->franklin_display)) {
-                    slot_add_card(m, slot_number, SLOT_TYPE_VIDEX_API, &m->franklin_display,
-                                  &m->roms.blocks[ROM_FRANKLIN_ACE_DISPLAY].bytes[0x600], franklin_display_map_cx_rom);
-                    memset(m->RAM_WATCH + 0xCC00, 1, 0x200);
+    }
+
+    s = ini_find_section(&m->ini_store, "smartport");
+    if(s) {
+        for(int i = 0; i < s->kv.items; i++) {
+            INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
+            const char *key = kv->key;
+            const char *val = kv->val;
+            if(0 == stricmp(key, "slot")) {
+                sscanf(val, "%d", &slot_number);
+                if(slot_number >= 1 && slot_number < 8) {
+                    slot_add_card(m, slot_number, SLOT_TYPE_SMARTPORT, &m->sp_device[slot_number],
+                                &m->roms.blocks[ROM_SMARTPORT].bytes[slot_number * 0x100], NULL);
+                }
+            } else if(slot_number >= 0 && slot_number < 8) {
+                if(0 == stricmp(key, "disk0")) {
+                    sp_mount(m, slot_number, 0, val);
+                } else if(0 == stricmp(key, "disk1")) {
+                    sp_mount(m, slot_number, 1, val);
+                } else if(0 == stricmp(key, "boot")) {
+                    if(0 != strcmp(val, "0") && m->sp_device[slot_number].sp_files[0].is_file_open) {
+                        // The rom doesn't get a chance to run but fortunately ProDOS does just fine
+                        m->cpu.pc = 0xc000 + slot_number * 0x100;
+                    }
+                }
+            }
+        }
+    }
+
+    s = ini_find_section(&m->ini_store, "smartport");
+    if(s) {
+        for(int i = 0; i < s->kv.items; i++) {
+            INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
+            const char *key = kv->key;
+            const char *val = kv->val;
+            if(0 == stricmp(key, "slot")) {
+                sscanf(val, "%d", &slot_number);
+            }
+            if(0 == stricmp(key, "device")) {
+                if(slot_number >= 1 && slot_number < 8) {
+                    if(A2_OK == franklin_display_init(&m->franklin_display)) {
+                        slot_add_card(m, slot_number, SLOT_TYPE_VIDEX_API, &m->franklin_display,
+                                    &m->roms.blocks[ROM_FRANKLIN_ACE_DISPLAY].bytes[0x600], franklin_display_map_cx_rom);
+                        memset(m->RAM_WATCH + 0xCC00, 1, 0x200);
+                    }
                 }
             }
         }

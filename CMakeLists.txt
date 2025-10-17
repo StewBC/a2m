@@ -35,6 +35,7 @@ add_executable(apple2
     src/errorlog.c
     src/frankdisp.c
     src/image.c
+    src/inifiles.c
     src/main.c
     src/ramcard.c
     src/roms.c

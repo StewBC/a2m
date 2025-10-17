@@ -97,10 +97,14 @@ typedef struct APPLE2 {
 
     // Additiona Info
     VIEWPORT *viewport;                                     // 0 (no view) or active view for this instance
+
+    // Configuration
+    INI_STORE ini_store;
 } APPLE2;
 
 int apple2_configure(APPLE2 *m);
-void apple2_ini_load_callback(void *user_data, char *section, char *key, char *value);
+void apple2_machine_setup(APPLE2 *m);
+void apple2_slot_setup(APPLE2 *m);
 void apple2_shutdown(APPLE2 *m);
 void apple2_slot_configure(APPLE2 *m, int slot, uint8_t type);
 uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address);

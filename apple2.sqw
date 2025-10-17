@@ -1,3 +1,6 @@
+[Machine]
+Model = apple2_ee             ; apple2_plus | apple2_ee (//e Enhanced)
+
 [Display]
 scale = 1.0                   ; Uniformly scale Application Window
 disk_leds = 1                 ; Show disk activity LEDs

@@ -90,6 +90,9 @@ typedef struct DEBUGGER DEBUGGER;
 
 #ifdef IS_EMULATOR
 
+// Helper
+#include "inifiles.h"
+
 // Machine
 #include "6502.h"
 #include "diskii.h"
