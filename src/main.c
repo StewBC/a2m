@@ -31,7 +31,6 @@ int main(int argc, char *argv[]) {
         return A2_ERR;
     }
 
-
     // Reverse and inverse the //e character rom, so it matches the II+ rom style
     viewapl2_init_character_rom_2e(&m);
 

@@ -13,8 +13,23 @@ int apple2_configure(APPLE2 *m) {
     ini_init(&m->ini_store);
     // Load config from ini file
     if(A2_OK != util_ini_load_file("./apple2.ini", ini_add, (void *)&m->ini_store)) {
-        ini_set(&m->ini_store, "SmartPort", "slot", "5");
-        ini_set(&m->ini_store, "DiskII", "slot", "6");
+        ini_add(&m->ini_store, "Machine", "Model", "apple2_ee ; apple2_plus | apple2_ee (//e Enhanced)");
+        ini_add(&m->ini_store, "Display", "scale", "1.0 ; Uniformly scale Application Window");
+        ini_add(&m->ini_store, "Display", "disk_leds", "1 ; Show disk activity LEDs");
+        ini_add(&m->ini_store, "Video", ";slot", "3 ; Slot where an apple2_plus 80 col card is inserted ");
+        ini_add(&m->ini_store, "Video", ";device", "Franklin Ace Display ; 80 Column Videx like card");
+        ini_add(&m->ini_store, "DiskII", "slot", "6 ; This says a slot contains a disk II controller");
+        ini_add(&m->ini_store, "DiskII", "disk0", "; file name of a NIB floppy image, NOT in quotes");
+        ini_add(&m->ini_store, "DiskII", "disk1", "; ./disks/Apple DOS 3.3 January 1983.nib ; example usage");
+        ini_add(&m->ini_store, "SmartPort", "slot", "5 ; This says a slot contains a smartport");
+        ini_add(&m->ini_store, "SmartPort", "disk0", " ; file name of an image, NOT in quotes");
+        ini_add(&m->ini_store, "SmartPort", "disk1", "");
+        ini_add(&m->ini_store, "SmartPort", "boot", "0 ; any value other than 0 will cause a boot of disk0");
+        ini_add(&m->ini_store, "SmartPort", "slot", "7 ; There can be multiple slots");
+        ini_add(&m->ini_store, "SmartPort", "disk0", "");
+        ini_add(&m->ini_store, "SmartPort", "disk1", "");
+        ini_add(&m->ini_store, "SmartPort", "boot", "0 ; last listed non-zero boot devices' disk0 will boot");
+        util_ini_save_file("apple2.ini", &m->ini_store);
     }
     // Configure the type of machine (II+ or //e Enhanced, based on ini_store)
     apple2_machine_setup(m);
@@ -111,9 +126,9 @@ void apple2_machine_setup(APPLE2 *m) {
     INI_SECTION *s;
     int slot_number = -1;
 
-    m->model = MODEL_APPLE_II_PLUS;
-    m->cpu.class = CPU_6502;
-    m->ram_size = 64 * 1024;
+    m->model = MODEL_APPLE_IIEE;
+    m->cpu.class = CPU_65c02;
+    m->ram_size = 128 * 1024;
 
     s = ini_find_section(&m->ini_store, "machine");
     if(s) {
@@ -122,10 +137,10 @@ void apple2_machine_setup(APPLE2 *m) {
             const char *key = kv->key;
             const char *val = kv->val;
             if(0 == stricmp(key, "model")) {
-                if(0 == stricmp(val, "apple2_ee")) {
-                    m->model = MODEL_APPLE_IIEE;
-                    m->cpu.class = CPU_65c02;
-                    m->ram_size = 128 * 1024;
+                if(0 == stricmp(val, "apple2_plus")) {
+                    m->model = MODEL_APPLE_II_PLUS;
+                    m->cpu.class = CPU_6502;
+                    m->ram_size = 64 * 1024;
                 }
             }
         }

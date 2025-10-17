@@ -85,13 +85,11 @@ typedef struct DEBUGGER DEBUGGER;
 
 #endif                                                      // IS_EMULATOR
 
-#include "util.h"
 #include "dynarray.h"
+#include "inifiles.h"
+#include "util.h"
 
 #ifdef IS_EMULATOR
-
-// Helper
-#include "inifiles.h"
 
 // Machine
 #include "6502.h"
