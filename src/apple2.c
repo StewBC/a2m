@@ -294,7 +294,7 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
     } else if(address >= 0xc100 && address <= 0xcFFE) {
         // Map the C800 ROM based on access to Cs00, if card provides a C800 ROM
         int slot = (address >> 8) & 0x7;
-        if(!((slot != 3 && m->cxromset) || (slot == 3 && m->c3romset))) {
+        if(!m->model || !((slot != 3 && m->cxromset) || (slot == 3 && m->c3romset))) {
             if(!m->slot_cards[slot].cx_rom_mapped && m->slot_cards[slot].slot_map_cx_rom) {
                 m->slot_cards[slot].slot_map_cx_rom(m, address);
                 m->slot_cards[slot].cx_rom_mapped = 1;
@@ -306,38 +306,57 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
             case KBD:
                 break;
             case SET80COL:  //e
+                if(m->model) {
+
+                }
                 break;
             case CLRCXROM:  //e
-                m->cxromset = 0;
-                pages_map(&m->read_pages, 0xC100 / PAGE_SIZE, 0x200 / PAGE_SIZE, &m->RAM_MAIN[0xC100]);
-                pages_map(&m->read_pages, 0xC400 / PAGE_SIZE, 0xC00 / PAGE_SIZE, &m->RAM_MAIN[0xC400]);
+                if(m->model) {
+                    m->cxromset = 0;
+                    pages_map(&m->read_pages, 0xC100 / PAGE_SIZE, 0x200 / PAGE_SIZE, &m->RAM_MAIN[0xC100]);
+                    pages_map(&m->read_pages, 0xC400 / PAGE_SIZE, 0xC00 / PAGE_SIZE, &m->RAM_MAIN[0xC400]);
+                }
                 break;
             case SETCXROM:  //e
-                m->cxromset = 1;
-                pages_map(&m->read_pages, 0xC100 / PAGE_SIZE, 0x200 / PAGE_SIZE, m->roms.blocks[ROM_APPLE2_SLOTS].bytes);
-                pages_map(&m->read_pages, 0xC400 / PAGE_SIZE, 0xC00 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x300]);
+                if(m->model) {
+                    m->cxromset = 1;
+                    pages_map(&m->read_pages, 0xC100 / PAGE_SIZE, 0x200 / PAGE_SIZE, m->roms.blocks[ROM_APPLE2_SLOTS].bytes);
+                    pages_map(&m->read_pages, 0xC400 / PAGE_SIZE, 0xC00 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x300]);
+                }
                 break;
-            case CLRC3ROM:
-                m->c3romset = 0;
-                pages_map(&m->read_pages, 0xC300 / PAGE_SIZE, 0x100 / PAGE_SIZE, &m->RAM_MAIN[0xC300]);
+            case CLRC3ROM: //e
+                if(m->model) {
+                    m->c3romset = 0;
+                    pages_map(&m->read_pages, 0xC300 / PAGE_SIZE, 0x100 / PAGE_SIZE, &m->RAM_MAIN[0xC300]);
+                }
                 break;
-            case SETC3ROM:
-                m->c3romset = 1;
-                // The slot starts at 0xc100 so + 0x200 = 0xc300
-                pages_map(&m->read_pages, 0xC300 / PAGE_SIZE, 0x100 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x200]);
+            case SETC3ROM: // e
+                if(m->model) {
+                    m->c3romset = 1;
+                    // The slot starts at 0xc100 so + 0x200 = 0xc300
+                    pages_map(&m->read_pages, 0xC300 / PAGE_SIZE, 0x100 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x200]);
+                }
                 break;
             case KBDSTRB:
                 m->write_pages.pages[KBD / PAGE_SIZE].bytes[KBD % PAGE_SIZE] &= 0x7F;
                 break;
             case RDCXROM:   //e
-                return (m->cxromset << 7);
+                if(m->model) {
+                    return (m->cxromset << 7);
+                }
                 break;
             case RDC3ROM:   //e
-                return (m->c3romset << 7);
+                if(m->model) {
+                    return (m->c3romset << 7);
+                }
                 break;
             case RD80COL:   //e
+                if(m->model) {
+                }
                 break;
             case RDPAGE2:   //e
+                if(m->model) {
+                }
                 break;
             case A2SPEAKER:
                 speaker_toggle(&m->speaker);
@@ -366,13 +385,13 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
             case HIRES:
                 m->screen_mode |= SCREEN_MODE_HIRES;
                 break;
-            case SETAN0: //e
+            case SETAN0: // SQW
                 break;
-            case SETAN1: //e
+            case SETAN1: // SQW
                 break;
-            case CLRAN2: //e
+            case CLRAN2: // SQW
                 break;
-            case CLRAN3: //e
+            case CLRAN3: // SQW
                 break;
             case BUTN0:
                 return m->open_apple;

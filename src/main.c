@@ -4,7 +4,8 @@
 
 #include "header.h"
 
-#define TARGET_FPS      60                                  // (cycles/sec) / (updates/sec) = cycles/update
+#define TARGET_FPS              60                          // (cycles/sec) / (updates/sec) = cycles/update
+#define OPS_PER_SLICE_FREE_RUN  20000                       // Maybe 20k..200k
 
 int main(int argc, char *argv[]) {
     int quit = 0;
@@ -49,41 +50,36 @@ int main(int argc, char *argv[]) {
     SDL_PauseAudio(0);
 
     // Start running the sim loop
-    while(!quit) {
-        // Take note of the time to help sync to Apple II speed
-        start_time = SDL_GetPerformanceCounter();
+    while (!quit) {
+        uint64_t start_time = SDL_GetPerformanceCounter();
 
-        // Process the input for this view (if apple2 stopped, this won't return asap)
-        quit = viewport_process_events(&m);
-
-        // Step the sim one full instruction - several cycles
-        int cycles = m.cpu.cycles;
-        machine_run_opcode(&m);
-        cycles = m.cpu.cycles - cycles;
-        
-        // Add speaker - in loop for 1 cycle or here for "instruction's" cycles
+        int ops = m.free_run ? OPS_PER_SLICE_FREE_RUN : 1;
+        int c0 = m.cpu.cycles;
+        for (int i = 0; i < ops && (m.free_run | !m.stopped | !m.step); ++i) {
+            machine_run_opcode(&m);
+            // See if a breakpoint was hit (will set m.stopped)
+            viewdbg_update(&m);
+        }
+        int cycles = m.cpu.cycles - c0;
         speaker_on_cycles(&m.speaker, cycles);
         speaker_pump(&m.speaker);
-		
-        // Give debugger a chance to process the new state and set m->step
-        viewdbg_update(&m);
 
-        // Force an update of the current page at the desired frame rate
-        if(SDL_GetPerformanceCounter() >= update_time || m.stopped) {
+        quit = viewport_process_events(&m);
+
+        // draw if stopped or at desired fps
+        if (SDL_GetPerformanceCounter() >= update_time || m.stopped) {
             v.shadow_screen_mode = m.screen_mode;
             v.shadow_active_page = m.active_page;
             viewport_show(&m);
             viewapl2_screen_apple2(&m);
             viewport_update(&m);
-            update_time = SDL_GetPerformanceCounter() + SDL_GetPerformanceFrequency() / TARGET_FPS;
+            update_time = SDL_GetPerformanceCounter() + SDL_GetPerformanceFrequency()/TARGET_FPS;
         }
 
-        if(!m.free_run) {
-            // Try to lock the SIM to the Apple II 1.023 MHz
-            end_time = SDL_GetPerformanceCounter();
-
-            // Sleep is only ms but I want us delays here
-            while((end_time - start_time) < (ticks_per_clock_cycle * cycles)) {
+        // 1 MHz pacing only when NOT in free-run
+        if (!m.free_run) {
+            uint64_t end_time = SDL_GetPerformanceCounter();
+            while ((end_time - start_time) < (ticks_per_clock_cycle * cycles)) {
                 end_time = SDL_GetPerformanceCounter();
             }
         }
