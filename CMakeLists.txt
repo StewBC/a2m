@@ -1,16 +1,12 @@
 #-----------------------------------------------------------------------------
 # Stefan Wessels, November 2024
-# Builds an Apple ][+ emulator, called apple2
+# Builds an Apple ][+ and //e Emhanced emulator, called apple2
 # Builds a 6502 assembler, called asm6502
 
 cmake_minimum_required(VERSION 3.16)
 
 # Set project name
 project(a2m LANGUAGES C)
-
-# Set the C++ standard
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Find SDL2, and SDL2_mixer
 find_package(SDL2 CONFIG REQUIRED)
@@ -134,3 +130,18 @@ target_compile_definitions(asm6502 PRIVATE IS_ASSEMBLER)
 target_link_libraries(asm6502
     $<$<PLATFORM_ID:Linux>:m>
 )
+
+# RelWithDebInfo gets special flags for profiling
+foreach(tgt IN ITEMS apple2 asm6502)
+  if(TARGET ${tgt})
+    if(MSVC)
+      target_compile_options(${tgt} PRIVATE
+        $<$<CONFIG:RelWithDebInfo>:/O2;/Zi;/Oy->)
+      target_link_options(${tgt} PRIVATE
+        $<$<CONFIG:RelWithDebInfo>:/DEBUG>)
+    elseif(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+      target_compile_options(${tgt} PRIVATE
+        $<$<CONFIG:RelWithDebInfo>:-O2;-g;-fno-omit-frame-pointer;-fno-optimize-sibling-calls>)
+    endif()
+  endif()
+endforeach()

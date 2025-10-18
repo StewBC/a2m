@@ -1,4 +1,4 @@
-// Apple ][+ emulator
+// Apple ][+ and //e Emhanced emulator
 // Stefan Wessels, 2024
 // This is free and unencumbered software released into the public domain.
 
@@ -10,8 +10,10 @@
 
 // Memory access
 static inline uint8_t read_from_memory(APPLE2 *m, uint16_t address) {
-    assert(address / PAGE_SIZE < m->read_pages.num_pages);
-    uint8_t cb_mask = m->watch_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
+    size_t page = address >> 8;
+    size_t offset = address & 0xff;
+    assert(page < m->read_pages.num_pages);
+    uint8_t cb_mask = m->watch_pages.pages[page].bytes[offset];
     if(cb_mask) {
         if(cb_mask & 2) {
             m->callback_breakpoint(m, address);
@@ -20,7 +22,7 @@ static inline uint8_t read_from_memory(APPLE2 *m, uint16_t address) {
             return m->callback_read(m, address);
         }
     }
-    return m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
+    return m->read_pages.pages[page].bytes[offset];
 }
 
 static inline uint8_t read_from_memory_debug(APPLE2 *m, uint16_t address) {
@@ -29,8 +31,8 @@ static inline uint8_t read_from_memory_debug(APPLE2 *m, uint16_t address) {
 }
 
 static inline void write_to_memory(APPLE2 *m, uint16_t address, uint8_t value) {
-    uint16_t page = address / PAGE_SIZE;
-    uint16_t offset = address % PAGE_SIZE;
+    size_t page = address >> 8;
+    size_t offset = address & 0xff;
     assert(page < m->write_pages.num_pages);
     uint8_t cb_mask = m->watch_pages.pages[page].bytes[offset];
     if(cb_mask) {

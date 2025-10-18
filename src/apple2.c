@@ -1,4 +1,4 @@
-// Apple ][+ emulator
+// Apple ][+ and //e Emhanced emulator
 // Stefan Wessels, 2024
 // This is free and unencumbered software released into the public domain.
 
@@ -305,7 +305,7 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
         switch(address) {
             case KBD:
                 break;
-            case SET80COL:  //e
+            case SET80STORE:  //e
                 if(m->model) {
 
                 }
@@ -314,7 +314,7 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
                 if(m->model) {
                     m->cxromset = 0;
                     pages_map(&m->read_pages, 0xC100 / PAGE_SIZE, 0x200 / PAGE_SIZE, &m->RAM_MAIN[0xC100]);
-                    pages_map(&m->read_pages, 0xC400 / PAGE_SIZE, 0xC00 / PAGE_SIZE, &m->RAM_MAIN[0xC400]);
+                    pages_map(&m->read_pages, 0xC400 / PAGE_SIZE, 0x400 / PAGE_SIZE, &m->RAM_MAIN[0xC400]);
                 }
                 break;
             case SETCXROM:  //e
@@ -457,6 +457,8 @@ void apple2_softswitch_write_callback(APPLE2 *m, uint16_t address, uint8_t value
                 franklin_display_set(m, address, value);
                 break;
         }
+    } else if(address == CLR80STORE) {
+        // SQW
     } else if(address >= 0xCC00 && address < 0xCE00) {
         m->franklin_display.display_ram[(address & 0x01ff) + m->franklin_display.bank * 0x200] = value;
     }
