@@ -389,8 +389,8 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
                         viewdbg_symbol_search_update(d);
 
                         if(errorlog.log_array.items) {
-                            v->viewdlg_modal = -1;
-                            v->dlg_assassembler_errors = -1;
+                            v->viewdlg_modal = 1;
+                            v->dlg_assassembler_errors = 1;
                         } else {
                             if(ac->reset_stack) {
                                 m->cpu.sp = 0x1ff;
@@ -403,24 +403,24 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
                     }
                 } else if((mod & KMOD_CTRL) && (mod & KMOD_SHIFT)) {
                     local_assembler_config = d->assembler_config;
-                    v->viewdlg_modal = -1;
-                    v->dlg_assassembler_config = -1;
+                    v->viewdlg_modal = 1;
+                    v->dlg_assassembler_config = 1;
                 }
             }
             break;
 
         case SDLK_e:
             if(mod & KMOD_CTRL && !v->viewdlg_modal) {
-                v->viewdlg_modal = -1;
-                v->dlg_assassembler_errors = -1;
+                v->viewdlg_modal = 1;
+                v->dlg_assassembler_errors = 1;
             }
             break;
 
         case SDLK_g:
             if(mod & KMOD_CTRL && !v->viewdlg_modal) {
                 global_entry_length = 0;
-                v->viewdlg_modal = -1;
-                v->dlg_disassembler_go = -1;
+                v->viewdlg_modal = 1;
+                v->dlg_disassembler_go = 1;
             }
             break;
 
@@ -433,8 +433,8 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
         case SDLK_s:
             if(mod & KMOD_CTRL) {
                 global_entry_length = 0;
-                v->viewdlg_modal = -1;
-                v->dlg_symbol_lookup_dbg = -1;
+                v->viewdlg_modal = 1;
+                v->dlg_symbol_lookup_dbg = 1;
             }
             break;
 
@@ -476,7 +476,7 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
                 m->stopped = v->shadow_stopped;
             } else {
                 v->shadow_stopped = m->stopped;
-                m->stopped = -1;
+                m->stopped = 1;
             }
             v->show_help ^= 1;
             return 1;
@@ -529,8 +529,8 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
                         m->stopped = 0;                         // Put the emulator back in run mode
                     } else {
                         // Not a step over, just a step
-                        m->stopped = -1;                         // Stop the emulator
-                        m->step = -1;                            // Step one opcode
+                        m->stopped = 1;                         // Stop the emulator
+                        m->step = 1;                            // Step one opcode
                     }
                 }
             }
@@ -553,8 +553,8 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
                 // If run to rts was active, stop that and reset the counter
                 // This is needed so the user can initiate a new run to rts
                 d->flowmanager.run_to_rts_set = 0;
-                m->stopped = -1;                                 // Stop the emulator
-                m->step = -1;                                    // Step one opcode
+                m->stopped = 1;                                 // Stop the emulator
+                m->step = 1;                                    // Step one opcode
             }
             break;
 
@@ -779,7 +779,7 @@ void viewdbg_update(APPLE2 *m) {
     if(!m->stopped || m->step) {
         m->step = 0;                                        // Set step off
         if(d->flowmanager.run_to_pc_set && d->flowmanager.run_to_pc == m->cpu.pc) {
-            m->stopped = -1;
+            m->stopped = 1;
             d->flowmanager.run_to_pc_set = 0;
         } else if(d->flowmanager.run_to_rts_set) {
             uint8_t instruction = read_from_memory_debug(m, m->cpu.pc);
@@ -789,15 +789,15 @@ void viewdbg_update(APPLE2 *m) {
                     break;
                 case OPCODE_RTS:
                     if(--d->flowmanager.jsr_counter < 0) {
-                        m->stopped = -1;
-                        m->step = -1;                            // Step the RTS
+                        m->stopped = 1;
+                        m->step = 1;                            // Step the RTS
                         d->flowmanager.run_to_rts_set = 0;
                     }
                     break;
             }
         }
         if(breakpoint_at(&d->flowmanager, m->cpu.pc, 1)) {
-            m->stopped = -1;
+            m->stopped = 1;
         }
     }
     if(m->stopped && !m->step) {

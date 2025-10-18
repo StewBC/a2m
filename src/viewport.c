@@ -50,7 +50,7 @@ void viewport_config(APPLE2 *m) {
                 int state = 0;
                 sscanf(val, "%d", &state);
                 if(state == 1) {
-                    v->show_leds = -1;
+                    v->show_leds = 1;
                 }
             }
         }
@@ -188,10 +188,10 @@ int viewport_init(APPLE2 *m, int w, int h) {
     array_init(&v->viewmisc.file_browser.dir_contents, sizeof(FILE_INFO));
 
     // Currently, all windows are always visible when any are visible
-    v->viewcpu_show = -1;
-    v->viewdbg_show = -1;
-    v->viewmem_show = -1;
-    v->viewmisc_show = -1;
+    v->viewcpu_show = 1;
+    v->viewdbg_show = 1;
+    v->viewmem_show = 1;
+    v->viewmisc_show = 1;
     return A2_OK;
 
 error:

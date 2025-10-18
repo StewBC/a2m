@@ -52,7 +52,7 @@ void sp_read(APPLE2 *m, const int slot) {
         spd->sp_buffer[0] = SP_IO_ERROR;
         return;
     }
-    m->disk_activity_read = -1;
+    m->disk_activity_read = 1;
     spd->sp_buffer[0] = SP_SUCCESS;
 }
 
@@ -90,6 +90,6 @@ void sp_write(APPLE2 *m, const int slot) {
         return;
     }
 
-    m->disk_activity_write = -1;
+    m->disk_activity_write = 1;
     spd->sp_buffer[0] = SP_SUCCESS;
 }

@@ -320,15 +320,15 @@ int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window) {
             case SDLK_f:                                        // CTRL F - Find
                 if(!v->viewdlg_modal) {
                     ms->find_string_len = 0;
-                    v->viewdlg_modal = -1;
-                    v->dlg_memory_find = -1;
+                    v->viewdlg_modal = 1;
+                    v->dlg_memory_find = 1;
                 }
                 break;
 
             case SDLK_g:                                        // CTRL G - Goto address
                 if(!v->viewdlg_modal) {
-                    v->viewdlg_modal = -1;
-                    v->dlg_memory_go = -1;
+                    v->viewdlg_modal = 1;
+                    v->dlg_memory_go = 1;
                 }
                 break;
 
@@ -349,8 +349,8 @@ int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window) {
 
             case SDLK_s:                                        // CTRL S - New Range (Split)
                 global_entry_length = 0;
-                v->viewdlg_modal = -1;
-                v->dlg_symbol_lookup_mem = -1;
+                v->viewdlg_modal = 1;
+                v->dlg_symbol_lookup_mem = 1;
                 break;
 
             case SDLK_t:                                        // CTRL T - Toggle between ascii and hex edit

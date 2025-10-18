@@ -91,6 +91,10 @@ int apple2_configure(APPLE2 *m) {
 
     // Map the rom ($D000-$FFFF) as read pages
     pages_map_memory_block(&m->read_pages, &m->roms.blocks[ROM_APPLE2]);
+    if(m->model) {
+        // On a //e start with the C800 area also as ROM - SQW Is this correct?
+        pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, (0xD000 - 0xC800) / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x700]);
+    }
 
     // Install the watch callbacks
     m->callback_write = apple2_softswitch_write_callback;
@@ -118,6 +122,11 @@ int apple2_configure(APPLE2 *m) {
 
     // Configure the slots (based on ini_store)
     apple2_slot_setup(m);
+
+    // Shadow the slot read area for easy restore
+    for(int slot_page = 0; slot_page < (0xC800 - 0xC100) / PAGE_SIZE; slot_page++) {
+        m->rom_shadow_pages[slot_page] = m->read_pages.pages[(0xC100 / PAGE_SIZE) + slot_page].bytes;
+    }
 
     return A2_OK;
 }
@@ -202,7 +211,7 @@ void apple2_slot_setup(APPLE2 *m) {
         }
     }
 
-    s = ini_find_section(&m->ini_store, "smartport");
+    s = ini_find_section(&m->ini_store, "video");
     if(s) {
         for(int i = 0; i < s->kv.items; i++) {
             INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
@@ -292,9 +301,10 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
                 break;
         }
     } else if(address >= 0xc100 && address <= 0xcFFE) {
-        // Map the C800 ROM based on access to Cs00, if card provides a C800 ROM
         int slot = (address >> 8) & 0x7;
-        if(!m->model || !((slot != 3 && m->cxromset) || (slot == 3 && m->c3romset))) {
+        // Only if rom isn't mapped
+        if(!(m->c3romset || (slot == 3 && m->cxromset))) {
+            // Map the C800 ROM based on access to Cs00, if card provides a C800 ROM
             if(!m->slot_cards[slot].cx_rom_mapped && m->slot_cards[slot].slot_map_cx_rom) {
                 m->slot_cards[slot].slot_map_cx_rom(m, address);
                 m->slot_cards[slot].cx_rom_mapped = 1;
@@ -307,27 +317,30 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
                 break;
             case SET80STORE:  //e
                 if(m->model) {
-
                 }
                 break;
             case CLRCXROM:  //e
                 if(m->model) {
                     m->cxromset = 0;
-                    pages_map(&m->read_pages, 0xC100 / PAGE_SIZE, 0x200 / PAGE_SIZE, &m->RAM_MAIN[0xC100]);
-                    pages_map(&m->read_pages, 0xC400 / PAGE_SIZE, 0x400 / PAGE_SIZE, &m->RAM_MAIN[0xC400]);
+                    m->read_pages.pages[0xC100 / PAGE_SIZE].bytes = m->rom_shadow_pages[0];
+                    m->read_pages.pages[0xC200 / PAGE_SIZE].bytes = m->rom_shadow_pages[1];
+                    m->read_pages.pages[0xC400 / PAGE_SIZE].bytes = m->rom_shadow_pages[3];
+                    m->read_pages.pages[0xC500 / PAGE_SIZE].bytes = m->rom_shadow_pages[4];
+                    m->read_pages.pages[0xC600 / PAGE_SIZE].bytes = m->rom_shadow_pages[5];
+                    m->read_pages.pages[0xC700 / PAGE_SIZE].bytes = m->rom_shadow_pages[6];
                 }
                 break;
             case SETCXROM:  //e
                 if(m->model) {
                     m->cxromset = 1;
                     pages_map(&m->read_pages, 0xC100 / PAGE_SIZE, 0x200 / PAGE_SIZE, m->roms.blocks[ROM_APPLE2_SLOTS].bytes);
-                    pages_map(&m->read_pages, 0xC400 / PAGE_SIZE, 0xC00 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x300]);
+                    pages_map(&m->read_pages, 0xC400 / PAGE_SIZE, 0x400 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x300]);
                 }
                 break;
             case CLRC3ROM: //e
                 if(m->model) {
                     m->c3romset = 0;
-                    pages_map(&m->read_pages, 0xC300 / PAGE_SIZE, 0x100 / PAGE_SIZE, &m->RAM_MAIN[0xC300]);
+                    m->read_pages.pages[0xC300 / PAGE_SIZE].bytes = m->rom_shadow_pages[2];
                 }
                 break;
             case SETC3ROM: // e
@@ -409,7 +422,8 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
                     for(int i = 1; i < 8; i++) {
                         m->slot_cards[i].cx_rom_mapped = 0;
                     }
-                    pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, 0x800 / PAGE_SIZE, &m->RAM_MAIN[0xC800]);
+                    // On a //e this C800-CFFF becomes rom, on a II+ it's floating bus (ram in my case)
+                    pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, 0x800 / PAGE_SIZE, m->model ? &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0X700] : &m->RAM_MAIN[0xC800]);
                 }
                 break;
             default:

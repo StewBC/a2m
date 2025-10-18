@@ -28,7 +28,7 @@ typedef struct PAGE {
     uint8_t *bytes;
 } PAGE;
 
-/* PAGES is an array of PAGE structures.  These can be mapped (or not) into teh 6502 address space */
+/* PAGES is an array of PAGE structures.  These can be mapped (or not) into the 6502 address space */
 typedef struct PAGES {
     PAGE *pages;
     uint16_t num_pages;

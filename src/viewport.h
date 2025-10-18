@@ -33,26 +33,26 @@ typedef struct VIEWPORT {
     int help_page;
 
     // Flags
-    int debug_view: 1;
-    int dlg_assassembler_config: 1;
-    int dlg_assassembler_errors: 1;
-    int dlg_breakpoint: 1;
-    int dlg_disassembler_go: 1;
-    int dlg_filebrowser: 1;
-    int dlg_memory_find: 1;
-    int dlg_memory_go: 1;
-    int dlg_symbol_lookup_dbg: 1;
-    int dlg_symbol_lookup_mem: 1;
-    int shadow_active_page: 1;                              // Flags that shadow machine states
-    int shadow_free_run: 1;
-    int shadow_stopped: 1;
-    int show_help: 1;
-    int show_leds: 1;
-    int viewcpu_show: 1;
-    int viewdbg_show: 1;
-    int viewdlg_modal: 1;
-    int viewmem_show: 1;
-    int viewmisc_show: 1;
+    uint32_t debug_view: 1;
+    uint32_t dlg_assassembler_config: 1;
+    uint32_t dlg_assassembler_errors: 1;
+    uint32_t dlg_breakpoint: 1;
+    uint32_t dlg_disassembler_go: 1;
+    uint32_t dlg_filebrowser: 1;
+    uint32_t dlg_memory_find: 1;
+    uint32_t dlg_memory_go: 1;
+    uint32_t dlg_symbol_lookup_dbg: 1;
+    uint32_t dlg_symbol_lookup_mem: 1;
+    uint32_t shadow_active_page: 1;                              // Flags that shadow machine states
+    uint32_t shadow_free_run: 1;
+    uint32_t shadow_stopped: 1;
+    uint32_t show_help: 1;
+    uint32_t show_leds: 1;
+    uint32_t viewcpu_show: 1;
+    uint32_t viewdbg_show: 1;
+    uint32_t viewdlg_modal: 1;
+    uint32_t viewmem_show: 1;
+    uint32_t viewmisc_show: 1;
 } VIEWPORT;
 
 int viewport_init(APPLE2 *m, int w, int h);

@@ -10,7 +10,7 @@ uint8_t ram_card(APPLE2 *m, uint16_t address, uint16_t value) {
     if((address & 0b11) && (address & 0b11) != 3) {
         lc->read_ram_enable = 0;
     } else {
-        lc->read_ram_enable = -1;
+        lc->read_ram_enable = 1;
     }
 
     if(!(address & 1) || value < 0x100) {
@@ -22,10 +22,10 @@ uint8_t ram_card(APPLE2 *m, uint16_t address, uint16_t value) {
     } else {
         // odd access
         if(lc->pre_write) {
-            lc->write_enable = -1;
+            lc->write_enable = 1;
         }
         // odd sets pre_write
-        lc->pre_write = -1;
+        lc->pre_write = 1;
     }
 
     if(lc->read_ram_enable) {

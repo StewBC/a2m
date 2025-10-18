@@ -72,6 +72,7 @@ typedef struct APPLE2 {
     uint32_t ram_size;                                      // How much ram this machine has
     uint8_t *RAM_MAIN;                                      // The ram_size MEMORY - addressable in max 64k chunks
     uint8_t *RAM_WATCH;                                     // 64K of IO port "mask" (0 = is not a port)
+    uint8_t *rom_shadow_pages[(0xC800-0xC100)/PAGE_SIZE];    // Slot ram page mappings when SETC?ROM active
 
     // keyboard
     uint8_t open_apple;
@@ -82,18 +83,18 @@ typedef struct APPLE2 {
     int monitor_type;
 
     // Status flags
-    int cxromset: 1;
-    int c3romset: 1;
-    int model: 2;                                           // (0) II+ or (1) //e
-    int original_del: 1;                                    // backspace key does crsr left if 0
-    int cols80active: 1;                                    // Videx/Franklin Ace Display active
-    int active_page: 1;                                     // 0x2000 or 0x4000 - active hires bytes page
-    int free_run: 1;                                        // 0 - 1 Mhz, 1 - as fast as possible
-    int debug_view: 1;                                      // Apple ][ is not full-screen, debugger visible
-    int stopped: 1;                                         // Emulation is halted
-    int step: 1;                                            // Emulation halted but one instruction is "stepped"
-    int disk_activity_read: 1;                              // 0 = no read/write (here for convenience)
-    int disk_activity_write: 1;                             // 0 = no read/write
+    uint32_t cxromset: 1;
+    uint32_t c3romset: 1;
+    uint32_t model: 1;                                           // (0) II+ or (1) //e
+    uint32_t original_del: 1;                                    // backspace key does crsr left if 0
+    uint32_t cols80active: 1;                                    // Videx/Franklin Ace Display active
+    uint32_t active_page: 1;                                     // 0x2000 or 0x4000 - active hires bytes page
+    uint32_t free_run: 1;                                        // 0 - 1 Mhz, 1 - as fast as possible
+    uint32_t debug_view: 1;                                      // Apple ][ is not full-screen, debugger visible
+    uint32_t stopped: 1;                                         // Emulation is halted
+    uint32_t step: 1;                                            // Emulation halted but one instruction is "stepped"
+    uint32_t disk_activity_read: 1;                              // 0 = no read/write (here for convenience)
+    uint32_t disk_activity_write: 1;                             // 0 = no read/write
 
     // Additiona Info
     VIEWPORT *viewport;                                     // 0 (no view) or active view for this instance

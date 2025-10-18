@@ -62,13 +62,13 @@ void breakpoint_callback(APPLE2 *m, uint16_t address) {
                     // Trigger so install reset counter, reset the count and stop the emulation
                     bp->counter_count = 0;
                     bp->counter_stop_value = bp->counter_reset;
-                    m->stopped = -1;
+                    m->stopped = 1;
                     fm->run_to_pc_set = 0;
                     fm->run_to_rts_set = 0;
                 }
             } else {
                 // If not using a counter, trigger by stopping the emulation
-                m->stopped = -1;
+                m->stopped = 1;
                 fm->run_to_pc_set = 0;
                 fm->run_to_rts_set = 0;
             }
