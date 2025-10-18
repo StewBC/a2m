@@ -36,7 +36,7 @@ int apple2_configure(APPLE2 *m) {
     // Allocate the RAM
     m->RAM_MAIN = (uint8_t *) malloc(m->ram_size);
     memset(&m->RAM_MAIN[0xc000], 0, 0x100); // SQW Hack till I get all softswitches working
-    // $E4 (at least) needs to be FF and doesn't seem to be set so I am setting all of 
+    // $E4 (at least) needs to be FF and doesn't seem to be set so I am setting all of
     // zero page to FF instead of random memory
     memset(&m->RAM_MAIN[0x0], 0xff, 0x100);
     m->RAM_WATCH = (uint8_t *) malloc(m->ram_size);
@@ -161,7 +161,7 @@ void apple2_slot_setup(APPLE2 *m) {
                 sscanf(val, "%d", &slot_number);
                 if(slot_number >= 1 && slot_number < 8) {
                     slot_add_card(m, slot_number, SLOT_TYPE_DISKII, &m->diskii_controller[slot_number],
-                                m->roms.blocks[ROM_DISKII_16SECTOR].bytes, NULL);
+                                  m->roms.blocks[ROM_DISKII_16SECTOR].bytes, NULL);
                     m->diskii_controller[slot_number].diskii_drive[0].quarter_track_pos = rand() % DISKII_QUATERTRACKS;
                     m->diskii_controller[slot_number].diskii_drive[1].quarter_track_pos = rand() % DISKII_QUATERTRACKS;
                 }
@@ -185,7 +185,7 @@ void apple2_slot_setup(APPLE2 *m) {
                 sscanf(val, "%d", &slot_number);
                 if(slot_number >= 1 && slot_number < 8) {
                     slot_add_card(m, slot_number, SLOT_TYPE_SMARTPORT, &m->sp_device[slot_number],
-                                &m->roms.blocks[ROM_SMARTPORT].bytes[slot_number * 0x100], NULL);
+                                  &m->roms.blocks[ROM_SMARTPORT].bytes[slot_number * 0x100], NULL);
                 }
             } else if(slot_number >= 0 && slot_number < 8) {
                 if(0 == stricmp(key, "disk0")) {
@@ -215,7 +215,7 @@ void apple2_slot_setup(APPLE2 *m) {
                 if(slot_number >= 1 && slot_number < 8) {
                     if(A2_OK == franklin_display_init(&m->franklin_display)) {
                         slot_add_card(m, slot_number, SLOT_TYPE_VIDEX_API, &m->franklin_display,
-                                    &m->roms.blocks[ROM_FRANKLIN_ACE_DISPLAY].bytes[0x600], franklin_display_map_cx_rom);
+                                      &m->roms.blocks[ROM_FRANKLIN_ACE_DISPLAY].bytes[0x600], franklin_display_map_cx_rom);
                         memset(m->RAM_WATCH + 0xCC00, 1, 0x200);
                     }
                 }

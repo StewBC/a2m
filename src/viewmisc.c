@@ -158,9 +158,9 @@ void viewmisc_show(APPLE2 *m) {
                         uint16_t stack_addr = read_from_memory_debug(m, address) + read_from_memory_debug(m, address + 1) * 256;
                         if(read_from_memory_debug(m, stack_addr - 2) == 0x20) {
                             nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 2);
-                            uint16_t dest_addr = read_from_memory_debug(m, stack_addr-1) + read_from_memory_debug(m, stack_addr) * 256;
+                            uint16_t dest_addr = read_from_memory_debug(m, stack_addr - 1) + read_from_memory_debug(m, stack_addr) * 256;
                             char *symbol = viewdbg_find_symbols(d, dest_addr);
-                            sprintf(callstack_display, "%04X", stack_addr-2);
+                            sprintf(callstack_display, "%04X", stack_addr - 2);
                             nk_layout_row_push(ctx, 0.1f);
                             if(nk_select_label(ctx, callstack_display, NK_TEXT_ALIGN_LEFT, 0)) {
                                 d->cursor_pc = strtoul(callstack_display, NULL, 16);
@@ -323,7 +323,7 @@ void viewmisc_show(APPLE2 *m) {
             if(display_override) {
                 // Only redraw the screen, when stopped, if a change is made
                 if(display_mode != display_mode_setting || display_mixed != display_mixed_setting
-                   || display_active_page != display_active_page_setting) {
+                        || display_active_page != display_active_page_setting) {
                     display_mode = display_mode_setting;
                     display_mixed = display_mixed_setting;
                     display_active_page = display_active_page_setting;
@@ -387,8 +387,8 @@ void viewmisc_show(APPLE2 *m) {
                 breakpoint_reapply_address_masks(m);
             }
             // This is necessary to keep the Misc window active. Why 193?
-            // That's the value ctx->current->flags had coming in and 
-            // ctx->current->layout->flags is assigned to ctx->current->flags in 
+            // That's the value ctx->current->flags had coming in and
+            // ctx->current->layout->flags is assigned to ctx->current->flags in
             // nuklear.h line 20330 inside nk_panel_end just before a comment
             // /* property garbage collector */
             // Without this, you have to mouse out of the misc window, and back in
@@ -406,8 +406,8 @@ void viewmisc_show(APPLE2 *m) {
             v->viewdlg_modal = 0;
             if(1 == ret) {
                 // A file was selected, so get a FQN
-                strncat(fb->dir_selected.name, "/", PATH_MAX-1);
-                strncat(fb->dir_selected.name, fb->file_selected.name, PATH_MAX-1);
+                strncat(fb->dir_selected.name, "/", PATH_MAX - 1);
+                strncat(fb->dir_selected.name, fb->file_selected.name, PATH_MAX - 1);
                 if(v->viewmisc.file_browser.device_type == SLOT_TYPE_SMARTPORT) {
                     util_file_discard(&m->sp_device[fb->slot].sp_files[fb->device]);
                     // Eject the file that's active, if there is one, and mount the new one

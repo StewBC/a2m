@@ -153,27 +153,27 @@ void next_token() {
             as->current_token.op = first;
             as->token_start++;
             char second = toupper(*as->token_start);
-            switch (first) {
-            case 'L':
-            case 'G':
-                if(second == 'E') {
-                    as->current_token.op = tolower(first);
-                } else if(second != 'T') {
-                    errlog("Expected .%cT or %cE", first, first);
-                }
-                break;
-            case 'E':
-                if(second != 'Q') {
-                    errlog("Expected .EQ");
-                }
-                break;
-            case 'N':
-                if(second != 'E') {
-                    errlog("Expected .NE");
-                }
-                break;
-            default:
-                errlog("Expected .LT, .LE, .GT, .GE, .EQ or .NE");
+            switch(first) {
+                case 'L':
+                case 'G':
+                    if(second == 'E') {
+                        as->current_token.op = tolower(first);
+                    } else if(second != 'T') {
+                        errlog("Expected .%cT or %cE", first, first);
+                    }
+                    break;
+                case 'E':
+                    if(second != 'Q') {
+                        errlog("Expected .EQ");
+                    }
+                    break;
+                case 'N':
+                    if(second != 'E') {
+                        errlog("Expected .NE");
+                    }
+                    break;
+                default:
+                    errlog("Expected .LT, .LE, .GT, .GE, .EQ or .NE");
             }
         } else {
             // 'D' is now the token for defined
@@ -360,7 +360,7 @@ int64_t parse_exponentiation() {
 int64_t parse_term() {
     int64_t value = parse_exponentiation();
     while(as->current_token.type == TOKEN_OP
-          && (as->current_token.op == '*' || as->current_token.op == '/' || as->current_token.op == '%')) {
+            && (as->current_token.op == '*' || as->current_token.op == '/' || as->current_token.op == '%')) {
         char op = as->current_token.op;
         next_token();
         int64_t right = parse_exponentiation();
@@ -409,7 +409,7 @@ int64_t parse_shift() {
 int64_t parse_relational() {
     int64_t value = parse_shift();
     while(as->current_token.type == TOKEN_OP && (toupper(as->current_token.op) == 'L' || // .lt | .le
-                                                 toupper(as->current_token.op) == 'G')) { // .gt | .ge
+            toupper(as->current_token.op) == 'G')) { // .gt | .ge
         char op = as->current_token.op;
         next_token();
         int64_t right = parse_shift();
@@ -429,7 +429,7 @@ int64_t parse_relational() {
 int64_t parse_equality() {
     int64_t value = parse_relational();
     while(as->current_token.type == TOKEN_OP && (toupper(as->current_token.op) == 'E' || // .eq
-                                                 toupper(as->current_token.op) == 'N')) { // .ne
+            toupper(as->current_token.op) == 'N')) { // .ne
         char op = as->current_token.op;
         next_token();
         int64_t right = parse_relational();

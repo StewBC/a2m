@@ -316,59 +316,59 @@ int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window) {
             viewmem_active_range(m, key);
         }
     } else if(mod & KMOD_CTRL) {
-        switch (e->key.keysym.sym) {
-        case SDLK_f:                                        // CTRL F - Find
-            if(!v->viewdlg_modal) {
-                ms->find_string_len = 0;
+        switch(e->key.keysym.sym) {
+            case SDLK_f:                                        // CTRL F - Find
+                if(!v->viewdlg_modal) {
+                    ms->find_string_len = 0;
+                    v->viewdlg_modal = -1;
+                    v->dlg_memory_find = -1;
+                }
+                break;
+
+            case SDLK_g:                                        // CTRL G - Goto address
+                if(!v->viewdlg_modal) {
+                    v->viewdlg_modal = -1;
+                    v->dlg_memory_go = -1;
+                }
+                break;
+
+            case SDLK_h:                                        // CTRL H - Find & Replace
+                break;
+
+            case SDLK_j:                                        // CTRL J - Join (down) CTRL SHIFT J - Join Up
+                viewmem_join_range(m, (mod & KMOD_SHIFT) ? -1 : 1);
+                break;
+
+            case SDLK_n:                                        // CTRL (shift) N - Find (prev) Next
+                if(mod & KMOD_SHIFT) {
+                    viewmem_find_string_reverse(m);
+                } else {
+                    viewmem_find_string(m);
+                }
+                break;
+
+            case SDLK_s:                                        // CTRL S - New Range (Split)
+                global_entry_length = 0;
                 v->viewdlg_modal = -1;
-                v->dlg_memory_find = -1;
-            }
-            break;
+                v->dlg_symbol_lookup_mem = -1;
+                break;
 
-        case SDLK_g:                                        // CTRL G - Goto address
-            if(!v->viewdlg_modal) {
-                v->viewdlg_modal = -1;
-                v->dlg_memory_go = -1;
-            }
-            break;
+            case SDLK_t:                                        // CTRL T - Toggle between ascii and hex edit
+                ms->edit_mode_ascii ^= 1;
+                ms->cursor_x = (ms->edit_mode_ascii ? (ms->cursor_x / 2 + 32) : ((ms->cursor_x - 32) * 2));
+                break;
 
-        case SDLK_h:                                        // CTRL H - Find & Replace
-            break;
+            case SDLK_v:
+                viewmem_new_range(m);
+                break;
 
-        case SDLK_j:                                        // CTRL J - Join (down) CTRL SHIFT J - Join Up
-            viewmem_join_range(m, (mod & KMOD_SHIFT) ? -1 : 1);
-            break;
+            case SDLK_HOME:
+                viewmem_cursor_home(m, 1);
+                break;
 
-        case SDLK_n:                                        // CTRL (shift) N - Find (prev) Next
-            if(mod & KMOD_SHIFT) {
-                viewmem_find_string_reverse(m);
-            } else {
-                viewmem_find_string(m);
-            }
-            break;
-
-        case SDLK_s:                                        // CTRL S - New Range (Split)
-            global_entry_length = 0;
-            v->viewdlg_modal = -1;
-            v->dlg_symbol_lookup_mem = -1;
-            break;
-
-        case SDLK_t:                                        // CTRL T - Toggle between ascii and hex edit
-            ms->edit_mode_ascii ^= 1;
-            ms->cursor_x = (ms->edit_mode_ascii ? (ms->cursor_x / 2 + 32) : ((ms->cursor_x - 32) * 2));
-            break;
-
-        case SDLK_v:
-            viewmem_new_range(m);
-            break;
-
-        case SDLK_HOME:
-            viewmem_cursor_home(m, 1);
-            break;
-
-        case SDLK_END:
-            viewmem_cursor_end(m, 1);
-            break;
+            case SDLK_END:
+                viewmem_cursor_end(m, 1);
+                break;
         }
     } else {
         // Regular, unmodified keys
@@ -389,45 +389,45 @@ int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window) {
             return 0;
         }
         // Unmodified special keys
-        switch (e->key.keysym.sym) {
-        case SDLK_HOME:
-            viewmem_cursor_home(m, 0);
-            break;
+        switch(e->key.keysym.sym) {
+            case SDLK_HOME:
+                viewmem_cursor_home(m, 0);
+                break;
 
-        case SDLK_END:
-            viewmem_cursor_end(m, 0);
-            break;
+            case SDLK_END:
+                viewmem_cursor_end(m, 0);
+                break;
 
-        case SDLK_UP:
-            viewmem_cursor_up(m);
-            break;
+            case SDLK_UP:
+                viewmem_cursor_up(m);
+                break;
 
-        case SDLK_DOWN:
-            viewmem_cursor_down(m);
-            break;
+            case SDLK_DOWN:
+                viewmem_cursor_down(m);
+                break;
 
-        case SDLK_LEFT:
-            viewmem_cursor_left(m);
-            break;
+            case SDLK_LEFT:
+                viewmem_cursor_left(m);
+                break;
 
-        case SDLK_RIGHT:
-            viewmem_cursor_right(m);
-            break;
-
-        case SDLK_PAGEUP:
-            viewmem_page_up(m);
-            break;
-
-        case SDLK_PAGEDOWN:
-            viewmem_page_down(m);
-            break;
-
-        default:
-            if(ms->edit_mode_ascii) {
-                write_to_memory(m, ms->cursor_address, e->key.keysym.sym);
+            case SDLK_RIGHT:
                 viewmem_cursor_right(m);
-            }
-            break;
+                break;
+
+            case SDLK_PAGEUP:
+                viewmem_page_up(m);
+                break;
+
+            case SDLK_PAGEDOWN:
+                viewmem_page_down(m);
+                break;
+
+            default:
+                if(ms->edit_mode_ascii) {
+                    write_to_memory(m, ms->cursor_address, e->key.keysym.sym);
+                    viewmem_cursor_right(m);
+                }
+                break;
         }
     }
 

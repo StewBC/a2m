@@ -17,8 +17,8 @@ int viewdlg_assembler_config(struct nk_context *ctx, struct nk_rect r, ASSEMBLER
         nk_layout_row_push(ctx, 0.60f);
         ctx->current->edit.mode = NK_TEXT_EDIT_MODE_REPLACE;
         if(NK_EDIT_COMMITED &
-           nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, fb->dir_selected.name,
-                          &fb->dir_selected.name_length, PATH_MAX - 1, nk_filter_default)) {
+                nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, fb->dir_selected.name,
+                               &fb->dir_selected.name_length, PATH_MAX - 1, nk_filter_default)) {
             UTIL_FILE file;
             memset(&file, 0, sizeof(file));
             fb->dir_selected.name[fb->dir_selected.name_length] = '\0';
@@ -38,7 +38,7 @@ int viewdlg_assembler_config(struct nk_context *ctx, struct nk_rect r, ASSEMBLER
                 fb->dir_selected.name_length = strnlen(fb->dir_selected.name, PATH_MAX);
                 // This keeps the cursor active in the edit box, and places it at the end
                 ctx->current->edit.cursor = ctx->current->edit.sel_start = ctx->current->edit.sel_end =
-                    strnlen(fb->dir_selected.name, PATH_MAX);
+                                                strnlen(fb->dir_selected.name, PATH_MAX);
                 // ctx->current->edit.active = 1;
             }
         }
@@ -57,8 +57,8 @@ int viewdlg_assembler_config(struct nk_context *ctx, struct nk_rect r, ASSEMBLER
         nk_label(ctx, "Address", NK_TEXT_RIGHT);
         nk_layout_row_push(ctx, 0.3f);
         if(NK_EDIT_COMMITED &
-           nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER,
-                          ac->start_address_text, &ac->start_address_text_len, 5, nk_filter_hex)) {
+                nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER,
+                               ac->start_address_text, &ac->start_address_text_len, 5, nk_filter_hex)) {
             ac->start_address = strtol(ac->start_address_text, NULL, 16);
         }
         nk_layout_row_end(ctx);
@@ -114,8 +114,8 @@ int viewdlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
             nk_label(ctx, "Break At", NK_TEXT_LEFT);
             nk_layout_row_push(ctx, 0.10f);
             if(NK_EDIT_COMMITED &
-               nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_address[0],
-                              &bpe->string_address_len[0], 5, nk_filter_hex)) {
+                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_address[0],
+                                   &bpe->string_address_len[0], 5, nk_filter_hex)) {
                 ctx->active->popup.win->edit.active = 0;
             }
             nk_layout_row_push(ctx, 0.05f);
@@ -136,8 +136,8 @@ int viewdlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
                 nk_widget_disable_begin(ctx);
             }
             if(NK_EDIT_COMMITED &
-               nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_address[1],
-                              &bpe->string_address_len[1], 5, nk_filter_hex)) {
+                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_address[1],
+                                   &bpe->string_address_len[1], 5, nk_filter_hex)) {
                 ctx->active->popup.win->edit.active = 0;
             }
             if(!bpe->bp_under_edit.use_pc && !bpe->bp_under_edit.use_range) {
@@ -180,14 +180,14 @@ int viewdlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
             }
             nk_label(ctx, "Initial Counter", NK_TEXT_LEFT);
             if(NK_EDIT_COMMITED &
-               nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_counter[0],
-                              &bpe->string_counter_len[0], 8, nk_filter_decimal)) {
+                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_counter[0],
+                                   &bpe->string_counter_len[0], 8, nk_filter_decimal)) {
                 ctx->active->popup.win->edit.active = 0;
             }
             nk_label(ctx, "Reset Counter", NK_TEXT_LEFT);
             if(NK_EDIT_COMMITED &
-               nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_counter[1],
-                              &bpe->string_counter_len[1], 8, nk_filter_decimal)) {
+                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_counter[1],
+                                   &bpe->string_counter_len[1], 8, nk_filter_decimal)) {
                 ctx->active->popup.win->edit.active = 0;
             }
             if(!bpe->bp_under_edit.use_counter) {
@@ -276,8 +276,8 @@ int viewdlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
         nk_label(ctx, "Path", NK_TEXT_LEFT);
         nk_layout_row_push(ctx, 0.90f);
         if(NK_EDIT_COMMITED &
-           nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, fb->dir_selected.name,
-                          &fb->dir_selected.name_length, PATH_MAX - 1, nk_filter_default)) {
+                nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, fb->dir_selected.name,
+                               &fb->dir_selected.name_length, PATH_MAX - 1, nk_filter_default)) {
             UTIL_FILE file;
             memset(&file, 0, sizeof(file));
             fb->dir_selected.name[fb->dir_selected.name_length] = '\0';

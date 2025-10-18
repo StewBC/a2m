@@ -166,15 +166,15 @@ void viewapl2_init_color_table(APPLE2 *m) {
     }
 
     // Init the hgr_lut table
-    for (int byte = 0; byte < 128; ++byte) {
-        for (int next_lsb = 0; next_lsb < 2; ++next_lsb) {
-            for (int prev_bit = 0; prev_bit < 2; ++prev_bit) {
-                for (int phase = 0; phase < 2; ++phase) {
-                    for (int start_bit = 0; start_bit < 2; ++start_bit) {
+    for(int byte = 0; byte < 128; ++byte) {
+        for(int next_lsb = 0; next_lsb < 2; ++next_lsb) {
+            for(int prev_bit = 0; prev_bit < 2; ++prev_bit) {
+                for(int phase = 0; phase < 2; ++phase) {
+                    for(int start_bit = 0; start_bit < 2; ++start_bit) {
                         int stream = (next_lsb << 8) | (byte << 1) | prev_bit;
                         int parity = start_bit;
 
-                        for (int b = 0; b < 7; ++b) {
+                        for(int b = 0; b < 7; ++b) {
                             int bit_stream = stream & 0b111;                 // same 3-bit window
                             hgr_lut[byte][next_lsb][prev_bit][phase][start_bit].pixel[b] =
                                 color_table[bit_stream][parity][phase];
@@ -188,9 +188,9 @@ void viewapl2_init_color_table(APPLE2 *m) {
     }
 
     // Init the hgr_mono_lut table
-    for (int byte = 0; byte < 128; ++byte) {
+    for(int byte = 0; byte < 128; ++byte) {
         uint8_t x = byte;
-        for (int i = 0; i < 7; ++i) {
+        for(int i = 0; i < 7; ++i) {
             hgr_mono_lut[byte].pixel[i] = (x & 1) ? color_table[0][0][0] : color_table[7][0][0];
             x >>= 1;
         }
@@ -229,100 +229,100 @@ void viewapl2_process_event(APPLE2 *m, SDL_Event *e) {
         if(mod & KMOD_CTRL) {
             // CTRL is held down, now check which key is pressed
             if(e->key.keysym.scancode != SDL_SCANCODE_LCTRL) {
-                switch (e->key.keysym.sym) {
-                case SDLK_SCROLLLOCK:                       // CTRL+PAUSE generates SDLK_SCROLLLOCK on my PC
-                case SDLK_PAUSE:
-                    cpu_init(m);
-                    diskii_reset(m);
-                    break;
-                default:
-                    // CTRL+A = 1, etc.
-                    m->RAM_MAIN[KBD] = 0x80 | (e->key.keysym.sym - 0x60);
-                    break;
+                switch(e->key.keysym.sym) {
+                    case SDLK_SCROLLLOCK:                       // CTRL+PAUSE generates SDLK_SCROLLLOCK on my PC
+                    case SDLK_PAUSE:
+                        cpu_init(m);
+                        diskii_reset(m);
+                        break;
+                    default:
+                        // CTRL+A = 1, etc.
+                        m->RAM_MAIN[KBD] = 0x80 | (e->key.keysym.sym - 0x60);
+                        break;
                 }
             }
         } else {
             // Handle special keys like ENTER, BACKSPACE, etc.
-            switch (e->key.keysym.sym) {
-            case SDLK_BACKSPACE:
-                if(m->original_del) {                       // Apple ][ key for del
-                    m->RAM_MAIN[KBD] = 0x80 + 127;
-                } else {                                    // CRSR left on del
+            switch(e->key.keysym.sym) {
+                case SDLK_BACKSPACE:
+                    if(m->original_del) {                       // Apple ][ key for del
+                        m->RAM_MAIN[KBD] = 0x80 + 127;
+                    } else {                                    // CRSR left on del
+                        m->RAM_MAIN[KBD] = 0x80 | e->key.keysym.sym;
+                    }
+                    break;
+
+                case SDLK_RETURN:
+                case SDLK_ESCAPE:
+                case SDLK_TAB:
                     m->RAM_MAIN[KBD] = 0x80 | e->key.keysym.sym;
-                }
-                break;
+                    break;
 
-            case SDLK_RETURN:
-            case SDLK_ESCAPE:
-            case SDLK_TAB:
-                m->RAM_MAIN[KBD] = 0x80 | e->key.keysym.sym;
-                break;
+                case SDLK_UP:
+                    m->RAM_MAIN[KBD] = 0x8B;                    // UP arrow
+                    break;
 
-            case SDLK_UP:
-                m->RAM_MAIN[KBD] = 0x8B;                    // UP arrow
-                break;
+                case SDLK_DOWN:
+                    m->RAM_MAIN[KBD] = 0x8A;                    // DOWN arrow
+                    break;
 
-            case SDLK_DOWN:
-                m->RAM_MAIN[KBD] = 0x8A;                    // DOWN arrow
-                break;
+                case SDLK_LEFT:
+                    m->RAM_MAIN[KBD] = 0x88;                    // LEFT arrow
+                    break;
 
-            case SDLK_LEFT:
-                m->RAM_MAIN[KBD] = 0x88;                    // LEFT arrow
-                break;
+                case SDLK_RIGHT:
+                    m->RAM_MAIN[KBD] = 0x95;                    // RIGHT arrow
+                    break;
 
-            case SDLK_RIGHT:
-                m->RAM_MAIN[KBD] = 0x95;                    // RIGHT arrow
-                break;
-
-            default:
-                break;
+                default:
+                    break;
             }
         }
     } else if(e->type == SDL_KEYUP) {
-        switch (e->key.keysym.sym) {
-        case SDLK_LALT:
-            m->open_apple = 0;
-            break;
+        switch(e->key.keysym.sym) {
+            case SDLK_LALT:
+                m->open_apple = 0;
+                break;
 
-        case SDLK_RALT:
-            m->closed_apple = 0;
-            break;
+            case SDLK_RALT:
+                m->closed_apple = 0;
+                break;
         }
     }
 }
 
 // Select which screen to display based on what mode is active
 void viewapl2_screen_apple2(APPLE2 *m) {
-    switch (m->viewport->shadow_screen_mode) {
-    case 0b001:                                             // lores
-        viewapl2_screen_lores(m, 0, 24);
-        break;
+    switch(m->viewport->shadow_screen_mode) {
+        case 0b001:                                             // lores
+            viewapl2_screen_lores(m, 0, 24);
+            break;
 
-    case 0b011:                                             // mixed lores
-        viewapl2_screen_lores(m, 0, 20);
-        viewapl2_screen_txt(m, 20, 24);
-        break;
+        case 0b011:                                             // mixed lores
+            viewapl2_screen_lores(m, 0, 20);
+            viewapl2_screen_txt(m, 20, 24);
+            break;
 
-    case 0b101:                                             // hgr graphics
-        viewapl2_screen_hgr(m, 0, 192);
-        break;
+        case 0b101:                                             // hgr graphics
+            viewapl2_screen_hgr(m, 0, 192);
+            break;
 
-    case 0b111:                                             // hgr, mixed graphics
-        viewapl2_screen_hgr(m, 0, 160);
-        viewapl2_screen_txt(m, 20, 24);
-        break;
+        case 0b111:                                             // hgr, mixed graphics
+            viewapl2_screen_hgr(m, 0, 160);
+            viewapl2_screen_txt(m, 20, 24);
+            break;
 
-    default:
-        // case 0b000: // text
-        // case 0b010: // mixed text (also just text)
-        // case 0b100: // hgr but not graphics, so text
-        // case 0b110: // hgr, mixed but not graphics, so text
-        if(m->cols80active) {
-            viewapl2_screen_80col(m, 0, 24);
-        } else {
-            viewapl2_screen_txt(m, 0, 24);
-        }
-        break;
+        default:
+            // case 0b000: // text
+            // case 0b010: // mixed text (also just text)
+            // case 0b100: // hgr but not graphics, so text
+            // case 0b110: // hgr, mixed but not graphics, so text
+            if(m->cols80active) {
+                viewapl2_screen_80col(m, 0, 24);
+            } else {
+                viewapl2_screen_txt(m, 0, 24);
+            }
+            break;
     }
 }
 
@@ -421,21 +421,21 @@ void viewapl2_screen_hgr(APPLE2 *m, int start, int end) {
         int bit_column = 0;                // start of scanline
         int prev_bit    = 0;               // first column "left neighbor" is 0
 
-        for (int col = 0; col < 40; ++col) {
+        for(int col = 0; col < 40; ++col) {
             uint8_t next_byte = (col + 1 < 40) ? m->RAM_MAIN[address + col + 1] : 0;
             int next_lsb = next_byte & 1;
             int phase   = (byte >> 7) & 1;
 
-            const HGRLUTENTRY* e = &hgr_lut[byte & 0x7F][next_lsb][prev_bit][phase][bit_column];
+            const HGRLUTENTRY *e = &hgr_lut[byte & 0x7F][next_lsb][prev_bit][phase][bit_column];
 
             // emit the 7 pixels already expanded in the LUT
-            p[px+0] = e->pixel[0]; 
-            p[px+1] = e->pixel[1]; 
-            p[px+2] = e->pixel[2];
-            p[px+3] = e->pixel[3]; 
-            p[px+4] = e->pixel[4]; 
-            p[px+5] = e->pixel[5];
-            p[px+6] = e->pixel[6];
+            p[px + 0] = e->pixel[0];
+            p[px + 1] = e->pixel[1];
+            p[px + 2] = e->pixel[2];
+            p[px + 3] = e->pixel[3];
+            p[px + 4] = e->pixel[4];
+            p[px + 5] = e->pixel[5];
+            p[px + 6] = e->pixel[6];
             px += 7;
 
             // prepare for next column
@@ -464,13 +464,13 @@ void viewapl2_screen_hgr_mono(APPLE2 *m, int start, int end) {
         uint8_t *bytes = &m->RAM_MAIN[address];
         for(int x = 0; x < 40; x++) {
             const HGRMONOLUTENTRY *e = &hgr_mono_lut[*bytes++ & 0x7F];
-            p[0]=e->pixel[0]; 
-            p[1]=e->pixel[1]; 
-            p[2]=e->pixel[2]; 
-            p[3]=e->pixel[3];
-            p[4]=e->pixel[4]; 
-            p[5]=e->pixel[5]; 
-            p[6]=e->pixel[6];
+            p[0] = e->pixel[0];
+            p[1] = e->pixel[1];
+            p[2] = e->pixel[2];
+            p[3] = e->pixel[3];
+            p[4] = e->pixel[4];
+            p[5] = e->pixel[5];
+            p[6] = e->pixel[6];
             p += 7;
         }
     }

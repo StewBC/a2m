@@ -50,12 +50,12 @@ int main(int argc, char *argv[]) {
     SDL_PauseAudio(0);
 
     // Start running the sim loop
-    while (!quit) {
+    while(!quit) {
         uint64_t start_time = SDL_GetPerformanceCounter();
 
         int ops = m.free_run && !m.step ? OPS_PER_SLICE_FREE_RUN : 1;
         int c0 = m.cpu.cycles;
-        for (int i = 0; i < ops && (!m.stopped | m.step); ++i) {
+        for(int i = 0; i < ops && (!m.stopped | m.step); ++i) {
             machine_run_opcode(&m);
             // See if a breakpoint was hit (will set m.stopped)
             viewdbg_update(&m);
@@ -67,19 +67,19 @@ int main(int argc, char *argv[]) {
         quit = viewport_process_events(&m);
 
         // draw if stopped or at desired fps
-        if (SDL_GetPerformanceCounter() >= update_time || m.stopped) {
+        if(SDL_GetPerformanceCounter() >= update_time || m.stopped) {
             v.shadow_screen_mode = m.screen_mode;
             v.shadow_active_page = m.active_page;
             viewport_show(&m);
             viewapl2_screen_apple2(&m);
             viewport_update(&m);
-            update_time = SDL_GetPerformanceCounter() + SDL_GetPerformanceFrequency()/TARGET_FPS;
+            update_time = SDL_GetPerformanceCounter() + SDL_GetPerformanceFrequency() / TARGET_FPS;
         }
 
         // 1 MHz pacing only when NOT in free-run
-        if (!m.free_run) {
+        if(!m.free_run) {
             uint64_t end_time = SDL_GetPerformanceCounter();
-            while ((end_time - start_time) < (ticks_per_clock_cycle * cycles)) {
+            while((end_time - start_time) < (ticks_per_clock_cycle * cycles)) {
                 end_time = SDL_GetPerformanceCounter();
             }
         }

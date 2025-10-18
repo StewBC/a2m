@@ -4,7 +4,7 @@
 
 #include "header.h"
 
-//  Set key to value in section (allows duplicates). Returns 0 on success. 
+//  Set key to value in section (allows duplicates). Returns 0 on success.
 int ini_add(INI_STORE *st, const char *section, const char *key, const char *value) {
     if(!section || !key) {
         return -1;
@@ -28,7 +28,7 @@ int ini_add(INI_STORE *st, const char *section, const char *key, const char *val
     return 0;
 }
 
-INI_KV* ini_find_kv(INI_SECTION *s, const char *key) {
+INI_KV *ini_find_kv(INI_SECTION *s, const char *key) {
     for(size_t i = 0 ; i < s->kv.items; i++) {
         INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
         if(stricmp(kv->key, key) == 0) {
@@ -38,7 +38,7 @@ INI_KV* ini_find_kv(INI_SECTION *s, const char *key) {
     return NULL;
 }
 
-INI_SECTION* ini_find_section(INI_STORE *st, const char *name) {
+INI_SECTION *ini_find_section(INI_STORE *st, const char *name) {
     for(size_t i = 0; i < st->sections.items; i++) {
         INI_SECTION *s = ARRAY_GET(&st->sections, INI_SECTION, i);
         if(stricmp(s->name, name) == 0) {
@@ -48,7 +48,7 @@ INI_SECTION* ini_find_section(INI_STORE *st, const char *name) {
     return NULL;
 }
 
-const char* ini_get(INI_STORE *st, const char *section, const char *key) {
+const char *ini_get(INI_STORE *st, const char *section, const char *key) {
     INI_SECTION *s = ini_find_section(st, section);
     if(!s) {
         return NULL;
@@ -57,12 +57,12 @@ const char* ini_get(INI_STORE *st, const char *section, const char *key) {
     return kv ? kv->val : NULL;
 }
 
-INI_SECTION* ini_get_or_add_section(INI_STORE *st, const char *name) {
+INI_SECTION *ini_get_or_add_section(INI_STORE *st, const char *name) {
     INI_SECTION *s = ini_find_section(st, name);
     if(s) {
         return s;
     }
-    
+
     INI_SECTION new_section;
     new_section.name = strdup(name ? name : "");
     ARRAY_INIT(&new_section.kv, INI_KV);
@@ -100,9 +100,9 @@ int ini_remove_key(INI_STORE *st, const char *section, const char *key) {
 }
 
 int ini_remove_section(INI_STORE *st, const char *section) {
-    for(size_t i=0; i < st->sections.items; i++) {
+    for(size_t i = 0; i < st->sections.items; i++) {
         INI_SECTION *s = ARRAY_GET(&st->sections, INI_SECTION, i);
-        if(stricmp(s->name, section) ==0 ) {
+        if(stricmp(s->name, section) == 0) {
             ini_section_free(s);
             return 1;
         }
@@ -121,7 +121,7 @@ void ini_section_free(INI_SECTION *s) {
     array_free(&s->kv);
 }
 
-//  Set key in section (no dups). Returns 0 on success. 
+//  Set key in section (no dups). Returns 0 on success.
 int ini_set(INI_STORE *st, const char *section, const char *key, const char *value) {
     if(!section || !key) {
         return -1;
@@ -159,7 +159,7 @@ void ini_shutdown(INI_STORE *st) {
     if(!st) {
         return;
     }
-    for(size_t i=0; i < st->sections.items; i++) {
+    for(size_t i = 0; i < st->sections.items; i++) {
         INI_SECTION *s = ARRAY_GET(&st->sections, INI_SECTION, i);
         ini_section_free(s);
     }

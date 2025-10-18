@@ -65,16 +65,16 @@ static inline void add_value_to_accumulator(APPLE2 *m, uint8_t value) {
     m->cpu.C = m->cpu.scratch_hi;
     if(m->cpu.D) {
         m->cpu.scratch_hi = (a >> 4) + (value >> 4);
-        if (m->cpu.scratch_lo > 9) {
+        if(m->cpu.scratch_lo > 9) {
             m->cpu.scratch_lo += 6;
             m->cpu.scratch_hi++;
         }
-        if (m->cpu.scratch_hi > 9) {
+        if(m->cpu.scratch_hi > 9) {
             m->cpu.scratch_hi += 6;
             m->cpu.C = 1;
         }
         m->cpu.A = (m->cpu.scratch_hi << 4) | (m->cpu.scratch_lo & 0x0F);
-        if(m->cpu.class == CPU_65c02) {            
+        if(m->cpu.class == CPU_65c02) {
             read_from_memory(m, m->cpu.address_16);
             CYCLE(m);
             set_register_to_value(m, &m->cpu.A, m->cpu.A);
@@ -106,18 +106,18 @@ static inline void subtract_value_from_accumulator(APPLE2 *m, uint8_t value) {
     uint8_t a = m->cpu.A;
     m->cpu.C ^= 1;
     m->cpu.scratch_16 = a - value - m->cpu.C;
-    
+
     if(m->cpu.class == CPU_6502) {
         set_register_to_value(m, &m->cpu.A, m->cpu.scratch_lo);
         m->cpu.V = ((a ^ value) & (a ^ m->cpu.A) & 0x80) != 0 ? 1 : 0;
         if(m->cpu.D) {
             uint8_t lo = (a & 0x0F) - (value & 0x0F) - m->cpu.C;
             uint8_t hi = (a >> 4) - (value >> 4);
-            if (lo & 0x10) {
+            if(lo & 0x10) {
                 lo -= 6;
                 hi--;
             }
-            if (hi & 0xF0) {
+            if(hi & 0xF0) {
                 hi -= 6;
             }
             m->cpu.A = (hi << 4) | (lo & 0x0F);
@@ -127,10 +127,10 @@ static inline void subtract_value_from_accumulator(APPLE2 *m, uint8_t value) {
         m->cpu.A = m->cpu.scratch_lo;
         m->cpu.V = ((a ^ m->cpu.A) & (a ^ value) & 0x80) ? 1 : 0;
         if(m->cpu.D) {
-            if ((a & 0x0F) < ((value & 0x0F) + m->cpu.C)) {
+            if((a & 0x0F) < ((value & 0x0F) + m->cpu.C)) {
                 m->cpu.scratch_lo -= 0x06;
             }
-            if (a < value + m->cpu.C) {
+            if(a < value + m->cpu.C) {
                 m->cpu.scratch_lo -= 0x60;
             }
             read_from_memory(m, m->cpu.address_16);
@@ -260,7 +260,7 @@ static inline void aix(APPLE2 *m) {
         if(m->cpu.class == CPU_6502) {
             read_from_memory(m, m->cpu.address_16);
         } else {
-            read_from_memory(m, m->cpu.pc-1);
+            read_from_memory(m, m->cpu.pc - 1);
         }
         m->cpu.address_hi++;
         CYCLE(m);
@@ -274,7 +274,7 @@ static inline void aipxr(APPLE2 *m) {
     if(m->cpu.class == CPU_6502) {
         read_from_memory(m, m->cpu.address_16);
     } else {
-        read_from_memory(m, m->cpu.pc-1);
+        read_from_memory(m, m->cpu.pc - 1);
     }
     CYCLE(m);
     if(m->cpu.address_lo < lo) {
@@ -306,7 +306,7 @@ static inline void aiy(APPLE2 *m) {
         if(m->cpu.class == CPU_6502) {
             read_from_memory(m, m->cpu.address_16);
         } else {
-            read_from_memory(m, m->cpu.pc-1);
+            read_from_memory(m, m->cpu.pc - 1);
         }
         m->cpu.address_hi++;
         CYCLE(m);
@@ -320,7 +320,7 @@ static inline void aiyr(APPLE2 *m) {
     if(m->cpu.class == CPU_6502) {
         read_from_memory(m, m->cpu.address_16);
     } else {
-        read_from_memory(m, m->cpu.pc-1);
+        read_from_memory(m, m->cpu.pc - 1);
     }
     CYCLE(m);
     if(m->cpu.address_lo < lo) {
@@ -359,7 +359,7 @@ static inline void miy(APPLE2 *m) {
         if(m->cpu.class == CPU_6502) {
             read_from_memory(m, m->cpu.address_16);
         } else {
-            read_from_memory(m, m->cpu.pc-1);
+            read_from_memory(m, m->cpu.pc - 1);
         }
         m->cpu.address_hi++;
         CYCLE(m);
@@ -375,7 +375,7 @@ static inline void miyr(APPLE2 *m) {
     if(m->cpu.class == CPU_6502) {
         read_from_memory(m, m->cpu.address_16);
     } else {
-        read_from_memory(m, m->cpu.pc-1);
+        read_from_memory(m, m->cpu.pc - 1);
     }
     CYCLE(m);
     if(m->cpu.address_lo < lo) {
@@ -420,10 +420,11 @@ static inline void unimplemented(APPLE2 *m) {
 
 // Pipeline selectors
 static inline void aixr_sel(APPLE2 *m) {
-    if (m->cpu.class == CPU_6502)
+    if(m->cpu.class == CPU_6502) {
         aipxrw(m);
-    else
+    } else {
         aixrr(m);
+    }
 }
 
 // Instructions
@@ -643,7 +644,7 @@ static inline void cpy_imm(APPLE2 *m) {
     CYCLE(m);
 }
 
-static inline void dea(APPLE2 * m) {
+static inline void dea(APPLE2 *m) {
     read_from_memory(m, m->cpu.pc);
     set_register_to_value(m, &m->cpu.A, m->cpu.A - 1);
     CYCLE(m);
@@ -686,7 +687,7 @@ static inline void inc_a16(APPLE2 *m) {
     CYCLE(m);
 }
 
-static inline void ina(APPLE2 * m) {
+static inline void ina(APPLE2 *m) {
     read_from_memory(m, m->cpu.pc);
     set_register_to_value(m, &m->cpu.A, m->cpu.A + 1);
     CYCLE(m);

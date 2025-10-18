@@ -18,7 +18,7 @@ typedef struct SP_DEVICE {
 #define SP_IO_ERROR         0x27
 #define SP_WRITE_PROTECT    0x2B
 
-int sp_mount(APPLE2 * m, const int slot, const int device, const char *file_name);
-void sp_status(APPLE2 * m, const int slot);
-void sp_read(APPLE2 * m, const int slot);
-void sp_write(APPLE2 * m, const int slot);
+int sp_mount(APPLE2 *m, const int slot, const int device, const char *file_name);
+void sp_status(APPLE2 *m, const int slot);
+void sp_read(APPLE2 *m, const int slot);
+void sp_write(APPLE2 *m, const int slot);
