@@ -53,9 +53,9 @@ int main(int argc, char *argv[]) {
     while (!quit) {
         uint64_t start_time = SDL_GetPerformanceCounter();
 
-        int ops = m.free_run ? OPS_PER_SLICE_FREE_RUN : 1;
+        int ops = m.free_run && !m.step ? OPS_PER_SLICE_FREE_RUN : 1;
         int c0 = m.cpu.cycles;
-        for (int i = 0; i < ops && (m.free_run | !m.stopped | !m.step); ++i) {
+        for (int i = 0; i < ops && (!m.stopped | m.step); ++i) {
             machine_run_opcode(&m);
             // See if a breakpoint was hit (will set m.stopped)
             viewdbg_update(&m);
