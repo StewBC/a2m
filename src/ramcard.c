@@ -4,8 +4,8 @@
 
 #include "header.h"
 
-uint8_t ram_card(APPLE2 *m, uint16_t address, uint16_t value) {
-    RAM_CARD *lc = &m->ram_card;
+uint8_t ram_card(APPLE2 *m, int index, uint16_t address, uint16_t value) {
+    RAM_CARD *lc = &m->ram_card[index];
     lc->bank2_enable = (address & 0b1000) ? 0 : 1;
     if((address & 0b11) && (address & 0b11) != 3) {
         lc->read_ram_enable = 0;

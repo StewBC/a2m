@@ -144,7 +144,9 @@ void viewapl2_init_character_rom_2e(APPLE2 *m) {
         x = (x >> 4) | (x << 4);
         x = ((x & 0xCC) >> 2) | ((x & 0x33) << 2);
         x = ((x & 0xAA) >> 1) | ((x & 0x55) << 1);
-        x = ~x;
+        if(x > 0x80) {
+            x = ~x;
+        }
         a2ee_character_rom[byte] = x;
     }
 }

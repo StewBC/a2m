@@ -63,7 +63,7 @@ typedef struct APPLE2 {
     MEMORY roms;                                            // All MEMORY in the system, may be mapped into 64K, through read_pages
     SLOT_CARDS slot_cards[8];                               // The 8 slots and their status and option ROMs
     SPEAKER speaker;                                        // 1 bit audio speaker
-    RAM_CARD ram_card;                                      // State for which pages are visible
+    RAM_CARD ram_card[2];                                   // State for which pages are visible
     DISKII_CONTROLLER diskii_controller[8];                 // Any slot can have a disk ii controller (and drives)
     SP_DEVICE sp_device[8];                                 // All slots could be made smartport
     FRANKLIN_DISPLAY franklin_display;                      // Franklin Display 80 col card
@@ -72,7 +72,8 @@ typedef struct APPLE2 {
     uint32_t ram_size;                                      // How much ram this machine has
     uint8_t *RAM_MAIN;                                      // The ram_size MEMORY - addressable in max 64k chunks
     uint8_t *RAM_WATCH;                                     // 64K of IO port "mask" (0 = is not a port)
-    uint8_t *rom_shadow_pages[(0xC800-0xC100)/PAGE_SIZE];    // Slot ram page mappings when SETC?ROM active
+    uint8_t *rom_shadow_pages[(0xC800-0xC000)/PAGE_SIZE];   // Slot ram page mappings when SETC?ROM active
+    uint8_t mapped_slot;
 
     // keyboard
     uint8_t open_apple;
@@ -83,8 +84,14 @@ typedef struct APPLE2 {
     int monitor_type;
 
     // Status flags
+    uint32_t store80set: 1;
+    uint32_t ramrdset: 1;
+    uint32_t ramwrtset: 1;
     uint32_t cxromset: 1;
     uint32_t c3romset: 1;
+    uint32_t altzpset: 1;
+    uint32_t vid80set: 1;
+    uint32_t altcharset: 1;
     uint32_t model: 1;                                           // (0) II+ or (1) //e
     uint32_t original_del: 1;                                    // backspace key does crsr left if 0
     uint32_t cols80active: 1;                                    // Videx/Franklin Ace Display active

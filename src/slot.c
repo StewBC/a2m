@@ -12,6 +12,7 @@ void slot_add_card(APPLE2 *m, uint8_t slot, int slot_type, void *slot_card, uint
     m->slot_cards[slot].slot_card = slot_card;
     m->slot_cards[slot].slot_map_cx_rom = map_cx_rom;
     pages_map(&m->read_pages, (0xC000 + (slot * 0x100)) / PAGE_SIZE, 0x100 / PAGE_SIZE, card_rom);
+    m->rom_shadow_pages[(0xC000 + (slot * 0x100)) / PAGE_SIZE] = card_rom;
     // map the device select range
     for(size_t i = 0xC080 + slot * 0x10; i <= 0xC08F + slot * 0x10; i++) {
         m->RAM_WATCH[i] |= 1;
