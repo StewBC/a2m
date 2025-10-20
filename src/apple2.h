@@ -80,8 +80,9 @@ typedef struct APPLE2 {
     uint8_t closed_apple;
 
     // Screen State
-    int screen_mode;
-    int monitor_type;
+    uint8_t screen_mode;
+    uint8_t monitor_type;
+    uint64_t vbl_cycles;                                    // To have a counter at $C019 on //e
 
     // Status flags
     uint32_t store80set: 1;

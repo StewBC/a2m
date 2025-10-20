@@ -255,13 +255,14 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
         // Ram card address
         ram_card(m, m->ramrdset, address, 0x100);
     } else if(address >= 0xc090 && address <= 0xc0FF) {
+        // Device Select
         int slot = (address >> 4) & 0x7;
         switch(m->slot_cards[slot].slot_type) {
             case SLOT_TYPE_DISKII: {
                     uint8_t soft_switch = address & 0x0f;
                     if(soft_switch <= IWM_PH3_ON) {
                         diskii_step_head(m, slot, soft_switch);
-                        return 0xff;
+                        break;
                     }
                     switch(soft_switch) {
                         case IWM_MOTOR_ON:
@@ -305,6 +306,7 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
                 break;
         }
     } else if(address >= 0xc100 && address <= 0xcFFE) {
+        // IO Select
         int slot = (address >> 8) & 0x7;
         // Only if slot isn't mapped, and only if ROM isn't active
         if(m->mapped_slot != slot && !(m->cxromset || (slot == 3 && m->c3romset))) {
@@ -320,85 +322,17 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
         switch(address) {
             case KBD:
                 break;
-            case SET80STORE:  //e
-                if(m->model) {
-                    m->store80set = 1;
-                }
-                break;
-            case CLRRAMRD: //e
-                if(m->model) {
-                    m->ramrdset = 0;
-                    pages_map(&m->read_pages, 0x0200 / PAGE_SIZE, 0xBE00 / PAGE_SIZE, &m->RAM_MAIN[0x0200]);
-                }
-                break;
-            case SETRAMRD: //e
-                if(m->model) {
-                    m->ramrdset = 1;
-                    pages_map(&m->read_pages, 0x0200 / PAGE_SIZE, 0xBE00 / PAGE_SIZE, &m->RAM_MAIN[0x10200]);
-                }
-                break;
-            case CLRRAMWRT: //e
-                if(m->model) {
-                    m->ramwrtset = 0;
-                    pages_map(&m->write_pages, 0x0200 / PAGE_SIZE, 0xBE00 / PAGE_SIZE, &m->RAM_MAIN[0x0200]);
-                }
-                break;
-            case SETRAMWRT: //e
-                if(m->model) {
-                    m->ramwrtset = 1;
-                    pages_map(&m->write_pages, 0x0200 / PAGE_SIZE, 0xBE00 / PAGE_SIZE, &m->RAM_MAIN[0x10200]);
-                }
-                break;
-            case CLRCXROM:  //e
-                if(m->model) {
-                    m->cxromset = 0;
-                    m->read_pages.pages[0xC100 / PAGE_SIZE].bytes = m->rom_shadow_pages[1];
-                    m->read_pages.pages[0xC200 / PAGE_SIZE].bytes = m->rom_shadow_pages[2];
-                    m->read_pages.pages[0xC400 / PAGE_SIZE].bytes = m->rom_shadow_pages[4];
-                    m->read_pages.pages[0xC500 / PAGE_SIZE].bytes = m->rom_shadow_pages[5];
-                    m->read_pages.pages[0xC600 / PAGE_SIZE].bytes = m->rom_shadow_pages[6];
-                    m->read_pages.pages[0xC700 / PAGE_SIZE].bytes = m->rom_shadow_pages[7];
-                }
-                break;
-            case SETCXROM:  //e
-                if(m->model) {
-                    m->cxromset = 1;
-                    // C100-C2FF
-                    pages_map(&m->read_pages, 0xC100 / PAGE_SIZE, 0x200 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x100]);
-                    // C400-CFFF
-                    pages_map(&m->read_pages, 0xC400 / PAGE_SIZE, 0xC00 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x400]);
-                }
-                break;
-            case CLRC3ROM: //e
-                if(m->model) {
-                    m->c3romset = 0;
-                    // C300-C3FF
-                    m->read_pages.pages[0xC300 / PAGE_SIZE].bytes = m->rom_shadow_pages[3];
-                }
-                break;
-            case SETC3ROM: // e
-                if(m->model) {
-                    m->c3romset = 1;
-                    // C300-C3FF
-                    pages_map(&m->read_pages, 0xC300 / PAGE_SIZE, 0x100 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x300]);
-                    // SQW - Map C800 as well?
-                    // pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, 0x800 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x800]);
-                }
-                break;
-            case CLR80VID: //e
-                if(m->model) {
-                    m->vid80set = 0;
-                }
-            case SET80VID: //e
-                if(m->model) {
-                    m->vid80set = 1;
-                }
             case KBDSTRB:
                 m->write_pages.pages[KBD / PAGE_SIZE].bytes[KBD % PAGE_SIZE] &= 0x7F;
                 break;
             case RDCXROM:   //e
                 if(m->model) {
                     return (m->cxromset << 7);
+                }
+                break;
+            case RDALTZP:
+                if(m->model) {
+                    return (m->altzpset << 7);
                 }
                 break;
             case RDC3ROM:   //e
@@ -409,6 +343,17 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
             case RD80COL:   //e
                 if(m->model) {
                     return (m->vid80set << 7);
+                }
+                break;
+            case RDVBL:     //e
+                if(m->model) {
+                    // Assume a frame (scanline to scanline) is 17030 cycles
+                    // something lke 40 + 25 = 65 for a horizontal line
+                    // and 65 * 262 = 17030
+                    uint64_t delta = m->cpu.cycles - m->vbl_cycles;
+                    uint64_t frames = delta / 17030;
+                    m->vbl_cycles += frames * 17030;
+                    return ((m->cpu.cycles - m->vbl_cycles) % 17030);
                 }
                 break;
             case RDPAGE2:   //e
@@ -488,11 +433,41 @@ void apple2_softswitch_write_callback(APPLE2 *m, uint16_t address, uint8_t value
     } else if(address >= 0xc080 && address <= 0xc0FF) {
         int slot = (address >> 4) & 0x7;
         switch(m->slot_cards[slot].slot_type) {
-            case SLOT_TYPE_SMARTPORT:
+            case SLOT_TYPE_DISKII: {
+                    uint8_t soft_switch = address & 0x0f;
+                    if(soft_switch <= IWM_PH3_ON) {
+                        diskii_step_head(m, slot, soft_switch);
+                        break;
+                    }
+                    switch(soft_switch) {
+                        case IWM_MOTOR_ON:
+                        case IWM_MOTOR_OFF:
+                            diskii_motor(m, slot, soft_switch);
+                            break;
+
+                        case IWM_SEL_DRIVE_1:
+                        case IWM_SEL_DRIVE_2:
+                            diskii_drive_select(m, slot, soft_switch);
+                            break;
+
+                        // SQW - Do these trigger with write?
+                        case IWM_Q6_OFF:
+                        case IWM_Q6_ON:
+                            diskii_q6_access(m, slot, soft_switch & 1);
+
+                        case IWM_Q7_OFF:
+                        case IWM_Q7_ON:
+                            diskii_q7_access(m, slot, soft_switch & 1);
+                    }
+                }
+                break;
+
+                case SLOT_TYPE_SMARTPORT:
                 switch(address & 0x0F) {
                     case SP_DATA:
                         m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_write_offset++] = value;
                         return;
+
                     case SP_STATUS:
                         m->sp_device[slot].sp_read_offset = 0;
                         m->sp_device[slot].sp_write_offset = 0;
@@ -517,12 +492,157 @@ void apple2_softswitch_write_callback(APPLE2 *m, uint16_t address, uint8_t value
                 franklin_display_set(m, address, value);
                 break;
         }
-    } else if(address == CLR80STORE) {
-        // SQW
     } else if(address >= 0xCC00 && address < 0xCE00) {
         m->franklin_display.display_ram[(address & 0x01ff) + m->franklin_display.bank * 0x200] = value;
     }
     // Everything else
-    m->write_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE] = value;
-    apple2_softswitch_read_callback(m, address);
+    // m->write_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE] = value;
+    // apple2_softswitch_read_callback(m, address);
+    switch(address) {
+        case CLR80STORE:
+            if(m->model) {
+                m->store80set = 0;
+            }
+            break;
+        case SET80STORE:  //e
+            if(m->model) {
+                m->store80set = 1;
+            }
+            break;
+        case CLRRAMRD: //e
+            if(m->model) {
+                m->ramrdset = 0;
+                pages_map(&m->read_pages, 0x0200 / PAGE_SIZE, 0xBE00 / PAGE_SIZE, &m->RAM_MAIN[0x0200]);
+            }
+            break;
+        case SETRAMRD: //e
+            if(m->model) {
+                m->ramrdset = 1;
+                pages_map(&m->read_pages, 0x0200 / PAGE_SIZE, 0xBE00 / PAGE_SIZE, &m->RAM_MAIN[0x10200]);
+            }
+            break;
+        case CLRRAMWRT: //e
+            if(m->model) {
+                m->ramwrtset = 0;
+                pages_map(&m->write_pages, 0x0200 / PAGE_SIZE, 0xBE00 / PAGE_SIZE, &m->RAM_MAIN[0x0200]);
+            }
+            break;
+        case SETRAMWRT: //e
+            if(m->model) {
+                m->ramwrtset = 1;
+                pages_map(&m->write_pages, 0x0200 / PAGE_SIZE, 0xBE00 / PAGE_SIZE, &m->RAM_MAIN[0x10200]);
+            }
+            break;
+        case CLRCXROM:  //e
+            if(m->model) {
+                m->cxromset = 0;
+                m->read_pages.pages[0xC100 / PAGE_SIZE].bytes = m->rom_shadow_pages[1];
+                m->read_pages.pages[0xC200 / PAGE_SIZE].bytes = m->rom_shadow_pages[2];
+                m->read_pages.pages[0xC400 / PAGE_SIZE].bytes = m->rom_shadow_pages[4];
+                m->read_pages.pages[0xC500 / PAGE_SIZE].bytes = m->rom_shadow_pages[5];
+                m->read_pages.pages[0xC600 / PAGE_SIZE].bytes = m->rom_shadow_pages[6];
+                m->read_pages.pages[0xC700 / PAGE_SIZE].bytes = m->rom_shadow_pages[7];
+                if(!m->c3romset) {
+                    m->read_pages.pages[0xC300 / PAGE_SIZE].bytes = m->rom_shadow_pages[3];
+                }
+            }
+            break;
+        case SETCXROM:  //e
+            if(m->model) {
+                m->cxromset = 1;
+                // C100-C2FF
+                pages_map(&m->read_pages, 0xC100 / PAGE_SIZE, 0x200 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x100]);
+                // C400-CFFF
+                pages_map(&m->read_pages, 0xC400 / PAGE_SIZE, 0xC00 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x400]);
+            }
+            break;
+        case CLRALTZP:
+            if(m->model) {
+                m->altzpset = 0;
+                // 0000-01ff
+                pages_map(&m->write_pages, 0x0000 / PAGE_SIZE, 0x0200 / PAGE_SIZE, &m->RAM_MAIN[0x0000]);
+            }
+            break;
+        case SETALTZP:
+            if(m->model) {
+                m->altzpset = 1;
+                // 10000-101ff
+                pages_map(&m->write_pages, 0x0000 / PAGE_SIZE, 0x0200 / PAGE_SIZE, &m->RAM_MAIN[0x10000]);
+            }
+            break;
+        case CLRC3ROM: //e
+            if(m->model) {
+                m->c3romset = 0;
+                // C300-C3FF
+                m->read_pages.pages[0xC300 / PAGE_SIZE].bytes = m->rom_shadow_pages[3];
+            }
+            break;
+        case SETC3ROM: // e
+            if(m->model) {
+                m->c3romset = 1;
+                // C300-C3FF
+                pages_map(&m->read_pages, 0xC300 / PAGE_SIZE, 0x100 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x300]);
+                // SQW - Map C800 as well?
+                // pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, 0x800 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x800]);
+            }
+            break;
+        case CLR80VID: //e
+            if(m->model) {
+                m->vid80set = 0;
+            }
+        case SET80VID: //e
+            if(m->model) {
+                m->vid80set = 1;
+            }
+        case KBDSTRB:
+            m->write_pages.pages[KBD / PAGE_SIZE].bytes[KBD % PAGE_SIZE] &= 0x7F;
+            break;
+        case A2SPEAKER:
+            speaker_toggle(&m->speaker);
+            break;
+        case TXTCLR:
+            m->screen_mode |= SCREEN_MODE_GRAPHICS;
+            break;
+        case TXTSET:
+            m->screen_mode &= ~SCREEN_MODE_GRAPHICS;
+            break;
+        case MIXCLR:
+            m->screen_mode &= ~SCREEN_MODE_MIXED;
+            break;
+        case MIXSET:
+            m->screen_mode |= SCREEN_MODE_MIXED;
+            break;
+        case LOWSCR:
+            m->active_page = 0;
+            break;
+        case HISCR:
+            m->active_page = -1;
+            break;
+        case LORES:
+            m->screen_mode &= ~SCREEN_MODE_HIRES;
+            break;
+        case HIRES:
+            m->screen_mode |= SCREEN_MODE_HIRES;
+            break;
+        case SETAN0: // SQW
+            break;
+        case SETAN1: // SQW
+            break;
+        case CLRAN2: // SQW
+            break;
+        case CLRAN3: // SQW
+            break;
+        case PTRIG: // read SDL joystick here and record cycle counter
+        case CLRROM: {
+                m->mapped_slot = -1;
+                for(int i = 1; i < 8; i++) {
+                    m->slot_cards[i].cx_rom_mapped = 0;
+                }
+                // On a //e this C800-CFFF becomes rom, on a II+ it's floating bus (ram in my case)
+                pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, 0x800 / PAGE_SIZE, m->model ? &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0X800] : &m->RAM_MAIN[0xC800]);
+            }
+            break;
+        default:
+            break;
+    }
 }

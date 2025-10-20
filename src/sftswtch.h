@@ -22,12 +22,15 @@
 #define CLRALTCHAR      0xC00E // primary/standard character set
 #define SETALTCHAR      0xC00F // alternate character set
 #define KBDSTRB         0xC010                              // Port where the Apple II acknowledges a key press (clears it)
-#define RDRAMRD         0xC011 // 1 = RAMRD on (reads from aux), 0 = off
-#define RDRAMWRT        0xC012 // 1 = RAMWRT on (writes to aux), 0 = off
+#define HRAMRD          0xC011 // 1 = HRAMRD  // SQW - need to understand
+#define HRAMWRT         0xC012 // 1 = HRAMWRT // SQW - need to understand
+#define RDRAMRD         0xC013 // 1 = RAMRD on (reads from aux), 0 = off
+#define RDRAMWRT        0xC014 // 1 = RAMWRT on (writes to aux), 0 = off
 #define RDCXROM         0xC015
 #define RDALTZP         0xC016 // 1 = ALTZP on (ZP/stack in aux), 0 = off
 #define RDC3ROM         0xc017
 #define RD80COL         0xC018
+#define RDVBL           0xC019
 #define RDTEXT          0xC01A // 1 = TEXT mode, 0 = graphics
 #define RDMIXED         0xC01B // 1 = MIXED (split screen) on, 0 = off
 #define RDPAGE2         0xC01C
