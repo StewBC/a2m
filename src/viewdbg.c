@@ -486,7 +486,10 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
             return 1;
 
         case SDLK_F3:
-            m->free_run ^= 1;                                   // Toggle free-run / 1 MHz mode
+            if(++m->turbo_index >= m->turbo_count) {
+                m->turbo_index = 0;
+            }
+            m->turbo_active = m->turbo[m->turbo_index];
             return 1;
 
         case SDLK_F5:

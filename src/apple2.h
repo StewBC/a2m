@@ -8,6 +8,9 @@
 // From John Brooks
 // The correct CPU frequency for an NTSC Apple II is 1020484.4.
 // The calc is 14,318,181 Hz crystal / 912 ticks per scanline (65 PH0 *14 ticks + 2 tick stretched clock) *65 PH0 per scanline.
+// Meaning the effective average during display when the video logic stretches the bus, since
+// roughly every 65 ϕ0 clocks you pay one extra 14 MHz tick (equivalently, +2 ticks per scanline),
+// so the average becomes, under video contention, 14,318,181 Hz × (65 / 912) = 1,020,484.391... Hz
 #define CPU_FREQUENCY   1020484.4
 
 // Supported Apple II Models
@@ -93,22 +96,28 @@ typedef struct APPLE2 {
     uint32_t altzpset: 1;
     uint32_t vid80set: 1;
     uint32_t altcharset: 1;
-    uint32_t model: 1;                                           // (0) II+ or (1) //e
-    uint32_t original_del: 1;                                    // backspace key does crsr left if 0
-    uint32_t cols80active: 1;                                    // Videx/Franklin Ace Display active
-    uint32_t active_page: 1;                                     // 0x2000 or 0x4000 - active hires bytes page
-    uint32_t free_run: 1;                                        // 0 - 1 Mhz, 1 - as fast as possible
-    uint32_t debug_view: 1;                                      // Apple ][ is not full-screen, debugger visible
-    uint32_t stopped: 1;                                         // Emulation is halted
-    uint32_t step: 1;                                            // Emulation halted but one instruction is "stepped"
-    uint32_t disk_activity_read: 1;                              // 0 = no read/write (here for convenience)
-    uint32_t disk_activity_write: 1;                             // 0 = no read/write
-
-    // Additiona Info
-    VIEWPORT *viewport;                                     // 0 (no view) or active view for this instance
+    uint32_t model: 1;                                      // (0) II+ or (1) //e
+    uint32_t original_del: 1;                               // backspace key does crsr left if 0
+    uint32_t cols80active: 1;                               // Videx/Franklin Ace Display active
+    uint32_t active_page: 1;                                // 0x2000 or 0x4000 - active hires bytes page
+    uint32_t debug_view: 1;                                 // Apple ][ is not full-screen, debugger visible
+    uint32_t stopped: 1;                                    // Emulation is halted
+    uint32_t step: 1;                                       // Emulation halted but one instruction is "stepped"
+    uint32_t disk_activity_read: 1;                         // 0 = no read/write (here for convenience)
+    uint32_t disk_activity_write: 1;                        // 0 = no read/write
 
     // Configuration
     INI_STORE ini_store;
+
+    // Turbo (1MHz+ settings)
+    float turbo_active;                                     // turbo[turbo_index]
+    uint32_t turbo_index;                                   // active entry in turbo array
+    uint32_t turbo_count;                                   // entries in turbo array
+    float *turbo;                                           // Array of multipliers (* 1MHz) to run at
+
+    // Additional Info
+    VIEWPORT *viewport;                                     // 0 (no view) or active view for this instance
+
 } APPLE2;
 
 int apple2_configure(APPLE2 *m);

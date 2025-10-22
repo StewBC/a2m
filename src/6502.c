@@ -54,8 +54,9 @@ typedef enum {
     PLX         = 0xFA,
 } OP_65c02;
 
-void machine_run_opcode(APPLE2 *m) {
+size_t machine_run_opcode(APPLE2 *m) {
     uint8_t opcode = read_from_memory(m, m->cpu.pc);
+    size_t start_cycle = m->cpu.cycles;
     CYCLE(m);
     m->cpu.pc++;
     switch(opcode) {
@@ -316,4 +317,5 @@ void machine_run_opcode(APPLE2 *m) {
         case INC_abs_X: { aipxrw(m); inc_a16(m); } break; // FE
         case UND_FF:    { a(m); read_pc_1(m); } break; // FF
    }
+   return m->cpu.cycles - start_cycle;
 }

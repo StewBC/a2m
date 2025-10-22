@@ -31,6 +31,7 @@ typedef struct VIEWPORT {
     // Shadow of machine states
     int shadow_screen_mode;
     int help_page;
+    uint32_t shadow_turbo_index;
 
     // Flags
     uint32_t debug_view: 1;
@@ -44,7 +45,6 @@ typedef struct VIEWPORT {
     uint32_t dlg_symbol_lookup_dbg: 1;
     uint32_t dlg_symbol_lookup_mem: 1;
     uint32_t shadow_active_page: 1;                              // Flags that shadow machine states
-    uint32_t shadow_free_run: 1;
     uint32_t shadow_stopped: 1;
     uint32_t show_help: 1;
     uint32_t show_leds: 1;

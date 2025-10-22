@@ -99,6 +99,7 @@ void speaker_on_cycles(SPEAKER *speaker, uint32_t cycles_executed) {
         float x = speaker->level;   // -1 or +1
         float y = speaker_filter(speaker, x);
         ring_push(speaker, y);
+        speaker_pump(speaker);
     }
 }
 

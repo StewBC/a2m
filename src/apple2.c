@@ -14,6 +14,7 @@ int apple2_configure(APPLE2 *m) {
     // Load config from ini file
     if(A2_OK != util_ini_load_file("./apple2.ini", ini_add, (void *)&m->ini_store)) {
         ini_add(&m->ini_store, "Machine", "Model", "apple2_ee ; apple2_plus | apple2_ee (//e Enhanced)");
+        ini_add(&m->ini_store, "Machine", "Turbo", "1, 8, 16, max ; Float.  F3 cycles - max is flat out");
         ini_add(&m->ini_store, "Display", "scale", "1.0 ; Uniformly scale Application Window");
         ini_add(&m->ini_store, "Display", "disk_leds", "1 ; Show disk activity LEDs");
         ini_add(&m->ini_store, "Video", ";slot", "3 ; Slot where an apple2_plus 80 col card is inserted ");
@@ -33,10 +34,22 @@ int apple2_configure(APPLE2 *m) {
     }
     // Configure the type of machine (II+ or //e Enhanced, based on ini_store)
     apple2_machine_setup(m);
+    // Set the Turbo state
+    if(!m->turbo_count) {
+        m->turbo_count = 2;
+        m->turbo = (float*)malloc(m->turbo_count * sizeof(float));
+        if(m->turbo) {
+            m->turbo[0] = 1.0f;
+			m->turbo[1] = -1.0f;
+        } else {
+            return A2_ERR;
+        }
+    }
+    m->turbo_active = m->turbo[m->turbo_index];
     // Allocate the RAM
     m->RAM_MAIN = (uint8_t *) malloc(m->ram_size);
     // SQW Makes RAM sel-test pass - uninit fails tests
-    memset(&m->RAM_MAIN[0x0000], 0xff, 0x20000);
+    memset(&m->RAM_MAIN[0x0000], 0xff, m->model ? 0x20000 : 0x10000);
     m->RAM_WATCH = (uint8_t *) malloc(m->ram_size);
     if(!m->RAM_MAIN || !m->RAM_WATCH) {
         return A2_ERR;
@@ -146,11 +159,57 @@ void apple2_machine_setup(APPLE2 *m) {
             INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
             const char *key = kv->key;
             const char *val = kv->val;
+            
             if(0 == stricmp(key, "model")) {
                 if(0 == stricmp(val, "apple2_plus")) {
                     m->model = MODEL_APPLE_II_PLUS;
                     m->cpu.class = CPU_6502;
                     m->ram_size = 64 * 1024;
+                }
+            }
+
+            if(0 == stricmp(key, "turbo")) {
+                // Count the commas to know how many turbo states there are
+                const char *s = val;
+                m->turbo_count = 1;
+                while(*s) {
+                    if(*s++ == ',') {
+                        m->turbo_count++;
+                    }
+                }
+                // Allocare the turbo's array
+                m->turbo = (float*)malloc(m->turbo_count * sizeof(float));
+                if(m->turbo) {
+                    // Convert the nubers to +float and any unknowns (non-float)
+                    // to -1 (max speed)
+                    s = val;
+                    for(int i = 0; i < m->turbo_count; i++) {
+                        int l = sscanf(s, "%f", &m->turbo[i]);
+                        if(l == -1) {
+                            // no value - make it a turbo of 1.0
+                            m->turbo[i] = 1.0f;
+                        } else if(l == 0) {
+                            // bad conversion - max
+                            m->turbo[i] = -1.0f;
+                        } else {
+                            // normal conversion - make it the positive to be sure
+                            m->turbo[i] = fabs(m->turbo[i]);
+                            // treat overflow as "max speed"
+                            if(isinf(m->turbo[i])) {
+                                m->turbo[i] = -1.0f;  
+                            }
+                        }
+                        // scan to the comma
+                        while(*s && *s != ',') {
+                            s++;
+                        }
+                        // Skip the comma
+                        if(*s) {
+                            s++;
+                        }
+                    }
+                } else {
+                    m->turbo_count = 0;
                 }
             }
         }
@@ -241,10 +300,13 @@ void apple2_shutdown(APPLE2 *m) {
     ram_card_shutdown(&m->ram_card[1]);
     diskii_shutdown(m);
     free(m->RAM_MAIN);
-    m->RAM_MAIN = 0;
+    m->RAM_MAIN = NULL;
     free(m->RAM_WATCH);
-    m->RAM_WATCH = 0;
-    m->viewport = 0;
+    m->RAM_WATCH = NULL;
+    m->turbo_count = 0;
+    free(m->turbo);
+    m->turbo = NULL;
+    m->viewport = NULL;
 }
 
 // Handle the Apple II sofswitches when read

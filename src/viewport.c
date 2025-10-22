@@ -82,6 +82,7 @@ int viewport_init(APPLE2 *m, int w, int h) {
     memset(v, 0, sizeof(VIEWPORT));
 
     v->display_scale = 1.0f;
+    v->shadow_turbo_index = -1;
 
     // Configure display_scale from the ini file
     viewport_config(m);
@@ -208,18 +209,23 @@ int viewport_process_events(APPLE2 *m) {
     if(!v) {
         return 0;
     }
+
     // Update the CPU view to the latest stats
     if(m->stopped && v->debug_view) {
         viewcpu_update(m);
     }
 
-    if(v->shadow_stopped != m->stopped || v->shadow_free_run != m->free_run) {
-        char sdl_window_title[48];
+    if(v->shadow_stopped != m->stopped || v->shadow_turbo_index != m->turbo_index) {
+        char sdl_window_title[64];
         v->shadow_stopped = m->stopped;
-        v->shadow_free_run = m->free_run;
+        v->shadow_turbo_index = m->turbo_index;
         strcpy(sdl_window_title, "Apple ][+ Emulator ");
         strcat(sdl_window_title, v->shadow_stopped ? "[stopped]" : "[running]");
-        strcat(sdl_window_title, v->shadow_free_run ? " @ Fast" : " @ 1 MHz");
+        if(m->turbo_active > 0) {
+            sprintf(&sdl_window_title[strlen(sdl_window_title)], " @ %1.1f", m->turbo_active);
+        } else {
+            strcat(sdl_window_title, " @ Max");
+        }
         SDL_SetWindowTitle(v->window, sdl_window_title);
     }
 
