@@ -214,6 +214,17 @@ void viewapl2_process_event(APPLE2 *m, SDL_Event *e) {
     VIEWPORT *v = m->viewport;
     DEBUGGER *d = &v->debugger;
 
+    // Get joystick states
+    for(int i = 0; i < v->num_controllers; i++) {
+        if(v->game_controller[i]) {
+            v->axis_left_x[i] = (32768 + SDL_GameControllerGetAxis(v->game_controller[i], SDL_CONTROLLER_AXIS_LEFTX)) >> 8;
+            v->axis_left_y[i] = (32768 + SDL_GameControllerGetAxis(v->game_controller[i], SDL_CONTROLLER_AXIS_LEFTY)) >> 8;
+            v->button_a[i] = SDL_GameControllerGetButton(v->game_controller[i], SDL_CONTROLLER_BUTTON_A);
+            v->button_b[i] = SDL_GameControllerGetButton(v->game_controller[i], SDL_CONTROLLER_BUTTON_B);
+            v->button_x[i] = SDL_GameControllerGetButton(v->game_controller[i], SDL_CONTROLLER_BUTTON_X);
+        }
+    }
+
     // Keyboard keys directly to emulator
     if(e->type == SDL_TEXTINPUT) {
         // Handle regular text input (letters, symbols, etc.)

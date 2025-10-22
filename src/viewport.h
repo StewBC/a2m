@@ -13,6 +13,7 @@ typedef struct VIEWPORT {
     SDL_Texture *texture640;
     SDL_Texture *greenLED;
     SDL_Texture *redLED;
+    SDL_GameController *game_controller[2];
     SDL_Rect target_rect;
     SDL_Rect full_window_rect;
 
@@ -32,6 +33,15 @@ typedef struct VIEWPORT {
     int shadow_screen_mode;
     int help_page;
     uint32_t shadow_turbo_index;
+
+    // Game controller values
+    int8_t num_controllers;
+    uint8_t button_a[2];
+    uint8_t button_b[2];
+    uint8_t button_x[2];
+    uint8_t axis_left_x[2];
+    uint8_t axis_left_y[2];
+    uint64_t ptrig_cycle;
 
     // Flags
     uint32_t debug_view: 1;

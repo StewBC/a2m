@@ -4,6 +4,12 @@
 
 #include "header.h"
 
+#define paddl_normalized    ((CPU_FREQUENCY  / 1000.0) * 2.6)
+
+static inline uint8_t clamp_u8(uint32_t x, uint8_t lo, uint8_t hi) {
+    return x < lo ? lo : (x > hi ? hi : x);
+}
+
 // Set MACHINE up as an Apple II
 int apple2_configure(APPLE2 *m) {
 
@@ -50,6 +56,11 @@ int apple2_configure(APPLE2 *m) {
     m->RAM_MAIN = (uint8_t *) malloc(m->ram_size);
     // SQW Makes RAM sel-test pass - uninit fails tests
     memset(&m->RAM_MAIN[0x0000], 0xff, m->model ? 0x20000 : 0x10000);
+    // This fixes some issues with how I handle the softswitch areas
+    memset(&m->RAM_MAIN[0xC000], 0x00, 0x1000);
+    if(m->model) {
+        memset(&m->RAM_MAIN[0x1C000], 0x00, 0x1000);
+    }
     m->RAM_WATCH = (uint8_t *) malloc(m->ram_size);
     if(!m->RAM_MAIN || !m->RAM_WATCH) {
         return A2_ERR;
@@ -385,6 +396,14 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
             case KBDSTRB:
                 m->write_pages.pages[KBD / PAGE_SIZE].bytes[KBD % PAGE_SIZE] &= 0x7F;
                 break;
+            case RDRAMRD: //e
+                if(m->model) {
+                    return (m->ramrdset << 7);
+                }
+            case RDRAMWRT: //e
+                if(m->model) {
+                    return (m->ramwrtset << 7);
+                }
             case RDCXROM:   //e
                 if(m->model) {
                     return (m->cxromset << 7);
@@ -456,18 +475,92 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
                 break;
             case CLRAN3: // SQW
                 break;
-            case BUTN0:
-                return m->open_apple;
+            case BUTN0: {
+                uint8_t button = m->open_apple;
+                VIEWPORT *v = m->viewport;
+                if(v) {
+                    for(int i = 0; i < v->num_controllers; i++) {
+                        button |= v->button_a[i];
+                    }
+                }
+                return button ? 0x80 : 0;
+            }
+            case BUTN1: {
+                uint8_t button = m->closed_apple;
+                VIEWPORT *v = m->viewport;
+                if(v) {
+                    for(int i = 0; i < v->num_controllers; i++) {
+                        button |= v->button_b[i];
+                    }
+                }
+                return button ? 0x80 : 0;
+            }
+            case BUTN2: {
+                uint8_t button = 0;
+                VIEWPORT *v = m->viewport;
+                if(v) {
+                    for(int i = 0; i < v->num_controllers; i++) {
+                        button |= v->button_x[i];
+                    }
+                }
+                return button ? 0x80 : 0;
+            }
+            case PADDL0: {
+                VIEWPORT *v = m->viewport;
+                if(v && v->game_controller[0]) {
+                    uint64_t cycle_delta = m->cpu.cycles - v->ptrig_cycle;
+                    uint8_t val = clamp_u8( floor(cycle_delta * 255 / paddl_normalized), 0, 255 );
+                    if(val >= v->axis_left_x[0]) {
+                        return 0x0;
+                    }
+                    return 0x80;
+                }
                 break;
-            case BUTN1:
-                return m->closed_apple;
+            }
+            case PADDL1: {
+                VIEWPORT *v = m->viewport;
+                if(v && v->game_controller[0]) {
+                    uint64_t cycle_delta = m->cpu.cycles - v->ptrig_cycle;
+                    uint8_t val = clamp_u8( floor(cycle_delta * 255 / paddl_normalized), 0, 255 );
+                    if(val >= v->axis_left_y[0]) {
+                        return 0x0;
+                    }
+                    return 0x80;
+                }
                 break;
-            case PADDL0:
-            case PADDL1:
-            case PADDL2:
-            case PADDL3:
-            case PTRIG: // read SDL joystick here and record cycle counter
+            }
+            case PADDL2: {
+                VIEWPORT *v = m->viewport;
+                if(v && v->game_controller[1]) {
+                    uint64_t cycle_delta = m->cpu.cycles - v->ptrig_cycle;
+                    uint8_t val = clamp_u8( floor(cycle_delta * 255 / paddl_normalized), 0, 255 );
+                    if(val >= v->axis_left_x[1]) {
+                        return 0x0;
+                    }
+                    return 0x80;
+                }
+                break;
+            }
+            case PADDL3: {
+                VIEWPORT *v = m->viewport;
+                if(v && v->game_controller[1]) {
+                    uint64_t cycle_delta = m->cpu.cycles - v->ptrig_cycle;
+                    uint8_t val = clamp_u8( floor(cycle_delta * 255 / paddl_normalized), 0, 255 );
+                    if(val >= v->axis_left_y[1]) {
+                        return 0x0;
+                    }
+                    return 0x80;
+                }
+                break;
+            }
+            case PTRIG: {
+                VIEWPORT *v = m->viewport;
+                if(v && v->num_controllers) {
+                    v->ptrig_cycle = m->cpu.cycles;
+                    return 0;
+                }
                 return 255;
+            }
             case CLRROM: {
                     m->mapped_slot = -1;
                     for(int i = 1; i < 8; i++) {
@@ -692,7 +785,6 @@ void apple2_softswitch_write_callback(APPLE2 *m, uint16_t address, uint8_t value
             break;
         case CLRAN3: // SQW
             break;
-        case PTRIG: // read SDL joystick here and record cycle counter
         case CLRROM: {
                 m->mapped_slot = -1;
                 for(int i = 1; i < 8; i++) {

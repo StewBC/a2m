@@ -98,7 +98,7 @@ int viewport_init(APPLE2 *m, int w, int h) {
     v->full_window_rect = v->target_rect;                   // And remember the setting
 
     // Initialize SDL with video and audio
-    if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER) < 0) {
+    if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) < 0) {
         printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
         goto error;
     }
@@ -184,7 +184,6 @@ int viewport_init(APPLE2 *m, int w, int h) {
     v->ctx->style.window.header.active.data.color = color_active_win;
     v->ctx->style.window.popup_border_color = color_popup_border;
 
-
     // Init the file_broswer dynamic array
     array_init(&v->viewmisc.file_browser.dir_contents, sizeof(FILE_INFO));
 
@@ -193,6 +192,18 @@ int viewport_init(APPLE2 *m, int w, int h) {
     v->viewdbg_show = 1;
     v->viewmem_show = 1;
     v->viewmisc_show = 1;
+
+    // See if there's a game controller
+    v->num_controllers = 0;
+    for(int i = 0; i < SDL_NumJoysticks() && v->num_controllers < 2; i++) {
+        if (!SDL_IsGameController(i)) {
+            continue;
+        }
+        v->game_controller[v->num_controllers] = SDL_GameControllerOpen(i);
+        if(v->game_controller[v->num_controllers]) {
+            v->num_controllers++;
+        }
+    }
     return A2_OK;
 
 error:
@@ -283,6 +294,7 @@ int viewport_process_events(APPLE2 *m) {
         }
     }
     nk_input_end(v->ctx);
+
     return ret;
 }
 

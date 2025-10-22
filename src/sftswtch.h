@@ -49,6 +49,7 @@
 #define CLRAN3          0xC05F
 #define BUTN0           0xC061                              // Open-Apple key
 #define BUTN1           0xC062                              // Closed-Apple key
+#define BUTN2           0xC063
 #define PADDL0          0xC064                              // Paddle / Joystick related
 #define PADDL1          0xC065
 #define PADDL2          0xC066
