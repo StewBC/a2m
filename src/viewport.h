@@ -32,7 +32,7 @@ typedef struct VIEWPORT {
     // Shadow of machine states
     int shadow_screen_mode;
     int help_page;
-    uint32_t shadow_turbo_index;
+    uint32_t shadow_turbo_index;                                // Usesd to know when to update window title
 
     // Game controller values
     int8_t num_controllers;

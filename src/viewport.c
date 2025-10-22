@@ -825,7 +825,7 @@ void viewport_update(APPLE2 *m) {
     // Commit changes to the texture
     // And update renderer with the texture
     VIEWPORT *v = m->viewport;
-    if(m->cols80active) {
+    if(m->franklin80active) {
         SDL_UpdateTexture(v->texture640, NULL, v->surface640->pixels, v->surface640->pitch);
         SDL_RenderCopy(v->renderer, v->texture640, NULL, &v->target_rect);
     } else {

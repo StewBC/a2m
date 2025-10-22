@@ -330,8 +330,8 @@ void viewapl2_screen_apple2(APPLE2 *m) {
             // case 0b010: // mixed text (also just text)
             // case 0b100: // hgr but not graphics, so text
             // case 0b110: // hgr, mixed but not graphics, so text
-            if(m->cols80active) {
-                viewapl2_screen_80col(m, 0, 24);
+            if(m->franklin80active) {
+                viewapl2_screen_franklin80col(m, 0, 24);
             } else {
                 viewapl2_screen_txt(m, 0, 24);
             }
@@ -527,7 +527,7 @@ void viewapl2_screen_txt(APPLE2 *m, int start, int end) {
 }
 
 // Display the 80 col text screen
-void viewapl2_screen_80col(APPLE2 *m, int start, int end) {
+void viewapl2_screen_franklin80col(APPLE2 *m, int start, int end) {
     int x, y;
     FRANKLIN_DISPLAY *fd80 = &m->franklin_display;
     SDL_Surface *surface = m->viewport->surface640;

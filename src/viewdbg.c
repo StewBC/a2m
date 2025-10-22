@@ -564,11 +564,11 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
         case SDLK_F12:
             if(mod & KMOD_SHIFT) {
                 // Force switching screen view modes
-                int mode = ((m->cols80active & 1) << 1) + (m->monitor_type & 1);
+                int mode = ((m->franklin80active & 1) << 1) + (m->monitor_type & 1);
                 if(++mode == 3) {
                     mode = 0;
                 }
-                m->cols80active = (mode & 2) >> 1;
+                m->franklin80active = (mode & 2) >> 1;
                 m->monitor_type = mode & 1;
             } else {
                 switch(m->screen_mode) {
@@ -577,7 +577,7 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
                     case 0b100:
                     case 0b110:
                         // If a text mode, toggle 80 col mode
-                        m->cols80active ^= 1;                       // 80 col toggle
+                        m->franklin80active ^= 1;                       // 80 col toggle
                         break;
                     default:
                         // Otherwise toggle mono mode

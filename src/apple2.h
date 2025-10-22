@@ -83,8 +83,8 @@ typedef struct APPLE2 {
     uint8_t closed_apple;
 
     // Screen State
-    uint8_t screen_mode;
-    uint8_t monitor_type;
+    uint8_t screen_mode;                                    // lores, text hgr, etc. See viewapl2_screen_apple2
+    uint8_t monitor_type;                                   // 0 = color; 1 = mono
     uint64_t vbl_cycles;                                    // To have a counter at $C019 on //e
 
     // Status flags
@@ -98,7 +98,7 @@ typedef struct APPLE2 {
     uint32_t altcharset: 1;
     uint32_t model: 1;                                      // (0) II+ or (1) //e
     uint32_t original_del: 1;                               // backspace key does crsr left if 0
-    uint32_t cols80active: 1;                               // Videx/Franklin Ace Display active
+    uint32_t franklin80active: 1;                           // Videx/Franklin Ace Display active
     uint32_t active_page: 1;                                // 0x2000 or 0x4000 - active hires bytes page
     uint32_t debug_view: 1;                                 // Apple ][ is not full-screen, debugger visible
     uint32_t stopped: 1;                                    // Emulation is halted
