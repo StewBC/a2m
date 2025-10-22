@@ -318,6 +318,9 @@ void apple2_shutdown(APPLE2 *m) {
     free(m->turbo);
     m->turbo = NULL;
     m->viewport = NULL;
+    SDL_free(m->clipboard_text);
+    m->clipboard_text = 0;
+    m->clipboard_index = 0;
 }
 
 // Handle the Apple II sofswitches when read
@@ -394,7 +397,11 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
             case KBD:
                 break;
             case KBDSTRB:
-                m->write_pages.pages[KBD / PAGE_SIZE].bytes[KBD % PAGE_SIZE] &= 0x7F;
+                if(m->clipboard_text) {
+                    viewapl2_feed_clipboard_key(m);
+                } else {
+                    m->write_pages.pages[KBD / PAGE_SIZE].bytes[KBD % PAGE_SIZE] &= 0x7F;
+                }
                 break;
             case RDRAMRD: //e
                 if(m->model) {
@@ -748,7 +755,11 @@ void apple2_softswitch_write_callback(APPLE2 *m, uint16_t address, uint8_t value
                 m->vid80set = 1;
             }
         case KBDSTRB:
-            m->write_pages.pages[KBD / PAGE_SIZE].bytes[KBD % PAGE_SIZE] &= 0x7F;
+            if(m->clipboard_text) {
+                viewapl2_feed_clipboard_key(m);
+            } else {
+                m->write_pages.pages[KBD / PAGE_SIZE].bytes[KBD % PAGE_SIZE] &= 0x7F;
+            }
             break;
         case A2SPEAKER:
             speaker_toggle(&m->speaker);

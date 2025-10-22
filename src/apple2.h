@@ -115,6 +115,10 @@ typedef struct APPLE2 {
     uint32_t turbo_count;                                   // entries in turbo array
     float *turbo;                                           // Array of multipliers (* 1MHz) to run at
 
+    // Clipboard
+    char *clipboard_text;                                   // when not 0 points at a clipboard text UTF-8
+    size_t clipboard_index;                                 // index into clipboard_text, where to paste from next
+
     // Additional Info
     VIEWPORT *viewport;                                     // 0 (no view) or active view for this instance
 

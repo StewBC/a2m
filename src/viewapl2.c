@@ -137,6 +137,45 @@ static uint32_t gr_mono_lut[16];
 static uint32_t gr_line[16][7];
 static uint32_t gr_mono_line[16][7];
 
+// Put the next clipboard character into the KBD
+void viewapl2_feed_clipboard_key(APPLE2 *m) {
+    while(1) {
+        uint8_t byte = !m->clipboard_text ? 0 : (uint8_t)m->clipboard_text[m->clipboard_index++];
+
+        // End of buffer: cleanup + clear bit7 of $C000
+        if (byte == 0) {
+            SDL_free(m->clipboard_text);
+            m->clipboard_text = NULL;
+            m->clipboard_index = 0;
+            m->write_pages.pages[KBD / PAGE_SIZE].bytes[KBD % PAGE_SIZE] &= 0x7F;
+            return;
+        }
+
+        // ASCII path
+        if (byte < 0x80) {
+            if (byte == '\n') {
+                // Skip LF
+                continue;
+            }
+            if (byte == '\r') {
+                byte = 0x0D;           // keep CR
+            } else if (byte == '\t') {
+                byte = ' ';            // tabs to space
+            } else if (!m->model && byte >= 0x20 && byte <= 0x7E) {
+                byte = (uint8_t)toupper(byte); // BASIC-friendly
+            }
+            // Emit whatever we have (including other control chars unchanged)
+            m->RAM_MAIN[KBD] = byte | 0x80;
+            return;
+        }
+
+        // Non-ASCII start byte: skip the UTF-8 multibyte sequence (drop it)
+        while ((m->clipboard_text[m->clipboard_index] & 0xC0) == 0x80) {
+            m->clipboard_index++;
+        }
+    }
+}
+
 // Reverse the bytes of the 2ee character rom so I can use the II+ render code
 void viewapl2_init_character_rom_2e(APPLE2 *m) {
     for(int byte = 0; byte < a2ee_character_rom_size; ++byte) {
@@ -268,6 +307,12 @@ void viewapl2_process_event(APPLE2 *m, SDL_Event *e) {
                 case SDLK_RETURN:
                 case SDLK_ESCAPE:
                 case SDLK_TAB:
+                    if(m->clipboard_text) {
+                        // Kill any paste that's busy happening
+                        SDL_free(m->clipboard_text);
+                        m->clipboard_text = 0;
+                        m->clipboard_index = 0;
+                    }
                     m->RAM_MAIN[KBD] = 0x80 | e->key.keysym.sym;
                     break;
 
@@ -285,6 +330,19 @@ void viewapl2_process_event(APPLE2 *m, SDL_Event *e) {
 
                 case SDLK_RIGHT:
                     m->RAM_MAIN[KBD] = 0x95;                    // RIGHT arrow
+                    break;
+
+                case SDLK_INSERT:
+                    if(mod & KMOD_SHIFT) {
+                        if(SDL_HasClipboardText()) {
+                            if(m->clipboard_text) {
+                                SDL_free(m->clipboard_text);
+                            }
+                            m->clipboard_text = SDL_GetClipboardText();
+                            m->clipboard_index = 0;
+                            viewapl2_feed_clipboard_key(m);
+                        }
+                    }
                     break;
 
                 default:
