@@ -43,10 +43,10 @@ int apple2_configure(APPLE2 *m) {
     // Set the Turbo state
     if(!m->turbo_count) {
         m->turbo_count = 2;
-        m->turbo = (float*)malloc(m->turbo_count * sizeof(float));
+        m->turbo = (double*)malloc(m->turbo_count * sizeof(double));
         if(m->turbo) {
-            m->turbo[0] = 1.0f;
-			m->turbo[1] = -1.0f;
+            m->turbo[0] = 1.0;
+			m->turbo[1] = -1.0;
         } else {
             return A2_ERR;
         }
@@ -54,13 +54,14 @@ int apple2_configure(APPLE2 *m) {
     m->turbo_active = m->turbo[m->turbo_index];
     // Allocate the RAM
     m->RAM_MAIN = (uint8_t *) malloc(m->ram_size);
-    // SQW Makes RAM sel-test pass - uninit fails tests
+    // SQW made the RAM test pass but no longer...
     memset(&m->RAM_MAIN[0x0000], 0xff, m->model ? 0x20000 : 0x10000);
     // This fixes some issues with how I handle the softswitch areas
     memset(&m->RAM_MAIN[0xC000], 0x00, 0x1000);
     if(m->model) {
         memset(&m->RAM_MAIN[0x1C000], 0x00, 0x1000);
     }
+
     m->RAM_WATCH = (uint8_t *) malloc(m->ram_size);
     if(!m->RAM_MAIN || !m->RAM_WATCH) {
         return A2_ERR;
@@ -170,7 +171,7 @@ void apple2_machine_setup(APPLE2 *m) {
             INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
             const char *key = kv->key;
             const char *val = kv->val;
-            
+
             if(0 == stricmp(key, "model")) {
                 if(0 == stricmp(val, "apple2_plus")) {
                     m->model = MODEL_APPLE_II_PLUS;
@@ -189,25 +190,25 @@ void apple2_machine_setup(APPLE2 *m) {
                     }
                 }
                 // Allocare the turbo's array
-                m->turbo = (float*)malloc(m->turbo_count * sizeof(float));
+                m->turbo = (double*)malloc(m->turbo_count * sizeof(double));
                 if(m->turbo) {
                     // Convert the nubers to +float and any unknowns (non-float)
                     // to -1 (max speed)
                     s = val;
                     for(int i = 0; i < m->turbo_count; i++) {
-                        int l = sscanf(s, "%f", &m->turbo[i]);
+                        int l = sscanf(s, "%lf", &m->turbo[i]);
                         if(l == -1) {
                             // no value - make it a turbo of 1.0
-                            m->turbo[i] = 1.0f;
+                            m->turbo[i] = 1.0;
                         } else if(l == 0) {
                             // bad conversion - max
-                            m->turbo[i] = -1.0f;
+                            m->turbo[i] = -1.0;
                         } else {
                             // normal conversion - make it the positive to be sure
                             m->turbo[i] = fabs(m->turbo[i]);
                             // treat overflow as "max speed"
                             if(isinf(m->turbo[i])) {
-                                m->turbo[i] = -1.0f;  
+                                m->turbo[i] = -1.0;
                             }
                         }
                         // scan to the comma
@@ -394,8 +395,7 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
     } else {
         // Everything else
         switch(address) {
-            case KBD:
-                break;
+            // KBD is not here - it's fed through viewapl2_process_event or viewapl2_feed_clipboard_key
             case KBDSTRB:
                 if(m->clipboard_text) {
                     viewapl2_feed_clipboard_key(m);
@@ -407,10 +407,12 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
                 if(m->model) {
                     return (m->ramrdset << 7);
                 }
+                break;
             case RDRAMWRT: //e
                 if(m->model) {
                     return (m->ramwrtset << 7);
                 }
+                break;
             case RDCXROM:   //e
                 if(m->model) {
                     return (m->cxromset << 7);
@@ -520,9 +522,8 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
                     if(val >= v->axis_left_x[0]) {
                         return 0x0;
                     }
-                    return 0x80;
                 }
-                break;
+                return 0x80;
             }
             case PADDL1: {
                 VIEWPORT *v = m->viewport;
@@ -532,9 +533,8 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
                     if(val >= v->axis_left_y[0]) {
                         return 0x0;
                     }
-                    return 0x80;
                 }
-                break;
+                return 0x80;
             }
             case PADDL2: {
                 VIEWPORT *v = m->viewport;
@@ -544,9 +544,8 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
                     if(val >= v->axis_left_x[1]) {
                         return 0x0;
                     }
-                    return 0x80;
                 }
-                break;
+                return 0x80;
             }
             case PADDL3: {
                 VIEWPORT *v = m->viewport;
@@ -556,9 +555,8 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
                     if(val >= v->axis_left_y[1]) {
                         return 0x0;
                     }
-                    return 0x80;
                 }
-                break;
+                return 0x80;
             }
             case PTRIG: {
                 VIEWPORT *v = m->viewport;
@@ -750,10 +748,22 @@ void apple2_softswitch_write_callback(APPLE2 *m, uint16_t address, uint8_t value
             if(m->model) {
                 m->vid80set = 0;
             }
+            break;
         case SET80VID: //e
             if(m->model) {
                 m->vid80set = 1;
             }
+            break;
+        case CLRALTCHAR: // e
+            if(m->model) {
+                m->altcharset = 0;
+            }
+            break;
+        case SETALTCHAR: // e
+            if(m->model) {
+                m->altcharset = 1;
+            }
+            break;
         case KBDSTRB:
             if(m->clipboard_text) {
                 viewapl2_feed_clipboard_key(m);

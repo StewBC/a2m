@@ -67,6 +67,8 @@
 #pragma warning(pop)
 #endif
 
+#define TARGET_FPS              60
+
 #endif                                                      // IS_EMULATOR
 
 // Often used return codes

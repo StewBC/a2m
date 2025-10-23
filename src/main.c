@@ -4,8 +4,6 @@
 
 #include "header.h"
 
-#define TARGET_FPS              60
-
 int main(int argc, char *argv[]) {
     int quit = 0;
     APPLE2 m;                                               // The Apple II machine
@@ -29,9 +27,6 @@ int main(int argc, char *argv[]) {
         return A2_ERR;
     }
 
-    // Reverse and inverse the //e character rom, so it matches the II+ rom style
-    viewapl2_init_character_rom_2e(&m);
-
     // Set up a table to speed up rendering HGR
     viewapl2_init_color_table(&m);
 
@@ -48,19 +43,16 @@ int main(int argc, char *argv[]) {
 
     const uint64_t pfreq = SDL_GetPerformanceFrequency();
     const uint64_t ticks_per_ms = pfreq / 1000;
-    const double ms_per_frame = (1000.0 / TARGET_FPS);
     const double clock_cycles_per_tick = CPU_FREQUENCY / (double)pfreq;
-    const uint64_t ticks_per_frame = pfreq / TARGET_FPS; // ms_per_frame * ticks_per_ms;
+    const uint64_t ticks_per_frame = pfreq / TARGET_FPS;
     uint64_t overhead_ticks = ticks_per_ms / 2 ; // Assume 1/2 ms to render
     while(!quit) {
         uint64_t frame_start_ticks = SDL_GetPerformanceCounter();
         uint64_t desired_frame_end_ticks = frame_start_ticks + ticks_per_frame;
 
         // If not going at max speed
-        if(m.turbo_active > 0.0f) {
-            double cycles_per_ms = (CPU_FREQUENCY * m.turbo_active) / 1000.0;
-            double cycles_per_frame = ms_per_frame * cycles_per_ms;
-            // uint64_t emulation_window = max(0, cycles_per_frame - overhead_ticks * clock_cycles_per_tick);
+        if(m.turbo_active > 0.0) {
+            double cycles_per_frame = (CPU_FREQUENCY * m.turbo_active) / TARGET_FPS ;
             double overhead_cycles = (double)overhead_ticks * clock_cycles_per_tick;
             uint64_t emulation_window = ((cycles_per_frame > overhead_cycles) ? (uint64_t)(cycles_per_frame - overhead_cycles) : 0);
             uint64_t cycles = 0;
@@ -89,8 +81,8 @@ int main(int argc, char *argv[]) {
         viewport_show(&m);
         viewapl2_screen_apple2(&m);
         viewport_update(&m);
-        // Delay for the right MHz emulation
         uint64_t frame_end_ticks = SDL_GetPerformanceCounter();
+        // Delay for the right MHz emulation
         if(desired_frame_end_ticks > frame_end_ticks) {
             uint32_t sleep_ms = (desired_frame_end_ticks - frame_end_ticks) / ticks_per_ms;
             if(sleep_ms > 0) {

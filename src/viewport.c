@@ -232,7 +232,7 @@ int viewport_process_events(APPLE2 *m) {
         v->shadow_turbo_index = m->turbo_index;
         strcpy(sdl_window_title, "Apple ][+ Emulator ");
         strcat(sdl_window_title, v->shadow_stopped ? "[stopped]" : "[running]");
-        if(m->turbo_active > 0) {
+        if(m->turbo_active > 0.0) {
             sprintf(&sdl_window_title[strlen(sdl_window_title)], " @ %1.1f", m->turbo_active);
         } else {
             strcat(sdl_window_title, " @ Max");

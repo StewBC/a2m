@@ -176,20 +176,6 @@ void viewapl2_feed_clipboard_key(APPLE2 *m) {
     }
 }
 
-// Reverse the bytes of the 2ee character rom so I can use the II+ render code
-void viewapl2_init_character_rom_2e(APPLE2 *m) {
-    for(int byte = 0; byte < a2ee_character_rom_size; ++byte) {
-        uint8_t x = a2ee_character_rom[byte];
-        x = (x >> 4) | (x << 4);
-        x = ((x & 0xCC) >> 2) | ((x & 0x33) << 2);
-        x = ((x & 0xAA) >> 1) | ((x & 0x55) << 1);
-        if(x > 0x80) {
-            x = ~x;
-        }
-        a2ee_character_rom[byte] = x;
-    }
-}
-
 // Initialize the color_table once, outside the rendering function
 void viewapl2_init_color_table(APPLE2 *m) {
     SDL_PixelFormat *format = m->viewport->surface->format;
@@ -364,6 +350,7 @@ void viewapl2_process_event(APPLE2 *m, SDL_Event *e) {
 
 // Select which screen to display based on what mode is active
 void viewapl2_screen_apple2(APPLE2 *m) {
+    // SQW - Path diverts here between ][+ an //e - if 80 cols active
     switch(m->viewport->shadow_screen_mode) {
         case 0b001:                                             // lores
             viewapl2_screen_lores(m, 0, 24);
@@ -553,6 +540,11 @@ void viewapl2_screen_txt(APPLE2 *m, int start, int end) {
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
     int page = m->viewport->shadow_active_page ? 0x0800 : 0x0400;
+    Uint64 now = SDL_GetPerformanceCounter();
+    double freq = (double)SDL_GetPerformanceFrequency();
+    // I got 3.7 from recording a flash on my Platinum //e - 0.17 to 0.44 for a change so 0.27
+    uint8_t time_inv = (((uint64_t)(now * 3.7 / freq)) & 1) ? 0xFF : 0x00;
+    int alt_charset = m->model ? m->model && m->altcharset : 0;
 
     // Loop through each row
     for(y = start; y < end; y++) {
@@ -563,18 +555,26 @@ void viewapl2_screen_txt(APPLE2 *m, int start, int end) {
         // Loop through every col (byte)
         for(int x = 0; x < 40; x++) {
             int r;
-            // Get the character on screen
-            int character = m->RAM_MAIN[address + x];
-            // See if inverse
-            uint8_t inv = (~character >> 7) & 1;
+            uint8_t inv = 0x00;
+            uint8_t character = m->RAM_MAIN[address + x];   // Get the character on screen
+            if(character < 0x80) {
+                if(character >= 0x40) {
+                    if(!alt_charset) {
+                        character &= 0x3F;
+                        inv = time_inv;
+                    }
+                } else if(!m->model) {
+                    inv = 0xFF;
+                }
+            }
             // Get the font offset in the font blocks
             uint8_t *character_font = &m->roms.blocks[ROM_APPLE2_CHARACTER].bytes[character * 8];
             // "Plot" the character to the SDL graphics screen
             uint32_t *pr = p;
             for(r = 0; r < 8; r++) {
-                uint8_t pixels = *character_font++;
+                uint8_t pixels = inv ^ *character_font++;
                 for(int i = 6; i >= 0; i--) {
-                    pr[i] = gr_lut[(inv ^ (pixels & 1)) ? 15 : 0];
+                    pr[i] = gr_lut[(pixels & 1) ? 15 : 0];
                     pixels >>= 1;
                 }
                 pr += surface->w;
