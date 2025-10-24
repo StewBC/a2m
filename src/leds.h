@@ -4,6 +4,8 @@
 
 #pragma once
 
+// These are the green and red LEDs for disk activity
+
 extern unsigned char green_led[];
 extern unsigned int green_led_len;
 extern unsigned char red_led[];
