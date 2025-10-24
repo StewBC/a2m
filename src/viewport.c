@@ -817,11 +817,6 @@ void viewport_update(APPLE2 *m) {
         SDL_UpdateTexture(v->texture, NULL, v->surface->pixels, v->surface->pitch);
         SDL_RenderCopy(v->renderer, v->texture, NULL, &v->target_rect);
     }
-    // if(v->debug_view) {
-    //     // In debug view, the A2 screen is maybe small black on black so outline it
-    //     SDL_SetRenderDrawColor(v->renderer, 255, 255, 255, 255);
-    //     SDL_RenderDrawRect(v->renderer, &v->target_rect);
-    // }
     if(v->debug_view) {
         nk_sdl_render(NK_ANTI_ALIASING_ON);
     }
@@ -841,7 +836,7 @@ void viewport_update(APPLE2 *m) {
 
     if(1) {
         // Show the window title after calculating a moving average MHz
-        char sdl_window_title[64];
+        char sdl_window_title[80];
         if(!m->stopped) {
             uint64_t freq = SDL_GetPerformanceFrequency();
             uint64_t now_ticks = SDL_GetPerformanceCounter();
@@ -850,11 +845,14 @@ void viewport_update(APPLE2 *m) {
             v->prev_ticks  = now_ticks;
             v->prev_cycles = m->cpu.cycles;
 
-            double mhz = (dt_ticks > 0) ? (double)(dc * freq) / ((double)dt_ticks * 1e6) : 0.0;
+            double mhz = (double)(dc * freq) / ((double)dt_ticks * 1e6);
             v->mhz_moving_average = 0.1 * mhz + (1 - 0.1) * v->mhz_moving_average;
+
+            double fps = (1.0 / (double)dt_ticks) * freq;
+            v->fps_moving_average  = 0.1 * fps + (1 - 0.1) * v->fps_moving_average;
         }
 
-        sprintf(sdl_window_title, "Apple ][+ Emulator %s @ %2.1f MHz", m->stopped ? "[stopped] " : "[running]", v->mhz_moving_average);
+        sprintf(sdl_window_title, "Apple ][+ Emulator %s : %2.1f MHz @ %2.1f FPS", m->stopped ? "[stopped] " : "[running]", v->mhz_moving_average, v->fps_moving_average);
         SDL_SetWindowTitle(v->window, sdl_window_title);
     }
 }

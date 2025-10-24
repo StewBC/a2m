@@ -45,19 +45,16 @@ int main(int argc, char *argv[]) {
     const uint64_t ticks_per_ms = pfreq / 1000;
     const double clock_cycles_per_tick = CPU_FREQUENCY / (double)pfreq;
     const uint64_t ticks_per_frame = pfreq / TARGET_FPS;
-    uint64_t overhead_ticks = ticks_per_ms / 2 ; // Assume 1/2 ms to render
+    uint64_t overhead_ticks = 0; // Assume emulation and rendering fit in 1 frame's time
     while(!quit) {
         uint64_t frame_start_ticks = SDL_GetPerformanceCounter();
         uint64_t desired_frame_end_ticks = frame_start_ticks + ticks_per_frame;
 
         // If not going at max speed
         if(m.turbo_active > 0.0) {
-            double cycles_per_frame = (CPU_FREQUENCY * m.turbo_active) / TARGET_FPS ;
-            double overhead_cycles = (double)overhead_ticks * clock_cycles_per_tick;
-            uint64_t emulation_window = ((cycles_per_frame > overhead_cycles) ? (uint64_t)(cycles_per_frame - overhead_cycles) : 0);
+            double cycles_per_frame = ((CPU_FREQUENCY * m.turbo_active) / TARGET_FPS) + (overhead_ticks * clock_cycles_per_tick);
             uint64_t cycles = 0;
-
-            while(cycles < emulation_window && (!m.stopped || m.step)) {
+            while(cycles < cycles_per_frame && (!m.stopped || m.step)) {
                 size_t opcode_cycles = machine_run_opcode(&m);
                 speaker_on_cycles(&m.speaker, opcode_cycles);
                 cycles += opcode_cycles;
@@ -65,8 +62,8 @@ int main(int argc, char *argv[]) {
                 viewdbg_update(&m);
             }
         } else {
-            uint64_t emulation_window = max(0, frame_start_ticks + ticks_per_frame - overhead_ticks);
-            while(SDL_GetPerformanceCounter() < emulation_window && (!m.stopped || m.step)) {
+            uint64_t emulation_cycles = max(1, frame_start_ticks + ticks_per_frame - overhead_ticks);
+            while(SDL_GetPerformanceCounter() < emulation_cycles && (!m.stopped || m.step)) {
                 size_t opcode_cycles = machine_run_opcode(&m);
                 speaker_on_cycles(&m.speaker, opcode_cycles);
                 // See if a breakpoint was hit (will set m.stopped)
@@ -74,7 +71,6 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        uint64_t overhead_start_ticks = SDL_GetPerformanceCounter();
         quit = viewport_process_events(&m);
         v.shadow_screen_mode = m.screen_mode;
         v.shadow_active_page = m.active_page;
@@ -82,17 +78,25 @@ int main(int argc, char *argv[]) {
         viewapl2_screen_apple2(&m);
         viewport_update(&m);
         uint64_t frame_end_ticks = SDL_GetPerformanceCounter();
-        // Delay for the right MHz emulation
-        if(desired_frame_end_ticks > frame_end_ticks) {
+
+        // Delay to get the MHz emulation right for the desired FPS - no vsync
+        if(frame_end_ticks < desired_frame_end_ticks) {
             uint32_t sleep_ms = (desired_frame_end_ticks - frame_end_ticks) / ticks_per_ms;
-            if(sleep_ms > 0) {
-                SDL_Delay(sleep_ms);
+            // Sleep for coarse delay
+            if(sleep_ms > 1) {
+                SDL_Delay(sleep_ms - 1);
             }
+            // The emulation + rendering fit in a frame, no compensation
+            overhead_ticks = 0;
+        } else {
+            // Over-ran the frame
+            // In MHz mode, do more emulation per frame to hit the MHz desired
+            // In max turbo, do less emulation to try and keep the FPS target
+            overhead_ticks = frame_end_ticks - desired_frame_end_ticks;
         }
+        // Tail spin for accuracy
         while(SDL_GetPerformanceCounter() < desired_frame_end_ticks) {
         }
-        // Overhead does not include the delay
-        overhead_ticks = frame_end_ticks - overhead_start_ticks;
     }
 
     // Cleanup, Apple II first and then the viewport for it

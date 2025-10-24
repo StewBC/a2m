@@ -21,6 +21,7 @@ typedef struct VIEWPORT {
     uint64_t prev_cycles;
     uint64_t prev_ticks;
     double mhz_moving_average;
+    double fps_moving_average;
 
     float display_scale;
 
