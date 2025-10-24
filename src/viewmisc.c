@@ -93,11 +93,11 @@ void viewmisc_show(APPLE2 *m) {
                                 apple2_softswitch_read_callback(m, CLRRAMWRT);
                                 apple2_softswitch_read_callback(m, CLRCXROM);
                                 apple2_softswitch_read_callback(m, CLRC3ROM);
-                                apple2_softswitch_read_callback(m, CLR80VID);
+                                apple2_softswitch_read_callback(m, CLR80COL);
                                 apple2_softswitch_read_callback(m, CLRALTCHAR);
                                 apple2_softswitch_read_callback(m, TXTSET);
                                 apple2_softswitch_read_callback(m, MIXCLR);
-                                apple2_softswitch_read_callback(m, LOWSCR);
+                                apple2_softswitch_read_callback(m, CLRPAGE2);
                                 apple2_softswitch_read_callback(m, CLRALTZP);
                                 apple2_softswitch_read_callback(m, CLRROM);
                                 apple2_softswitch_read_callback(m, 0xC000 + i * 0x100);

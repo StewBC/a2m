@@ -5,7 +5,7 @@
 #pragma once
 
 #define KBD             0xC000                              // Port where the Apple II reads what keys are down
-#define CLR80STORE      0xC000 // Write only, RAMRD/WRT decides $0400–$0BFF, $2000–$3FFF, $4000–$5FFF access
+#define CLR80STORE      0xC000 // Write only, RAMRD/WRT decides $0400–$0BFF, $2000–$3FFF
 #define SET80STORE      0xC001 // ($C054/$C055) selects main vs aux independently of RAMRD/WRT for display mem
 #define CLRRAMRD        0xC002 // CPU reads  from main $0200–$BFFF and LC $D000–$FFFF, see SET80STORE
 #define SETRAMRD        0xC003 // CPU reads  from aux  $0200–$BFFF and LC $D000–$FFFF, see SET80STORE
@@ -17,8 +17,8 @@
 #define SETALTZP        0xC009 // ZP/stack are in aux  bank
 #define CLRC3ROM        0xC00A // C300-C3FF slot card rom
 #define SETC3ROM        0xC00B // C300-C3FF //e       rom
-#define CLR80VID        0xC00C // 40-column display (turn 80-col display off)
-#define SET80VID        0xC00D // 80-column display (turn 80-col display on)
+#define CLR80COL        0xC00C // 40-column display (turn 80-col display off)
+#define SET80COL        0xC00D // 80-column display (turn 80-col display on)
 #define CLRALTCHAR      0xC00E // primary/standard character set
 #define SETALTCHAR      0xC00F // alternate character set
 #define KBDSTRB         0xC010                              // Port where the Apple II acknowledges a key press (clears it)
@@ -29,24 +29,34 @@
 #define RDCXROM         0xC015
 #define RDALTZP         0xC016 // 1 = ALTZP on (ZP/stack in aux), 0 = off
 #define RDC3ROM         0xc017
-#define RD80COL         0xC018
+#define RD80STORE       0xC018
 #define RDVBL           0xC019
 #define RDTEXT          0xC01A // 1 = TEXT mode, 0 = graphics
 #define RDMIXED         0xC01B // 1 = MIXED (split screen) on, 0 = off
 #define RDPAGE2         0xC01C
+#define RDHIRES         0xC01D
+#define RDALTCHAR       0xC01E
+#define RD80COL         0xC01F
 #define A2SPEAKER       0xC030                              // Port that toggles the speaker
+#define CYAREG          0xC036 // Bits 0-3 disk detect; 4 shadow all banks; 7 fast 
+#define RDVBLMSK        0xC041 // 128 if VBL interrupts enabled
 #define TXTCLR          0xC050                              // Enable graphics (lores or hires)
 #define TXTSET          0xC051                              // Enable text
 #define MIXCLR          0xC052                              // Enable Full Screen, Disable 4 lines of text
 #define MIXSET          0xC053                              // Enable Split Screen, Enable 4 lines of text
-#define LOWSCR          0xC054                              // Page 1
-#define HISCR           0xC055                              // Page 2
+#define CLRPAGE2        0xC054                              // Page 1
+#define SETPAGE2        0xC055                              // Page 2
 #define LORES           0xC056                              // Enable Lores graphics (Disable Hires)
 #define HIRES           0xC057                              // Enable Hires graphics (Disable Lores)
-#define SETAN0          0xC058
-#define SETAN1          0xC05A
-#define CLRAN2          0xC05D
-#define CLRAN3          0xC05F
+#define CLRAN0          0xC058
+#define SETAN0          0xC059
+#define CLRAN1          0xC05A // Disable VBL
+#define SETAN1          0xC05B // Enable VBL
+#define CLRAN2          0xC05C
+#define SETAN2          0xC05D
+#define CLRAN3          0xC05E // Enable double-width graphics
+#define SETAN3          0xC05F // Disable double-width graphics
+#define TAPEIN          0xC060 // Read casette input / Switch input 3
 #define BUTN0           0xC061                              // Open-Apple key
 #define BUTN1           0xC062                              // Closed-Apple key
 #define BUTN2           0xC063
@@ -55,7 +65,11 @@
 #define PADDL2          0xC066
 #define PADDL3          0xC067
 #define PTRIG           0xC070
-
+#define IOUDISON        0xC07E // Disable IOU
+#define IOUDISOFF       0xC07F // Enable IOU
+#define ROMIN           0xC081 // Swap in D000-FFFF ROM
+#define LCBANK2         0xC083 // Swap in LC bank 2
+#define LCBANK1         0xC08B // Swap in LC bank 1
 #define CLRROM          0xCFFF                              // Release C800 ROM
 
 // These values effectively are $C080 + $s0 + value, where s is the slot number

@@ -358,7 +358,7 @@ void viewapl2_screen_apple2(APPLE2 *m) {
 
         case 0b011:                                             // mixed lores
             viewapl2_screen_lores(m, 0, 20);
-            viewapl2_screen_txt(m, 20, 24);
+            viewapl2_screen_txt40(m, 20, 24);
             break;
 
         case 0b101:                                             // hgr graphics
@@ -367,7 +367,7 @@ void viewapl2_screen_apple2(APPLE2 *m) {
 
         case 0b111:                                             // hgr, mixed graphics
             viewapl2_screen_hgr(m, 0, 160);
-            viewapl2_screen_txt(m, 20, 24);
+            viewapl2_screen_txt40(m, 20, 24);
             break;
 
         default:
@@ -377,8 +377,10 @@ void viewapl2_screen_apple2(APPLE2 *m) {
             // case 0b110: // hgr, mixed but not graphics, so text
             if(m->franklin80active) {
                 viewapl2_screen_franklin80col(m, 0, 24);
+            } else if(m->col80set) {
+                viewapl2_screen_txt80(m, 0, 24);
             } else {
-                viewapl2_screen_txt(m, 0, 24);
+                viewapl2_screen_txt40(m, 0, 24);
             }
             break;
     }
@@ -535,7 +537,7 @@ void viewapl2_screen_hgr_mono(APPLE2 *m, int start, int end) {
 }
 
 // Display the text screen
-void viewapl2_screen_txt(APPLE2 *m, int start, int end) {
+void viewapl2_screen_txt40(APPLE2 *m, int start, int end) {
     int x, y;
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
@@ -584,11 +586,60 @@ void viewapl2_screen_txt(APPLE2 *m, int start, int end) {
     }
 }
 
-// Display the 80 col text screen
+void viewapl2_screen_txt80(APPLE2 *m, int start, int end) {
+    int x, y;
+    SDL_Surface *surface = m->viewport->surface_wide;
+    uint32_t *pixels = (uint32_t *) surface->pixels;
+    Uint64 now = SDL_GetPerformanceCounter();
+    double freq = (double)SDL_GetPerformanceFrequency();
+    // I got 3.7 from recording a flash on my Platinum //e - 0.17 to 0.44 for a change so 0.27
+    uint8_t time_inv = (((uint64_t)(now * 3.7 / freq)) & 1) ? 0xFF : 0x00;
+    int alt_charset = m->model ? m->model && m->altcharset : 0;
+
+    // Loop through each row
+    for(y = start; y < end; y++) {
+        // Get the pointer to the start of the row in the SDL surface
+        uint32_t *p = &pixels[y * 8 * surface->w];
+        int address = 0x0400 + txt_row_start[y];
+
+        // Loop through every col (byte)
+        for(int x = 0; x < 80; x++) {
+            int r;
+            uint8_t inv = 0x00;
+            int char_in_bank = (x & 1) ? (x >> 1) : (x >> 1) + 0x10000;
+            uint8_t character = m->RAM_MAIN[address + char_in_bank];   // Get the character on screen
+            if(character < 0x80) {
+                if(character >= 0x40) {
+                    if(!alt_charset) {
+                        character &= 0x3F;
+                        inv = time_inv;
+                    }
+                } else if(!m->model) {
+                    inv = 0xFF;
+                }
+            }
+            // Get the font offset in the font blocks
+            uint8_t *character_font = &m->roms.blocks[ROM_APPLE2_CHARACTER].bytes[character * 8];
+            // "Plot" the character to the SDL graphics screen
+            uint32_t *pr = p;
+            for(r = 0; r < 8; r++) {
+                uint8_t pixels = inv ^ *character_font++;
+                for(int i = 6; i >= 0; i--) {
+                    pr[i] = gr_lut[(pixels & 1) ? 15 : 0];
+                    pixels >>= 1;
+                }
+                pr += surface->w;
+            }
+            p += 7;
+        }
+    }
+}
+
+// Display the 80 col text screen in franklin 80 mode
 void viewapl2_screen_franklin80col(APPLE2 *m, int start, int end) {
     int x, y;
     FRANKLIN_DISPLAY *fd80 = &m->franklin_display;
-    SDL_Surface *surface = m->viewport->surface640;
+    SDL_Surface *surface = m->viewport->surface_wide;
     uint32_t *pixels = (uint32_t *) surface->pixels;
     // int page = m->viewport->shadow_active_page ? 0x0800 : 0x0400;
     uint32_t c[2] = { color_table[0][0][0], color_table[7][0][0] };
@@ -606,15 +657,15 @@ void viewapl2_screen_franklin80col(APPLE2 *m, int start, int end) {
             // Get the character on screen
             int character = fd80->display_ram[(address + x) & 0x7ff];
             // See if inverse
-            uint8_t inv = (character >> 7) & 1;
+            uint8_t inv = (character >> 7) & 1 ? 0xff : 0;
             // Get the font offset in the font blocks
             uint8_t *character_font = &m->roms.blocks[ROM_FRANKLIN_ACE_CHARACTER].bytes[character * 16];
             // "Plot" the character to the SDL graphics screen
             uint32_t *pr = p;
             for(r = 0; r < 8; r++) {
-                uint8_t pixels = *character_font++;
+                uint8_t pixels = inv ^ *character_font++;
                 for(int i = 7; i >= 0; i--) {
-                    pr[i] = c[inv ^ (pixels & 1)];
+                    pr[i] = c[pixels & 1];
                     pixels >>= 1;
                 }
                 pr += surface->w;

@@ -47,6 +47,13 @@ enum {
     SLOT_TYPE_VIDEX_API,
 };
 
+// The mask for the bits in the RAM_WATCH array 
+enum RAM_WATCH_MASK {
+    WATCH_IO_PORT = 1,
+    WATCH_READ_BREAKPOINT = 2,  // When !use_pc
+    WATCH_WRITE_BREAKPOINT = 4, // When !use_pc
+};
+
 // Prototypes for callbacks when cpu accesses a port
 typedef uint8_t(*CALLBACK_READ)(APPLE2 *m, uint16_t address);
 typedef void (*CALLBACK_WRITE)(APPLE2 *m, uint16_t address, uint8_t value);
@@ -74,7 +81,7 @@ typedef struct APPLE2 {
     // Base setup
     uint32_t ram_size;                                      // How much ram this machine has
     uint8_t *RAM_MAIN;                                      // The ram_size MEMORY - addressable in max 64k chunks
-    uint8_t *RAM_WATCH;                                     // 64K of IO port "mask" (0 = is not a port)
+    uint8_t *RAM_WATCH;                                     // 64K of IO port "mask" (0 = is not a port). See RAM_WATCH_MASK
     uint8_t *rom_shadow_pages[(0xC800-0xC000)/PAGE_SIZE];   // Slot ram page mappings when SETC?ROM active
     uint8_t mapped_slot;
 
@@ -94,7 +101,7 @@ typedef struct APPLE2 {
     uint32_t cxromset: 1;
     uint32_t c3romset: 1;
     uint32_t altzpset: 1;
-    uint32_t vid80set: 1;
+    uint32_t col80set: 1;
     uint32_t altcharset: 1;
     uint32_t model: 1;                                      // (0) II+ or (1) //e
     uint32_t original_del: 1;                               // backspace key does crsr left if 0

@@ -126,12 +126,12 @@ int viewport_init(APPLE2 *m, int w, int h) {
     }
     SDL_FillRect(v->surface, NULL, SDL_MapRGB(v->surface->format, 0, 0, 0));
 
-    v->surface640 = SDL_CreateRGBSurfaceWithFormat(0, 80 * 8, 24 * 8, 32, SDL_PIXELFORMAT_ARGB8888);
-    if(v->surface640 == NULL) {
+    v->surface_wide = SDL_CreateRGBSurfaceWithFormat(0, 80 * (m->model ? 7 : 8), 24 * 8, 32, SDL_PIXELFORMAT_ARGB8888);
+    if(v->surface_wide == NULL) {
         printf("Surface640 could not be created! SDL_Error: %s\n", SDL_GetError());
         goto error;
     }
-    SDL_FillRect(v->surface640, NULL, SDL_MapRGB(v->surface640->format, 0, 0, 0));
+    SDL_FillRect(v->surface_wide, NULL, SDL_MapRGB(v->surface_wide->format, 0, 0, 0));
 
     // Create texture for pixel rendering
     v->texture = SDL_CreateTextureFromSurface(v->renderer, v->surface);
@@ -140,8 +140,8 @@ int viewport_init(APPLE2 *m, int w, int h) {
         goto error;
     }
     // Create texture for pixel rendering
-    v->texture640 = SDL_CreateTextureFromSurface(v->renderer, v->surface640);
-    if(v->texture640 == NULL) {
+    v->texture_wide = SDL_CreateTextureFromSurface(v->renderer, v->surface_wide);
+    if(v->texture_wide == NULL) {
         printf("Texture could not be created! SDL_Error: %s\n", SDL_GetError());
         goto error;
     }
@@ -825,9 +825,9 @@ void viewport_update(APPLE2 *m) {
     // Commit changes to the texture
     // And update renderer with the texture
     VIEWPORT *v = m->viewport;
-    if(m->franklin80active) {
-        SDL_UpdateTexture(v->texture640, NULL, v->surface640->pixels, v->surface640->pitch);
-        SDL_RenderCopy(v->renderer, v->texture640, NULL, &v->target_rect);
+    if(m->franklin80active || m->col80set) {
+        SDL_UpdateTexture(v->texture_wide, NULL, v->surface_wide->pixels, v->surface_wide->pitch);
+        SDL_RenderCopy(v->renderer, v->texture_wide, NULL, &v->target_rect);
     } else {
         SDL_UpdateTexture(v->texture, NULL, v->surface->pixels, v->surface->pitch);
         SDL_RenderCopy(v->renderer, v->texture, NULL, &v->target_rect);

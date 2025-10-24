@@ -8,9 +8,9 @@ typedef struct VIEWPORT {
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Surface *surface;
-    SDL_Surface *surface640;
+    SDL_Surface *surface_wide;  // The 80 col / double res surface
     SDL_Texture *texture;
-    SDL_Texture *texture640;
+    SDL_Texture *texture_wide;  // The 80 col / double res backing texture
     SDL_Texture *greenLED;
     SDL_Texture *redLED;
     SDL_GameController *game_controller[2];
