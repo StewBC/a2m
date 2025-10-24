@@ -32,6 +32,7 @@ add_executable(apple2
     src/frankdisp.c
     src/image.c
     src/inifiles.c
+    src/leds.c
     src/main.c
     src/ramcard.c
     src/roms.c
