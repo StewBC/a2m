@@ -82,7 +82,6 @@ int viewport_init(APPLE2 *m, int w, int h) {
     memset(v, 0, sizeof(VIEWPORT));
 
     v->display_scale = 1.0f;
-    v->shadow_turbo_index = -1;
 
     // Configure display_scale from the ini file
     viewport_config(m);
@@ -224,20 +223,6 @@ int viewport_process_events(APPLE2 *m) {
     // Update the CPU view to the latest stats
     if(m->stopped && v->debug_view) {
         viewcpu_update(m);
-    }
-
-    if(v->shadow_stopped != m->stopped || v->shadow_turbo_index != m->turbo_index) {
-        char sdl_window_title[64];
-        v->shadow_stopped = m->stopped;
-        v->shadow_turbo_index = m->turbo_index;
-        strcpy(sdl_window_title, "Apple ][+ Emulator ");
-        strcat(sdl_window_title, v->shadow_stopped ? "[stopped]" : "[running]");
-        if(m->turbo_active > 0.0) {
-            sprintf(&sdl_window_title[strlen(sdl_window_title)], " @ %1.1f", m->turbo_active);
-        } else {
-            strcat(sdl_window_title, " @ Max");
-        }
-        SDL_SetWindowTitle(v->window, sdl_window_title);
     }
 
     nk_input_begin(v->ctx);
@@ -853,4 +838,23 @@ void viewport_update(APPLE2 *m) {
         }
     }
     SDL_RenderPresent(v->renderer);
+
+    if(1) {
+        // Show the window title after calculating a moving average MHz
+        char sdl_window_title[64];
+        if(!m->stopped) {
+            uint64_t freq = SDL_GetPerformanceFrequency();
+            uint64_t now_ticks = SDL_GetPerformanceCounter();
+            uint64_t dt_ticks = now_ticks - v->prev_ticks;
+            uint64_t dc = m->cpu.cycles - v->prev_cycles;
+            v->prev_ticks  = now_ticks;
+            v->prev_cycles = m->cpu.cycles;
+
+            double mhz = (dt_ticks > 0) ? (double)(dc * freq) / ((double)dt_ticks * 1e6) : 0.0;
+            v->mhz_moving_average = 0.1 * mhz + (1 - 0.1) * v->mhz_moving_average;
+        }
+
+        sprintf(sdl_window_title, "Apple ][+ Emulator %s @ %2.1f MHz", m->stopped ? "[stopped] " : "[running]", v->mhz_moving_average);
+        SDL_SetWindowTitle(v->window, sdl_window_title);
+    }
 }

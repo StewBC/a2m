@@ -17,6 +17,11 @@ typedef struct VIEWPORT {
     SDL_Rect target_rect;
     SDL_Rect full_window_rect;
 
+    // Window title MHz display helpers
+    uint64_t prev_cycles;
+    uint64_t prev_ticks;
+    double mhz_moving_average;
+
     float display_scale;
 
     struct nk_context *ctx;
@@ -32,7 +37,6 @@ typedef struct VIEWPORT {
     // Shadow of machine states
     int shadow_screen_mode;
     int help_page;
-    uint32_t shadow_turbo_index;                                // Usesd to know when to update window title
 
     // Game controller values
     int8_t num_controllers;
