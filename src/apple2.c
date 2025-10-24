@@ -55,12 +55,7 @@ int apple2_configure(APPLE2 *m) {
     // Allocate the RAM
     m->RAM_MAIN = (uint8_t *) malloc(m->ram_size);
     // SQW made the RAM test pass but no longer...
-    memset(&m->RAM_MAIN[0x0000], 0xff, m->model ? 0x20000 : 0x10000);
-    // This fixes some issues with how I handle the softswitch areas
-    memset(&m->RAM_MAIN[0xC000], 0x00, 0x1000);
-    if(m->model) {
-        memset(&m->RAM_MAIN[0x1C000], 0x00, 0x1000);
-    }
+    memset(&m->RAM_MAIN[0x0000], 0xFF, m->model ? 0x20000 : 0x10000);
 
     m->RAM_WATCH = (uint8_t *) malloc(m->ram_size);
     if(!m->RAM_MAIN || !m->RAM_WATCH) {
@@ -407,32 +402,32 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
                 break;
             case RDRAMRD: //e
                 if(m->model) {
-                    return (m->ramrdset << 7);
+                    return (m->ramrdset << 7) | 0x0d;
                 }
                 break;
             case RDRAMWRT: //e
                 if(m->model) {
-                    return (m->ramwrtset << 7);
+                    return (m->ramwrtset << 7) | 0x0d;
                 }
                 break;
             case RDCXROM:   //e
                 if(m->model) {
-                    return (m->cxromset << 7);
+                    return (m->cxromset << 7) | 0x0d;
                 }
                 break;
             case RDALTZP:
                 if(m->model) {
-                    return (m->altzpset << 7);
+                    return (m->altzpset << 7) | 0x0d;
                 }
                 break;
             case RDC3ROM:   //e
                 if(m->model) {
-                    return (m->c3romset << 7);
+                    return (m->c3romset << 7) | 0x0d;
                 }
                 break;
             case RD80STORE:   //e
                 if(m->model) {
-                    return (m->store80set << 7);
+                    return (m->store80set << 7) | 0x0d;
                 }
                 break;
             case RDVBL:     //e
@@ -448,29 +443,29 @@ uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
                 break;
             case RDTEXT: // e
                 if(m->model) {
-                    return (m->screen_mode & SCREEN_MODE_GRAPHICS) ? 0 : 128;
+                    return ((m->screen_mode & SCREEN_MODE_GRAPHICS) ? 0 : 128) | 0x0d;;
                 }
             case RDMIXED: // e
                 if(m->model) {
-                    return (m->screen_mode & SCREEN_MODE_MIXED) ? 128 : 0;
+                    return ((m->screen_mode & SCREEN_MODE_MIXED) ? 128 : 0) | 0x0d;;
                 }
                 break;
             case RDPAGE2:   //e
                 if(m->model) {
-                    return (m->active_page << 7);
+                    return (m->active_page << 7) | 0x0d;;
                 }
                 break;
             case RDHIRES: //e
                 if(m->model) {
-                    return (m->screen_mode & SCREEN_MODE_GRAPHICS) ? 128 : 0;
+                    return ((m->screen_mode & SCREEN_MODE_GRAPHICS) ? 128 : 0) | 0x0d;;
                 }
             case RDALTCHAR: //e
                 if(m->model) {
-                    return (m->altcharset << 7);
+                    return (m->altcharset << 7) | 0x0d;;
                 }
             case RD80COL: //e
                 if(m->model) {
-                    return (m->col80set << 7);
+                    return (m->col80set << 7) | 0x0d;;
                 }
             case A2SPEAKER:
                 speaker_toggle(&m->speaker);
@@ -714,8 +709,12 @@ void apple2_softswitch_write_callback(APPLE2 *m, uint16_t address, uint8_t value
                     m->ramrdset = 0;
                     if(m->store80set) {
                         pages_map(&m->read_pages, 0x0200 / PAGE_SIZE, 0x0200 / PAGE_SIZE, &m->RAM_MAIN[0x0200]);
-                        pages_map(&m->read_pages, 0x0800 / PAGE_SIZE, 0x1800 / PAGE_SIZE, &m->RAM_MAIN[0x0800]);
-                        pages_map(&m->read_pages, 0x4000 / PAGE_SIZE, 0x8000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
+                        if(m->screen_mode & SCREEN_MODE_HIRES) {
+                            pages_map(&m->read_pages, 0x0800 / PAGE_SIZE, 0x1800 / PAGE_SIZE, &m->RAM_MAIN[0x0800]);
+                            pages_map(&m->read_pages, 0x4000 / PAGE_SIZE, 0x8000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
+                        } else {
+                            pages_map(&m->read_pages, 0x0800 / PAGE_SIZE, 0xB800 / PAGE_SIZE, &m->RAM_MAIN[0x0200]);
+                        }
                     } else {
                         pages_map(&m->read_pages, 0x0200 / PAGE_SIZE, 0xBE00 / PAGE_SIZE, &m->RAM_MAIN[0x0200]);
                     }
@@ -726,8 +725,12 @@ void apple2_softswitch_write_callback(APPLE2 *m, uint16_t address, uint8_t value
                     m->ramrdset = 1;
                     if(m->store80set) {
                         pages_map(&m->read_pages, 0x0200 / PAGE_SIZE, 0x0200 / PAGE_SIZE, &m->RAM_MAIN[0x10200]);
-                        pages_map(&m->read_pages, 0x0800 / PAGE_SIZE, 0x1800 / PAGE_SIZE, &m->RAM_MAIN[0x10800]);
-                        pages_map(&m->read_pages, 0x4000 / PAGE_SIZE, 0x8000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
+                        if(m->screen_mode & SCREEN_MODE_HIRES) {
+                            pages_map(&m->read_pages, 0x0800 / PAGE_SIZE, 0x1800 / PAGE_SIZE, &m->RAM_MAIN[0x10800]);
+                            pages_map(&m->read_pages, 0x4000 / PAGE_SIZE, 0x8000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
+                        } else {
+                            pages_map(&m->read_pages, 0x0800 / PAGE_SIZE, 0xB800 / PAGE_SIZE, &m->RAM_MAIN[0x10200]);
+                        }
                     } else {
                         pages_map(&m->read_pages, 0x0200 / PAGE_SIZE, 0xBE00 / PAGE_SIZE, &m->RAM_MAIN[0x10200]);
                     }
@@ -738,8 +741,12 @@ void apple2_softswitch_write_callback(APPLE2 *m, uint16_t address, uint8_t value
                 	m->ramwrtset = 0;
                     if(m->store80set) {
                         pages_map(&m->write_pages, 0x0200 / PAGE_SIZE, 0x0200 / PAGE_SIZE, &m->RAM_MAIN[0x0200]);
-                        pages_map(&m->write_pages, 0x0800 / PAGE_SIZE, 0x1800 / PAGE_SIZE, &m->RAM_MAIN[0x0800]);
-                        pages_map(&m->write_pages, 0x4000 / PAGE_SIZE, 0x8000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
+                        if(m->screen_mode & SCREEN_MODE_HIRES) {
+                            pages_map(&m->write_pages, 0x0800 / PAGE_SIZE, 0x1800 / PAGE_SIZE, &m->RAM_MAIN[0x0800]);
+                            pages_map(&m->write_pages, 0x4000 / PAGE_SIZE, 0x8000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
+                        } else {
+                            pages_map(&m->write_pages, 0x0800 / PAGE_SIZE, 0xB800 / PAGE_SIZE, &m->RAM_MAIN[0x0200]);
+                        }
                     } else {
                         pages_map(&m->write_pages, 0x0200 / PAGE_SIZE, 0xBE00 / PAGE_SIZE, &m->RAM_MAIN[0x0200]);
                     }
@@ -750,8 +757,12 @@ void apple2_softswitch_write_callback(APPLE2 *m, uint16_t address, uint8_t value
                 	m->ramwrtset = 1;
                     if(m->store80set) {
                         pages_map(&m->write_pages, 0x0200 / PAGE_SIZE, 0x0200 / PAGE_SIZE, &m->RAM_MAIN[0x10200]);
-                        pages_map(&m->write_pages, 0x0800 / PAGE_SIZE, 0x1800 / PAGE_SIZE, &m->RAM_MAIN[0x10800]);
-                        pages_map(&m->write_pages, 0x4000 / PAGE_SIZE, 0x8000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
+                        if(m->screen_mode & SCREEN_MODE_HIRES) {
+                            pages_map(&m->write_pages, 0x0800 / PAGE_SIZE, 0x1800 / PAGE_SIZE, &m->RAM_MAIN[0x10800]);
+                            pages_map(&m->write_pages, 0x4000 / PAGE_SIZE, 0x8000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
+                        } else {
+                            pages_map(&m->write_pages, 0x0800 / PAGE_SIZE, 0xB800 / PAGE_SIZE, &m->RAM_MAIN[0x10200]);
+                        }
                     } else {
                         pages_map(&m->write_pages, 0x0200 / PAGE_SIZE, 0xBE00 / PAGE_SIZE, &m->RAM_MAIN[0x10200]);
                     }
