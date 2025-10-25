@@ -4,6 +4,8 @@
 
 #include "header.h"
 
+#define TARGET_FPS              60
+
 int main(int argc, char *argv[]) {
     int quit = 0;
     APPLE2 m;                                               // The Apple II machine
