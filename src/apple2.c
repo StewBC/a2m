@@ -3,8 +3,8 @@
 // This is free and unencumbered software released into the public domain.
 
 #include "header.h"
-#include "a2p_sft.h"
-#include "a2ee_sft.h"
+#include "a2sft_p.h"
+#include "a2sft_ee.h"
 
 // Set MACHINE up as an Apple II
 int apple2_configure(APPLE2 *m) {

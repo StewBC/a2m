@@ -97,7 +97,7 @@ typedef struct DEBUGGER DEBUGGER;
 #include "frankdisp.h"
 #include "ramcard.h"
 #include "roms.h"
-#include "sftswtch.h"
+#include "a2sft_defs.h"
 #include "slot.h"
 #include "speaker.h"
 #include "smrtprt.h"
