@@ -9,7 +9,7 @@ static const char *access_mode[3] = { "R", "W", "RW" };
 static int screen_mode[3] = { 0, 1, 5 };
 
 static int display_mode = 0;
-static int display_active_page = 0;
+static int display_page2set = 0;
 static int display_mixed = 0;
 static int display_override = 0;
 static int display_undo_change = 0;
@@ -23,7 +23,7 @@ void viewmisc_show(APPLE2 *m) {
     BREAKPOINT_EDIT *bpe = &v->viewmisc.breakpoint_edit;
 
     int display_mode_setting = 0;
-    int display_active_page_setting = 0;
+    int display_page2set_setting = 0;
     int display_mixed_setting = 0;
     int force_redraw = 0;
 
@@ -322,9 +322,9 @@ void viewmisc_show(APPLE2 *m) {
                 nk_layout_row_static(ctx, 13, 100, 1);
                 nk_label(ctx, "Display Page", NK_TEXT_LEFT);
                 nk_layout_row_static(ctx, 13, 60, 2);
-                display_active_page_setting = nk_option_label(ctx, "Page 0", display_active_page == 0) ? 0 : display_active_page;
-                display_active_page_setting =
-                    nk_option_label(ctx, "Page 1", display_active_page_setting == 1) ? 1 : display_active_page_setting;
+                display_page2set_setting = nk_option_label(ctx, "Page 0", display_page2set == 0) ? 0 : display_page2set;
+                display_page2set_setting =
+                    nk_option_label(ctx, "Page 1", display_page2set_setting == 1) ? 1 : display_page2set_setting;
                 nk_group_end(ctx);
             }
             nk_layout_row_end(ctx);
@@ -338,10 +338,10 @@ void viewmisc_show(APPLE2 *m) {
             if(display_override) {
                 // Only redraw the screen, when stopped, if a change is made
                 if(display_mode != display_mode_setting || display_mixed != display_mixed_setting
-                        || display_active_page != display_active_page_setting) {
+                        || display_page2set != display_page2set_setting) {
                     display_mode = display_mode_setting;
                     display_mixed = display_mixed_setting;
-                    display_active_page = display_active_page_setting;
+                    display_page2set = display_page2set_setting;
                     if(m->stopped) {
                         force_redraw = 1;
                         display_undo_change = 1;
@@ -350,7 +350,7 @@ void viewmisc_show(APPLE2 *m) {
             } else {
                 // Get the settings from the "hardware"
                 display_mode = m->screen_mode & 1 ? m->screen_mode & 4 ? 2 : 1 : 0;
-                display_active_page = m->active_page != 0;
+                display_page2set = m->page2set != 0;
                 display_mixed = display_mode && m->screen_mode & 2;
                 if(display_undo_change) {
                     // If the settings were overridden but is now driven from the hardware
@@ -362,7 +362,7 @@ void viewmisc_show(APPLE2 *m) {
             }
             // Set the view draw settings based on whatever is active
             v->shadow_screen_mode = screen_mode[display_mode] | (display_mixed << 1);
-            v->shadow_active_page = display_active_page;
+            v->shadow_page2set = display_page2set;
             if(force_redraw) {
                 // stopped and a change was made, so update the Apple II display
                 viewapl2_screen_apple2(m);

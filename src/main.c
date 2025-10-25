@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
 
         quit = viewport_process_events(&m);
         v.shadow_screen_mode = m.screen_mode;
-        v.shadow_active_page = m.active_page;
+        v.shadow_page2set = m.page2set;
         viewport_show(&m);
         viewapl2_screen_apple2(&m);
         viewport_update(&m);

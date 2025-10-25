@@ -398,7 +398,7 @@ void viewapl2_screen_lores(APPLE2 *m, int start, int end) {
     int x, y;
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    int page = m->viewport->shadow_active_page ? 0x0800 : 0x0400;
+    int page = m->viewport->shadow_page2set ? 0x0800 : 0x0400;
 
     // Loop through each row
     for(y = start; y < end; y++) {
@@ -432,7 +432,7 @@ void viewapl2_screen_lores_mono(APPLE2 *m, int start, int end) {
     int x, y;
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    int page = m->viewport->shadow_active_page ? 0x0800 : 0x0400;
+    int page = m->viewport->shadow_page2set ? 0x0800 : 0x0400;
 
     // Loop through each row
     for(y = start; y < end; y++) {
@@ -471,7 +471,7 @@ void viewapl2_screen_hgr(APPLE2 *m, int start, int end) {
     int y;
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    uint16_t page = m->viewport->shadow_active_page ? 0x4000 : 0x2000;
+    uint16_t page = m->viewport->shadow_page2set ? 0x4000 : 0x2000;
     int surface_width = surface->w;
 
     for(y = start; y < end; y++) {
@@ -513,7 +513,7 @@ void viewapl2_screen_hgr_mono(APPLE2 *m, int start, int end) {
     int x, y;
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    int page = m->viewport->shadow_active_page ? 0x4000 : 0x2000;
+    int page = m->viewport->shadow_page2set ? 0x4000 : 0x2000;
     uint32_t c[2] = { color_table[0][0][0], color_table[7][0][0] };
 
     // Loop through each row
@@ -543,7 +543,7 @@ void viewapl2_screen_txt40(APPLE2 *m, int start, int end) {
     int x, y;
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    int page = m->viewport->shadow_active_page ? 0x0800 : 0x0400;
+    int page = m->viewport->shadow_page2set ? 0x0800 : 0x0400;
     Uint64 now = SDL_GetPerformanceCounter();
     double freq = (double)SDL_GetPerformanceFrequency();
     // I got 3.7 from recording a flash on my Platinum //e - 0.17 to 0.44 for a change so 0.27
@@ -643,7 +643,7 @@ void viewapl2_screen_franklin80col(APPLE2 *m, int start, int end) {
     FRANKLIN_DISPLAY *fd80 = &m->franklin_display;
     SDL_Surface *surface = m->viewport->surface_wide;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    // int page = m->viewport->shadow_active_page ? 0x0800 : 0x0400;
+    // int page = m->viewport->shadow_page2set ? 0x0800 : 0x0400;
     uint32_t c[2] = { color_table[0][0][0], color_table[7][0][0] };
     uint16_t display_offset = 256 * fd80->registers[0x0c] + fd80->registers[0x0d];
 

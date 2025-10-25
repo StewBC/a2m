@@ -852,7 +852,7 @@ void viewport_update(APPLE2 *m) {
             v->fps_moving_average  = 0.1 * fps + (1 - 0.1) * v->fps_moving_average;
         }
 
-        sprintf(sdl_window_title, "Apple ][+ Emulator %s : %2.1f MHz @ %2.1f FPS", m->stopped ? "[stopped] " : "[running]", v->mhz_moving_average, v->fps_moving_average);
+        sprintf(sdl_window_title, "Apple %s Emulator %s : %2.1f MHz @ %2.1f FPS", m->model ? "//e" : "][+", m->stopped ? "[stopped] " : "[running]", v->mhz_moving_average, v->fps_moving_average);
         SDL_SetWindowTitle(v->window, sdl_window_title);
     }
 }

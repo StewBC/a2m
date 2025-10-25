@@ -92,26 +92,26 @@ typedef struct APPLE2 {
     // Screen State
     uint8_t screen_mode;                                    // lores, text hgr, etc. See viewapl2_screen_apple2
     uint8_t monitor_type;                                   // 0 = color; 1 = mono
-    uint64_t vbl_cycles;                                    // To have a counter at $C019 on //e
 
     // Status flags
-    uint32_t store80set: 1;
-    uint32_t ramrdset: 1;
-    uint32_t ramwrtset: 1;
-    uint32_t cxromset: 1;
-    uint32_t c3romset: 1;
-    uint32_t altzpset: 1;
-    uint32_t col80set: 1;
-    uint32_t altcharset: 1;
-    uint32_t model: 1;                                      // (0) II+ or (1) //e
-    uint32_t original_del: 1;                               // backspace key does crsr left if 0
-    uint32_t franklin80active: 1;                           // Videx/Franklin Ace Display active
-    uint32_t active_page: 1;                                // 0x2000 or 0x4000 - active hires bytes page
+    uint32_t altcharset: 1;                                 // 1 = mousetext
+    uint32_t altzpset: 1;                                   // 1 = 0x0000 - 0x0200 in aux
+    uint32_t c3romset: 1;                                   // 1 = 0xc300 - 0xc344 from rom
+    uint32_t col80set: 1;                                   // 1 = 80 col display active
+    uint32_t cxromset: 1;                                   // 1 = 0xc100 - cfff - from rom
     uint32_t debug_view: 1;                                 // Apple ][ is not full-screen, debugger visible
-    uint32_t stopped: 1;                                    // Emulation is halted
-    uint32_t step: 1;                                       // Emulation halted but one instruction is "stepped"
     uint32_t disk_activity_read: 1;                         // 0 = no read/write (here for convenience)
     uint32_t disk_activity_write: 1;                        // 0 = no read/write
+    uint32_t franklin80active: 1;                           // Videx/Franklin Ace Display active
+    uint32_t ioudclr :1;                                    // reverse of normal - ioudclr = 1, ioudset = 0
+    uint32_t model: 1;                                      // (0) II+ or (1) //e
+    uint32_t original_del: 1;                               // backspace key does crsr left if 0
+    uint32_t page2set: 1;                                   // 1 = 0x0800 text or 0x4000 HGR
+    uint32_t ramrdset: 1;                                   // 1 = 0x0200 - 0xbfff (with 80store excptions) read from aux
+    uint32_t ramwrtset: 1;                                  // 1 = 0x0200 - 0xbfff (with 80store excptions) write to aux
+    uint32_t step: 1;                                       // Emulation halted but one instruction is "stepped"
+    uint32_t stopped: 1;                                    // Emulation is halted
+    uint32_t store80set: 1;                                 // 1 - Page 2 text, and if hgr also 4000-6000, mapped from aux
 
     // Configuration
     INI_STORE ini_store;
@@ -130,6 +130,12 @@ typedef struct APPLE2 {
     VIEWPORT *viewport;                                     // 0 (no view) or active view for this instance
 
 } APPLE2;
+
+// Seems it's about 3.0 ms to get to paddel to 255, expressed as cycles
+#define paddl_normalized    ((CPU_FREQUENCY / 1000.0) * 3.0)
+static inline uint8_t clamp_u8(uint32_t x, uint8_t lo, uint8_t hi) {
+    return x < lo ? lo : (x > hi ? hi : x);
+}
 
 int apple2_configure(APPLE2 *m);
 void apple2_machine_setup(APPLE2 *m);

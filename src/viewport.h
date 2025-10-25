@@ -48,7 +48,7 @@ typedef struct VIEWPORT {
     uint8_t axis_left_y[2];
     uint64_t ptrig_cycle;
 
-    // Flags
+    // Flags that contain machine states
     uint32_t debug_view: 1;
     uint32_t dlg_assassembler_config: 1;
     uint32_t dlg_assassembler_errors: 1;
@@ -59,7 +59,7 @@ typedef struct VIEWPORT {
     uint32_t dlg_memory_go: 1;
     uint32_t dlg_symbol_lookup_dbg: 1;
     uint32_t dlg_symbol_lookup_mem: 1;
-    uint32_t shadow_active_page: 1;                              // Flags that shadow machine states
+    uint32_t shadow_page2set: 1;
     uint32_t shadow_stopped: 1;
     uint32_t show_help: 1;
     uint32_t show_leds: 1;
