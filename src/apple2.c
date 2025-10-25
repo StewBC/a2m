@@ -52,9 +52,10 @@ int apple2_configure(APPLE2 *m) {
     m->RAM_MAIN = (uint8_t *) malloc(m->ram_size);
     // SQW made the RAM test pass but no longer...
     memset(&m->RAM_MAIN[0x0000], 0xFF, m->model ? 0x20000 : 0x10000);
-    memset(&m->RAM_MAIN[0xC000], 0x00, 0x01000);
+    // SQW Something weird that this is needed...
+    memset(&m->RAM_MAIN[0xC000], 0x55, 0x01000);
     if(m->model) {
-        memset(&m->RAM_MAIN[0x1C000], 0x00, 0x01000);
+        memset(&m->RAM_MAIN[0x1C000], 0x55, 0x01000);
     }
 
     m->RAM_WATCH = (uint8_t *) malloc(m->ram_size);

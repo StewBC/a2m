@@ -3,10 +3,10 @@
 // This is free and unencumbered software released into the public domain.
 
 static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t address) {
-    // This would ideally not be neccesary
-    uint8_t byte = m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
-
+    uint8_t byte = 0xA0; // Floating bus value
     if(address >= 0xc100 && address < 0xCFFE) {
+        // SQW - why this?
+        byte = m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
         // IO Select
         int slot = (address >> 8) & 0x7;
         // Only if slot isn't mapped, and only if ROM isn't active
@@ -39,6 +39,7 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                             viewapl2_feed_clipboard_key(m);
                         } else {
                             // I believe you get the key, pre-stobe-reset back
+                            byte = m->RAM_MAIN[KBD];
                             m->write_pages.pages[KBD / PAGE_SIZE].bytes[KBD % PAGE_SIZE] &= 0x7F;
                         }
                         break;
@@ -297,6 +298,7 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                 switch(m->slot_cards[slot].slot_type) {
                     case SLOT_TYPE_DISKII: {
                             uint8_t soft_switch = address & 0x0f;
+                            byte = 0;
                             if(soft_switch <= IWM_PH3_ON) {
                                 diskii_step_head(m, slot, soft_switch);
                                 break;
