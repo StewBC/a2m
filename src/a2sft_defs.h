@@ -46,8 +46,8 @@
 #define MIXSET          0xC053 // Enable Split Screen, Enable 4 lines of text
 #define CLRPAGE2        0xC054 // Page 1
 #define SETPAGE2        0xC055 // Page 2
-#define LORES           0xC056 // Enable Lores graphics (Disable Hires)
-#define HIRES           0xC057 // Enable Hires graphics (Disable Lores)
+#define CLRHIRES        0xC056 // Enable Lores graphics (Disable Hires)
+#define SETHIRES        0xC057 // Enable Hires graphics (Disable Lores)
 #define CLRAN0          0xC058
 #define SETAN0          0xC059
 #define CLRAN1          0xC05A // Disable VBL

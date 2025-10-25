@@ -143,14 +143,14 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                         }
                         m->page2set = 1;
                         break;
-                    case LORES: // SQW - rename to CLRHIRES
+                    case CLRHIRES:
                         m->screen_mode &= ~SCREEN_MODE_HIRES;
                         if(m->store80set) {
                             pages_map(&m->read_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
                             pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
                         }
                         break;
-                    case HIRES: // SQW - rename to SETHIRES
+                    case SETHIRES:
                         m->screen_mode |= SCREEN_MODE_HIRES;
                         if(m->store80set) {
                             pages_map(&m->read_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
@@ -566,14 +566,14 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                     }
                     m->page2set = 1;
                     break;
-                case LORES: // SQW - rename to CLRHIRES
+                case CLRHIRES: // SQW - rename to CLRHIRES
                     m->screen_mode &= ~SCREEN_MODE_HIRES;
                     if(m->store80set) {
                         pages_map(&m->read_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
                         pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
                     }
                     break;
-                case HIRES: // SQW - rename to SETHIRES
+                case SETHIRES: // SQW - rename to SETHIRES
                     m->screen_mode |= SCREEN_MODE_HIRES;
                     if(m->store80set) {
                         pages_map(&m->read_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
@@ -612,76 +612,67 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
         case 0xC0D0:
         case 0xC0E0:
         case 0xC0F0: {
-            if(address == CLRROM) {
-                m->mapped_slot = -1;
-                for(int i = 1; i < 8; i++) {
-                    m->slot_cards[i].cx_rom_mapped = 0;
-                }
-                // On a //e this C800-CFFF becomes rom, on a II+ it's floating bus (ram in my case)
-                pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, 0x800 / PAGE_SIZE, m->model ? &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0X800] : &m->RAM_MAIN[0xC800]);
-            } else {
-                int slot = (address >> 4) & 0x7;
-                switch(m->slot_cards[slot].slot_type) {
-                    case SLOT_TYPE_DISKII: {
-                            uint8_t soft_switch = address & 0x0f;
-                            if(soft_switch <= IWM_PH3_ON) {
-                                diskii_step_head(m, slot, soft_switch);
+            int slot = (address >> 4) & 0x7;
+            switch(m->slot_cards[slot].slot_type) {
+                case SLOT_TYPE_DISKII: {
+                        uint8_t soft_switch = address & 0x0f;
+                        if(soft_switch <= IWM_PH3_ON) {
+                            diskii_step_head(m, slot, soft_switch);
+                            break;
+                        }
+                        switch(soft_switch) {
+                            case IWM_MOTOR_ON:
+                            case IWM_MOTOR_OFF:
+                                diskii_motor(m, slot, soft_switch);
                                 break;
-                            }
-                            switch(soft_switch) {
-                                case IWM_MOTOR_ON:
-                                case IWM_MOTOR_OFF:
-                                    diskii_motor(m, slot, soft_switch);
-                                    break;
 
-                                case IWM_SEL_DRIVE_1:
-                                case IWM_SEL_DRIVE_2:
-                                    diskii_drive_select(m, slot, soft_switch);
-                                    break;
+                            case IWM_SEL_DRIVE_1:
+                            case IWM_SEL_DRIVE_2:
+                                diskii_drive_select(m, slot, soft_switch);
+                                break;
 
-                                // SQW - Do these trigger with write?
-                                case IWM_Q6_OFF:
-                                case IWM_Q6_ON:
-                                    diskii_q6_access(m, slot, soft_switch & 1);
+                            // SQW - Do these trigger with write?
+                            case IWM_Q6_OFF:
+                            case IWM_Q6_ON:
+                                diskii_q6_access(m, slot, soft_switch & 1);
 
-                                case IWM_Q7_OFF:
-                                case IWM_Q7_ON:
-                                    diskii_q7_access(m, slot, soft_switch & 1);
-                            }
+                            case IWM_Q7_OFF:
+                            case IWM_Q7_ON:
+                                diskii_q7_access(m, slot, soft_switch & 1);
                         }
-                        break;
-
-                        case SLOT_TYPE_SMARTPORT:
-                        switch(address & 0x0F) {
-                            case SP_DATA:
-                                m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_write_offset++] = value;
-                                return;
-
-                            case SP_STATUS:
-                                m->sp_device[slot].sp_read_offset = 0;
-                                m->sp_device[slot].sp_write_offset = 0;
-
-                                switch(m->sp_device[slot].sp_buffer[0]) {
-                                    case 0:
-                                        sp_status(m, slot);
-                                        break;
-                                    case 1:
-                                        sp_read(m, slot);
-                                        break;
-                                    case 2:
-                                        sp_write(m, slot);
-                                        break;
-                                }
-                                m->sp_device[slot].sp_status = 0x80;
-                                return;
-                        }
-                        break;
-
-                    case SLOT_TYPE_VIDEX_API:
-                        franklin_display_set(m, address, value);
-                        break;
+                    }
                     break;
-                }
+
+                    case SLOT_TYPE_SMARTPORT:
+                    switch(address & 0x0F) {
+                        case SP_DATA:
+                            m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_write_offset++] = value;
+                            return;
+
+                        case SP_STATUS:
+                            m->sp_device[slot].sp_read_offset = 0;
+                            m->sp_device[slot].sp_write_offset = 0;
+
+                            switch(m->sp_device[slot].sp_buffer[0]) {
+                                case 0:
+                                    sp_status(m, slot);
+                                    break;
+                                case 1:
+                                    sp_read(m, slot);
+                                    break;
+                                case 2:
+                                    sp_write(m, slot);
+                                    break;
+                            }
+                            m->sp_device[slot].sp_status = 0x80;
+                            return;
+                    }
+                    break;
+
+                case SLOT_TYPE_VIDEX_API:
+                    franklin_display_set(m, address, value);
+                    break;
+                break;
             }
         }
     }
