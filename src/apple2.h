@@ -49,9 +49,10 @@ enum {
 
 // The mask for the bits in the RAM_WATCH array 
 enum RAM_WATCH_MASK {
-    WATCH_IO_PORT = 1,
-    WATCH_READ_BREAKPOINT = 2,  // When !use_pc
-    WATCH_WRITE_BREAKPOINT = 4, // When !use_pc
+    WATCH_NONE             = 0,                             // Nothing to watch
+    WATCH_IO_PORT          = 1<<0,                          // Call an IO callback function
+    WATCH_READ_BREAKPOINT  = 1<<1,                          // When !use_pc
+    WATCH_WRITE_BREAKPOINT = 1<<2,                          // When !use_pc
 };
 
 // Prototypes for callbacks when cpu accesses a port
@@ -83,7 +84,7 @@ typedef struct APPLE2 {
     uint8_t *RAM_MAIN;                                      // The ram_size MEMORY - addressable in max 64k chunks
     uint8_t *RAM_WATCH;                                     // 64K of IO port "mask" (0 = is not a port). See RAM_WATCH_MASK
     uint8_t *rom_shadow_pages[(0xC800-0xC000)/PAGE_SIZE];   // Slot ram page mappings when SETC?ROM active
-    uint8_t mapped_slot;
+    uint8_t mapped_slot;                                    // 0 = not mapped, 1-7 means that slot card is strobe mapped (to C800)
 
     // keyboard
     uint8_t open_apple;
@@ -96,7 +97,7 @@ typedef struct APPLE2 {
     // Status flags
     uint32_t altcharset: 1;                                 // 1 = mousetext
     uint32_t altzpset: 1;                                   // 1 = 0x0000 - 0x0200 in aux
-    uint32_t c3romset: 1;                                   // 1 = 0xc300 - 0xc344 from rom
+    uint32_t c3slotrom: 1;                                  // 1 = C300-C3FF slot card rom (not internal //e S3 ROM)
     uint32_t col80set: 1;                                   // 1 = 80 col display active
     uint32_t cxromset: 1;                                   // 1 = 0xc100 - cfff - from rom
     uint32_t debug_view: 1;                                 // Apple ][ is not full-screen, debugger visible
@@ -112,6 +113,7 @@ typedef struct APPLE2 {
     uint32_t step: 1;                                       // Emulation halted but one instruction is "stepped"
     uint32_t stopped: 1;                                    // Emulation is halted
     uint32_t store80set: 1;                                 // 1 - Page 2 text, and if hgr also 4000-6000, mapped from aux
+    uint32_t strobed: 1;                                    // 1 - C800-CFFF is mapped, 0 - it is floating bus
 
     // Configuration
     INI_STORE ini_store;

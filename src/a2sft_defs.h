@@ -12,18 +12,18 @@
 #define CLRRAMWRT       0xC004 // CPU writes from main $0200–$BFFF and LC $D000–$FFFF, see SET80STORE
 #define SETRAMWRT       0xC005 // CPU writes from aux  $0200–$BFFF and LC $D000–$FFFF, see SET80STORE
 #define CLRCXROM        0xC006 // C100-C7FF slot card roms
-#define SETCXROM        0xC007 // C100-C7FF                                                                   //e       rom
+#define SETCXROM        0xC007 // C100-CFFF //e rom (overrides c3rom and cfff)
 #define CLRALTZP        0xC008 // ZP/stack are in main bank
 #define SETALTZP        0xC009 // ZP/stack are in aux  bank
-#define CLRC3ROM        0xC00A // C300-C3FF slot card rom
-#define SETC3ROM        0xC00B // C300-C3FF                                                                   //e       rom
+#define CLRC3ROM        0xC00A // C300-C3FF Internal //e rom
+#define SETC3ROM        0xC00B // C300-C3FF slot card rom
 #define CLR80COL        0xC00C // 40-column display (turn 80-col display off)
 #define SET80COL        0xC00D // 80-column display (turn 80-col display on)
 #define CLRALTCHAR      0xC00E // primary/standard character set
 #define SETALTCHAR      0xC00F // alternate character set
 #define KBDSTRB         0xC010 // Port where the Apple II acknowledges a key press (clears it)
-#define HRAMRD          0xC011 // 1 = HRAMRD                                                                  // SQW - need to understand
-#define HRAMWRT         0xC012 // 1 = HRAMWRT                                                                 // SQW - need to understand
+#define HRAMRD          0xC011 // 1 = HRAMRD // SQW - need to understand
+#define HRAMWRT         0xC012 // 1 = HRAMWRT // SQW - need to understand
 #define RDRAMRD         0xC013 // 1 = RAMRD on (reads from aux), 0 = off
 #define RDRAMWRT        0xC014 // 1 = RAMWRT on (writes to aux), 0 = off
 #define RDCXROM         0xC015

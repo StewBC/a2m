@@ -63,7 +63,6 @@ void pages_map_memory_block(PAGES *pages, MEMORY_BLOCK *block) {
 
 // Init the 6502
 void cpu_init(APPLE2 *m) {
-    memset(&m->cpu, 0, sizeof(CPU));
     m->cpu.pc = read_from_memory_debug(m, 0xfffc) +  256 * read_from_memory_debug(m, 0xfffd);
     m->cpu.sp = 0x100;
 }

@@ -2,29 +2,44 @@
 // Stefan Wessels, 2024
 // This is free and unencumbered software released into the public domain.
 
+static void slot_io(APPLE2 *m, uint16_t address) {
+    // IO Select, which can "strobe" c800-cfff
+    int slot = (address >> 8) & 0x7;
+    // slot 3 and not m->c3slotrom overrides m->strobed
+    if(slot == 3 && !m->c3slotrom) {
+        // Map 80 col firmware
+        pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, 0x800 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x800]);
+        m->strobed = 1;
+        m->mapped_slot = 0;
+    } else if(!m->strobed && !m->cxromset && m->slot_cards[slot].slot_map_cx_rom) {
+        // If nothing is strobed, and the rom is not active and the card has rom, map the rom
+        m->slot_cards[slot].slot_map_cx_rom(m, address);
+        m->mapped_slot = slot;
+        m->strobed = 1;
+    }
+}
+
+static inline void slot_clrrom(APPLE2 *m, uint16_t address) {
+    // cxromset overriders all - do nothing if cxromset
+    if(m->strobed && !m->cxromset) {
+        if(!m->mapped_slot) {
+            m->slot_cards[m->mapped_slot].cx_rom_mapped = 0;
+            m->mapped_slot = 0;
+        }
+        pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, 0x800 / PAGE_SIZE, &m->RAM_MAIN[0xC800]);
+        m->strobed = 0;
+    }
+}
+
+
 static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t address) {
     uint8_t byte = 0xA0; // Floating bus value
-    if(address >= 0xc100 && address < 0xCFFE) {
-        // SQW - why this?
+    if(address >= 0xc100 && address < 0xC7FF) {
+        slot_io(m, address);
         byte = m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
-        // IO Select
-        int slot = (address >> 8) & 0x7;
-        // Only if slot isn't mapped, and only if ROM isn't active
-        if(m->mapped_slot != slot && !(m->cxromset || (slot == 3 && m->c3romset))) {
-            // Map the C800 ROM based on access to Cs00, if card provides a C800 ROM
-            if(!m->slot_cards[slot].cx_rom_mapped && m->slot_cards[slot].slot_map_cx_rom) {
-                m->slot_cards[slot].slot_map_cx_rom(m, address);
-                m->slot_cards[slot].cx_rom_mapped = 1;
-            }
-            m->mapped_slot = slot;
-        }
     } else if(address == CLRROM) {
-        m->mapped_slot = -1;
-        for(int i = 1; i < 8; i++) {
-            m->slot_cards[i].cx_rom_mapped = 0;
-        }
-        // On a //e this C800-CFFF becomes ROM
-        pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, 0x800 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0X800]);
+        slot_clrrom(m, address);
+        byte = m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
     } else {
         // Split into 16-byte "chunks"
         switch(address & 0xC0F0) {
@@ -62,7 +77,7 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                         byte |= m->altzpset << 7;
                         break;
                     case RDC3ROM:     //e
-                        byte |= m->c3romset << 7;
+                        byte |= m->c3slotrom << 7;
                         break;
                     case RD80STORE:   //e
                         byte |= m->store80set << 7;
@@ -101,7 +116,7 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                 speaker_toggle(&m->speaker);
                 break;
             case 0xC040:
-                // C40 strobe - don't know what that is
+                // C040 strobe - don't know what that is
                 break;
             case 0xC050:
                 if (!m->ioudclr && address & 0x0008) {
@@ -295,10 +310,10 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
             case 0xC0F0: {
                 // Device Select
                 int slot = (address >> 4) & 0x7;
+                byte = m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
                 switch(m->slot_cards[slot].slot_type) {
                     case SLOT_TYPE_DISKII: {
                             uint8_t soft_switch = address & 0x0f;
-                            byte = 0;
                             if(soft_switch <= IWM_PH3_ON) {
                                 diskii_step_head(m, slot, soft_switch);
                                 break;
@@ -328,6 +343,9 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                     case SLOT_TYPE_SMARTPORT:
                         switch(address & 0x0f) {
                             case SP_DATA:
+                                if(m->sp_device[slot].sp_read_offset == sizeof(m->sp_device[slot].sp_buffer)) {
+                                    m->sp_device[slot].sp_read_offset = 0;
+                                }
                                 return m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_read_offset++];
                                 break;
 
@@ -352,23 +370,26 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
 }
 
 static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t address, uint8_t value) {
-    uint8_t byte = m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
-
-    // All other addresses
-    switch(address & 0xC0F0) {
-        case 0xC000:
-            switch(address) {
-                case CLR80STORE:
-                    if(m->model) {
+    if(address != 0xc007 && address != 0xc006) {
+        printf("");
+    }
+    if(address >= 0xc100 && address < 0xC7FF) {
+        slot_io(m, address);
+    } else if(address == CLRROM) {
+        slot_clrrom(m, address);
+    } else {
+        // All other addresses
+        switch(address & 0xC0F0) {
+            case 0xC000:
+                switch(address) {
+                    case CLR80STORE:
                         m->store80set = 0;
                         pages_map(&m->read_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x0400]);
                         pages_map(&m->read_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
                         pages_map(&m->write_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x0400]);
                         pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
-                    }
-                    break;
-                case SET80STORE:  //e
-                    if(m->model) {
+                        break;
+                    case SET80STORE:  //e
                         m->store80set = 1;
                         if(m->page2set) {
                             pages_map(&m->read_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x10400]);
@@ -376,10 +397,8 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                             pages_map(&m->write_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x10400]);
                             pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
                         }
-                    }
-                    break;
-                case CLRRAMRD: //e
-                    if(m->model) {
+                        break;
+                    case CLRRAMRD: //e
                         m->ramrdset = 0;
                         if(m->store80set) {
                             pages_map(&m->read_pages, 0x0200 / PAGE_SIZE, 0x0200 / PAGE_SIZE, &m->RAM_MAIN[0x0200]);
@@ -392,10 +411,8 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                         } else {
                             pages_map(&m->read_pages, 0x0200 / PAGE_SIZE, 0xBE00 / PAGE_SIZE, &m->RAM_MAIN[0x0200]);
                         }
-                    }
-                    break;
-                case SETRAMRD: //e
-                    if(m->model) {
+                        break;
+                    case SETRAMRD: //e
                         m->ramrdset = 1;
                         if(m->store80set) {
                             pages_map(&m->read_pages, 0x0200 / PAGE_SIZE, 0x0200 / PAGE_SIZE, &m->RAM_MAIN[0x10200]);
@@ -408,10 +425,8 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                         } else {
                             pages_map(&m->read_pages, 0x0200 / PAGE_SIZE, 0xBE00 / PAGE_SIZE, &m->RAM_MAIN[0x10200]);
                         }
-                    }
-                    break;
-                case CLRRAMWRT: //e
-                    if(m->model) {
+                        break;
+                    case CLRRAMWRT: //e
                         m->ramwrtset = 0;
                         if(m->store80set) {
                             pages_map(&m->write_pages, 0x0200 / PAGE_SIZE, 0x0200 / PAGE_SIZE, &m->RAM_MAIN[0x0200]);
@@ -424,10 +439,8 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                         } else {
                             pages_map(&m->write_pages, 0x0200 / PAGE_SIZE, 0xBE00 / PAGE_SIZE, &m->RAM_MAIN[0x0200]);
                         }
-                    }
-                    break;
-                case SETRAMWRT: //e
-                    if(m->model) {
+                        break;
+                    case SETRAMWRT: //e
                         m->ramwrtset = 1;
                         if(m->store80set) {
                             pages_map(&m->write_pages, 0x0200 / PAGE_SIZE, 0x0200 / PAGE_SIZE, &m->RAM_MAIN[0x10200]);
@@ -440,241 +453,231 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                         } else {
                             pages_map(&m->write_pages, 0x0200 / PAGE_SIZE, 0xBE00 / PAGE_SIZE, &m->RAM_MAIN[0x10200]);
                         }
-                    }
-                    break;
-                case CLRCXROM:  //e
-                    if(m->model) {
+                        break;
+                    case CLRCXROM:  //e
                         m->cxromset = 0;
+                        // Restore the slot mappings
                         m->read_pages.pages[0xC100 / PAGE_SIZE].bytes = m->rom_shadow_pages[1];
                         m->read_pages.pages[0xC200 / PAGE_SIZE].bytes = m->rom_shadow_pages[2];
                         m->read_pages.pages[0xC400 / PAGE_SIZE].bytes = m->rom_shadow_pages[4];
                         m->read_pages.pages[0xC500 / PAGE_SIZE].bytes = m->rom_shadow_pages[5];
                         m->read_pages.pages[0xC600 / PAGE_SIZE].bytes = m->rom_shadow_pages[6];
                         m->read_pages.pages[0xC700 / PAGE_SIZE].bytes = m->rom_shadow_pages[7];
-                        if(!m->c3romset) {
+                        // Only if internal slot3 is not overriding the card rom
+                        if(m->c3slotrom) {
                             m->read_pages.pages[0xC300 / PAGE_SIZE].bytes = m->rom_shadow_pages[3];
                         }
-                    }
-                    break;
-                case SETCXROM:  //e
-                    if(m->model) {
+                        // If a card was mapped to c800, restore that mapping
+                        if(m->strobed) {
+                            if(m->mapped_slot) {
+                                m->slot_cards[m->mapped_slot].slot_map_cx_rom(m, address);
+                            } 
+                        } else {
+                            pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, 0x800 / PAGE_SIZE, &m->RAM_MAIN[0xC800]);
+                        }
+                        break;
+                    case SETCXROM:  //e
                         m->cxromset = 1;
-                        // C100-C2FF
-                        pages_map(&m->read_pages, 0xC100 / PAGE_SIZE, 0x200 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x100]);
-                        // C400-CFFF
-                        pages_map(&m->read_pages, 0xC400 / PAGE_SIZE, 0xC00 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x400]);
-                    }
-                    break;
-                case CLRALTZP:
-                    if(m->model) {
+                        // C100-D000
+                        pages_map(&m->read_pages, 0xC100 / PAGE_SIZE, 0xF00 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x100]);
+                        break;
+                    case CLRALTZP:
                         m->altzpset = 0;
                         // 0000-01ff
+                        pages_map(&m->read_pages, 0x0000 / PAGE_SIZE, 0x0200 / PAGE_SIZE, &m->RAM_MAIN[0x0000]);
                         pages_map(&m->write_pages, 0x0000 / PAGE_SIZE, 0x0200 / PAGE_SIZE, &m->RAM_MAIN[0x0000]);
-                    }
-                    break;
-                case SETALTZP:
-                    if(m->model) {
+                        break;
+                    case SETALTZP:
                         m->altzpset = 1;
                         // 10000-101ff
+                        pages_map(&m->read_pages, 0x0000 / PAGE_SIZE, 0x0200 / PAGE_SIZE, &m->RAM_MAIN[0x10000]);
                         pages_map(&m->write_pages, 0x0000 / PAGE_SIZE, 0x0200 / PAGE_SIZE, &m->RAM_MAIN[0x10000]);
-                    }
-                    break;
-                case CLRC3ROM: //e
-                    if(m->model) {
-                        m->c3romset = 0;
+                        break;
+                    case CLRC3ROM: //e
+                        // This turns on motherboard ROM
+                        m->c3slotrom = 0;
                         // C300-C3FF
-                        m->read_pages.pages[0xC300 / PAGE_SIZE].bytes = m->rom_shadow_pages[3];
-                    }
-                    break;
-                case SETC3ROM: // e
-                    if(m->model) {
-                        m->c3romset = 1;
-                        // C300-C3FF
-                        pages_map(&m->read_pages, 0xC300 / PAGE_SIZE, 0x100 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x300]);
-                        // SQW - Map C800 as well?
-                        // pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, 0x800 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x800]);
-                    }
-                    break;
-                case CLR80COL: //e
-                    if(m->model) {
+                        break;
+                    case SETC3ROM: // e
+                        // This is a bit confusing but set here sets card rom, not internal rom
+                        m->c3slotrom = 1;
+                        break;
+                    case CLR80COL: //e
                         m->col80set = 0;
-                    }
-                    break;
-                case SET80COL: //e
-                    if(m->model) {
+                        break;
+                    case SET80COL: //e
                         m->col80set = 1;
-                    }
-                    break;
-                case CLRALTCHAR: // e
-                    if(m->model) {
+                        break;
+                    case CLRALTCHAR: // e
                         m->altcharset = 0;
-                    }
-                    break;
-                case SETALTCHAR: // e
-                    if(m->model) {
+                        break;
+                    case SETALTCHAR: // e
                         m->altcharset = 1;
-                    }
-                    break;
-            }
-            break;
-        case 0xC010:
-                if(m->clipboard_text) {
-                    viewapl2_feed_clipboard_key(m);
-                } else {
-                    m->write_pages.pages[KBD / PAGE_SIZE].bytes[KBD % PAGE_SIZE] &= 0x7F;
+                        break;
                 }
-            break;
-        case 0xC020:
-            break;
-        case 0xC030:
-            speaker_toggle(&m->speaker);
-            break;
-        case 0xC040:
-            // C40 strobe - don't know what that is
-            break;
-        case 0xC050:
-            switch (address) {
-                case TXTCLR:
-                    m->screen_mode |= SCREEN_MODE_GRAPHICS;
-                    break;
-                case TXTSET:
-                    m->screen_mode &= ~SCREEN_MODE_GRAPHICS;
-                    break;
-                case MIXCLR:
-                    m->screen_mode &= ~SCREEN_MODE_MIXED;
-                    break;
-                case MIXSET:
-                    m->screen_mode |= SCREEN_MODE_MIXED;
-                    break;
-                case CLRPAGE2:
-                    if(m->store80set) {
-                        pages_map(&m->read_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x0400]);
-                        pages_map(&m->write_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x0400]);
-                        if(m->screen_mode & SCREEN_MODE_HIRES) {
+                break;
+            case 0xC010:
+                    if(m->clipboard_text) {
+                        viewapl2_feed_clipboard_key(m);
+                    } else {
+                        m->write_pages.pages[KBD / PAGE_SIZE].bytes[KBD % PAGE_SIZE] &= 0x7F;
+                    }
+                break;
+            case 0xC020:
+                break;
+            case 0xC030:
+                speaker_toggle(&m->speaker);
+                break;
+            case 0xC040:
+                // C040 strobe - don't know what that is
+                break;
+            case 0xC050:
+                switch (address) {
+                    case TXTCLR:
+                        m->screen_mode |= SCREEN_MODE_GRAPHICS;
+                        break;
+                    case TXTSET:
+                        m->screen_mode &= ~SCREEN_MODE_GRAPHICS;
+                        break;
+                    case MIXCLR:
+                        m->screen_mode &= ~SCREEN_MODE_MIXED;
+                        break;
+                    case MIXSET:
+                        m->screen_mode |= SCREEN_MODE_MIXED;
+                        break;
+                    case CLRPAGE2:
+                        if(m->store80set) {
+                            pages_map(&m->read_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x0400]);
+                            pages_map(&m->write_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x0400]);
+                            if(m->screen_mode & SCREEN_MODE_HIRES) {
+                                pages_map(&m->read_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
+                                pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
+                            }
+                        }
+                        m->page2set = 0;
+                        break;
+                    case SETPAGE2:
+                        if(m->store80set) {
+                            pages_map(&m->read_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x10400]);
+                            pages_map(&m->write_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x10400]);
+                            if(m->screen_mode & SCREEN_MODE_HIRES) {
+                                pages_map(&m->read_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
+                                pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
+                            }
+                        }
+                        m->page2set = 1;
+                        break;
+                    case CLRHIRES: // SQW - rename to CLRHIRES
+                        m->screen_mode &= ~SCREEN_MODE_HIRES;
+                        if(m->store80set) {
                             pages_map(&m->read_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
                             pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
                         }
-                    }
-                    m->page2set = 0;
-                    break;
-                case SETPAGE2:
-                    if(m->store80set) {
-                        pages_map(&m->read_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x10400]);
-                        pages_map(&m->write_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x10400]);
-                        if(m->screen_mode & SCREEN_MODE_HIRES) {
+                        break;
+                    case SETHIRES: // SQW - rename to SETHIRES
+                        m->screen_mode |= SCREEN_MODE_HIRES;
+                        if(m->store80set) {
                             pages_map(&m->read_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
                             pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
                         }
-                    }
-                    m->page2set = 1;
-                    break;
-                case CLRHIRES: // SQW - rename to CLRHIRES
-                    m->screen_mode &= ~SCREEN_MODE_HIRES;
-                    if(m->store80set) {
-                        pages_map(&m->read_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
-                        pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
-                    }
-                    break;
-                case SETHIRES: // SQW - rename to SETHIRES
-                    m->screen_mode |= SCREEN_MODE_HIRES;
-                    if(m->store80set) {
-                        pages_map(&m->read_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
-                        pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
-                    }
-                    break;
-                case CLRAN0: // SQW - hires or dhires if text off 
-                    break;
-                case SETAN0: // SQW
-                    break;
-                case CLRAN1: // SQW
-                    break;
-                case SETAN1: // SQW
-                    break;
-                case CLRAN2: // SQW
-                    break;
-                case SETAN2: // SQW
-                    break;
-                case CLRDHGR: // SQW - dhires on if IOUD is on
-                    break;
-                case SETDHGR: // SQW - dhires off if IOUD is on
-                    break;
-            }
-            break;
-        case 0xC060:
-            break;
-        case 0xC070: 
-            break;
-        case 0xC080:
-            ram_card(m, m->ramrdset, address, value);
-            break;
-        case 0xC090:
-        case 0xC0A0:
-        case 0xC0B0:
-        case 0xC0C0:
-        case 0xC0D0:
-        case 0xC0E0:
-        case 0xC0F0: {
-            int slot = (address >> 4) & 0x7;
-            switch(m->slot_cards[slot].slot_type) {
-                case SLOT_TYPE_DISKII: {
-                        uint8_t soft_switch = address & 0x0f;
-                        if(soft_switch <= IWM_PH3_ON) {
-                            diskii_step_head(m, slot, soft_switch);
-                            break;
-                        }
-                        switch(soft_switch) {
-                            case IWM_MOTOR_ON:
-                            case IWM_MOTOR_OFF:
-                                diskii_motor(m, slot, soft_switch);
-                                break;
-
-                            case IWM_SEL_DRIVE_1:
-                            case IWM_SEL_DRIVE_2:
-                                diskii_drive_select(m, slot, soft_switch);
-                                break;
-
-                            // SQW - Do these trigger with write?
-                            case IWM_Q6_OFF:
-                            case IWM_Q6_ON:
-                                diskii_q6_access(m, slot, soft_switch & 1);
-
-                            case IWM_Q7_OFF:
-                            case IWM_Q7_ON:
-                                diskii_q7_access(m, slot, soft_switch & 1);
-                        }
-                    }
-                    break;
-
-                    case SLOT_TYPE_SMARTPORT:
-                    switch(address & 0x0F) {
-                        case SP_DATA:
-                            m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_write_offset++] = value;
-                            return;
-
-                        case SP_STATUS:
-                            m->sp_device[slot].sp_read_offset = 0;
-                            m->sp_device[slot].sp_write_offset = 0;
-
-                            switch(m->sp_device[slot].sp_buffer[0]) {
-                                case 0:
-                                    sp_status(m, slot);
-                                    break;
-                                case 1:
-                                    sp_read(m, slot);
-                                    break;
-                                case 2:
-                                    sp_write(m, slot);
-                                    break;
-                            }
-                            m->sp_device[slot].sp_status = 0x80;
-                            return;
-                    }
-                    break;
-
-                case SLOT_TYPE_VIDEX_API:
-                    franklin_display_set(m, address, value);
-                    break;
+                        break;
+                    case CLRAN0: // SQW - hires or dhires if text off 
+                        break;
+                    case SETAN0: // SQW
+                        break;
+                    case CLRAN1: // SQW
+                        break;
+                    case SETAN1: // SQW
+                        break;
+                    case CLRAN2: // SQW
+                        break;
+                    case SETAN2: // SQW
+                        break;
+                    case CLRDHGR: // SQW - dhires on if IOUD is on
+                        break;
+                    case SETDHGR: // SQW - dhires off if IOUD is on
+                        break;
+                }
                 break;
+            case 0xC060:
+                break;
+            case 0xC070: 
+                break;
+            case 0xC080:
+                ram_card(m, m->ramrdset, address, value);
+                break;
+            case 0xC090:
+            case 0xC0A0:
+            case 0xC0B0:
+            case 0xC0C0:
+            case 0xC0D0:
+            case 0xC0E0:
+            case 0xC0F0: {
+                int slot = (address >> 4) & 0x7;
+                switch(m->slot_cards[slot].slot_type) {
+                    case SLOT_TYPE_DISKII: {
+                            uint8_t soft_switch = address & 0x0f;
+                            if(soft_switch <= IWM_PH3_ON) {
+                                diskii_step_head(m, slot, soft_switch);
+                                break;
+                            }
+                            switch(soft_switch) {
+                                case IWM_MOTOR_ON:
+                                case IWM_MOTOR_OFF:
+                                    diskii_motor(m, slot, soft_switch);
+                                    break;
+
+                                case IWM_SEL_DRIVE_1:
+                                case IWM_SEL_DRIVE_2:
+                                    diskii_drive_select(m, slot, soft_switch);
+                                    break;
+
+                                // SQW - Do these trigger with write?
+                                case IWM_Q6_OFF:
+                                case IWM_Q6_ON:
+                                    diskii_q6_access(m, slot, soft_switch & 1);
+
+                                case IWM_Q7_OFF:
+                                case IWM_Q7_ON:
+                                    diskii_q7_access(m, slot, soft_switch & 1);
+                            }
+                        }
+                        break;
+
+                        case SLOT_TYPE_SMARTPORT:
+                        switch(address & 0x0F) {
+                            case SP_DATA:
+                                if(m->sp_device[slot].sp_write_offset == sizeof(m->sp_device[slot].sp_buffer)) {
+                                    m->sp_device[slot].sp_write_offset = 0;
+                                }
+                                m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_write_offset++] = value;
+                                return;
+
+                            case SP_STATUS:
+                                m->sp_device[slot].sp_read_offset = 0;
+                                m->sp_device[slot].sp_write_offset = 0;
+
+                                switch(m->sp_device[slot].sp_buffer[0]) {
+                                    case 0:
+                                        sp_status(m, slot);
+                                        break;
+                                    case 1:
+                                        sp_read(m, slot);
+                                        break;
+                                    case 2:
+                                        sp_write(m, slot);
+                                        break;
+                                }
+                                m->sp_device[slot].sp_status = 0x80;
+                                return;
+                        }
+                        break;
+
+                    case SLOT_TYPE_VIDEX_API:
+                        franklin_display_set(m, address, value);
+                        break;
+                    break;
+                }
             }
         }
     }

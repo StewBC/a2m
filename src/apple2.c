@@ -48,20 +48,27 @@ int apple2_configure(APPLE2 *m) {
         }
     }
     m->turbo_active = m->turbo[m->turbo_index];
+
     // Allocate the RAM
     m->RAM_MAIN = (uint8_t *) malloc(m->ram_size);
-    // SQW made the RAM test pass but no longer...
-    memset(&m->RAM_MAIN[0x0000], 0xFF, m->model ? 0x20000 : 0x10000);
-    // SQW Something weird that this is needed...
-    memset(&m->RAM_MAIN[0xC000], 0x55, 0x01000);
-    if(m->model) {
-        memset(&m->RAM_MAIN[0x1C000], 0x55, 0x01000);
-    }
-
+    // Allocate the WATCH RAM (for breakpoints and IO callbacks)
     m->RAM_WATCH = (uint8_t *) malloc(m->ram_size);
     if(!m->RAM_MAIN || !m->RAM_WATCH) {
         return A2_ERR;
     }
+
+    // Zero page seems to come up with a lot of 255's
+    memset(&m->RAM_MAIN[0x0000], 0xFF, 0x10000);
+    // And IO area floating bus is a lot of 160's
+    memset(&m->RAM_MAIN[0xC001], 0xA0, 0x1000);
+    m->RAM_MAIN[0xC000] = 0;
+    if(m->model) {
+        // Same in AUX ram for zp & IO?
+        memset(&m->RAM_MAIN[0x10000], 0xFF, 0x100);
+        memset(&m->RAM_MAIN[0x1C001], 0xA0, 0x1000);
+        m->RAM_MAIN[0x1C000] = 0x0d;
+    }
+
     // INIT the ram_card
     if(A2_OK != ram_card_init(&m->ram_card[0])) {
         return A2_ERR;
@@ -69,6 +76,7 @@ int apple2_configure(APPLE2 *m) {
     if(A2_OK != ram_card_init(&m->ram_card[1])) {
         return A2_ERR;
     }
+
     // RAM
     if(!memory_init(&m->ram, m->model ? 2 : 1)) {
         return A2_ERR;
@@ -105,32 +113,28 @@ int apple2_configure(APPLE2 *m) {
     if(!pages_init(&m->watch_pages, BANK_SIZE / PAGE_SIZE)) {
         return A2_ERR;
     }
+
     // Map main write ram
     pages_map(&m->write_pages, 0, BANK_SIZE / PAGE_SIZE, m->ram.blocks[MAIN_RAM].bytes);
-
     // Map read ram (same as write ram in this case)
     pages_map(&m->read_pages, 0, BANK_SIZE / PAGE_SIZE, m->ram.blocks[MAIN_RAM].bytes);
-
     // Map the rom ($D000-$FFFF) as read pages
     pages_map_memory_block(&m->read_pages, &m->roms.blocks[ROM_APPLE2]);
-    if(m->model) {
-        // On a //e start with the C800 area also as ROM - SQW Is this correct?
-        pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, (0xD000 - 0xC800) / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x700]);
-    }
 
     // Install the watch callbacks
     m->callback_write = apple2_softswitch_write_callback;
     m->callback_read = apple2_softswitch_read_callback;
     m->callback_breakpoint = breakpoint_callback;
-
     // Map watch area checks - start with no watch
-    memset(m->RAM_WATCH, 0, BANK_SIZE);
-
+    memset(m->RAM_WATCH, WATCH_NONE, BANK_SIZE);
     // Add the IO ports by flagging them as 1 in the RAM watch
-    memset(m->RAM_WATCH + 0xC000, 1, 0xFF);
+    memset(&m->RAM_WATCH[0xC000], WATCH_IO_PORT, 0xFF);
+    if(m->model) {
+        // On a //e, also watch Slot 3
+        memset(&m->RAM_WATCH[0xC300], WATCH_IO_PORT, 0xFF);
+    }
     // Watch the location to clear slot rom
-    m->RAM_WATCH[CLRROM] = 1;
-
+    m->RAM_WATCH[CLRROM] = WATCH_IO_PORT;
     // Set up the Watch Pages (RAM_WATCH can be changed without re-doing the map)
     pages_map(&m->watch_pages, 0, BANK_SIZE / PAGE_SIZE, m->RAM_WATCH);
 
@@ -226,7 +230,10 @@ void apple2_machine_setup(APPLE2 *m) {
 
 void apple2_slot_setup(APPLE2 *m) {
     INI_SECTION *s;
-    int slot_number = -1;
+    int slot_number = 0;
+    
+    // No slot mapped in C800 range to start
+    m->mapped_slot = 0;
 
     s = ini_find_section(&m->ini_store, "diskii");
     if(s) {
@@ -242,7 +249,7 @@ void apple2_slot_setup(APPLE2 *m) {
                     m->diskii_controller[slot_number].diskii_drive[0].quarter_track_pos = rand() % DISKII_QUATERTRACKS;
                     m->diskii_controller[slot_number].diskii_drive[1].quarter_track_pos = rand() % DISKII_QUATERTRACKS;
                 }
-            } else if(slot_number >= 0 && slot_number < 8) {
+            } else if(slot_number >= 1 && slot_number < 8) {
                 if(0 == stricmp(key, "disk0")) {
                     diskii_mount(m, slot_number, 0, val);
                 } else if(0 == stricmp(key, "disk1")) {
@@ -264,7 +271,7 @@ void apple2_slot_setup(APPLE2 *m) {
                     slot_add_card(m, slot_number, SLOT_TYPE_SMARTPORT, &m->sp_device[slot_number],
                                   &m->roms.blocks[ROM_SMARTPORT].bytes[slot_number * 0x100], NULL);
                 }
-            } else if(slot_number >= 0 && slot_number < 8) {
+            } else if(slot_number >= 1 && slot_number < 8) {
                 if(0 == stricmp(key, "disk0")) {
                     sp_mount(m, slot_number, 0, val);
                 } else if(0 == stricmp(key, "disk1")) {

@@ -62,7 +62,7 @@ static inline uint8_t apple2_softswitch_read_callback_IIplus(APPLE2 *m, uint16_t
         // IO Select
         int slot = (address >> 8) & 0x7;
         // Only if slot isn't mapped, and only if ROM isn't active
-        if(m->mapped_slot != slot && !(m->cxromset || (slot == 3 && m->c3romset))) {
+        if(m->mapped_slot != slot && !(m->cxromset || (slot == 3 && m->c3slotrom))) {
             // Map the C800 ROM based on access to Cs00, if card provides a C800 ROM
             if(!m->slot_cards[slot].cx_rom_mapped && m->slot_cards[slot].slot_map_cx_rom) {
                 m->slot_cards[slot].slot_map_cx_rom(m, address);
@@ -71,7 +71,7 @@ static inline uint8_t apple2_softswitch_read_callback_IIplus(APPLE2 *m, uint16_t
             m->mapped_slot = slot;
         }
     } else if(address == CLRROM) {
-        m->mapped_slot = -1;
+        m->mapped_slot = 0;
         for(int i = 1; i < 8; i++) {
             m->slot_cards[i].cx_rom_mapped = 0;
         }
@@ -302,7 +302,7 @@ static inline void apple2_softswitch_write_callback_IIplus(APPLE2 *m, uint16_t a
             m->mapped_slot = slot;
         }
     } else if(address == CLRROM) {
-        m->mapped_slot = -1;
+        m->mapped_slot = 0;
         for(int i = 1; i < 8; i++) {
             m->slot_cards[i].cx_rom_mapped = 0;
         }
