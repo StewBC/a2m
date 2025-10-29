@@ -104,7 +104,6 @@ typedef struct APPLE2 {
     uint32_t disk_activity_read: 1;                         // 0 = no read/write (here for convenience)
     uint32_t disk_activity_write: 1;                        // 0 = no read/write
     uint32_t franklin80active: 1;                           // Videx/Franklin Ace Display active
-    uint32_t ioudclr :1;                                    // reverse of normal - ioudclr = 1, ioudset = 0
     uint32_t model: 1;                                      // (0) II+ or (1) //e
     uint32_t original_del: 1;                               // backspace key does crsr left if 0
     uint32_t page2set: 1;                                   // 1 = 0x0800 text or 0x4000 HGR

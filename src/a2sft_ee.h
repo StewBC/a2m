@@ -14,7 +14,7 @@ static void slot_io(APPLE2 *m, uint16_t address) {
     } else if(!m->strobed && !m->cxromset && m->slot_cards[slot].slot_map_cx_rom) {
         // If nothing is strobed, and the rom is not active and the card has rom, map the rom
         m->slot_cards[slot].slot_map_cx_rom(m, address);
-        m->mapped_slot = slot;
+        m->mapped_slot = slot;  
         m->strobed = 1;
     }
 }
@@ -83,15 +83,18 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                         byte |= m->store80set << 7;
                         break;
                     case RDVBL: {     //e
-                            // SQW is that what this VBL is about?
-                            // Assume a frame (scanline to scanline) is 17030 cycles
-                            // something lke 40 + 25 = 65 for a horizontal line
-                            // and 65 * 262 = 17030; 262 = 525 NTSC / 2 (interlaced)
-                            byte |= (m->cpu.cycles % 17030); // 17063 if 262.5 is used
+                                // CYCLES_PER_LINE  = 65,
+                                // LINES_PER_FRAME  = 262,
+                                // CYCLES_PER_FRAME = CYCLES_PER_LINE * LINES_PER_FRAME,  // 17030
+                                // VBL_LINES        = 21,                                 // ~NTSC VBI
+                                // VBL_CYCLES       = VBL_LINES * CYCLES_PER_LINE,        // 1365
+                                // VBL_START_CYCLE  = CYCLES_PER_FRAME - VBL_CYCLES       // 15665                            
+                                byte |= (m->cpu.cycles % 17030) >= 15665 ? 0x80 : 0;
                         }
                         break;
                     case RDTEXT:      //e
                         byte |= (m->screen_mode & SCREEN_MODE_GRAPHICS) ? 0 : 128;
+                        break;
                     case RDMIXED:     //e
                         byte |= (m->screen_mode & SCREEN_MODE_MIXED) ? 128 : 0;
                         break;
@@ -99,7 +102,7 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                         byte |= m->page2set << 7;
                         break;
                     case RDHIRES:     //e
-                        byte |= (m->screen_mode & SCREEN_MODE_GRAPHICS) ? 128 : 0;
+                        byte |= (m->screen_mode & SCREEN_MODE_HIRES) ? 128 : 0;
                         break;
                     case RDALTCHAR:   //e
                         byte |= m->altcharset << 7;
@@ -119,14 +122,9 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                 // C040 strobe - don't know what that is
                 break;
             case 0xC050:
-                if (!m->ioudclr && address & 0x0008) {
-                    // if ioudclr == 1, ie ioud not set (0 == set)
-                    // Enable IOU access to 0xC058-0xC05F
-                    break;
-                }
                 switch (address) {
                     case TXTCLR:
-                        m->screen_mode |= SCREEN_MODE_GRAPHICS;
+                         m->screen_mode |= SCREEN_MODE_GRAPHICS;
                         break;
                     case TXTSET:
                         m->screen_mode &= ~SCREEN_MODE_GRAPHICS;
@@ -174,20 +172,17 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                         }
                         break;
                     case CLRAN0: // SQW - hires or dhires if text off 
-                        break;
                     case SETAN0: // SQW
-                        break;
                     case CLRAN1: // SQW
-                        break;
                     case SETAN1: // SQW
-                        break;
                     case CLRAN2: // SQW
-                        break;
                     case SETAN2: // SQW
                         break;
-                    case CLRDHGR: // SQW - dhires on if IOUD is on
+                    case CLRAN3: // SQW - dhires on if IOUD is on
+                        m->screen_mode |= SCREEN_MODE_DOUBLE;
                         break;
-                    case SETDHGR: // SQW - dhires off if IOUD is on
+                    case SETAN3: // SQW - dhires off if IOUD is on
+                        m->screen_mode &= ~SCREEN_MODE_DOUBLE;
                         break;
                 }
                 break;
@@ -287,15 +282,7 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                     if(v && v->num_controllers) {
                         v->ptrig_cycle = m->cpu.cycles;
                     }
-                    // Should also reset the VBL interrup flag...
-                    switch(address) {
-                        case RDWCLRIOUD: // e
-                            byte |= 0; // m->ioudclr << 7; // Notice 0 == ON
-                            break;
-                        case RDHGR_WSETIOUD: // e
-                            byte |= 0; // m->dhiresclr << 7; // Notice 0 == ON
-                            break;
-                    }
+                    // // Should also reset the VBL interrup flag...
                 }
                 break;
             case 0xC080:
@@ -384,10 +371,14 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                 switch(address) {
                     case CLR80STORE:
                         m->store80set = 0;
-                        pages_map(&m->read_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x0400]);
-                        pages_map(&m->read_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
-                        pages_map(&m->write_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x0400]);
-                        pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
+                        if(!m->ramrdset) {
+                            pages_map(&m->read_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x0400]);
+                            pages_map(&m->read_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
+                            pages_map(&m->write_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x0400]);
+                            pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
+                        } else {
+                            pages_map(&m->read_pages, 0x0200 / PAGE_SIZE, 0xBE00 / PAGE_SIZE, &m->RAM_MAIN[0x0200]);
+                        }
                         break;
                     case SET80STORE:  //e
                         m->store80set = 1;
@@ -396,6 +387,11 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                             pages_map(&m->read_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
                             pages_map(&m->write_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x10400]);
                             pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
+                        } else {
+                            pages_map(&m->read_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x0400]);
+                            pages_map(&m->read_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
+                            pages_map(&m->write_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x0400]);
+                            pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
                         }
                         break;
                     case CLRRAMRD: //e
@@ -404,7 +400,7 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                             pages_map(&m->read_pages, 0x0200 / PAGE_SIZE, 0x0200 / PAGE_SIZE, &m->RAM_MAIN[0x0200]);
                             if(m->screen_mode & SCREEN_MODE_HIRES) {
                                 pages_map(&m->read_pages, 0x0800 / PAGE_SIZE, 0x1800 / PAGE_SIZE, &m->RAM_MAIN[0x0800]);
-                                pages_map(&m->read_pages, 0x4000 / PAGE_SIZE, 0x8000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
+                                pages_map(&m->read_pages, 0x4000 / PAGE_SIZE, 0x8000 / PAGE_SIZE, &m->RAM_MAIN[0x4000]);
                             } else {
                                 pages_map(&m->read_pages, 0x0800 / PAGE_SIZE, 0xB800 / PAGE_SIZE, &m->RAM_MAIN[0x0200]);
                             }
@@ -418,7 +414,7 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                             pages_map(&m->read_pages, 0x0200 / PAGE_SIZE, 0x0200 / PAGE_SIZE, &m->RAM_MAIN[0x10200]);
                             if(m->screen_mode & SCREEN_MODE_HIRES) {
                                 pages_map(&m->read_pages, 0x0800 / PAGE_SIZE, 0x1800 / PAGE_SIZE, &m->RAM_MAIN[0x10800]);
-                                pages_map(&m->read_pages, 0x4000 / PAGE_SIZE, 0x8000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
+                                pages_map(&m->read_pages, 0x4000 / PAGE_SIZE, 0x8000 / PAGE_SIZE, &m->RAM_MAIN[0x14000]);
                             } else {
                                 pages_map(&m->read_pages, 0x0800 / PAGE_SIZE, 0xB800 / PAGE_SIZE, &m->RAM_MAIN[0x10200]);
                             }
@@ -529,7 +525,7 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                 speaker_toggle(&m->speaker);
                 break;
             case 0xC040:
-                // C040 strobe - don't know what that is
+                // GCStrobe - Ignore
                 break;
             case 0xC050:
                 switch (address) {
@@ -567,14 +563,14 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                         }
                         m->page2set = 1;
                         break;
-                    case CLRHIRES: // SQW - rename to CLRHIRES
+                    case CLRHIRES:
                         m->screen_mode &= ~SCREEN_MODE_HIRES;
                         if(m->store80set) {
                             pages_map(&m->read_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
                             pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
                         }
                         break;
-                    case SETHIRES: // SQW - rename to SETHIRES
+                    case SETHIRES:
                         m->screen_mode |= SCREEN_MODE_HIRES;
                         if(m->store80set) {
                             pages_map(&m->read_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
@@ -582,26 +578,27 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                         }
                         break;
                     case CLRAN0: // SQW - hires or dhires if text off 
-                        break;
                     case SETAN0: // SQW
-                        break;
                     case CLRAN1: // SQW
-                        break;
                     case SETAN1: // SQW
-                        break;
                     case CLRAN2: // SQW
-                        break;
                     case SETAN2: // SQW
                         break;
-                    case CLRDHGR: // SQW - dhires on if IOUD is on
+                    case CLRAN3: // SQW - dhires on if IOUD is on
+                        m->screen_mode |= SCREEN_MODE_DOUBLE;
                         break;
-                    case SETDHGR: // SQW - dhires off if IOUD is on
+                    case SETAN3: // SQW - dhires off if IOUD is on
+                        m->screen_mode &= ~SCREEN_MODE_DOUBLE;
                         break;
                 }
                 break;
             case 0xC060:
                 break;
             case 0xC070: 
+                VIEWPORT *v = m->viewport;
+                if(v && v->num_controllers) {
+                    v->ptrig_cycle = m->cpu.cycles;
+                }
                 break;
             case 0xC080:
                 ram_card(m, m->ramrdset, address, value);

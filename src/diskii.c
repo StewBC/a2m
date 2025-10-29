@@ -4,6 +4,9 @@
 
 #include "header.h"
 
+// SQW
+// cycles_per_byte = (CPU_FREQUENCY * 60 / target_RPM) / track_bytes
+
 #define ms_to_cycles(x) (((x) * (uint64_t)CPU_FREQUENCY) / 1000)
 #define us_to_cycles(x) (((x) * (uint64_t)CPU_FREQUENCY) / 1000000)
 #define count_phases(x) ((x & 1) + ((x >> 1) & 1) + ((x >> 2) & 1) + ((x >> 3) & 1))

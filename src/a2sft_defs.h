@@ -50,12 +50,12 @@
 #define SETHIRES        0xC057 // Enable Hires graphics (Disable Lores)
 #define CLRAN0          0xC058
 #define SETAN0          0xC059
-#define CLRAN1          0xC05A // Disable VBL
-#define SETAN1          0xC05B // Enable VBL
+#define CLRAN1          0xC05A // Disable VBL?
+#define SETAN1          0xC05B // Enable VBL?
 #define CLRAN2          0xC05C
 #define SETAN2          0xC05D
-#define CLRDHGR         0xC05E // Enable double-width graphics
-#define SETDHGR         0xC05F // Disable double-width graphics
+#define CLRAN3          0xC05E // Enable double-width graphics (clr single gr)
+#define SETAN3          0xC05F // Disable double-width graphics (set single gr)
 #define TAPEIN          0xC060 // Read casette input / Switch input 3
 #define BUTN0           0xC061 // Open-Apple key
 #define BUTN1           0xC062 // Closed-Apple key
@@ -65,8 +65,8 @@
 #define PADDL2          0xC066
 #define PADDL3          0xC067
 #define PTRIG           0xC070
-#define RDWCLRIOUD      0xC07E // Read = IOUD state, Write = Disable IOU
-#define RDHGR_WSETIOUD  0xC07F // Read = DHGR, Write = Enable IOU
+#define RDWCLRIOUD      0xC07E // Read = IOUD state, Write = Disable IOU - //c only, I think
+#define RDHGR_WSETIOUD  0xC07F // Read = DHGR, Write = Enable IOU - //c only, I think
 #define ROMIN           0xC081 // Swap in D000-FFFF ROM
 #define LCBANK2         0xC083 // Swap in LC bank 2
 #define LCBANK1         0xC08B // Swap in LC bank 1

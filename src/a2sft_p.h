@@ -206,17 +206,8 @@ static inline uint8_t apple2_softswitch_read_callback_IIplus(APPLE2 *m, uint16_t
                 if(v && v->num_controllers) {
                     v->ptrig_cycle = m->cpu.cycles;
                 }
-                // Should also reset the VBL interrup flag...
-                    switch(address) {
-                        case RDWCLRIOUD: // e
-                            byte |= 0; // m->ioudclr << 7; // Notice 0 == ON
-                            break;
-                        case RDHGR_WSETIOUD: // e
-                            byte |= 0; // m->dhiresclr << 7; // Notice 0 == ON
-                            break;
-                    }
-                }
-                break;
+            }
+            break;
         }
     }
     return byte;

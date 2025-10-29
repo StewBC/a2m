@@ -74,22 +74,41 @@ mRGB palette[16] = {
 
 mRGB lores_palette[16] = {
     { 0x00, 0x00, 0x00 },                                   // Black
-    { 0x9D, 0x09, 0x66 },                                   // Red
+    { 0x9D, 0x09, 0x66 },                                   // Violet
     { 0x2A, 0x2A, 0xE5 },                                   // Dark blue
-    { 0xC7, 0x34, 0xFF },                                   // Purple
+    { 0xC7, 0x34, 0xFF },                                   // Purple/Magenta
     { 0x00, 0x80, 0x00 },                                   // Dark green
-    { 0x80, 0x80, 0x80 },                                   // Gray
-    { 0x0D, 0xA1, 0xFF },                                   // Blue-cyan
-    { 0xAA, 0xAA, 0xFF },                                   // Light blue
+    { 0x80, 0x80, 0x80 },                                   // Gray1
+    { 0x0D, 0xA1, 0xFF },                                   // Light Blue
+    { 0xAA, 0xAA, 0xFF },                                   // Meduim blue
     { 0x55, 0x55, 0x00 },                                   // Brown
     { 0xF2, 0x5E, 0x00 },                                   // Orange
-    { 0xC0, 0xC0, 0xC0 },                                   // Gray
+    { 0xC0, 0xC0, 0xC0 },                                   // Gray2
     { 0xFF, 0x89, 0xE5 },                                   // Pink
-    { 0x38, 0xCB, 0x00 },                                   // Bright green
+    { 0x38, 0xCB, 0x00 },                                   // Green
     { 0xD5, 0xD5, 0x1A },                                   // Yellow
-    { 0x62, 0xF6, 0x99 },                                   // Cyan
+    { 0x62, 0xF6, 0x99 },                                   // Aqua (Cyan)
     { 0xFF, 0xFF, 0xFF },                                   // White
 };
+
+// mRGB dhgr_palette[16] = {
+//     { 0x00, 0x00, 0x00 },                                   // Black
+//     { 0xC7, 0x34, 0xFF },                                   // Magenta
+//     { 0x55, 0x55, 0x00 },                                   // Brown
+//     { 0xF2, 0x5E, 0x00 },                                   // Orange
+//     { 0x00, 0x80, 0x00 },                                   // Dark Green
+//     { 0x80, 0x80, 0x80 },                                   // Grey1
+//     { 0x38, 0xCB, 0x00 },                                   // Green
+//     { 0xD5, 0xD5, 0x1A },                                   // Yellow
+//     { 0x2A, 0x2A, 0xE5 },                                   // Dark Blue
+//     { 0x9D, 0x09, 0x66 },                                   // Violet
+//     { 0xC0, 0xC0, 0xC0 },                                   // Grey2
+//     { 0xFF, 0x89, 0xE5 },                                   // Pink
+//     { 0xAA, 0xAA, 0xFF },                                   // Medium Blue
+//     { 0x0D, 0xA1, 0xFF },                                   // Light Blue
+//     { 0x62, 0xF6, 0x99 },                                   // Aqua (Cyan)
+//     { 0xFF, 0xFF, 0xFF }                                    // White
+// };
 
 mRGB lores_palette_mono[16] = {
     { 0x00, 0x00, 0x00 },
@@ -136,6 +155,35 @@ static uint32_t gr_mono_lut[16];
 // A character width line of pixels for lores
 static uint32_t gr_line[16][7];
 static uint32_t gr_mono_line[16][7];
+
+static const uint8_t rev4_lut[16] = {
+    0x0, 0x8, 0x4, 0xC,
+    0x2, 0xA, 0x6, 0xE,
+    0x1, 0x9, 0x5, 0xD,
+    0x3, 0xB, 0x7, 0xF
+};
+
+// I just recenly learnt that (for modern compilers) small memcpy's turn into better,
+// safer, code than a cast assign
+static inline uint32_t load_u32_unaligned(const void *p) {
+    uint32_t v; memcpy(&v, p, sizeof v); return v;
+}
+
+static inline uint16_t load_u16_unaligned(const void *p) {
+    uint16_t v; memcpy(&v, p, sizeof v); return v;
+}
+
+static inline uint32_t clamp8i(int v) {
+    if(v < 0) {
+        return 0;
+    }
+
+    if(v > 255){
+        return 255;
+    }
+
+    return v; 
+}
 
 // Put the next clipboard character into the KBD
 void viewapl2_feed_clipboard_key(APPLE2 *m) {
@@ -353,9 +401,13 @@ void viewapl2_process_event(APPLE2 *m, SDL_Event *e) {
 // Select which screen to display based on what mode is active
 void viewapl2_screen_apple2(APPLE2 *m) {
     // SQW - Path diverts here between ][+ an //e - if 80 cols active
-    switch(m->viewport->shadow_screen_mode) {
+    switch(m->viewport->shadow_screen_mode & 0b111) {
         case 0b001:                                             // lores
-            viewapl2_screen_lores(m, 0, 24);
+            if(m->viewport->shadow_screen_mode & SCREEN_MODE_DOUBLE) {
+                viewapl2_screen_dlores(m, 0, 24);
+            } else {
+                viewapl2_screen_lores(m, 0, 24);
+            }
             break;
 
         case 0b011:                                             // mixed lores
@@ -364,7 +416,11 @@ void viewapl2_screen_apple2(APPLE2 *m) {
             break;
 
         case 0b101:                                             // hgr graphics
-            viewapl2_screen_hgr(m, 0, 192);
+            if(m->viewport->shadow_screen_mode & SCREEN_MODE_DOUBLE) {
+                viewapl2_screen_dhgr(m, 0, 192);
+            } else {
+                viewapl2_screen_hgr(m, 0, 192);
+            }
             break;
 
         case 0b111:                                             // hgr, mixed graphics
@@ -385,6 +441,46 @@ void viewapl2_screen_apple2(APPLE2 *m) {
                 viewapl2_screen_txt40(m, 0, 24);
             }
             break;
+    }
+}
+
+void viewapl2_screen_dlores(APPLE2 *m, int start, int end) {
+    if(m->monitor_type) {
+        // SQW
+        viewapl2_screen_hgr_mono(m, start, end);
+        return;
+    }
+
+    int y;
+    SDL_Surface *surface = m->viewport->surface_wide;
+    uint32_t *pixels = (uint32_t *) surface->pixels;
+    uint16_t page = m->viewport->shadow_page2set ? 0x4000 : 0x2000;
+    int surface_width = surface->w;
+
+    for(y = start; y < end; y++) {
+        uint32_t *p = &pixels[y * surface_width];
+        const uint8_t *man = m->RAM_MAIN + page + txt_row_start[y];
+        const uint8_t *aux = man + 0x10000;
+
+        for(int col = 0; col < 80; col++) {
+            int r;
+            uint8_t index = col >> 1;
+            uint8_t character = (col & 1) ? aux[index] : man[index];
+            uint8_t upper = character & 0x0f;
+            uint8_t lower = (character >> 4) & 0X0F;
+
+            // SQW The colors are not right - I am getting brown for purple, etc.
+            uint32_t *pr = p;
+            for(r = 0; r < 4; r++) {
+                memcpy(pr, gr_line[upper], sizeof(gr_line[upper]));
+                pr += surface->w;
+            }
+            for(r = 0; r < 4; r++) {
+                memcpy(pr, gr_line[lower], sizeof(gr_line[lower]));
+                pr += surface->w;
+            }
+            p += 7;
+        }
     }
 }
 
@@ -461,7 +557,138 @@ void viewapl2_screen_lores_mono(APPLE2 *m, int start, int end) {
     }
 }
 
-// Display the hires screen
+// Display the diuble hires screen
+void viewapl2_screen_dhgr(APPLE2 *m, int start, int end) {
+    if(m->monitor_type) {
+        // SQW
+        viewapl2_screen_hgr_mono(m, start, end);
+        return;
+    }
+
+    int y;
+    SDL_Surface *surface = m->viewport->surface_wide;
+    uint32_t *pixels = (uint32_t *) surface->pixels;
+    uint16_t page = m->viewport->shadow_page2set ? 0x4000 : 0x2000;
+    int surface_width = surface->w;
+    SDL_PixelFormat *format = m->viewport->surface->format; // (unused here but keeping your locals)
+
+    for(y = start; y < end; y++) {
+        uint32_t *p = &pixels[y * surface_width];
+        uint32_t px = 0;
+        uint16_t address = page + hgr_row_start[y];
+        const uint8_t *aux = m->RAM_MAIN + page + hgr_row_start[y] + 0x10000;  // b0,b2,b4 live here
+        const uint8_t *man = m->RAM_MAIN + page + hgr_row_start[y];            // b1,b3 live here
+        uint8_t bits[34];
+        bits[0] = bits[1] = 0;
+
+        for(int col = 0; col < 40; col += 2) {
+            // Pull 3 aux bytes (b0,b2,b4) and 2 main bytes (b1,b3) at once, clear bit7 in bulk.
+            uint32_t A = load_u32_unaligned(aux + col) & 0x7F7F7F7Fu; // b0=A0, b2=A1, b4=A2, (A3 unused)
+            uint16_t B = load_u16_unaligned(man + col) & 0x7F7Fu;     // b1=B0, b3=B1
+
+            uint8_t b0 = (uint8_t)(A      );
+            uint8_t b1 = (uint8_t)(B      );
+            uint8_t b2 = (uint8_t)(A >>  8);
+            uint8_t b3 = (uint8_t)(B >>  8);
+            uint8_t b4 = (col < 38) ? (uint8_t)(A >> 16) : 0;
+
+            // Make nibbles with bits in display order (from apple order)
+            uint8_t t0 = rev4_lut[ (b0     ) & 0x0F];                           // [4,5,6,7]->[7,6,5,4]
+            uint8_t t1 = rev4_lut[ (b0 >> 4) | ((b1 & 0x1) << 3)];              // [e,1,2,3]->[3,2,1,e]
+            uint8_t t2 = rev4_lut[ (b1 >> 1) & 0x0F];                           // [a,b,c,d]->[d,c,b,a]
+            uint8_t t3 = rev4_lut[((b1 >> 5) & 0x03) | ((b2 & 0x3) << 2)];      // [k,l,8,9]->[9,8,l,k]
+            uint8_t t4 = rev4_lut[ (b2 >> 2) & 0x0F];                           // [g,h,i,j]->[j,i,h,g]
+            uint8_t t5 = rev4_lut[ (b2 >> 6) | ((b3 & 0x7) << 1)];              // [q,r,s,f]->[f,s,r,q]
+            uint8_t t6 = rev4_lut[ (b3 >> 3)       ];                           // [m,n,o,p]->[p,o,n,m]
+            uint8_t t7 = rev4_lut[ (b4     ) & 0x0F];
+
+            uint32_t stream = t0 << 28 | t1 << 24 | t2 << 20 | t3 << 16 | t4 << 12 | t5 << 8 | t6 << 4 | t7;
+
+            // expand stream to bits [2..33] so 0,1 can be assigned from 32/31 for continuity
+            for (int i = 31; i >= 0; i--) {
+                bits[33-i] = (stream >> i) & 1;
+            }
+
+            // Tunables:
+            const int phase0  = 1; // flip 0/1 if whole image hue is inverted
+            const int phase90 = 2; // shift 0..3 to rotate hue
+            const int kY = 36;     // brightness gain
+            const int kI = 13;     // saturation (I axis)
+            const int kQ = 18;     // saturation (Q axis)
+            const int dead = 2;    // chroma deadzone to keep near-grays neutral
+
+            for (int x = 2; x < 30; ++x) {
+                int x2l = x-2;
+                int x1l = x-1;
+                int x1r = x+1;
+                int x2r = x+2;
+
+                // Luma 5-tap [1,2,3,2,1]
+                int by2l = bits[x2l];
+                int by1l = bits[x1l];
+                int by0  = bits[x];
+                int by1r = bits[x1r];
+                int by2r = bits[x2r];
+                int ytap = by2l + 2*by1l + 3*by0 + 2*by1r + by2r;
+
+                // Map 0/1 -> -1/+1
+                int s2l = by2l ? +1 : -1;
+                int s1l = by1l ? +1 : -1;
+                int s0  = by0  ? +1 : -1;
+                int s1r = by1r ? +1 : -1;
+                int s2r = by2r ? +1 : -1;
+
+                // Reference axes:
+                // I-like (0 deg): period-2 (+1,-1,+1,...)  => ((x+phase0)&1) ? -1 : +1
+                int r2l0 = (((x2l + phase0) & 1) ? -1 : +1);
+                int r1l0 = (((x1l + phase0) & 1) ? -1 : +1);
+                int r00  = (((x   + phase0) & 1) ? -1 : +1);
+                int r1r0 = (((x1r + phase0) & 1) ? -1 : +1);
+                int r2r0 = (((x2r + phase0) & 1) ? -1 : +1);
+
+                // Q-like (90 dec): period-4 (+1,0,-1,0,...)  => ((x+phase90)&3)
+                int t2l = (x2l + phase90) & 3;
+                int t1l = (x1l + phase90) & 3;
+                int t0  = (x   + phase90) & 3;
+                int t1r2= (x1r + phase90) & 3;
+                int t2r2= (x2r + phase90) & 3;
+                int r2lQ = (t2l==0)?+1: (t2l==2)?-1: 0;
+                int r1lQ = (t1l==0)?+1: (t1l==2)?-1: 0;
+                int r0Q  = (t0 ==0)?+1: (t0 ==2)?-1: 0;
+                int r1rQ = (t1r2==0)?+1: (t1r2==2)?-1: 0;
+                int r2rQ = (t2r2==0)?+1: (t2r2==2)?-1: 0;
+
+                // Weighted sums (same 5-tap weights)
+                int Iraw = s2l*r2l0 + 2*(s1l*r1l0) + 3*(s0*r00) + 2*(s1r*r1r0) + (s2r*r2r0);
+                int Qraw = s2l*r2lQ + 2*(s1l*r1lQ) + 3*(s0*r0Q) + 2*(s1r*r1rQ) + (s2r*r2rQ);
+
+                // Deadzone: keep near-gray neutral
+                int amag = (Iraw < 0 ? -Iraw : Iraw) + (Qraw < 0 ? -Qraw : Qraw);
+                if (amag <= dead) { Iraw = 0; Qraw = 0; }
+
+                // Scale to 8-bit-ish domain
+                int Y = kY * ytap;         // 0..(9*kY)
+                int I = kI * Iraw;
+                int Q = kQ * Qraw;
+
+                // YIQ -> RGB (coeffs scaled by 256)
+                // R = Y + 0.956I + 0.621Q
+                // G = Y - 0.272I - 0.647Q
+                // B = Y - 1.106I + 1.703Q
+                uint8_t R = clamp8i(Y + ((245*I + 159*Q) >> 8));
+                uint8_t G = clamp8i(Y - (( 70*I + 166*Q) >> 8));
+                uint8_t B = clamp8i(Y - ((283*I - 436*Q) >> 8));
+
+                *p++ = SDL_MapRGB(format, R, G, B);
+            }
+            // carry over last two samples for continuity
+            bits[0] = bits[30];
+            bits[1] = bits[31];
+        }
+    }
+}
+
+
 void viewapl2_screen_hgr(APPLE2 *m, int start, int end) {
     if(m->monitor_type) {
         viewapl2_screen_hgr_mono(m, start, end);
@@ -480,8 +707,8 @@ void viewapl2_screen_hgr(APPLE2 *m, int start, int end) {
         uint16_t address = page + hgr_row_start[y];
         uint8_t byte = m->RAM_MAIN[address];
 
-        int bit_column = 0;                // start of scanline
-        int prev_bit    = 0;               // first column "left neighbor" is 0
+        int bit_column = 0;                 // start of scanline
+        int prev_bit = 0;                   // first column "left neighbor" is 0
 
         for(int col = 0; col < 40; ++col) {
             uint8_t next_byte = (col + 1 < 40) ? m->RAM_MAIN[address + col + 1] : 0;

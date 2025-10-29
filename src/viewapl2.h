@@ -7,7 +7,8 @@
 enum {
     SCREEN_MODE_GRAPHICS = 1,
     SCREEN_MODE_MIXED = 2,
-    SCREEN_MODE_HIRES = 4
+    SCREEN_MODE_HIRES = 4,
+    SCREEN_MODE_DOUBLE = 8
 };
 
 // RGB values
@@ -24,8 +25,10 @@ void viewapl2_feed_clipboard_key(APPLE2 *m);
 void viewapl2_init_color_table(APPLE2 *m);
 void viewapl2_process_event(APPLE2 *m, SDL_Event *e);
 void viewapl2_screen_apple2(APPLE2 *m);
+void viewapl2_screen_dlores(APPLE2 *m, int start, int end);
 void viewapl2_screen_lores(APPLE2 *m, int start, int end);
 void viewapl2_screen_lores_mono(APPLE2 *m, int start, int end);
+void viewapl2_screen_dhgr(APPLE2 *m, int start, int end);
 void viewapl2_screen_hgr(APPLE2 *m, int start, int end);
 void viewapl2_screen_hgr_mono(APPLE2 *m, int start, int end);
 void viewapl2_screen_txt40(APPLE2 *m, int start, int end);
