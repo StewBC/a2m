@@ -578,7 +578,7 @@ void viewapl2_screen_dhgr(APPLE2 *m, int start, int end) {
         uint16_t address = page + hgr_row_start[y];
         const uint8_t *aux = m->RAM_MAIN + page + hgr_row_start[y] + 0x10000;  // b0,b2,b4 live here
         const uint8_t *man = m->RAM_MAIN + page + hgr_row_start[y];            // b1,b3 live here
-        uint8_t bits[34];
+        uint8_t bits[32];
         bits[0] = bits[1] = 0;
 
         for(int col = 0; col < 40; col += 2) {
@@ -586,35 +586,40 @@ void viewapl2_screen_dhgr(APPLE2 *m, int start, int end) {
             uint32_t A = load_u32_unaligned(aux + col) & 0x7F7F7F7Fu; // b0=A0, b2=A1, b4=A2, (A3 unused)
             uint16_t B = load_u16_unaligned(man + col) & 0x7F7Fu;     // b1=B0, b3=B1
 
+            // Extract the bytes, interleaving aux / main
             uint8_t b0 = (uint8_t)(A      );
             uint8_t b1 = (uint8_t)(B      );
             uint8_t b2 = (uint8_t)(A >>  8);
             uint8_t b3 = (uint8_t)(B >>  8);
             uint8_t b4 = (col < 38) ? (uint8_t)(A >> 16) : 0;
 
-            // Make nibbles with bits in display order (from apple order)
-            uint8_t t0 = rev4_lut[ (b0     ) & 0x0F];                           // [4,5,6,7]->[7,6,5,4]
-            uint8_t t1 = rev4_lut[ (b0 >> 4) | ((b1 & 0x1) << 3)];              // [e,1,2,3]->[3,2,1,e]
-            uint8_t t2 = rev4_lut[ (b1 >> 1) & 0x0F];                           // [a,b,c,d]->[d,c,b,a]
-            uint8_t t3 = rev4_lut[((b1 >> 5) & 0x03) | ((b2 & 0x3) << 2)];      // [k,l,8,9]->[9,8,l,k]
-            uint8_t t4 = rev4_lut[ (b2 >> 2) & 0x0F];                           // [g,h,i,j]->[j,i,h,g]
-            uint8_t t5 = rev4_lut[ (b2 >> 6) | ((b3 & 0x7) << 1)];              // [q,r,s,f]->[f,s,r,q]
-            uint8_t t6 = rev4_lut[ (b3 >> 3)       ];                           // [m,n,o,p]->[p,o,n,m]
-            uint8_t t7 = rev4_lut[ (b4     ) & 0x0F];
+            // Make nibbles 
+            // Bits are in reverse display order (apple order)
+            uint8_t t0 =  (b0     ) & 0x0F;
+            uint8_t t1 =  (b0 >> 4) | ((b1 & 0x1) << 3);
+            uint8_t t2 =  (b1 >> 1) & 0x0F;
+            uint8_t t3 = ((b1 >> 5) & 0x03) | ((b2 & 0x3) << 2);
+            uint8_t t4 =  (b2 >> 2) & 0x0F;
+            uint8_t t5 =  (b2 >> 6) | ((b3 & 0x7) << 1);
+            uint8_t t6 =  (b3 >> 3)       ;
+            uint8_t t7 =  (b4     ) & 0x0F;
 
-            uint32_t stream = t0 << 28 | t1 << 24 | t2 << 20 | t3 << 16 | t4 << 12 | t5 << 8 | t6 << 4 | t7;
+            // Put the bits in a stream (reverse display order)
+            uint32_t stream = t7 << 28 | t6 << 24 | t5 << 20 | t4 << 16 | t3 << 12 | t2 << 8 | t1 << 4 | t0;
 
-            // expand stream to bits [2..33] so 0,1 can be assigned from 32/31 for continuity
-            for (int i = 31; i >= 0; i--) {
-                bits[33-i] = (stream >> i) & 1;
+            // Expand stream to bits array [2..31] so [0,1] can be assigned from [30,31] for continuity
+            // The bits are now in display order, left to right, starting at bits[2] with 1, and 2 being prev bits
+            for (int x = 0; x < 30; x++) {
+                bits[2+x] = stream & 1;
+                stream >>= 1;
             }
 
             // Tunables:
             const int phase0  = 1; // flip 0/1 if whole image hue is inverted
-            const int phase90 = 2; // shift 0..3 to rotate hue
-            const int kY = 36;     // brightness gain
-            const int kI = 13;     // saturation (I axis)
-            const int kQ = 18;     // saturation (Q axis)
+            const int phase90 = 1; // shift 0..3 to rotate hue
+            const int kY = 28;     // brightness gain
+            const int kI = 18;     // saturation (I axis)
+            const int kQ = -16;     // saturation (Q axis)
             const int dead = 2;    // chroma deadzone to keep near-grays neutral
 
             for (int x = 2; x < 30; ++x) {
@@ -646,17 +651,17 @@ void viewapl2_screen_dhgr(APPLE2 *m, int start, int end) {
                 int r1r0 = (((x1r + phase0) & 1) ? -1 : +1);
                 int r2r0 = (((x2r + phase0) & 1) ? -1 : +1);
 
-                // Q-like (90 dec): period-4 (+1,0,-1,0,...)  => ((x+phase90)&3)
+                // Q-like (90 deg): period-4 (+1,0,-1,0,...)  => ((x+phase90)&3)
                 int t2l = (x2l + phase90) & 3;
                 int t1l = (x1l + phase90) & 3;
                 int t0  = (x   + phase90) & 3;
                 int t1r2= (x1r + phase90) & 3;
                 int t2r2= (x2r + phase90) & 3;
-                int r2lQ = (t2l==0)?+1: (t2l==2)?-1: 0;
-                int r1lQ = (t1l==0)?+1: (t1l==2)?-1: 0;
-                int r0Q  = (t0 ==0)?+1: (t0 ==2)?-1: 0;
-                int r1rQ = (t1r2==0)?+1: (t1r2==2)?-1: 0;
-                int r2rQ = (t2r2==0)?+1: (t2r2==2)?-1: 0;
+                int r2lQ = (t2l==0)  ? +1 : (t2l==2)  ? -1 : 0;
+                int r1lQ = (t1l==0)  ? +1 : (t1l==2)  ? -1 : 0;
+                int r0Q  = (t0 ==0)  ? +1 : (t0 ==2)  ? -1 : 0;
+                int r1rQ = (t1r2==0) ? +1 : (t1r2==2) ? -1 : 0;
+                int r2rQ = (t2r2==0) ? +1 : (t2r2==2) ? -1 : 0;
 
                 // Weighted sums (same 5-tap weights)
                 int Iraw = s2l*r2l0 + 2*(s1l*r1l0) + 3*(s0*r00) + 2*(s1r*r1r0) + (s2r*r2r0);
@@ -667,14 +672,14 @@ void viewapl2_screen_dhgr(APPLE2 *m, int start, int end) {
                 if (amag <= dead) { Iraw = 0; Qraw = 0; }
 
                 // Scale to 8-bit-ish domain
-                int Y = kY * ytap;         // 0..(9*kY)
+                int Y = kY * ytap;         // (0..9)*kY
                 int I = kI * Iraw;
                 int Q = kQ * Qraw;
 
                 // YIQ -> RGB (coeffs scaled by 256)
-                // R = Y + 0.956I + 0.621Q
-                // G = Y - 0.272I - 0.647Q
-                // B = Y - 1.106I + 1.703Q
+                // float R = Y + 0.956*I + 0.619*Q;
+                // float G = Y - 0.272*I - 0.647*Q;
+                // float B = Y - 1.106*I + 1.703*Q;
                 uint8_t R = clamp8i(Y + ((245*I + 159*Q) >> 8));
                 uint8_t G = clamp8i(Y - (( 70*I + 166*Q) >> 8));
                 uint8_t B = clamp8i(Y - ((283*I - 436*Q) >> 8));
@@ -682,8 +687,8 @@ void viewapl2_screen_dhgr(APPLE2 *m, int start, int end) {
                 *p++ = SDL_MapRGB(format, R, G, B);
             }
             // carry over last two samples for continuity
-            bits[0] = bits[30];
-            bits[1] = bits[31];
+            bits[0] = bits[28];
+            bits[1] = bits[29];
         }
     }
 }
