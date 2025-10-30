@@ -41,7 +41,6 @@ static inline void set_memory_map(APPLE2 *m) {
     if(m->altzpset) {
         pages_map(&m->read_pages,  0x0000 / PAGE_SIZE, 0x0200 / PAGE_SIZE, &m->RAM_MAIN[0100000]);
         pages_map(&m->write_pages, 0x0000 / PAGE_SIZE, 0x0200 / PAGE_SIZE, &m->RAM_MAIN[0100000]);
-        // ram_card_map_memory(m);
     }
 
     //SETRAMRD
@@ -56,28 +55,21 @@ static inline void set_memory_map(APPLE2 *m) {
 
     // SET80
     if(m->store80set) {
+        pages_map(&m->read_pages,  0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x00400]);
+        pages_map(&m->write_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x00400]);
+        if(m->screen_mode & SCREEN_MODE_HIRES) {
+            pages_map(&m->read_pages,  0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x02000]);
+            pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x02000]);
+        }
         if(m->page2set) {
             pages_map(&m->read_pages,  0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x10400]);
             pages_map(&m->write_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x10400]);
-            pages_map(&m->read_pages,  0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
-            pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
             if(m->screen_mode & SCREEN_MODE_HIRES) {
                 pages_map(&m->read_pages,  0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
                 pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
-            } else {
-                pages_map(&m->read_pages,  0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x02000]);
-                pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x02000]);
-            }
-        } else {
-            pages_map(&m->read_pages,  0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x0400]);
-            pages_map(&m->write_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x0400]);
-            pages_map(&m->read_pages,  0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
-            pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x2000]);
-            if(m->screen_mode & SCREEN_MODE_HIRES) {
-                pages_map(&m->read_pages,  0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x02000]);
-                pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x02000]);
             }
         }
+
     }
 }
 
@@ -200,18 +192,20 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                         m->screen_mode |= SCREEN_MODE_HIRES;
                         set_memory_map(m);
                         break;
-                    case CLRAN0: // SQW - hires or dhires if text off 
-                    case SETAN0: // SQW
-                    case CLRAN1: // SQW
-                    case SETAN1: // SQW
-                    case CLRAN2: // SQW
-                    case SETAN2: // SQW
+                    case CLRAN0:
+                    case SETAN0:
+                    case CLRAN1:
+                    case SETAN1:
+                    case CLRAN2:
+                    case SETAN2:
                         break;
-                    case CLRAN3: // SQW - dhires on if IOUD is on
+                    case CLRAN3:
                         m->screen_mode |= SCREEN_MODE_DOUBLE;
+                        m->wide_canvas = 1;
                         break;
-                    case SETAN3: // SQW - dhires off if IOUD is on
+                    case SETAN3:
                         m->screen_mode &= ~SCREEN_MODE_DOUBLE;
+                        m->wide_canvas = 0; // SQW not neccesarily
                         break;
                 }
                 break;
@@ -457,19 +451,23 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                         set_memory_map(m);
                         break;
                     case CLRC3ROM: //e
-                        // This turns on motherboard ROM
-                        m->c3slotrom = 0;
                         // C300-C3FF
+                        // Turn internal rom on, slot rom off
+                        m->c3slotrom = 0;
+                        pages_map(&m->read_pages, 0xC300 / PAGE_SIZE, 0x100 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x300]);
                         break;
                     case SETC3ROM: // e
-                        // This is a bit confusing but set here sets card rom, not internal rom
+                        // Turn internal rom off, slot rom on
                         m->c3slotrom = 1;
+                        m->read_pages.pages[0xC300 / PAGE_SIZE].bytes = m->rom_shadow_pages[3];
                         break;
                     case CLR80COL: //e
                         m->col80set = 0;
+                        m->wide_canvas = 0;
                         break;
                     case SET80COL: //e
                         m->col80set = 1;
+                        m->wide_canvas = 1;
                         break;
                     case CLRALTCHAR: // e
                         m->altcharset = 0;

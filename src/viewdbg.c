@@ -570,6 +570,7 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
                 }
                 m->franklin80active = (mode & 2) >> 1;
                 m->monitor_type = mode & 1;
+                m->wide_canvas = m->franklin80active;
             } else {
                 switch(m->screen_mode) {
                     case 0b000:
@@ -578,6 +579,7 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
                     case 0b110:
                         // If a text mode, toggle 80 col mode
                         m->franklin80active ^= 1;                       // 80 col toggle
+                        m->wide_canvas = m->franklin80active;
                         break;
                     default:
                         // Otherwise toggle mono mode

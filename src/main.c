@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
 
         // If not going at max speed
         if(m.turbo_active > 0.0) {
-            double cycles_per_frame = ((CPU_FREQUENCY * m.turbo_active) / TARGET_FPS) + (overhead_ticks * clock_cycles_per_tick);
+            double cycles_per_frame = max(1, (CPU_FREQUENCY * m.turbo_active) / TARGET_FPS) - (overhead_ticks * clock_cycles_per_tick);
             uint64_t cycles = 0;
             while(cycles < cycles_per_frame && (!m.stopped || m.step)) {
                 size_t opcode_cycles = machine_run_opcode(&m);

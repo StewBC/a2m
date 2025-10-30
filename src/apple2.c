@@ -170,11 +170,13 @@ void apple2_machine_reset(APPLE2 *m) {
     m->stopped = 0;
     m->store80set = 0;
     m->strobed = 0;
+    m->wide_canvas = 0;
     cpu_init(m);
     ram_card_reinit(m);
     // ram_card(m, 0xC081, 0x100); // SQW - Make part pf reset
     // ram_card(m, 0xC081, 0x100);
     set_memory_map(m);
+    memset(&m->RAM_MAIN[0x0400], 0xA0, 0x400);
     apple2_softswitch_write_callback_IIe(m, CLRCXROM, 0);
 }
 

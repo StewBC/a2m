@@ -113,6 +113,7 @@ typedef struct APPLE2 {
     uint32_t stopped: 1;                                    // Emulation is halted
     uint32_t store80set: 1;                                 // 1 - Page 2 text, and if hgr also 4000-6000, mapped from aux
     uint32_t strobed: 1;                                    // 1 - C800-CFFF is mapped, 0 - it is floating bus
+    uint32_t wide_canvas: 1;                                // Using the wide texture (560px)
 
     // Configuration
     INI_STORE ini_store;

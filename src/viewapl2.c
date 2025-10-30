@@ -319,7 +319,7 @@ void viewapl2_process_event(APPLE2 *m, SDL_Event *e) {
                     case SDLK_SCROLLLOCK:                       // CTRL+PAUSE generates SDLK_SCROLLLOCK on my PC
                     case SDLK_PAUSE:
                         // Reset the machine
-                        cpu_init(m);
+                        apple2_machine_reset(m);
                         v->prev_cycles = 0;                     // So MHz doesn't jump massively
                         diskii_reset(m);
                         break;

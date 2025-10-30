@@ -15,8 +15,8 @@
 #define SETCXROM        0xC007 // C100-CFFF //e rom (overrides c3rom and cfff)
 #define CLRALTZP        0xC008 // ZP/stack are in main bank
 #define SETALTZP        0xC009 // ZP/stack are in aux  bank
-#define CLRC3ROM        0xC00A // C300-C3FF Internal //e rom
-#define SETC3ROM        0xC00B // C300-C3FF slot card rom
+#define CLRC3ROM        0xC00A // Turn internal rom on,  turn Slot rom off
+#define SETC3ROM        0xC00B // Turn internal rom off, turn Slot rom on
 #define CLR80COL        0xC00C // 40-column display (turn 80-col display off)
 #define SET80COL        0xC00D // 80-column display (turn 80-col display on)
 #define CLRALTCHAR      0xC00E // primary/standard character set
