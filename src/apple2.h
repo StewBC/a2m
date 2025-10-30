@@ -74,7 +74,7 @@ typedef struct APPLE2 {
     MEMORY roms;                                            // All MEMORY in the system, may be mapped into 64K, through read_pages
     SLOT_CARDS slot_cards[8];                               // The 8 slots and their status and option ROMs
     SPEAKER speaker;                                        // 1 bit audio speaker
-    RAM_CARD ram_card[2];                                   // State for which pages are visible
+    RAM_CARD ram_card;                                      // State for which pages are visible
     DISKII_CONTROLLER diskii_controller[8];                 // Any slot can have a disk ii controller (and drives)
     SP_DEVICE sp_device[8];                                 // All slots could be made smartport
     FRANKLIN_DISPLAY franklin_display;                      // Franklin Display 80 col card

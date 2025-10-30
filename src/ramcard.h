@@ -13,6 +13,8 @@ typedef struct RAM_CARD {
     uint32_t write_enable: 1;
 } RAM_CARD;
 
-uint8_t ram_card(APPLE2 *m, int index, uint16_t address, uint16_t value);
-int ram_card_init(RAM_CARD *ram_card);
+uint8_t ram_card(APPLE2 *m, uint16_t address, uint16_t value);
+int ram_card_init(APPLE2 *m);
+void ram_card_reinit(APPLE2 *m);
+void ram_card_map_memory(APPLE2 *m);
 void ram_card_shutdown(RAM_CARD *ram_card);

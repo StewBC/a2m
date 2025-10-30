@@ -47,10 +47,8 @@ void viewmisc_show(APPLE2 *m) {
                             char label[4];
                             sprintf(label, "%d.%d", i, j);
                             if(nk_button_label(ctx, label)) {
-                                ram_card(m, 0, 1, 0);  // Make sure the ROM is active
-                                ram_card(m, 1, 1, 0);  // Make sure the ROM is active
+                                apple2_machine_reset(m);
                                 m->cpu.pc = 0xc000 + i * 0x100;
-                                m->stopped = 0;
                             }
                         } else {
                             nk_labelf(ctx, NK_TEXT_CENTERED, "%d.%d", i, j);
@@ -86,23 +84,8 @@ void viewmisc_show(APPLE2 *m) {
                             char label[4];
                             sprintf(label, "%d.%d", i, j);
                             if(nk_button_label(ctx, label)) {
-                                // SQW - Maybe re-think all of this...
-                                ram_card(m, 0, 1, 0);  // Make sure the ROM is active
-                                ram_card(m, 1, 1, 0);  // Make sure the ROM is active
-                                apple2_softswitch_read_callback(m, CLRRAMRD);
-                                apple2_softswitch_read_callback(m, CLRRAMWRT);
-                                apple2_softswitch_read_callback(m, CLRCXROM);
-                                apple2_softswitch_read_callback(m, CLRC3ROM);
-                                apple2_softswitch_read_callback(m, CLR80COL);
-                                apple2_softswitch_read_callback(m, CLRALTCHAR);
-                                apple2_softswitch_read_callback(m, TXTSET);
-                                apple2_softswitch_read_callback(m, MIXCLR);
-                                apple2_softswitch_read_callback(m, CLRPAGE2);
-                                apple2_softswitch_read_callback(m, CLRALTZP);
-                                apple2_softswitch_read_callback(m, CLRROM);
-                                apple2_softswitch_read_callback(m, 0xC000 + i * 0x100);
+                                apple2_machine_reset(m);
                                 m->cpu.pc = 0xc000 + i * 0x100;
-                                m->stopped = 0;
                             }
                         } else {
                             nk_labelf(ctx, NK_TEXT_CENTERED, "%d.%d", i, j);
@@ -371,7 +354,7 @@ void viewmisc_show(APPLE2 *m) {
         }
         // The Language Card tab
         if(nk_tree_push(ctx, NK_TREE_TAB, "Language Card", NK_MAXIMIZED)) {
-            RAM_CARD *lc = &m->ram_card[m->ramrdset];
+            RAM_CARD *lc = &m->ram_card;
             nk_layout_row_dynamic(ctx, 26, 4);
             if(nk_option_label(ctx, "Read ROM", lc->read_ram_enable ? 0 : 1) && lc->read_ram_enable) {
                 pages_map_memory_block(&m->read_pages, &m->roms.blocks[ROM_APPLE2]);

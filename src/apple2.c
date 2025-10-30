@@ -69,14 +69,6 @@ int apple2_configure(APPLE2 *m) {
         m->RAM_MAIN[0x1C000] = 0x0d;
     }
 
-    // INIT the ram_card
-    if(A2_OK != ram_card_init(&m->ram_card[0])) {
-        return A2_ERR;
-    }
-    if(A2_OK != ram_card_init(&m->ram_card[1])) {
-        return A2_ERR;
-    }
-
     // RAM
     if(!memory_init(&m->ram, m->model ? 2 : 1)) {
         return A2_ERR;
@@ -138,12 +130,15 @@ int apple2_configure(APPLE2 *m) {
     // Set up the Watch Pages (RAM_WATCH can be changed without re-doing the map)
     pages_map(&m->watch_pages, 0, BANK_SIZE / PAGE_SIZE, m->RAM_WATCH);
 
+    // INIT the ram_card
+    if(A2_OK != ram_card_init(m)) {
+        return A2_ERR;
+    }
+
     // Configure the LC using the same function the soft switches would, so the
     // same way, meaning call 2x to enable ROM and WRITE
-    ram_card(m, 0, 0xC081, 0x100);
-    ram_card(m, 0, 0xC081, 0x100);
-    ram_card(m, 1, 0xC081, 0x100);
-    ram_card(m, 1, 0xC081, 0x100);
+    // ram_card(m, 0xC081, 0x100);
+    // ram_card(m, 0xC081, 0x100);
 
     // Init the CPU to cold-start by jumping to ROM address at 0xfffc
     cpu_init(m);
@@ -155,6 +150,32 @@ int apple2_configure(APPLE2 *m) {
     memcpy(m->rom_shadow_pages, &m->read_pages.pages[(0xC000 / PAGE_SIZE)], sizeof(uint8_t *) * (0xC800 - 0xC000) / PAGE_SIZE);
 
     return A2_OK;
+}
+
+void apple2_machine_reset(APPLE2 *m) {
+    m->screen_mode = 0;
+    m->monitor_type = 0;
+    m->altcharset = 0;
+    m->altzpset = 0;
+    m->c3slotrom = 0;
+    m->col80set = 0;
+    m->cxromset = 0;
+    m->disk_activity_read = 0;
+    m->disk_activity_write = 0;
+    m->franklin80active = 0;
+    m->page2set = 0;
+    m->ramrdset = 0;
+    m->ramwrtset = 0;
+    m->step = 0;
+    m->stopped = 0;
+    m->store80set = 0;
+    m->strobed = 0;
+    cpu_init(m);
+    ram_card_reinit(m);
+    // ram_card(m, 0xC081, 0x100); // SQW - Make part pf reset
+    // ram_card(m, 0xC081, 0x100);
+    set_memory_map(m);
+    apple2_softswitch_write_callback_IIe(m, CLRCXROM, 0);
 }
 
 void apple2_machine_setup(APPLE2 *m) {
@@ -311,8 +332,7 @@ void apple2_slot_setup(APPLE2 *m) {
 // Clean up the Apple II
 void apple2_shutdown(APPLE2 *m) {
     speaker_shutdown(&m->speaker);
-    ram_card_shutdown(&m->ram_card[0]);
-    ram_card_shutdown(&m->ram_card[1]);
+    ram_card_shutdown(&m->ram_card);
     diskii_shutdown(m);
     free(m->RAM_MAIN);
     m->RAM_MAIN = NULL;

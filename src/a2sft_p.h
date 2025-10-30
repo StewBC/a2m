@@ -6,7 +6,7 @@ static inline uint8_t apple2_softswitch_read_callback_IIplus(APPLE2 *m, uint16_t
     uint8_t byte = m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
 
     if(address >= 0xc080 && address < 0xC090) {
-        ram_card(m, m->ramrdset, address, 0x100);
+        ram_card(m, address, 0x100);
     } else if(address >= 0xc090 && address < 0xC100) {
         // Device Select
         int slot = (address >> 4) & 0x7;
@@ -216,7 +216,7 @@ static inline uint8_t apple2_softswitch_read_callback_IIplus(APPLE2 *m, uint16_t
 static inline void apple2_softswitch_write_callback_IIplus(APPLE2 *m, uint16_t address, uint8_t value) {
     uint8_t byte = m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
     if(address >= 0xc080 && address < 0xC090) {
-        ram_card(m, m->ramrdset, address, value);
+        ram_card(m, address, value);
     } else if(address >= 0xc090 && address < 0xC100) {
         int slot = (address >> 4) & 0x7;
         switch(m->slot_cards[slot].slot_type) {
