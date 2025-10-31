@@ -803,8 +803,23 @@ void viewdbg_update(APPLE2 *m) {
                     break;
             }
         }
-        if(breakpoint_at(&d->flowmanager, m->cpu.pc, 1)) {
-            m->stopped = 1;
+        BREAKPOINT *bp = breakpoint_at(&d->flowmanager, m->cpu.pc, 1);
+        if(bp) {
+            if(!bp->speed) {
+                m->stopped = 1;
+            } else {
+                switch(bp->speed) {
+                    case SPEED_FAST:
+                        m->turbo_active = -1.0;
+                        break;
+                    case SPEED_SLOW:
+                        m->turbo_active =  1.0;
+                        break;
+                    case SPEED_RESTORE:
+                        m->turbo_active = m->turbo[m->turbo_index];
+                        break;
+                }
+            }
         }
     }
     if(m->stopped && !m->step) {

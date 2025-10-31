@@ -119,10 +119,10 @@ typedef struct APPLE2 {
     INI_STORE ini_store;
 
     // Turbo (1MHz+ settings)
-    double turbo_active;                                     // turbo[turbo_index]
+    double turbo_active;                                    // turbo[turbo_index] unless bp->speed override
     uint32_t turbo_index;                                   // active entry in turbo array
     uint32_t turbo_count;                                   // entries in turbo array
-    double *turbo;                                           // Array of multipliers (* 1MHz) to run at
+    double *turbo;                                          // Array of multipliers (* 1MHz) to run at
 
     // Clipboard
     char *clipboard_text;                                   // when not 0 points at a clipboard text UTF-8

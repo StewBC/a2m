@@ -77,12 +77,6 @@ static int parse_addr_field(char *field, uint32_t *start, uint32_t *end) {
 
 // Main parse function
 int parse_breakpoint_line(const char *val, parsed_t *out) {
-    // out->start = 0;
-    // out->end = 0;
-    // out->mode = MODE_PC;
-    // out->speed = SPEED_RESTORE;
-    // out->count = 0;
-    // out->reset = 0;
     memset(out, 0, sizeof(parsed_t));
     int set_count = 0;
     int set_reset = 0;
@@ -129,12 +123,12 @@ int parse_breakpoint_line(const char *val, parsed_t *out) {
                 out->mode = MODE_WRITE;
             } else if(0 == stricmp(param, "access")) {
                 out->mode = MODE_ACCESS;
-            } else if(0 == stricmp(param, "restore")) {
-                out->speed = SPEED_RESTORE;
             } else if(0 == stricmp(param, "fast")) {
                 out->speed = SPEED_FAST;
             } else if(0 == stricmp(param, "slow")) {
                 out->speed = SPEED_SLOW;
+            } else if(0 == stricmp(param, "restore")) {
+                out->speed = SPEED_RESTORE;
             } else {
                 // Otherwise, treat as integer (count then reset)
                 char *endp = NULL;

@@ -36,6 +36,7 @@ void breakpoints_init(APPLE2 *m) {
                         bp.counter_stop_value = parsed_line.count;
                         bp.counter_reset = parsed_line.reset;
                         bp.use_counter = bp.counter_stop_value || bp.counter_reset ? 1 : 0;
+                        bp.speed = parsed_line.speed;
                         ARRAY_ADD(&b->breakpoints, bp);
                         breakpoint_reapply_address_masks(m);
                     }
