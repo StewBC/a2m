@@ -104,6 +104,7 @@ typedef struct DEBUGGER DEBUGGER;
 
 // Debugger/Viewer
 #include "breakpnt.h"
+#include "breakprs.h"
 #include "viewapl2.h"
 #include "viewcpu.h"
 #include "viewdlg.h"                                        // ASSEMBLER_CONFIG before DEBUGGER

@@ -25,6 +25,7 @@ add_executable(apple2
     src/asmexpr.c
     src/asmgperf.c
     src/breakpnt.c
+    src/breakprs.c
     src/dbgopcds.c
     src/diskii.c
     src/dynarray.c

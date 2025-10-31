@@ -40,7 +40,7 @@ int viewdbg_add_symbols(DEBUGGER *d, const char *symbol_source, char *data, size
 void viewdbg_build_code_lines(APPLE2 *m, uint16_t pc, int lines_needed);
 int viewdbg_disassemble_line(APPLE2 *m, uint16_t pc, CODE_LINE *line);
 char *viewdbg_find_symbols(DEBUGGER *d, uint32_t address);
-int viewdbg_init(DEBUGGER *d, int num_lines);
+int viewdbg_init(APPLE2 *m, int num_lines);
 int viewdbg_init_symbols(DEBUGGER *d);
 uint16_t viewdbg_next_pc(APPLE2 *m, uint16_t pc);
 uint16_t viewdbg_prev_pc(APPLE2 *m, uint16_t pc);

@@ -32,6 +32,8 @@ int apple2_configure(APPLE2 *m) {
         ini_add(&m->ini_store, "SmartPort", "disk0", "");
         ini_add(&m->ini_store, "SmartPort", "disk1", "");
         ini_add(&m->ini_store, "SmartPort", "boot", "0 ; last listed non-zero boot devices' disk0 will boot");
+        ini_add(&m->ini_store, "Debug", ";break", "pc, restore, 0, 0 are the defaults for break =");
+        ini_add(&m->ini_store, "Debug", ";break", "<address[-address]>[,pc|read|write|access[,restore | fast | slow][, count[, reset]]]");
         util_ini_save_file("apple2.ini", &m->ini_store);
     }
     // Configure the type of machine (II+ or //e Enhanced, based on ini_store)

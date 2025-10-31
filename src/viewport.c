@@ -159,7 +159,7 @@ int viewport_init(APPLE2 *m, int w, int h) {
         goto error;
     }
 
-    if(A2_OK != viewdbg_init(&v->debugger, CODE_LINES_COUNT)) {
+    if(A2_OK != viewdbg_init(m, CODE_LINES_COUNT)) {
         goto error;
     }
 

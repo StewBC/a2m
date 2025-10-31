@@ -4,14 +4,50 @@
 
 #include "header.h"
 
-void breakpoints_init(FLOWMANAGER *b) {
+void breakpoints_init(APPLE2 *m) {
+    FLOWMANAGER *b = &m->viewport->debugger.flowmanager;
     // Clear the whole structure
     memset(b, 0, sizeof(FLOWMANAGER));
     // Set the dynamic array up to hold breakpoints
     ARRAY_INIT(&b->breakpoints, BREAKPOINT);
+/*------*/    
+    INI_SECTION *s;
+    s = ini_find_section(&m->ini_store, "debug");
+    if(s) {
+        for(int i = 0; i < s->kv.items; i++) {
+            INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
+            const char *key = kv->key;
+            const char *val = kv->val;
+            if(0 == stricmp(key, "break")) {
+                parsed_t parsed_line;
+                if(A2_OK == parse_breakpoint_line(val, &parsed_line)) {
+                    BREAKPOINT *bp = breakpoint_at(b, (uint16_t)parsed_line.start, 0);
+                    if(!bp) {
+                        BREAKPOINT bp;
+                        memset(&bp, 0, sizeof(bp));
+                        bp.address = (uint16_t)parsed_line.start;
+                        bp.address_range_end = (uint16_t)parsed_line.end;
+                        bp.use_range = bp.address != bp.address_range_end;
+                        bp.use_pc = MODE_PC == parsed_line.mode;
+                        bp.break_on_read = MODE_READ & parsed_line.mode ? 1 : 0;
+                        bp.break_on_write = MODE_WRITE & parsed_line.mode ? 1: 0;
+                        // SQW Look at why you set this up the way it is
+                        bp.access = (bp.break_on_write << 2) | (bp.break_on_read << 1);
+                        bp.counter_stop_value = parsed_line.count;
+                        bp.counter_reset = parsed_line.reset;
+                        bp.use_counter = bp.counter_stop_value || bp.counter_reset ? 1 : 0;
+                        ARRAY_ADD(&b->breakpoints, bp);
+                        breakpoint_reapply_address_masks(m);
+                    }
+                }
+            }
+        }
+    }
 }
 
 // Running is 0 when drawing the disassembly, but <> 0 when testing for a break running the emulation
+// SQW - This needs updating to show where read/write breakpoints are, and for finding those
+// through ini creation
 BREAKPOINT *breakpoint_at(FLOWMANAGER *b, uint16_t pc, int running) {
     int items = b->breakpoints.items;
     for(int i = 0; i < items; i++) {

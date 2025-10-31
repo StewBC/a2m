@@ -233,7 +233,9 @@ char *viewdbg_find_symbols(DEBUGGER *d, uint32_t address) {
     return 0;
 }
 
-int viewdbg_init(DEBUGGER *d, int num_lines) {
+int viewdbg_init(APPLE2 *m, int num_lines) {
+    DEBUGGER *d = &m->viewport->debugger;
+
     // Allocate the array itself
     d->code_lines = (DYNARRAY *) malloc(sizeof(DYNARRAY));
     if(!d->code_lines) {
@@ -296,7 +298,7 @@ int viewdbg_init(DEBUGGER *d, int num_lines) {
     }
 
     // Init the breakpoint structures
-    breakpoints_init(&d->flowmanager);
+    breakpoints_init(m);
 
     // Init the assembler structure
     d->assembler_config.auto_run_after_assemble = nk_true;
