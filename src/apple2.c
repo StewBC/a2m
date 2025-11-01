@@ -137,11 +137,6 @@ int apple2_configure(APPLE2 *m) {
         return A2_ERR;
     }
 
-    // Configure the LC using the same function the soft switches would, so the
-    // same way, meaning call 2x to enable ROM and WRITE
-    // ram_card(m, 0xC081, 0x100);
-    // ram_card(m, 0xC081, 0x100);
-
     // Init the CPU to cold-start by jumping to ROM address at 0xfffc
     cpu_init(m);
 
@@ -175,8 +170,6 @@ void apple2_machine_reset(APPLE2 *m) {
     m->wide_canvas = 0;
     cpu_init(m);
     ram_card_reinit(m);
-    // ram_card(m, 0xC081, 0x100); // SQW - Make part pf reset
-    // ram_card(m, 0xC081, 0x100);
     set_memory_map(m);
     memset(&m->RAM_MAIN[0x0400], 0xA0, 0x400);
     apple2_softswitch_write_callback_IIe(m, CLRCXROM, 0);
