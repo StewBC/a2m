@@ -1,0 +1,14 @@
+from: markdown
+to: pdf
+include-before-body: titlepage.tex
+pdf-engine: xelatex
+toc: false
+number-sections: true
+
+variables:
+  geometry: "margin=1in"
+  mainfont: "TeX Gyre Pagella"
+  monofont: "Inconsolata"
+
+metadata:
+  lang: en-US
