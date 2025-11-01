@@ -228,7 +228,6 @@ int viewport_process_events(APPLE2 *m) {
     nk_input_begin(v->ctx);
     // Process all SDL events, and keep doing if stopped and not stepping
     while(SDL_PollEvent(&e) != 0 || (m->stopped && !m->step)) {
-        int force_update = v->show_help;
         if(e.type == SDL_QUIT) {
             ret = 1;
             break;
@@ -238,7 +237,7 @@ int viewport_process_events(APPLE2 *m) {
 
         // Function keys all go to the disassembly view no matter what is active
         if(e.type == SDL_KEYDOWN && e.key.keysym.sym >= SDLK_F1 && e.key.keysym.sym <= SDLK_F12) {
-            force_update = viewdbg_process_event(m, &e);
+            viewdbg_process_event(m, &e);
         } else if(m->stopped) {
             // Stopped means input does not go to the Apple II
             if(v->debug_view && e.type == SDL_KEYDOWN || e.type == SDL_TEXTINPUT) {
@@ -269,7 +268,7 @@ int viewport_process_events(APPLE2 *m) {
             viewapl2_process_event(m, &e);
         }
 
-        if(m->stopped && !m->step) {
+        if((m->stopped && !m->step)) {
             viewport_show(m);
             viewport_update(m);
             // The begin is needed to clear out keys that were handled
@@ -817,9 +816,13 @@ void viewport_update(APPLE2 *m) {
         SDL_UpdateTexture(v->texture, NULL, v->surface->pixels, v->surface->pitch);
         SDL_RenderCopy(v->renderer, v->texture, NULL, &v->target_rect);
     }
-    if(v->debug_view) {
+
+    // if the help screen is open, or any debug windows are up, nuklear must be updated
+    if(v->debug_view | v->show_help) {
         nk_sdl_render(NK_ANTI_ALIASING_ON);
     }
+
+    // Add after nuklear so that the LEDs render over any nuklear windows
     if(v->show_leds) {
         if(m->disk_activity_read) {
             SDL_Rect led = {v->full_window_rect.w - 16, v->full_window_rect.h - 16, 16, 16};
@@ -832,10 +835,12 @@ void viewport_update(APPLE2 *m) {
             m->disk_activity_write = 0;
         }
     }
+
+    // Finally show the user
     SDL_RenderPresent(v->renderer);
 
+    // Show the window title after calculating a moving average MHz
     if(1) {
-        // Show the window title after calculating a moving average MHz
         char sdl_window_title[80];
         if(!m->stopped) {
             uint64_t freq = SDL_GetPerformanceFrequency();

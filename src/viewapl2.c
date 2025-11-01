@@ -266,7 +266,7 @@ void viewapl2_init_color_table(APPLE2 *m) {
     for(int byte = 0; byte < 128; ++byte) {
         uint8_t x = byte;
         for(int i = 0; i < 7; ++i) {
-            hgr_mono_lut[byte].pixel[i] = (x & 1) ? color_table[0][0][0] : color_table[7][0][0];
+            hgr_mono_lut[byte].pixel[i] = (x & 1) ? color_table[7][0][0] : color_table[0][0][0];
             x >>= 1;
         }
     }

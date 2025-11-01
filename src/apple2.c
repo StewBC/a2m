@@ -313,12 +313,13 @@ void apple2_slot_setup(APPLE2 *m) {
             if(0 == stricmp(key, "slot")) {
                 sscanf(val, "%d", &slot_number);
             }
-            if(0 == stricmp(key, "device")) {
+            if(0 == stricmp(key, "device") && !m->model) { // Prevent the enhanced from adding this card
                 if(slot_number >= 1 && slot_number < 8) {
                     if(A2_OK == franklin_display_init(&m->franklin_display)) {
                         slot_add_card(m, slot_number, SLOT_TYPE_VIDEX_API, &m->franklin_display,
                                       &m->roms.blocks[ROM_FRANKLIN_ACE_DISPLAY].bytes[0x600], franklin_display_map_cx_rom);
                         memset(m->RAM_WATCH + 0xCC00, 1, 0x200);
+                        m->franklin80installed = 1;
                     }
                 }
             }
