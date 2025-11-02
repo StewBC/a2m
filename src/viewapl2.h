@@ -29,6 +29,7 @@ void viewapl2_screen_dlores(APPLE2 *m, int start, int end);
 void viewapl2_screen_lores(APPLE2 *m, int start, int end);
 void viewapl2_screen_lores_mono(APPLE2 *m, int start, int end);
 void viewapl2_screen_dhgr(APPLE2 *m, int start, int end);
+void viewapl2_screen_dhgr_rgb(APPLE2 *m, int start, int end);
 void viewapl2_screen_hgr(APPLE2 *m, int start, int end);
 void viewapl2_screen_hgr_mono(APPLE2 *m, int start, int end);
 void viewapl2_screen_txt40(APPLE2 *m, int start, int end);
