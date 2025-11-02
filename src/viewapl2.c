@@ -411,8 +411,13 @@ void viewapl2_screen_apple2(APPLE2 *m) {
             break;
 
         case 0b011:                                             // mixed lores
-            viewapl2_screen_lores(m, 0, 20);
-            viewapl2_screen_txt40(m, 20, 24);
+            if(m->viewport->shadow_screen_mode & SCREEN_MODE_DOUBLE) {
+                viewapl2_screen_dlores(m, 0, 20);
+                viewapl2_screen_txt80(m, 20, 24);
+            } else {
+                viewapl2_screen_lores(m, 0, 20);
+                viewapl2_screen_txt40(m, 20, 24);
+            }
             break;
 
         case 0b101:                                             // hgr graphics
@@ -454,18 +459,18 @@ void viewapl2_screen_dlores(APPLE2 *m, int start, int end) {
     int y;
     SDL_Surface *surface = m->viewport->surface_wide;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    uint16_t page = m->viewport->shadow_page2set ? 0x4000 : 0x2000;
+    uint16_t page = m->viewport->shadow_page2set ? 0x0800 : 0x0400;
     int surface_width = surface->w;
 
     for(y = start; y < end; y++) {
-        uint32_t *p = &pixels[y * surface_width];
+        uint32_t *p = &pixels[y * 8 * surface_width];
         const uint8_t *man = m->RAM_MAIN + page + txt_row_start[y];
         const uint8_t *aux = man + 0x10000;
 
         for(int col = 0; col < 80; col++) {
             int r;
             uint8_t index = col >> 1;
-            uint8_t character = (col & 1) ? aux[index] : man[index];
+            uint8_t character = (col & 1) ? man[index] : aux[index];
             uint8_t upper = character & 0x0f;
             uint8_t lower = (character >> 4) & 0X0F;
 
@@ -577,21 +582,21 @@ void viewapl2_screen_dhgr(APPLE2 *m, int start, int end) {
         uint16_t address = page + hgr_row_start[y];
         const uint8_t *aux = m->RAM_MAIN + page + hgr_row_start[y] + 0x10000;  // b0,b2,b4 live here
         const uint8_t *man = m->RAM_MAIN + page + hgr_row_start[y];            // b1,b3 live here
+        uint8_t R = 0, G = 0, B = 0;                                           // exponential moving average
 
         for(int col = 0; col < 40; col += 2) {
             // Pull 3 aux bytes (b0,b2,b4) and 2 main bytes (b1,b3) at once, clear bit7 in bulk.
-            uint32_t A = load_u32_unaligned(aux + col) & 0x7F7F7F7Fu; // b0=A0, b2=A1, b4=A2, (A3 unused)
-            uint16_t B = load_u16_unaligned(man + col) & 0x7F7Fu;     // b1=B0, b3=B1
+            uint32_t AUX = load_u32_unaligned(aux + col) & 0x7F7F7F7Fu; // b0=AUX0, b2=AUX1, b4=AUX2, (AUX3 unused)
+            uint16_t MAN = load_u16_unaligned(man + col) & 0x7F7Fu;     // b1=MAN0, b3=MAN1
 
             // Extract the bytes, interleaving aux / main
-            uint8_t b0 = (uint8_t)(A      );
-            uint8_t b1 = (uint8_t)(B      );
-            uint8_t b2 = (uint8_t)(A >>  8);
-            uint8_t b3 = (uint8_t)(B >>  8);
-            uint8_t b4 = (col < 38) ? (uint8_t)(A >> 16) : 0;
+            uint8_t b0 = (uint8_t)(AUX     );
+            uint8_t b1 = (uint8_t)(MAN     );
+            uint8_t b2 = (uint8_t)(AUX >> 8);
+            uint8_t b3 = (uint8_t)(MAN >> 8);
+            uint8_t b4 = (col < 38) ? (uint8_t)(AUX >> 16) : 0;
 
             // Make nibbles 
-            // Bits are in reverse display order (apple order)
             uint8_t t0 =  (b0     ) & 0x0F;
             uint8_t t1 =  (b0 >> 4) | ((b1 & 0x1) << 3);
             uint8_t t2 =  (b1 >> 1) & 0x0F;
@@ -605,15 +610,14 @@ void viewapl2_screen_dhgr(APPLE2 *m, int start, int end) {
             uint32_t stream = t7 << 28 | t6 << 24 | t5 << 20 | t4 << 16 | t3 << 12 | t2 << 8 | t1 << 4 | t0;
 
             // Tunables:
-            const int phase0  = 1; // flip 0/1 if whole image hue is inverted
-            const int phase90 = 3; // shift 0..3 to rotate hue
-            const int kY = 24;     // brightness gain
-            const int kI = 30;     // saturation (I axis)
-            const int kQ = 22;     // saturation (Q axis)
-            const int dead = 3;    // chroma deadzone to keep near-grays neutral
+            const int phase0  = 1;  // flip 0/1 if whole image hue is inverted
+            const int phase90 = 1;  // shift 0..3 to rotate hue
+            const int kY = 20;      // brightness gain
+            const int kI = 32;      // saturation (I axis)
+            const int kQ = 24;      // saturation (Q axis)
+            const int dead = 3;     // chroma deadzone to keep near-grays neutral
 
-            uint8_t a = 0, R0, G0, B0, Y0, I0, Q0;
-            for(int x = 0; x < 28; x += 1) {
+            for(int x = 0; x < 28; x++) {
                 uint8_t px = stream & 0x0f;
                 stream >>= 1;
 
@@ -629,15 +633,15 @@ void viewapl2_screen_dhgr(APPLE2 *m, int start, int end) {
                 int s2 = b2 ? +1 : -1;
                 int s3 = b3 ? +1 : -1;
 
-                int r0 = (((fx + 1 + phase0 ) & 1) ? -1 : +1);
-                int r1 = (((fx + 1 + phase0 ) & 1) ? -1 : +1);
-                int r2 = (((fx + 0 + phase0 ) & 1) ? -1 : +1);
-                int r3 = (((fx + 0 + phase0 ) & 1) ? -1 : +1);
+                int r0 = (((fx + 0 + phase0 ) & 1) ? -1 : +1);
+                int r1 = (((fx + 0 + phase0 ) & 1) ? -1 : +1);
+                int r2 = (((fx + 1 + phase0 ) & 1) ? -1 : +1);
+                int r3 = (((fx + 1 + phase0 ) & 1) ? -1 : +1);
 
-                int t0 =   (fx + 1 + phase90) & 3;
-                int t1 =   (fx + 1 + phase90) & 3;
-                int t2 =   (fx + 0 + phase90) & 3;
-                int t3 =   (fx + 0 + phase90) & 3;
+                int t0 =   (fx + 0 + phase90) & 3;
+                int t1 =   (fx + 0 + phase90) & 3;
+                int t2 =   (fx + 1 + phase90) & 3;
+                int t3 =   (fx + 1 + phase90) & 3;
 
                 int q0 = (t0 == 0) ? +1 : (t0 == 2) ? -1 : 0;
                 int q1 = (t1 == 0) ? +1 : (t1 == 2) ? -1 : 0;
@@ -658,33 +662,15 @@ void viewapl2_screen_dhgr(APPLE2 *m, int start, int end) {
                 int I = kI * Iraw;
                 int Q = kQ * Qraw;
 
-                if(!a) {
-                    Y0 = Y;
-                    I0 = I;
-                    Q0 = Q;
-                    a ^=1 ;
-                } else {
-                    float magA = sqrtf(I0*I0 + Q0*Q0);
-                    float magB = sqrtf(I*I + Q*Q);
-                    Y = (1.f - 0.5)*Y0 + 0.5*Y;
+                uint8_t R0 = clamp8i(Y + 245*I + 159*Q);
+                uint8_t G0 = clamp8i(Y -  70*I - 166*Q);
+                uint8_t B0 = clamp8i(Y - 283*I + 436*Q);
 
-                    float angA = atan2f(Q0, I0);
-                    float angB = atan2f(Q, I);
-
-                    float d = fmodf(angB - angA + (float)M_PI, 2.f*(float)M_PI) - (float)M_PI;
-                    float ang = angA + 0.5f * d;
-                    float mag = (1.f - 0.5f)*magA + 0.5*magB;
-
-                    I = mag * cosf(ang);
-                    Q = mag * sinf(ang);
-                    
-                    a ^= 1;
-                    uint8_t R = clamp8i(Y + ((245*I + 159*Q) >> 8));
-                    uint8_t G = clamp8i(Y - (( 70*I + 166*Q) >> 8));
-                    uint8_t B = clamp8i(Y - ((283*I - 436*Q) >> 8));
-                    *p++ = SDL_MapRGB(format, R, G, B);
-                    *p++ = SDL_MapRGB(format, R, G, B);
-                }
+                R = (R0 + R) / 2; // R = (1-0.5)R + 0.5R
+                G = (G0 + G) / 2;
+                B = (B0 + B) / 2;
+                
+                *p++ = SDL_MapRGB(format, R, G, B);
             }
         }
     }

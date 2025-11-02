@@ -463,10 +463,12 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                         break;
                     case CLR80COL: //e
                         m->col80set = 0;
+                        m->screen_mode &= ~SCREEN_MODE_DOUBLE;
                         m->wide_canvas = 0;
                         break;
-                    case SET80COL: //e
+                        case SET80COL: //e
                         m->col80set = 1;
+                        m->screen_mode |= SCREEN_MODE_DOUBLE;
                         m->wide_canvas = 1;
                         break;
                     case CLRALTCHAR: // e
