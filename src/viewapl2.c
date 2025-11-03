@@ -459,12 +459,12 @@ void viewapl2_screen_dlores(APPLE2 *m, int start, int end) {
     int y;
     SDL_Surface *surface = m->viewport->surface_wide;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    uint16_t page = m->viewport->shadow_page2set ? 0x0800 : 0x0400;
+    // uint16_t page = m->viewport->shadow_page2set ? 0x0800 : 0x0400;
     int surface_width = surface->w;
 
     for(y = start; y < end; y++) {
         uint32_t *p = &pixels[y * 8 * surface_width];
-        const uint8_t *man = m->RAM_MAIN + page + txt_row_start[y];
+        const uint8_t *man = m->RAM_MAIN + 0x0400 + txt_row_start[y];
         const uint8_t *aux = man + 0x10000;
 
         for(int col = 0; col < 80; col++) {
