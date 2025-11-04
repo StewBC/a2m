@@ -579,6 +579,7 @@ static inline void brk(APPLE2 *m) {
             m->cpu.flags |= 0b00000100;
         }
     }
+    m->stopped = 1;
 }
 
 static inline void clc(APPLE2 *m) {

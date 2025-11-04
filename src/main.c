@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
 
         // If not going at max speed
         if(m.turbo_active > 0.0) {
-            double cycles_per_frame = max(1, (CPU_FREQUENCY * m.turbo_active) / TARGET_FPS) - (overhead_ticks * clock_cycles_per_tick);
+            double cycles_per_frame = max(1, (CPU_FREQUENCY * m.turbo_active) / TARGET_FPS - (overhead_ticks * clock_cycles_per_tick));
             uint64_t cycles = 0;
             while(cycles < cycles_per_frame && (!m.stopped || m.step)) {
                 size_t opcode_cycles = machine_run_opcode(&m);
@@ -74,8 +74,7 @@ int main(int argc, char *argv[]) {
         }
 
         quit = viewport_process_events(&m);
-        v.shadow_screen_mode = m.screen_mode;
-        v.shadow_page2set = m.page2set;
+        v.shadow_flags.u32 = m.state_flags;
         viewport_show(&m);
         viewapl2_screen_apple2(&m);
         viewport_update(&m);

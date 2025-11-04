@@ -36,7 +36,8 @@ typedef struct VIEWPORT {
     VIEWMISC viewmisc;
 
     // Shadow of machine states
-    int shadow_screen_mode;
+    // int shadow_flags;
+    A2FLAGSPACK shadow_flags;
     int help_page;
 
     // Game controller values
@@ -59,7 +60,6 @@ typedef struct VIEWPORT {
     uint32_t dlg_memory_go: 1;
     uint32_t dlg_symbol_lookup_dbg: 1;
     uint32_t dlg_symbol_lookup_mem: 1;
-    uint32_t shadow_page2set: 1;
     uint32_t shadow_stopped: 1;
     uint32_t show_help: 1;
     uint32_t show_leds: 1;

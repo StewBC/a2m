@@ -400,81 +400,145 @@ void viewapl2_process_event(APPLE2 *m, SDL_Event *e) {
 
 // Select which screen to display based on what mode is active
 void viewapl2_screen_apple2(APPLE2 *m) {
-    // SQW - Path diverts here between ][+ an //e - if 80 cols active
-    switch(m->viewport->shadow_screen_mode & 0b111) {
-        case 0b001:                                             // lores
-            if(m->viewport->shadow_screen_mode & SCREEN_MODE_DOUBLE) {
-                viewapl2_screen_dlores(m, 0, 24);
-            } else {
-                viewapl2_screen_lores(m, 0, 24);
-            }
-            break;
-
-        case 0b011:                                             // mixed lores
-            if(m->viewport->shadow_screen_mode & SCREEN_MODE_DOUBLE) {
-                viewapl2_screen_dlores(m, 0, 20);
-                viewapl2_screen_txt80(m, 20, 24);
-            } else {
-                viewapl2_screen_lores(m, 0, 20);
-                viewapl2_screen_txt40(m, 20, 24);
-            }
-            break;
-
-        case 0b101:                                             // hgr graphics
-            if(m->viewport->shadow_screen_mode & SCREEN_MODE_DOUBLE) {
-                viewapl2_screen_dhgr(m, 0, 192);
-            } else {
-                viewapl2_screen_hgr(m, 0, 192);
-            }
-            break;
-
-        case 0b111:                                             // hgr, mixed graphics
+    uint32_t mode = (
+        m->viewport->shadow_flags.b.col80set << 4) |
+        (m->viewport->shadow_flags.b.dhires << 3)  | (m->viewport->shadow_flags.b.hires << 2) |
+        (m->viewport->shadow_flags.b.mixed << 1)   | (m->viewport->shadow_flags.b.text);
+                    // The bits are col80, dhgr, hgr, mixed, text, (followed by bin, hex)
+    switch(mode) {
+        case 0x00: // 0 ,0 ,0 ,0 ,0 ,00000,00
+            viewapl2_screen_lores(m, 0, 24);
+        break;
+        case 0x01: // 0 ,0 ,0 ,0 ,1 ,00001,01
+            viewapl2_screen_txt40(m, 0, 24);
+        break;
+        case 0x02: // 0 ,0 ,0 ,1 ,0 ,00010,02
+            viewapl2_screen_lores(m, 0, 20);
+            viewapl2_screen_txt40(m, 20, 24);
+        break;
+        case 0x03: // 0 ,0 ,0 ,1 ,1 ,00011,03
+            viewapl2_screen_txt40(m, 0, 20);
+            viewapl2_screen_lores(m, 20, 24);
+        break;
+        case 0x04: // 0 ,0 ,1 ,0 ,0 ,00100,04
+            viewapl2_screen_hgr(m, 0, 192);
+        break;
+        case 0x05: // 0 ,0 ,1 ,0 ,1 ,00101,05
+            viewapl2_screen_txt40(m, 0, 24);
+        break;
+        case 0x06: // 0 ,0 ,1 ,1 ,0 ,00110,06
             viewapl2_screen_hgr(m, 0, 160);
             viewapl2_screen_txt40(m, 20, 24);
-            break;
-
-        default:
-            // case 0b000: // text
-            // case 0b010: // mixed text (also just text)
-            // case 0b100: // hgr but not graphics, so text
-            // case 0b110: // hgr, mixed but not graphics, so text
-            if(m->franklin80active) {
-                viewapl2_screen_franklin80col(m, 0, 24);
-            } else if(m->col80set) {
-                viewapl2_screen_txt80(m, 0, 24);
-            } else {
-                viewapl2_screen_txt40(m, 0, 24);
-            }
-            break;
+        break;
+        case 0x07: // 0 ,0 ,1 ,1 ,1 ,00111,07
+            viewapl2_screen_txt40(m, 0, 24);
+        break;
+        case 0x08: // 0 ,1 ,0 ,0 ,0 ,01000,08
+            viewapl2_screen_lores(m, 0, 24);
+        break;
+        case 0x09: // 0 ,1 ,0 ,0 ,1 ,01001,09
+            viewapl2_screen_txt40(m, 0, 24);
+        break;
+        case 0x0A: // 0 ,1 ,0 ,1 ,0 ,01010,0A
+            viewapl2_screen_lores(m, 0, 20);
+            viewapl2_screen_txt40(m, 20, 24);
+        break;
+        case 0x0B: // 0 ,1 ,0 ,1 ,1 ,01011,0B
+            viewapl2_screen_txt40(m, 0, 24);
+        break;
+        case 0x0C: // 0 ,1 ,1 ,0 ,0 ,01100,0C
+            viewapl2_screen_hgr(m, 0, 192);
+        break;
+        case 0x0D: // 0 ,1 ,1 ,0 ,1 ,01101,0D
+            viewapl2_screen_txt40(m, 0, 24);
+        break;
+        case 0x0E: // 0 ,1 ,1 ,1 ,0 ,01110,0E
+            viewapl2_screen_hgr(m, 0, 160);
+            viewapl2_screen_txt40(m, 20, 24);
+        break;
+        case 0x0F: // 0 ,1 ,1 ,1 ,1 ,01111,0F
+            viewapl2_screen_txt40(m, 0, 24);
+        break;
+        case 0x10: // 1 ,0 ,0 ,0 ,0 ,10000,10
+            viewapl2_screen_dlores(m, 0, 24);
+        break;
+        case 0x11: // 1 ,0 ,0 ,0 ,1 ,10001,11
+            viewapl2_screen_txt80(m, 0, 24);
+        break;
+        case 0x12: // 1 ,0 ,0 ,1 ,0 ,10010,12
+            viewapl2_screen_dlores(m, 0, 20);
+            viewapl2_screen_txt80(m, 20, 24);
+        break;
+        case 0x13: // 1 ,0 ,0 ,1 ,1 ,10011,13
+            viewapl2_screen_txt80(m, 0, 24);
+        break;
+        case 0x14: // 1 ,0 ,1 ,0 ,0 ,10100,14
+            viewapl2_screen_hgr(m, 0, 192);
+        break;
+        case 0x15: // 1 ,0 ,1 ,0 ,1 ,10101,15
+            viewapl2_screen_txt80(m, 0, 24);
+        break;
+        case 0x16: // 1 ,0 ,1 ,1 ,0 ,10110,16
+            viewapl2_screen_hgr(m, 0, 160);
+            viewapl2_screen_txt80(m, 20, 24);
+        break;
+        case 0x17: // 1 ,0 ,1 ,1 ,1 ,10111,17
+            viewapl2_screen_txt80(m, 0, 24);
+        break;
+        case 0x18: // 1 ,1 ,0 ,0 ,0 ,11000,18
+            viewapl2_screen_dlores(m, 0, 24);
+        break;
+        case 0x19: // 1 ,1 ,0 ,0 ,1 ,11001,19
+            viewapl2_screen_txt80(m, 0, 24);
+        break;
+        case 0x1A: // 1 ,1 ,0 ,1 ,0 ,11010,1A
+            viewapl2_screen_dlores(m, 0, 20);
+            viewapl2_screen_txt80(m, 20, 24);
+        break;
+        case 0x1B: // 1 ,1 ,0 ,1 ,1 ,11011,1B
+            viewapl2_screen_dlores(m, 0, 20);
+            viewapl2_screen_txt80(m, 20, 24);
+        break;
+        case 0x1C: // 1 ,1 ,1 ,0 ,0 ,11100,1C
+            viewapl2_screen_dhgr(m, 0, 192);
+        break;
+        case 0x1D: // 1 ,1 ,1 ,0 ,1 ,11101,1D
+            viewapl2_screen_txt80(m, 0, 24);
+        break;
+        case 0x1E: // 1 ,1 ,1 ,1 ,0 ,11110,1E
+            viewapl2_screen_dhgr(m, 0, 160);
+            viewapl2_screen_txt80(m, 20, 24);
+        break;
+        case 0x1F: // 1 ,1 ,1 ,1 ,1 ,11111,1F
+            viewapl2_screen_txt80(m, 0, 24);
+        break;
     }
 }
 
 void viewapl2_screen_dlores(APPLE2 *m, int start, int end) {
     if(m->monitor_type) {
         // SQW
-        viewapl2_screen_hgr_mono(m, start, end);
+        viewapl2_screen_dlores_mono(m, start, end);
         return;
     }
 
     int y;
     SDL_Surface *surface = m->viewport->surface_wide;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    // uint16_t page = m->viewport->shadow_page2set ? 0x0800 : 0x0400;
     int surface_width = surface->w;
 
     for(y = start; y < end; y++) {
         uint32_t *p = &pixels[y * 8 * surface_width];
-        const uint8_t *man = m->RAM_MAIN + 0x0400 + txt_row_start[y];
-        const uint8_t *aux = man + 0x10000;
+        const uint8_t *man = m->RAM_MAIN + 0x00400 + txt_row_start[y];
+        const uint8_t *aux = m->RAM_MAIN + 0x10400 + txt_row_start[y];
 
         for(int col = 0; col < 80; col++) {
             int r;
             uint8_t index = col >> 1;
-            uint8_t character = (col & 1) ? man[index] : aux[index];
-            uint8_t upper = character & 0x0f;
+            uint8_t character = (col & 0x1) ? man[index] : aux[index];
+            uint8_t upper = character & 0x0F;
             uint8_t lower = (character >> 4) & 0X0F;
 
-            // SQW The colors are not right - I am getting brown for purple, etc.
             uint32_t *pr = p;
             for(r = 0; r < 4; r++) {
                 memcpy(pr, gr_line[upper], sizeof(gr_line[upper]));
@@ -482,6 +546,38 @@ void viewapl2_screen_dlores(APPLE2 *m, int start, int end) {
             }
             for(r = 0; r < 4; r++) {
                 memcpy(pr, gr_line[lower], sizeof(gr_line[lower]));
+                pr += surface->w;
+            }
+            p += 7;
+        }
+    }
+}
+
+void viewapl2_screen_dlores_mono(APPLE2 *m, int start, int end) {
+    int y;
+    SDL_Surface *surface = m->viewport->surface_wide;
+    uint32_t *pixels = (uint32_t *) surface->pixels;
+    int surface_width = surface->w;
+
+    for(y = start; y < end; y++) {
+        uint32_t *p = &pixels[y * 8 * surface_width];
+        const uint8_t *man = m->RAM_MAIN + 0x00400 + txt_row_start[y];
+        const uint8_t *aux = m->RAM_MAIN + 0x10400 + txt_row_start[y];
+
+        for(int col = 0; col < 80; col++) {
+            int r;
+            uint8_t index = col >> 1;
+            uint8_t character = (col & 0x1) ? man[index] : aux[index];
+            uint8_t upper = character & 0x0F;
+            uint8_t lower = (character >> 4) & 0X0F;
+
+            uint32_t *pr = p;
+            for(r = 0; r < 4; r++) {
+                memcpy(pr, gr_mono_line[upper], sizeof(gr_mono_line[upper]));
+                pr += surface->w;
+            }
+            for(r = 0; r < 4; r++) {
+                memcpy(pr, gr_mono_line[lower], sizeof(gr_mono_line[lower]));
                 pr += surface->w;
             }
             p += 7;
@@ -499,7 +595,7 @@ void viewapl2_screen_lores(APPLE2 *m, int start, int end) {
     int x, y;
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    int page = m->viewport->shadow_page2set ? 0x0800 : 0x0400;
+    uint16_t page = m->viewport->shadow_flags.b.page2set ? 0x0800 : 0x0400;
 
     // Loop through each row
     for(y = start; y < end; y++) {
@@ -533,7 +629,7 @@ void viewapl2_screen_lores_mono(APPLE2 *m, int start, int end) {
     int x, y;
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    int page = m->viewport->shadow_page2set ? 0x0800 : 0x0400;
+    uint16_t page = m->viewport->shadow_flags.b.page2set ? 0x0800 : 0x0400;
 
     // Loop through each row
     for(y = start; y < end; y++) {
@@ -573,7 +669,7 @@ void viewapl2_screen_dhgr(APPLE2 *m, int start, int end) {
     int y;
     SDL_Surface *surface = m->viewport->surface_wide;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    uint16_t page = m->viewport->shadow_page2set ? 0x4000 : 0x2000;
+    uint16_t page = m->viewport->shadow_flags.b.page2set ? 0x4000 : 0x2000;
     int surface_width = surface->w;
     SDL_PixelFormat *format = m->viewport->surface->format; // (unused here but keeping your locals)
 
@@ -681,7 +777,7 @@ void viewapl2_screen_dhgr_rgb(APPLE2 *m, int start, int end) {
     int y;
     SDL_Surface *surface = m->viewport->surface_wide;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    uint16_t page = m->viewport->shadow_page2set ? 0x4000 : 0x2000;
+    uint16_t page = m->viewport->shadow_flags.b.page2set ? 0x4000 : 0x2000;
     int surface_width = surface->w;
     SDL_PixelFormat *format = m->viewport->surface->format; // (unused here but keeping your locals)
 
@@ -736,7 +832,7 @@ void viewapl2_screen_hgr(APPLE2 *m, int start, int end) {
     int y;
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    uint16_t page = m->viewport->shadow_page2set ? 0x4000 : 0x2000;
+    uint16_t page = m->viewport->shadow_flags.b.page2set ? 0x4000 : 0x2000;
     int surface_width = surface->w;
 
     for(y = start; y < end; y++) {
@@ -778,7 +874,7 @@ void viewapl2_screen_hgr_mono(APPLE2 *m, int start, int end) {
     int x, y;
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    int page = m->viewport->shadow_page2set ? 0x4000 : 0x2000;
+    uint16_t page = m->viewport->shadow_flags.b.page2set ? 0x4000 : 0x2000;
     uint32_t c[2] = { color_table[0][0][0], color_table[7][0][0] };
 
     // Loop through each row
@@ -808,7 +904,7 @@ void viewapl2_screen_txt40(APPLE2 *m, int start, int end) {
     int x, y;
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    int page = m->viewport->shadow_page2set ? 0x0800 : 0x0400;
+    uint16_t page = m->viewport->shadow_flags.b.page2set ? 0x0800 : 0x0400;
     Uint64 now = SDL_GetPerformanceCounter();
     double freq = (double)SDL_GetPerformanceFrequency();
     // I got 3.7 from recording a flash on my Platinum //e - 0.17 to 0.44 for a change so 0.27
@@ -908,7 +1004,6 @@ void viewapl2_screen_franklin80col(APPLE2 *m, int start, int end) {
     FRANKLIN_DISPLAY *fd80 = &m->franklin_display;
     SDL_Surface *surface = m->viewport->surface_wide;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    // int page = m->viewport->shadow_page2set ? 0x0800 : 0x0400;
     uint32_t c[2] = { color_table[0][0][0], color_table[7][0][0] };
     uint16_t display_offset = 256 * fd80->registers[0x0c] + fd80->registers[0x0d];
 

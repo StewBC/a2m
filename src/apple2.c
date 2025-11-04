@@ -11,6 +11,8 @@ int apple2_configure(APPLE2 *m) {
 
     // Clear the whole emulated machine
     memset(m, 0, sizeof(APPLE2));
+    // Set text mode on
+    m->text = 1;
     // Init the ini config storage
     ini_init(&m->ini_store);
     // Load config from ini file
@@ -150,25 +152,17 @@ int apple2_configure(APPLE2 *m) {
 }
 
 void apple2_machine_reset(APPLE2 *m) {
-    m->screen_mode = 0;
-    m->monitor_type = 0;
-    m->altcharset = 0;
-    m->altzpset = 0;
-    m->c3slotrom = 0;
-    m->col80set = 0;
-    m->cxromset = 0;
-    m->disk_activity_read = 0;
-    m->disk_activity_write = 0;
-    m->franklin80active = 0;
-    m->page2set = 0;
-    m->ramrdset = 0;
-    m->ramwrtset = 0;
-    m->step = 0;
+
+    // emu flags reset only debugger state
     m->stopped = 0;
-    m->store80set = 0;
-    m->strobed = 0;
-    m->wide_canvas = 0;
+    m->step = 0;
+
+    // A2 state_flags reset, setting text mode
+    m->state_flags = 0;
+    m->text = 1;
+    
     cpu_init(m);
+
     ram_card_reinit(m);
     set_memory_map(m);
     memset(&m->RAM_MAIN[0x0400], 0xA0, 0x400);

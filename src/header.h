@@ -91,6 +91,9 @@ typedef struct DEBUGGER DEBUGGER;
 
 #ifdef IS_EMULATOR
 
+// State info in APPLE2 but also shadowed outside
+#include "a2flags.h"
+
 // Machine
 #include "6502.h"
 #include "diskii.h"

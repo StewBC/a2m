@@ -567,7 +567,6 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
             if(mod & KMOD_SHIFT) {
                 if(m->franklin80installed) {
                     m->franklin80active ^= 1;
-                    m->wide_canvas = m->franklin80active;
                 }
             } else {
                 m->monitor_type ^= 1;

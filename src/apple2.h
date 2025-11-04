@@ -90,31 +90,17 @@ typedef struct APPLE2 {
     uint8_t open_apple;
     uint8_t closed_apple;
 
-    // Screen State
-    uint8_t screen_mode;                                    // lores, text hgr, etc. See viewapl2_screen_apple2
-    uint8_t monitor_type;                                   // 0 = color; 1 = mono
+    // Emu Status flags
+    union {
+        uint32_t emu_flags;
+        EMUFLAGS;
+    };
 
-    // Status flags
-    uint32_t altcharset: 1;                                 // 1 = mousetext
-    uint32_t altzpset: 1;                                   // 1 = 0x0000 - 0x0200 in aux
-    uint32_t c3slotrom: 1;                                  // 1 = C300-C3FF slot card rom (not internal //e S3 ROM)
-    uint32_t col80set: 1;                                   // 1 = 80 col display active
-    uint32_t cxromset: 1;                                   // 1 = 0xc100 - cfff - from rom
-    uint32_t debug_view: 1;                                 // Apple ][ is not full-screen, debugger visible
-    uint32_t disk_activity_read: 1;                         // 0 = no read/write (here for convenience)
-    uint32_t disk_activity_write: 1;                        // 0 = no read/write
-    uint32_t franklin80active: 1;                           // Videx/Franklin Ace Display active
-    uint32_t franklin80installed: 1;                        // Videx/Franklin Ace Display in a slot
-    uint32_t model: 1;                                      // (0) II+ or (1) //e
-    uint32_t original_del: 1;                               // backspace key does crsr left if 0
-    uint32_t page2set: 1;                                   // 1 = 0x0800 text or 0x4000 HGR
-    uint32_t ramrdset: 1;                                   // 1 = 0x0200 - 0xbfff (with 80store excptions) read from aux
-    uint32_t ramwrtset: 1;                                  // 1 = 0x0200 - 0xbfff (with 80store excptions) write to aux
-    uint32_t step: 1;                                       // Emulation halted but one instruction is "stepped"
-    uint32_t stopped: 1;                                    // Emulation is halted
-    uint32_t store80set: 1;                                 // 1 - Page 2 text, and if hgr also 4000-6000, mapped from aux
-    uint32_t strobed: 1;                                    // 1 - C800-CFFF is mapped, 0 - it is floating bus
-    uint32_t wide_canvas: 1;                                // Using the wide texture (560px)
+    // A2 Status flags
+    union {
+        uint32_t state_flags;
+        A2FLAGS;
+    };
 
     // Configuration
     INI_STORE ini_store;

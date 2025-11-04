@@ -57,19 +57,18 @@ static inline void set_memory_map(APPLE2 *m) {
     if(m->store80set) {
         pages_map(&m->read_pages,  0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x00400]);
         pages_map(&m->write_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x00400]);
-        if(m->screen_mode & SCREEN_MODE_HIRES) {
+        if(m->hires) {
             pages_map(&m->read_pages,  0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x02000]);
             pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x02000]);
         }
         if(m->page2set) {
             pages_map(&m->read_pages,  0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x10400]);
             pages_map(&m->write_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x10400]);
-            if(m->screen_mode & SCREEN_MODE_HIRES) {
+            if(m->hires) {
                 pages_map(&m->read_pages,  0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
                 pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
             }
         }
-
     }
 }
 
@@ -134,16 +133,16 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                         }
                         break;
                     case RDTEXT:      //e
-                        byte |= (m->screen_mode & SCREEN_MODE_GRAPHICS) ? 0 : 128;
+                        byte |= m->text << 7;
                         break;
                     case RDMIXED:     //e
-                        byte |= (m->screen_mode & SCREEN_MODE_MIXED) ? 128 : 0;
+                        byte |= m->mixed << 7;
                         break;
                     case RDPAGE2:     //e
                         byte |= m->page2set << 7;
                         break;
                     case RDHIRES:     //e
-                        byte |= (m->screen_mode & SCREEN_MODE_HIRES) ? 128 : 0;
+                        byte |= m->hires << 7;
                         break;
                     case RDALTCHAR:   //e
                         byte |= m->altcharset << 7;
@@ -165,16 +164,16 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
             case 0xC050:
                 switch (address) {
                     case TXTCLR:
-                         m->screen_mode |= SCREEN_MODE_GRAPHICS;
+                         m->text = 0;
                         break;
                     case TXTSET:
-                        m->screen_mode &= ~SCREEN_MODE_GRAPHICS;
+                        m->text = 1;
                         break;
                     case MIXCLR:
-                        m->screen_mode &= ~SCREEN_MODE_MIXED;
+                        m->mixed = 0;
                         break;
                     case MIXSET:
-                        m->screen_mode |= SCREEN_MODE_MIXED;
+                        m->mixed = 1;
                         break;
                     case CLRPAGE2:
                         m->page2set = 0;
@@ -185,11 +184,11 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                         set_memory_map(m);
                         break;
                     case CLRHIRES:
-                        m->screen_mode &= ~SCREEN_MODE_HIRES;
+                        m->hires = 0;
                         set_memory_map(m);
                         break;
                     case SETHIRES:
-                        m->screen_mode |= SCREEN_MODE_HIRES;
+                        m->hires = 1;
                         set_memory_map(m);
                         break;
                     case CLRAN0:
@@ -200,12 +199,10 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                     case SETAN2:
                         break;
                     case CLRAN3:
-                        m->screen_mode |= SCREEN_MODE_DOUBLE;
-                        m->wide_canvas = 1;
+                        m->dhires = 1;
                         break;
                     case SETAN3:
-                        m->screen_mode &= ~SCREEN_MODE_DOUBLE;
-                        m->wide_canvas = 0; // SQW not neccesarily
+                        m->dhires = 0;
                         break;
                 }
                 break;
@@ -463,13 +460,9 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                         break;
                     case CLR80COL: //e
                         m->col80set = 0;
-                        m->screen_mode &= ~SCREEN_MODE_DOUBLE;
-                        m->wide_canvas = 0;
                         break;
-                        case SET80COL: //e
+                    case SET80COL: //e
                         m->col80set = 1;
-                        m->screen_mode |= SCREEN_MODE_DOUBLE;
-                        m->wide_canvas = 1;
                         break;
                     case CLRALTCHAR: // e
                         m->altcharset = 0;
@@ -497,16 +490,16 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
             case 0xC050:
                 switch (address) {
                     case TXTCLR:
-                        m->screen_mode |= SCREEN_MODE_GRAPHICS;
+                        m->text = 0;
                         break;
                     case TXTSET:
-                        m->screen_mode &= ~SCREEN_MODE_GRAPHICS;
+                        m->text = 1;
                         break;
                     case MIXCLR:
-                        m->screen_mode &= ~SCREEN_MODE_MIXED;
+                        m->mixed = 0;
                         break;
                     case MIXSET:
-                        m->screen_mode |= SCREEN_MODE_MIXED;
+                        m->mixed = 1;
                         break;
                     case CLRPAGE2:
                         m->page2set = 0;
@@ -517,11 +510,11 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                         set_memory_map(m);
                         break;
                     case CLRHIRES:
-                        m->screen_mode &= ~SCREEN_MODE_HIRES;
+                        m->hires = 0;
                         set_memory_map(m);
                         break;
                     case SETHIRES:
-                        m->screen_mode |= SCREEN_MODE_HIRES;
+                        m->hires = 1;
                         set_memory_map(m);
                         break;
                     case CLRAN0: // SQW - hires or dhires if text off 
@@ -531,11 +524,11 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                     case CLRAN2: // SQW
                     case SETAN2: // SQW
                         break;
-                    case CLRAN3: // SQW - dhires on if IOUD is on
-                        m->screen_mode |= SCREEN_MODE_DOUBLE;
+                    case CLRAN3:
+                        m->dhires = 1;
                         break;
-                    case SETAN3: // SQW - dhires off if IOUD is on
-                        m->screen_mode &= ~SCREEN_MODE_DOUBLE;
+                    case SETAN3:
+                        m->dhires = 0;
                         break;
                 }
                 break;

@@ -319,6 +319,7 @@ void viewmisc_show(APPLE2 *m) {
             display_override = nk_option_label(ctx, "Yes", display_override == 1) ? 1 : display_override;
 
             if(display_override) {
+                // SQW -- All of this needs updating now that the //e is in the picture
                 // Only redraw the screen, when stopped, if a change is made
                 if(display_mode != display_mode_setting || display_mixed != display_mixed_setting
                         || display_page2set != display_page2set_setting) {
@@ -332,9 +333,11 @@ void viewmisc_show(APPLE2 *m) {
                 }
             } else {
                 // Get the settings from the "hardware"
-                display_mode = m->screen_mode & 1 ? m->screen_mode & 4 ? 2 : 1 : 0;
+                // display_mode = m->screen_mode & 1 ? m->screen_mode & 4 ? 2 : 1 : 0; // SQW
+                display_mode = 0; // SQW - FIXME SOON
                 display_page2set = m->page2set != 0;
-                display_mixed = display_mode && m->screen_mode & 2;
+                // display_mixed = display_mode && m->screen_mode & 2; // SQW
+                display_mixed = 0; // SQW - FIXME SOON
                 if(display_undo_change) {
                     // If the settings were overridden but is now driven from the hardware
                     // a redraw is needed (can only happen when stopped since UI only
@@ -344,8 +347,8 @@ void viewmisc_show(APPLE2 *m) {
                 }
             }
             // Set the view draw settings based on whatever is active
-            v->shadow_screen_mode = screen_mode[display_mode] | (display_mixed << 1);
-            v->shadow_page2set = display_page2set;
+            // v->shadow_screen_mode = screen_mode[display_mode] | (display_mixed << 1); // SQW
+            m->viewport->shadow_flags.b.page2set = display_page2set;
             if(force_redraw) {
                 // stopped and a change was made, so update the Apple II display
                 viewapl2_screen_apple2(m);

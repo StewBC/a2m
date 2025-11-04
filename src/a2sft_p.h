@@ -94,16 +94,16 @@ static inline uint8_t apple2_softswitch_read_callback_IIplus(APPLE2 *m, uint16_t
                 speaker_toggle(&m->speaker);
                 break;
             case TXTCLR:
-                m->screen_mode |= SCREEN_MODE_GRAPHICS;
+                m->text = 0;
                 break;
             case TXTSET:
-                m->screen_mode &= ~SCREEN_MODE_GRAPHICS;
+                m->text = 1;
                 break;
             case MIXCLR:
-                m->screen_mode &= ~SCREEN_MODE_MIXED;
+                m->mixed = 0;
                 break;
             case MIXSET:
-                m->screen_mode |= SCREEN_MODE_MIXED;
+                m->mixed = 1;
                 break;
             case CLRPAGE2:
                 m->page2set = 0;
@@ -112,10 +112,10 @@ static inline uint8_t apple2_softswitch_read_callback_IIplus(APPLE2 *m, uint16_t
                 m->page2set = 1;
                 break;
             case CLRHIRES:
-                m->screen_mode &= ~SCREEN_MODE_HIRES;
+                m->hires = 0;
                 break;
             case SETHIRES:
-                m->screen_mode |= SCREEN_MODE_HIRES;
+                m->hires = 1;
                 break;
             case BUTN0: {
                 uint8_t button = m->open_apple;
@@ -313,16 +313,16 @@ static inline void apple2_softswitch_write_callback_IIplus(APPLE2 *m, uint16_t a
                 speaker_toggle(&m->speaker);
                 break;
             case TXTCLR:
-                m->screen_mode |= SCREEN_MODE_GRAPHICS;
+                m->text = 0;
                 break;
             case TXTSET:
-                m->screen_mode &= ~SCREEN_MODE_GRAPHICS;
+                m->text = 1;
                 break;
             case MIXCLR:
-                m->screen_mode &= ~SCREEN_MODE_MIXED;
+                m->mixed = 0;
                 break;
             case MIXSET:
-                m->screen_mode |= SCREEN_MODE_MIXED;
+                m->mixed = 1;
                 break;
             case CLRPAGE2:
                 m->page2set = 0;
@@ -330,11 +330,11 @@ static inline void apple2_softswitch_write_callback_IIplus(APPLE2 *m, uint16_t a
             case SETPAGE2:
                 m->page2set = 1;
                 break;
-            case CLRHIRES: // SQW - rename to CLRHIRES
-                m->screen_mode &= ~SCREEN_MODE_HIRES;
+            case CLRHIRES:
+                m->hires = 0;
                 break;
-            case SETHIRES: // SQW - rename to SETHIRES
-                m->screen_mode |= SCREEN_MODE_HIRES;
+            case SETHIRES:
+                m->hires = 1;
                 break;
         }
     }
