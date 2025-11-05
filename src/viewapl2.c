@@ -554,12 +554,15 @@ void viewapl2_screen_dlores(APPLE2 *m, int start, int end) {
         for(int col = 0; col < 80; col++) {
             int r;
             uint8_t index = col >> 1;
-            uint8_t character = (col & 0x1) ? man[index] : aux[index];
-            uint8_t upper = character & 0x0F;
-            uint8_t lower = (character >> 4) & 0X0F;
-            if(!(col & 1)) {
-                upper = double_aux_map[upper];
-                lower = double_aux_map[lower];
+            uint8_t character, upper, lower;
+            if(col & 0x1) {
+                character = man[index];
+                upper = character & 0x0F;
+                lower = (character >> 4) & 0X0F;
+            }else {
+                character = aux[index];
+                upper = double_aux_map[character & 0x0F];
+                lower = double_aux_map[(character >> 4) & 0X0F];
             }
 
             uint32_t *pr = p;
@@ -590,12 +593,15 @@ void viewapl2_screen_dlores_mono(APPLE2 *m, int start, int end) {
         for(int col = 0; col < 80; col++) {
             int r;
             uint8_t index = col >> 1;
-            uint8_t character = (col & 0x1) ? man[index] : aux[index];
-            uint8_t upper = character & 0x0F;
-            uint8_t lower = (character >> 4) & 0X0F;
-            if(!(col & 1)) {
-                upper = double_aux_map[upper];
-                lower = double_aux_map[lower];
+            uint8_t character, upper, lower;
+            if(col & 0x1) {
+                character = man[index];
+                upper = character & 0x0F;
+                lower = (character >> 4) & 0X0F;
+            }else {
+                character = aux[index];
+                upper = double_aux_map[character & 0x0F];
+                lower = double_aux_map[(character >> 4) & 0X0F];
             }
 
             uint32_t *pr = p;
