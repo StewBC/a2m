@@ -129,6 +129,25 @@ mRGB lores_palette_mono[16] = {
     { 0xFF, 0xFF, 0xFF },
 };
 
+uint8_t double_aux_map[] = {
+    0x00,
+    0x02,
+    0x04,
+    0x06,
+    0x08,
+    0x0A,
+    0x0C,
+    0x0E,
+    0x01,
+    0x03,
+    0x05,
+    0x07,
+    0x09,
+    0x0B,
+    0x0D,
+    0x0F
+};
+
 // color_table
 uint32_t color_table[8][2][2]; // [bit_stream, 3 bits][column, even/odd][phase]
 
@@ -538,6 +557,10 @@ void viewapl2_screen_dlores(APPLE2 *m, int start, int end) {
             uint8_t character = (col & 0x1) ? man[index] : aux[index];
             uint8_t upper = character & 0x0F;
             uint8_t lower = (character >> 4) & 0X0F;
+            if(!(col & 1)) {
+                upper = double_aux_map[upper];
+                lower = double_aux_map[lower];
+            }
 
             uint32_t *pr = p;
             for(r = 0; r < 4; r++) {
@@ -570,6 +593,10 @@ void viewapl2_screen_dlores_mono(APPLE2 *m, int start, int end) {
             uint8_t character = (col & 0x1) ? man[index] : aux[index];
             uint8_t upper = character & 0x0F;
             uint8_t lower = (character >> 4) & 0X0F;
+            if(!(col & 1)) {
+                upper = double_aux_map[upper];
+                lower = double_aux_map[lower];
+            }
 
             uint32_t *pr = p;
             for(r = 0; r < 4; r++) {
