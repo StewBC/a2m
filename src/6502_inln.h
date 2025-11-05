@@ -566,19 +566,19 @@ static inline void bvs(APPLE2 *m) {
 }
 
 static inline void brk(APPLE2 *m) {
-    m->cpu.pc = 0xFFFE;
-    a(m);
-    m->cpu.pc = m->cpu.address_16;
-    if(m->cpu.class == CPU_6502) {
-        // Interrupt flag on at break
-        m->cpu.flags |= 0b00000100;
-    } else {
-        m->cpu.flags &= ~0b00001000;
-        if(m->cpu.flags & 0b00100000) {
-            // Interrupt flag on at break, if '-' flag is set
-            m->cpu.flags |= 0b00000100;
-        }
-    }
+    // m->cpu.pc = 0xFFFE;
+    // a(m);
+    // m->cpu.pc = m->cpu.address_16;
+    // if(m->cpu.class == CPU_6502) {
+    //     // Interrupt flag on at break
+    //     m->cpu.flags |= 0b00000100;
+    // } else {
+    //     m->cpu.flags &= ~0b00001000;
+    //     if(m->cpu.flags & 0b00100000) {
+    //         // Interrupt flag on at break, if '-' flag is set
+    //         m->cpu.flags |= 0b00000100;
+    //     }
+    // }
     m->stopped = 1;
 }
 
