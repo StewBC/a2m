@@ -755,15 +755,15 @@ int viewdbg_symbol_search_update(DEBUGGER *d) {
     return A2_OK;
 }
 
-void viewdbg_update(APPLE2 *m) {
+int viewdbg_update(APPLE2 *m) {
     VIEWPORT *v = m->viewport;
-    if(!v) {
-        return;
+    // No viewport or when stepping doesn't stop at a breakpoint
+    if(!v || m->step) {
+        m->step = 0;
+        return 0;
     }
 
     DEBUGGER *d = &v->debugger;
-    // after a step, the pc the debugger will want to show should be the cpu pc
-    d->cursor_pc = m->cpu.pc;
     // See if a breakpoint was hit (Also in step mode so counters can update if needed)
     if(!m->stopped || m->step) {
         m->step = 0;                                        // Set step off
@@ -808,4 +808,5 @@ void viewdbg_update(APPLE2 *m) {
         v->debugger.prev_stop_cycles = v->debugger.stop_cycles;
         v->debugger.stop_cycles = m->cpu.cycles;
     }
+    return m->stopped;
 }

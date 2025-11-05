@@ -57,21 +57,27 @@ int main(int argc, char *argv[]) {
             double cycles_per_frame = max(1, (CPU_FREQUENCY * m.turbo_active) / TARGET_FPS - (overhead_ticks * clock_cycles_per_tick));
             uint64_t cycles = 0;
             while(cycles < cycles_per_frame && (!m.stopped || m.step)) {
+                // See if a breakpoint was hit (will set m.stopped)
+                if(viewdbg_update(&m)) {
+                    continue;
+                }
                 size_t opcode_cycles = machine_run_opcode(&m);
                 speaker_on_cycles(&m.speaker, opcode_cycles);
                 cycles += opcode_cycles;
-                // See if a breakpoint was hit (will set m.stopped)
-                viewdbg_update(&m);
             }
         } else {
             uint64_t emulation_cycles = max(1, frame_start_ticks + ticks_per_frame - overhead_ticks);
             while(SDL_GetPerformanceCounter() < emulation_cycles && (!m.stopped || m.step)) {
+                // See if a breakpoint was hit (will set m.stopped)
+                if(viewdbg_update(&m)) {
+                    continue;
+                }
                 size_t opcode_cycles = machine_run_opcode(&m);
                 speaker_on_cycles(&m.speaker, opcode_cycles);
-                // See if a breakpoint was hit (will set m.stopped)
-                viewdbg_update(&m);
             }
         }
+        // after a step, the pc the debugger will want to show should be the cpu pc
+        v.debugger.cursor_pc = m.cpu.pc;
 
         quit = viewport_process_events(&m);
         v.shadow_flags.u32 = m.state_flags;
