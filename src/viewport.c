@@ -800,6 +800,7 @@ void viewport_toggle_debug(APPLE2 *m) {
         m->viewport->target_rect.h *= 0.667f;
         SDL_SetRenderDrawColor(m->viewport->renderer, 0, 0, 0, 255);
         SDL_RenderClear(m->viewport->renderer);
+        viewcpu_update(m);
     } else {
         m->viewport->target_rect = m->viewport->full_window_rect;
     }
