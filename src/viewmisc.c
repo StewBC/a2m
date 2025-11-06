@@ -356,6 +356,7 @@ void viewmisc_show(APPLE2 *m) {
             nk_tree_pop(ctx);
         }
         // The Language Card tab
+        // SQW Update this to set the flags and then set memory accordingly (call ram_card_map_memory)
         if(nk_tree_push(ctx, NK_TREE_TAB, "Language Card", NK_MAXIMIZED)) {
             RAM_CARD *lc = &m->ram_card;
             nk_layout_row_dynamic(ctx, 26, 4);

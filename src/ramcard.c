@@ -59,7 +59,7 @@ void ram_card_reinit(APPLE2 *m) {
 void ram_card_map_memory(APPLE2 *m) {
     RAM_CARD *lc = &m->ram_card;
     uint16_t bank_addr = lc->bank2_enable ? 0x1000 : 0x0000;
-    uint16_t aux_addr = m->altzpset ? 0x4000 : 0x0;
+    uint16_t aux_addr =       m->altzpset ? 0x4000 : 0x0000; // Note - offset in LC ram, not RAM_MAIN
     if(lc->read_ram_enable) {
         pages_map(&m->read_pages, 0xD000 / PAGE_SIZE, 0x1000 / PAGE_SIZE, &lc->RAM[bank_addr + aux_addr]);
         pages_map(&m->read_pages, 0xE000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &lc->RAM[0x2000 + aux_addr]);

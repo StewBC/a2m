@@ -61,18 +61,10 @@ int apple2_configure(APPLE2 *m) {
         return A2_ERR;
     }
 
-    // // Zero page seems to come up with a lot of 255's
-    // memset(&m->RAM_MAIN[0x0000], 0xFF, 0x10000);
+    // Init RAM to a fixed pattern 
     util_memset32(m->RAM_MAIN, 0x0000ffff, m->ram_size / 4);
-    // // And IO area floating bus is a lot of 160's
-    memset(&m->RAM_MAIN[0xC001], 0xA0, 0x1000);
-    m->RAM_MAIN[0xC000] = 0;
-    if(m->model) {
-        // Same in AUX ram for zp & IO?
-        memset(&m->RAM_MAIN[0x10000], 0xFF, 0x100);
-        memset(&m->RAM_MAIN[0x1C001], 0xA0, 0x1000);
-        m->RAM_MAIN[0x1C000] = 0x0d;
-    }
+    // And IO area floating bus is a lot of 160's
+    memset(&m->RAM_MAIN[0xC001], 0xA0, 0xFFFF);
 
     // RAM
     if(!memory_init(&m->ram, m->model ? 2 : 1)) {
