@@ -55,6 +55,9 @@ typedef enum {
 } OP_65c02;
 
 size_t machine_run_opcode(APPLE2 *m) {
+    if(m->trace) {
+        trace_log(&m->trace_file, m);
+    }
     uint8_t opcode = read_from_memory(m, m->cpu.pc);
     size_t start_cycle = m->cpu.cycles;
     CYCLE(m);
@@ -316,6 +319,6 @@ size_t machine_run_opcode(APPLE2 *m) {
         case SBC_abs_X: { aix(m); sbc_a16(m); } break; // FD
         case INC_abs_X: { aipxrw(m); inc_a16(m); } break; // FE
         case UND_FF:    { a(m); read_pc_1(m); } break; // FF
-   }
-   return m->cpu.cycles - start_cycle;
+    }
+    return m->cpu.cycles - start_cycle;
 }

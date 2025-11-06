@@ -14,7 +14,8 @@ typedef struct EMUFLAGS {
     uint32_t original_del: 1;
     uint32_t step: 1;
     uint32_t stopped: 1;
-    uint32_t emuflags_pad: 22;
+    uint32_t trace: 1;
+    uint32_t emuflags_pad: 21;
 } EMUFLAGS;
 
 typedef struct A2FLAGS {

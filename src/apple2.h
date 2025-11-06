@@ -115,6 +115,9 @@ typedef struct APPLE2 {
     char *clipboard_text;                                   // when not 0 points at a clipboard text UTF-8
     size_t clipboard_index;                                 // index into clipboard_text, where to paste from next
 
+    // Trace
+    UTIL_FILE trace_file;                                   // file that CPU traces get logged to
+
     // Additional Info
     VIEWPORT *viewport;                                     // 0 (no view) or active view for this instance
 

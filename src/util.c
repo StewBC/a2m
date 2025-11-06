@@ -475,3 +475,11 @@ char *util_strrtok(char *str, const char *delim) {
     }
     return NULL;
 }
+
+void *util_memset32(void *ptr, uint32_t value, size_t count) {
+    uint32_t *p = ptr;
+    while (count--) {
+        *p++ = value;
+    }
+    return ptr;
+}

@@ -93,6 +93,7 @@ typedef struct DEBUGGER DEBUGGER;
 
 // State info in APPLE2 but also shadowed outside
 #include "a2flags.h"
+#include "trace.h"
 
 // Machine
 #include "6502.h"

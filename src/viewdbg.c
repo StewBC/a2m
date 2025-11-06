@@ -5,10 +5,6 @@
 #include "header.h"
 #include "dbgopcds.h"
 
-#define SYMBOL_COL_LEN      17                              // 10 chars + \0
-// pc: sym xx xx xx opc sym (+2 because SYMBOL_COL_LEN includes room for a \0)
-#define CODE_LINE_LENGTH    (6+SYMBOL_COL_LEN+9+4+SYMBOL_COL_LEN)
-
 // Colors for disassembly code
 #define color_bg_cursor         nk_rgb(  0,255,255)
 #define color_fg_cursor         nk_rgb(255, 70, 50)
@@ -170,6 +166,7 @@ int viewdbg_disassemble_line(APPLE2 *m, uint16_t pc, CODE_LINE *line) {
             strcpy(text, opcode_text[instruction]);
             text += 4;
             // Decode the class to decide if a symbol lookup is needed
+            // SQW 65c02 probably needs something here...
             switch(instruction & 0x0f) {
                 case 0x00:                                          // Branches, adjusted (destination) lookup
                     if(d->symbol_view || instruction == 0xa0 || instruction == 0xc0 || instruction == 0xe0) {
@@ -787,17 +784,27 @@ int viewdbg_update(APPLE2 *m) {
         }
         BREAKPOINT *bp = breakpoint_at(&d->flowmanager, m->cpu.pc, 1);
         if(bp) {
-            if(!bp->speed) {
+            if(!bp->action) {
                 m->stopped = 1;
             } else {
-                switch(bp->speed) {
-                    case SPEED_FAST:
+                switch(bp->action) {
+                    case ACTION_FAST:
                         m->turbo_active = -1.0;
                         break;
-                    case SPEED_SLOW:
+                    case ACTION_SLOW:
                         m->turbo_active =  1.0;
                         break;
-                    case SPEED_RESTORE:
+                    case ACTION_TRON:
+                    case ACTION_TRON_APPEND:
+                        if(A2_OK == trace_on(&m->trace_file, "trace.txt", bp->action == ACTION_TRON ? "w" : "a")) {
+                            m->trace =  1;
+                        }
+                        break;
+                    case ACTION_TROFF:
+                        trace_off(&m->trace_file);
+                        m->trace =  0;
+                        break;
+                    case ACTION_RESTORE:
                         m->turbo_active = m->turbo[m->turbo_index];
                         break;
                 }

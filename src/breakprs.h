@@ -12,17 +12,24 @@ typedef enum {
 } brkmode_t;
 
 typedef enum {
-    SPEED_UNUSED,
-    SPEED_FAST,
-    SPEED_SLOW,
-    SPEED_RESTORE
-} brkspeed_t;
+    ACTION_UNUSED,
+    ACTION_FAST,
+    ACTION_SLOW,
+    ACTION_RESTORE,
+    ACTION_TRON,
+    ACTION_TRON_APPEND,
+    ACTION_TROFF
+} brkaction_t;
+
+typedef enum {
+} brktrace_t;
 
 typedef struct {
     uint32_t    start;     // required
     uint32_t    end;       // = start if no range
     brkmode_t   mode;      // default = MODE_PC
-    brkspeed_t  speed;     // default = SPEED_UNUSED
+    brkaction_t action;    // default = ACTION_UNUSED
+    brktrace_t  trace;     // default = TRACE_OFF
     int         count;     // optional; 0 if unset
     int         reset;     // optional; 0 if unset
 } parsed_t;

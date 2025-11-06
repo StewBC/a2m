@@ -35,7 +35,7 @@ int apple2_configure(APPLE2 *m) {
         ini_add(&m->ini_store, "SmartPort", "disk1", "");
         ini_add(&m->ini_store, "SmartPort", "boot", "0 ; last listed non-zero boot devices' disk0 will boot");
         ini_add(&m->ini_store, "Debug", ";break", "pc, restore, 0, 0 are the defaults for break =");
-        ini_add(&m->ini_store, "Debug", ";break", "<address[-address]>[,pc|read|write|access[,restore | fast | slow][, count[, reset]]]");
+        ini_add(&m->ini_store, "Debug", ";break", "<address[-address]>[,pc|read|write|access][,restore | fast | slow | tron | trona | troff][, count[, reset]]]");
         util_ini_save_file("apple2.ini", &m->ini_store);
     }
     // Configure the type of machine (II+ or //e Enhanced, based on ini_store)
@@ -61,9 +61,10 @@ int apple2_configure(APPLE2 *m) {
         return A2_ERR;
     }
 
-    // Zero page seems to come up with a lot of 255's
-    memset(&m->RAM_MAIN[0x0000], 0xFF, 0x10000);
-    // And IO area floating bus is a lot of 160's
+    // // Zero page seems to come up with a lot of 255's
+    // memset(&m->RAM_MAIN[0x0000], 0xFF, 0x10000);
+    util_memset32(m->RAM_MAIN, 0x0000ffff, m->ram_size / 4);
+    // // And IO area floating bus is a lot of 160's
     memset(&m->RAM_MAIN[0xC001], 0xA0, 0x1000);
     m->RAM_MAIN[0xC000] = 0;
     if(m->model) {

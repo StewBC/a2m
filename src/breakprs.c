@@ -117,18 +117,24 @@ int parse_breakpoint_line(const char *val, parsed_t *out) {
             // Try keywords first
             if(stricmp(param, "pc") == 0) {
                 out->mode = MODE_PC;
-            } else if(0 == stricmp(param, "read")) {
-                out->mode = MODE_READ;
-            } else if(0 == stricmp(param, "write")) {
-                out->mode = MODE_WRITE;
             } else if(0 == stricmp(param, "access")) {
                 out->mode = MODE_ACCESS;
             } else if(0 == stricmp(param, "fast")) {
-                out->speed = SPEED_FAST;
-            } else if(0 == stricmp(param, "slow")) {
-                out->speed = SPEED_SLOW;
+                out->action = ACTION_FAST;
+            } else if(0 == stricmp(param, "read")) {
+                out->mode = MODE_READ;
             } else if(0 == stricmp(param, "restore")) {
-                out->speed = SPEED_RESTORE;
+                out->action = ACTION_RESTORE;
+            } else if(0 == stricmp(param, "slow")) {
+                out->action = ACTION_SLOW;
+            } else if(0 == stricmp(param, "tron")) {
+                out->action = ACTION_TRON;
+            } else if(0 == stricmp(param, "trona")) {
+                out->action = ACTION_TRON_APPEND;
+            } else if(0 == stricmp(param, "troff")) {
+                out->action = ACTION_TROFF;
+            } else if(0 == stricmp(param, "write")) {
+                out->mode = MODE_WRITE;
             } else {
                 // Otherwise, treat as integer (count then reset)
                 char *endp = NULL;

@@ -17,7 +17,7 @@ typedef struct BREAKPOINT {
     uint8_t break_on_write: 1;
     uint8_t use_range: 1;
     uint8_t use_counter: 1;
-    uint8_t speed: 2;                                       // 0 - unused, 1 - fast, 2 - slow, 3 - restore
+    uint8_t action: 3;                                      // 0 - unused, 1 - fast, 2 - slow, 3 - restore, 4 - tron, 5 - troff
 } BREAKPOINT;
 
 typedef struct FLOWMANAGER {

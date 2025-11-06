@@ -8,6 +8,10 @@
 #define OPCODE_RTS  0x60
 
 #define CODE_LINES_COUNT    31                              // Should be dynamic based on window size
+#define SYMBOL_COL_LEN      17                              // 10 chars + \0
+// pc: sym xx xx xx opc sym (+2 because SYMBOL_COL_LEN includes room for a \0)
+#define CODE_LINE_LENGTH    (6+SYMBOL_COL_LEN+9+4+SYMBOL_COL_LEN)
+
 
 typedef struct SYMBOL {
     uint16_t pc;

@@ -184,10 +184,10 @@ static inline void branch(APPLE2 *m) {
     m->cpu.pc += (int8_t)m->cpu.scratch_lo;
 }
 
-static inline void brk_pc(APPLE2 *m) {
-    m->cpu.pc = 0xFFFE;
-    al_read_pc(m);
-}
+// static inline void brk_pc(APPLE2 *m) {
+//     m->cpu.pc = 0xFFFE;
+//     al_read_pc(m);
+// }
 
 static inline void p_from_stack(APPLE2 *m) {
     m->cpu.flags = (pull(m) & ~0b00010000) | 0b00100000;
@@ -579,6 +579,7 @@ static inline void brk(APPLE2 *m) {
     //         m->cpu.flags |= 0b00000100;
     //     }
     // }
+    m->trace = 0;
     m->stopped = 1;
 }
 
