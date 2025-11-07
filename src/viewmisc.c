@@ -6,13 +6,31 @@
 
 // Display variables
 static const char *access_mode[3] = { "R", "W", "RW" };
-static int screen_mode[3] = { 0, 1, 5 };
 
-static int display_mode = 0;
-static int display_page2set = 0;
-static int display_mixed = 0;
-static int display_override = 0;
-static int display_undo_change = 0;
+// returns changes to state when enabled, otherwise state
+static int nk_option_label_disabled(struct nk_context *ctx, const char *label, int state, int disabled) {
+    struct nk_style_toggle saved = ctx->style.option;
+
+    if (disabled) {
+        struct nk_style_toggle t = saved;
+        t.normal        = nk_style_item_color(nk_rgba(70,70,70,255));
+        t.hover         = t.normal;
+        t.active        = t.normal;
+        t.cursor_normal = nk_style_item_color(nk_rgba(110,110,110,255));
+        t.cursor_hover  = t.cursor_normal;
+        t.text_normal   = nk_rgba(150,150,150,255);
+        ctx->style.option = t;
+    }
+
+    // Draw and process
+    int new_state = nk_option_label(ctx, label, state);
+
+    // Restore style
+    ctx->style.option = saved;
+
+    // Ignore processed result if disabled
+    return disabled ? state : new_state;
+}
 
 void viewmisc_show(APPLE2 *m) {
     static int last_state = 0;
@@ -21,11 +39,6 @@ void viewmisc_show(APPLE2 *m) {
     DEBUGGER *d = &v->debugger;
     FILE_BROWSER *fb = &v->viewmisc.file_browser;
     BREAKPOINT_EDIT *bpe = &v->viewmisc.breakpoint_edit;
-
-    int display_mode_setting = 0;
-    int display_page2set_setting = 0;
-    int display_mixed_setting = 0;
-    int force_redraw = 0;
 
     struct nk_color ob = ctx->style.window.background;
     int x = 512;
@@ -276,103 +289,43 @@ void viewmisc_show(APPLE2 *m) {
             }
             nk_tree_pop(ctx);
         }
-        // The Display tab
-        if(nk_tree_push(ctx, NK_TREE_TAB, "Display", NK_MAXIMIZED)) {
-            nk_layout_row_begin(ctx, NK_DYNAMIC, 50, 3);
-            nk_layout_row_push(ctx, 0.40f);
-            if(nk_group_begin(ctx, "", 0)) {
-                nk_layout_row_static(ctx, 13, 100, 1);
-                nk_label(ctx, "Display Mode", NK_TEXT_LEFT);
-                nk_layout_row_static(ctx, 13, 60, 3);
-                display_mode_setting = nk_option_label(ctx, "Text", display_mode == 0) ? 0 : display_mode;
-                display_mode_setting = nk_option_label(ctx, "Lores", display_mode_setting == 1) ? 1 : display_mode_setting;
-                display_mode_setting = nk_option_label(ctx, "HGR", display_mode_setting == 2) ? 2 : display_mode_setting;
-                nk_group_end(ctx);
-            }
-
-            nk_layout_row_push(ctx, 0.30f);
-            if(nk_group_begin(ctx, "", 0)) {
-                nk_layout_row_static(ctx, 13, 80, 1);
-                nk_label(ctx, "Mixed Mode", NK_TEXT_LEFT);
-                nk_layout_row_static(ctx, 13, 60, 2);
-                display_mixed_setting = nk_option_label(ctx, "Off", display_mixed == 0) ? 0 : display_mixed;
-                display_mixed_setting = nk_option_label(ctx, "On", display_mixed_setting == 1) ? 1 : display_mixed_setting;
-                nk_group_end(ctx);
-            }
-
-            nk_layout_row_push(ctx, 0.30f);
-            if(nk_group_begin(ctx, "", 0)) {
-                nk_layout_row_static(ctx, 13, 100, 1);
-                nk_label(ctx, "Display Page", NK_TEXT_LEFT);
-                nk_layout_row_static(ctx, 13, 60, 2);
-                display_page2set_setting = nk_option_label(ctx, "Page 0", display_page2set == 0) ? 0 : display_page2set;
-                display_page2set_setting =
-                    nk_option_label(ctx, "Page 1", display_page2set_setting == 1) ? 1 : display_page2set_setting;
-                nk_group_end(ctx);
-            }
-            nk_layout_row_end(ctx);
-
+        if(nk_tree_push(ctx, NK_TREE_TAB, "Soft Switches", NK_MAXIMIZED)) {
+            uint32_t pre_flags = v->shadow_flags.u32;
+            nk_layout_row_dynamic(ctx, 13, 4);
+            v->shadow_flags.b.store80set = nk_option_label_disabled(ctx, "C000-80STORE", v->shadow_flags.b.store80set, !m->stopped);
+            v->shadow_flags.b.ramrdset   = nk_option_label_disabled(ctx, "C003-RAMRD"  , v->shadow_flags.b.ramrdset, !m->stopped);
+            v->shadow_flags.b.ramwrtset  = nk_option_label_disabled(ctx, "C005-RAMWRT" , v->shadow_flags.b.ramwrtset, !m->stopped);
+            v->shadow_flags.b.cxromset   = nk_option_label_disabled(ctx, "C007-CXROM"  , v->shadow_flags.b.cxromset, !m->stopped);
+            v->shadow_flags.b.altzpset   = nk_option_label_disabled(ctx, "C009-ALTZP"  , v->shadow_flags.b.altzpset, !m->stopped);
+            v->shadow_flags.b.c3slotrom  = nk_option_label_disabled(ctx, "C00B-C3ROM"  , v->shadow_flags.b.c3slotrom, !m->stopped);
             nk_layout_row_dynamic(ctx, 13, 1);
-            nk_label(ctx, "Override", NK_TEXT_LEFT);
-            nk_layout_row_static(ctx, 26, 60, 2);
-            display_override = nk_option_label(ctx, "No", display_override == 0) ? 0 : display_override;
-            display_override = nk_option_label(ctx, "Yes", display_override == 1) ? 1 : display_override;
-
-            if(display_override) {
-                // SQW -- All of this needs updating now that the //e is in the picture
-                // Only redraw the screen, when stopped, if a change is made
-                if(display_mode != display_mode_setting || display_mixed != display_mixed_setting
-                        || display_page2set != display_page2set_setting) {
-                    display_mode = display_mode_setting;
-                    display_mixed = display_mixed_setting;
-                    display_page2set = display_page2set_setting;
-                    if(m->stopped) {
-                        force_redraw = 1;
-                        display_undo_change = 1;
-                    };
-                }
-            } else {
-                // Get the settings from the "hardware"
-                // display_mode = m->screen_mode & 1 ? m->screen_mode & 4 ? 2 : 1 : 0; // SQW
-                display_mode = 0; // SQW - FIXME SOON
-                display_page2set = m->page2set != 0;
-                // display_mixed = display_mode && m->screen_mode & 2; // SQW
-                display_mixed = 0; // SQW - FIXME SOON
-                if(display_undo_change) {
-                    // If the settings were overridden but is now driven from the hardware
-                    // a redraw is needed (can only happen when stopped since UI only
-                    // works when stopped)
-                    display_undo_change = 0;
-                    force_redraw = 1;
-                }
+            nk_spacer(ctx);
+            v->display_override          = nk_option_label(ctx, "Display (override)", v->display_override);
+            nk_layout_row_dynamic(ctx, 13, 4);
+            v->shadow_flags.b.col80set   = nk_option_label_disabled(ctx, "C00D-80COL"  , v->shadow_flags.b.col80set  , !(m->stopped | v->display_override));
+            v->shadow_flags.b.altcharset = nk_option_label_disabled(ctx, "C00F-ALTCHAR", v->shadow_flags.b.altcharset, !(m->stopped | v->display_override));
+            v->shadow_flags.b.text       = nk_option_label_disabled(ctx, "C051-TEXT"   , v->shadow_flags.b.text      , !(m->stopped | v->display_override));
+            v->shadow_flags.b.mixed      = nk_option_label_disabled(ctx, "C053-MIXED"  , v->shadow_flags.b.mixed     , !(m->stopped | v->display_override));
+            v->shadow_flags.b.page2set   = nk_option_label_disabled(ctx, "C055-PAGE2"  , v->shadow_flags.b.page2set  , !(m->stopped | v->display_override));
+            v->shadow_flags.b.hires      = nk_option_label_disabled(ctx, "C057-HIRES"  , v->shadow_flags.b.hires     , !(m->stopped | v->display_override));
+            v->shadow_flags.b.dhires     = nk_option_label_disabled(ctx, "C05E-DHGR"   , v->shadow_flags.b.dhires    , !(m->stopped | v->display_override));
+            nk_layout_row_dynamic(ctx, 13, 1);
+            nk_spacer(ctx);
+            nk_label(ctx, "Language Card", NK_TEXT_LEFT);
+            nk_layout_row_dynamic(ctx, 13, 4);
+            m->ram_card.bank2_enable     = nk_option_label_disabled(ctx, "LCBANK2"     , m->ram_card.bank2_enable, !m->stopped);
+            m->ram_card.read_ram_enable  = nk_option_label_disabled(ctx, "LCREAD"      , m->ram_card.read_ram_enable, !m->stopped);
+            m->ram_card.pre_write        = nk_option_label_disabled(ctx, "LCPREWRITE"  , m->ram_card.pre_write, !m->stopped);
+            m->ram_card.write_enable     = nk_option_label_disabled(ctx, "LCWRITE"     , m->ram_card.write_enable, !m->stopped);
+            nk_spacer(ctx); // Miss a row before the Apply button - looks nicer
+            nk_layout_row_dynamic(ctx, 21, 1);
+            if(nk_button_label(ctx, "Apply")) {
+                m->state_flags = v->shadow_flags.u32;
             }
-            // Set the view draw settings based on whatever is active
-            // v->shadow_screen_mode = screen_mode[display_mode] | (display_mixed << 1); // SQW
-            m->viewport->shadow_flags.b.page2set = display_page2set;
-            if(force_redraw) {
-                // stopped and a change was made, so update the Apple II display
+            if(pre_flags != v->shadow_flags.u32) {
+                // Change were made, so update the Apple II display
                 viewapl2_screen_apple2(m);
             }
-            nk_tree_pop(ctx);
-        }
-        // The Language Card tab
-        // SQW Update this to set the flags and then set memory accordingly (call ram_card_map_memory)
-        if(nk_tree_push(ctx, NK_TREE_TAB, "Language Card", NK_MAXIMIZED)) {
-            RAM_CARD *lc = &m->ram_card;
-            nk_layout_row_dynamic(ctx, 26, 4);
-            if(nk_option_label(ctx, "Read ROM", lc->read_ram_enable ? 0 : 1) && lc->read_ram_enable) {
-                pages_map_memory_block(&m->read_pages, &m->roms.blocks[ROM_APPLE2]);
-                lc->read_ram_enable = 0;
-            }
-            if(nk_option_label(ctx, "Read RAM", lc->read_ram_enable ? 1 : 0) && !lc->read_ram_enable) {
-                pages_map(&m->read_pages, 0xD000 / PAGE_SIZE, 0x1000 / PAGE_SIZE, &lc->RAM[lc->bank2_enable ? 0x1000 : 0x0000]);
-                pages_map(&m->read_pages, 0xE000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &lc->RAM[0x2000]);
-                lc->read_ram_enable = 1;
-            }
-            nk_option_label(ctx, "Pre-Write", lc->pre_write ? 1 : 0);
-            nk_option_label(ctx, "Write", lc->write_enable ? 1 : 0);
-            nk_option_label(ctx, "Bank 1", lc->bank2_enable ? 0 : 1);
-            nk_option_label(ctx, "Bank 2", lc->bank2_enable ? 1 : 0);
             nk_tree_pop(ctx);
         }
     }

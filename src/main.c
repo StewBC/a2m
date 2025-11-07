@@ -80,7 +80,20 @@ int main(int argc, char *argv[]) {
         v.debugger.cursor_pc = m.cpu.pc;
 
         quit = viewport_process_events(&m);
-        v.shadow_flags.u32 = m.state_flags;
+        if(v.display_override) {
+            A2FLAGSPACK state;
+            state.u32 = m.state_flags;
+            state.b.col80set = v.shadow_flags.b.col80set;
+            state.b.altcharset = v.shadow_flags.b.altcharset;
+            state.b.text = v.shadow_flags.b.text;
+            state.b.mixed = v.shadow_flags.b.mixed;
+            state.b.page2set = v.shadow_flags.b.page2set;
+            state.b.hires = v.shadow_flags.b.hires;
+            state.b.dhires = v.shadow_flags.b.dhires;
+            v.shadow_flags.u32 = state.u32;
+        } else {
+            v.shadow_flags.u32 = m.state_flags;
+        }
         viewport_show(&m);
         viewapl2_screen_apple2(&m);
         viewport_update(&m);

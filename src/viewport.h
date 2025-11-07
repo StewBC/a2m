@@ -68,6 +68,7 @@ typedef struct VIEWPORT {
     uint32_t viewdlg_modal: 1;
     uint32_t viewmem_show: 1;
     uint32_t viewmisc_show: 1;
+    uint32_t display_override: 1;
 } VIEWPORT;
 
 int viewport_init(APPLE2 *m, int w, int h);
