@@ -52,25 +52,25 @@ int main(int argc, char *argv[]) {
         uint64_t frame_start_ticks = SDL_GetPerformanceCounter();
         uint64_t desired_frame_end_ticks = frame_start_ticks + ticks_per_frame;
 
-        // If not going at max speed
-        if(m.turbo_active > 0.0) {
-            double cycles_per_frame = max(1, (CPU_FREQUENCY * m.turbo_active) / TARGET_FPS - (overhead_ticks * clock_cycles_per_tick));
+        // If not going at max speed, or stepping the debugger
+        if(m.turbo_active > 0.0 || m.step) {
+            double cycles_per_frame = m.step ? 1 : max(1, (CPU_FREQUENCY * m.turbo_active) / TARGET_FPS - (overhead_ticks * clock_cycles_per_tick));
             uint64_t cycles = 0;
             while(cycles < cycles_per_frame && (!m.stopped || m.step)) {
                 // See if a breakpoint was hit (will set m.stopped)
                 if(viewdbg_update(&m)) {
-                    continue;
+                    break;
                 }
                 size_t opcode_cycles = machine_run_opcode(&m);
                 speaker_on_cycles(&m.speaker, opcode_cycles);
                 cycles += opcode_cycles;
             }
         } else {
-            uint64_t emulation_cycles = max(1, frame_start_ticks + ticks_per_frame - overhead_ticks);
+            uint64_t emulation_cycles = frame_start_ticks + ticks_per_frame - overhead_ticks;
             while(SDL_GetPerformanceCounter() < emulation_cycles && (!m.stopped || m.step)) {
                 // See if a breakpoint was hit (will set m.stopped)
                 if(viewdbg_update(&m)) {
-                    continue;
+                    break;
                 }
                 size_t opcode_cycles = machine_run_opcode(&m);
                 speaker_on_cycles(&m.speaker, opcode_cycles);

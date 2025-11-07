@@ -97,14 +97,14 @@ typedef struct DEBUGGER DEBUGGER;
 
 // Machine
 #include "6502.h"
+#include "a2sft_defs.h"
 #include "diskii.h"
 #include "frankdisp.h"
-#include "ramcard.h"
+#include "langcard.h"
 #include "roms.h"
-#include "a2sft_defs.h"
 #include "slot.h"
-#include "speaker.h"
 #include "smrtprt.h"
+#include "speaker.h"
 
 // Debugger/Viewer
 #include "breakpnt.h"

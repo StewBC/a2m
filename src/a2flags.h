@@ -27,6 +27,10 @@ typedef struct A2FLAGS {
     uint32_t dhires: 1;
     uint32_t franklin80active: 1;
     uint32_t hires: 1;
+    uint32_t lc_bank2_enable: 1;
+    uint32_t lc_pre_write: 1;
+    uint32_t lc_read_ram_enable: 1;
+    uint32_t lc_write_enable: 1;
     uint32_t mixed: 1;
     uint32_t page2set: 1;
     uint32_t ramrdset: 1;
@@ -34,7 +38,7 @@ typedef struct A2FLAGS {
     uint32_t store80set: 1;
     uint32_t strobed: 1;
     uint32_t text: 1;
-    uint32_t a2flags_pad: 17;
+    uint32_t a2flags_pad: 13;
 } A2FLAGS;
 
 typedef union {

@@ -18,8 +18,8 @@ find_package(SDL2_mixer CONFIG REQUIRED)
 
 # Add the executable
 add_executable(apple2
-    src/6502.c
     src/6502_core.c
+    src/6502.c
     src/apple2.c
     src/asm6502.c
     src/asmexpr.c
@@ -33,9 +33,9 @@ add_executable(apple2
     src/frankdisp.c
     src/image.c
     src/inifiles.c
+    src/langcard.c
     src/leds.c
     src/main.c
-    src/ramcard.c
     src/roms.c
     src/slot.c
     src/smrtprt.c

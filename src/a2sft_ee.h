@@ -35,7 +35,7 @@ static inline void set_memory_map(APPLE2 *m) {
     // Start by restoring everything
     pages_map(&m->read_pages,  0x0000 / PAGE_SIZE, 0xC000 / PAGE_SIZE, &m->RAM_MAIN[0x00000]);
     pages_map(&m->write_pages, 0x0000 / PAGE_SIZE, 0xC000 / PAGE_SIZE, &m->RAM_MAIN[0x00000]);
-    ram_card_map_memory(m);
+    language_card_map_memory(m);
     
     // SETALTZP
     if(m->altzpset) {
@@ -99,10 +99,10 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                         }
                         break;
                     case HRAMRD:      //e
-                        byte |= m->ram_card.bank2_enable << 7;
+                        byte |= m->lc_bank2_enable << 7;
                         break;
                     case HRAMWRT:     //e
-                        byte |= m->ram_card.read_ram_enable << 7;
+                        byte |= m->lc_read_ram_enable << 7;
                         break;
                     case RDRAMRD:     //e
                         byte |= m->ramrdset << 7;
@@ -306,7 +306,7 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                 }
                 break;
             case 0xC080:
-                ram_card(m, address, 0x100);
+                language_card(m, address, 0x100);
                 break;
             case 0xC090:
             case 0xC0A0:
@@ -541,7 +541,7 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                 }
                 break;
             case 0xC080:
-                ram_card(m, address, value);
+                language_card(m, address, value);
                 break;
             case 0xC090:
             case 0xC0A0:

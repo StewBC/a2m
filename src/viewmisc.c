@@ -292,15 +292,15 @@ void viewmisc_show(APPLE2 *m) {
         if(nk_tree_push(ctx, NK_TREE_TAB, "Soft Switches", NK_MAXIMIZED)) {
             uint32_t pre_flags = v->shadow_flags.u32;
             nk_layout_row_dynamic(ctx, 13, 4);
-            v->shadow_flags.b.store80set = nk_option_label_disabled(ctx, "C000-80STORE", v->shadow_flags.b.store80set, !m->stopped);
-            v->shadow_flags.b.ramrdset   = nk_option_label_disabled(ctx, "C003-RAMRD"  , v->shadow_flags.b.ramrdset, !m->stopped);
-            v->shadow_flags.b.ramwrtset  = nk_option_label_disabled(ctx, "C005-RAMWRT" , v->shadow_flags.b.ramwrtset, !m->stopped);
-            v->shadow_flags.b.cxromset   = nk_option_label_disabled(ctx, "C007-CXROM"  , v->shadow_flags.b.cxromset, !m->stopped);
-            v->shadow_flags.b.altzpset   = nk_option_label_disabled(ctx, "C009-ALTZP"  , v->shadow_flags.b.altzpset, !m->stopped);
-            v->shadow_flags.b.c3slotrom  = nk_option_label_disabled(ctx, "C00B-C3ROM"  , v->shadow_flags.b.c3slotrom, !m->stopped);
+            v->shadow_flags.b.store80set = nk_option_label_disabled(ctx, "C000-80STORE", v->shadow_flags.b.store80set, 1);
+            v->shadow_flags.b.ramrdset   = nk_option_label_disabled(ctx, "C003-RAMRD"  , v->shadow_flags.b.ramrdset, 1);
+            v->shadow_flags.b.ramwrtset  = nk_option_label_disabled(ctx, "C005-RAMWRT" , v->shadow_flags.b.ramwrtset, 1);
+            v->shadow_flags.b.cxromset   = nk_option_label_disabled(ctx, "C007-CXROM"  , v->shadow_flags.b.cxromset, 1);
+            v->shadow_flags.b.altzpset   = nk_option_label_disabled(ctx, "C009-ALTZP"  , v->shadow_flags.b.altzpset, 1);
+            v->shadow_flags.b.c3slotrom  = nk_option_label_disabled(ctx, "C00B-C3ROM"  , v->shadow_flags.b.c3slotrom, 1);
             nk_layout_row_dynamic(ctx, 13, 1);
             nk_spacer(ctx);
-            v->display_override          = nk_option_label(ctx, "Display (override)", v->display_override);
+            v->display_override          = nk_option_label(ctx, "Display override", v->display_override);
             nk_layout_row_dynamic(ctx, 13, 4);
             v->shadow_flags.b.col80set   = nk_option_label_disabled(ctx, "C00D-80COL"  , v->shadow_flags.b.col80set  , !(m->stopped | v->display_override));
             v->shadow_flags.b.altcharset = nk_option_label_disabled(ctx, "C00F-ALTCHAR", v->shadow_flags.b.altcharset, !(m->stopped | v->display_override));
@@ -313,15 +313,10 @@ void viewmisc_show(APPLE2 *m) {
             nk_spacer(ctx);
             nk_label(ctx, "Language Card", NK_TEXT_LEFT);
             nk_layout_row_dynamic(ctx, 13, 4);
-            m->ram_card.bank2_enable     = nk_option_label_disabled(ctx, "LCBANK2"     , m->ram_card.bank2_enable, !m->stopped);
-            m->ram_card.read_ram_enable  = nk_option_label_disabled(ctx, "LCREAD"      , m->ram_card.read_ram_enable, !m->stopped);
-            m->ram_card.pre_write        = nk_option_label_disabled(ctx, "LCPREWRITE"  , m->ram_card.pre_write, !m->stopped);
-            m->ram_card.write_enable     = nk_option_label_disabled(ctx, "LCWRITE"     , m->ram_card.write_enable, !m->stopped);
-            nk_spacer(ctx); // Miss a row before the Apply button - looks nicer
-            nk_layout_row_dynamic(ctx, 21, 1);
-            if(nk_button_label(ctx, "Apply")) {
-                m->state_flags = v->shadow_flags.u32;
-            }
+            v->shadow_flags.b.lc_bank2_enable     = nk_option_label_disabled(ctx, "LCBANK2"     , v->shadow_flags.b.lc_bank2_enable, 1);
+            v->shadow_flags.b.lc_read_ram_enable  = nk_option_label_disabled(ctx, "LCREAD"      , v->shadow_flags.b.lc_read_ram_enable, 1);
+            v->shadow_flags.b.lc_pre_write        = nk_option_label_disabled(ctx, "LCPREWRITE"  , v->shadow_flags.b.lc_pre_write, 1);
+            v->shadow_flags.b.lc_write_enable     = nk_option_label_disabled(ctx, "LCWRITE"     , v->shadow_flags.b.lc_write_enable, 1);
             if(pre_flags != v->shadow_flags.u32) {
                 // Change were made, so update the Apple II display
                 viewapl2_screen_apple2(m);

@@ -66,6 +66,16 @@ int apple2_configure(APPLE2 *m) {
     // And IO area floating bus is a lot of 160's
     memset(&m->RAM_MAIN[0xC001], 0xA0, 0xFFFF);
 
+    // The language_card has 16 KB.  It is set up as
+    // 4K ($0000 - $0FFF) Bank 1 @ $D000 - $DFFF
+    // 4K ($1000 - $1FFF) Bank 2 @ $D000 - $DFFF
+    // 8K ($2000 - $3FFF)        @ $E000 - $FFFF
+    // That's 16K but 2x for AUX version in IIe (allocated on ][+ as well) // SQW
+    m->RAM_LC = (uint8_t *) malloc(32 * 1024);
+    if(!m->RAM_LC) {
+        return A2_ERR;
+    }
+
     // RAM
     if(!memory_init(&m->ram, m->model ? 2 : 1)) {
         return A2_ERR;
@@ -127,10 +137,8 @@ int apple2_configure(APPLE2 *m) {
     // Set up the Watch Pages (RAM_WATCH can be changed without re-doing the map)
     pages_map(&m->watch_pages, 0, BANK_SIZE / PAGE_SIZE, m->RAM_WATCH);
 
-    // INIT the ram_card
-    if(A2_OK != ram_card_init(m)) {
-        return A2_ERR;
-    }
+    // Set up the Language Card
+    language_card_init(m);
 
     // Init the CPU to cold-start by jumping to ROM address at 0xfffc
     cpu_init(m);
@@ -156,7 +164,7 @@ void apple2_machine_reset(APPLE2 *m) {
     
     cpu_init(m);
 
-    ram_card_reinit(m);
+    language_card_init(m);
     set_memory_map(m);
     memset(&m->RAM_MAIN[0x0400], 0xA0, 0x400);
     apple2_softswitch_write_callback_IIe(m, CLRCXROM, 0);
@@ -317,12 +325,13 @@ void apple2_slot_setup(APPLE2 *m) {
 // Clean up the Apple II
 void apple2_shutdown(APPLE2 *m) {
     speaker_shutdown(&m->speaker);
-    ram_card_shutdown(&m->ram_card);
     diskii_shutdown(m);
     free(m->RAM_MAIN);
     m->RAM_MAIN = NULL;
     free(m->RAM_WATCH);
     m->RAM_WATCH = NULL;
+    free(m->RAM_LC);
+    m->RAM_LC = NULL;
     m->turbo_count = 0;
     free(m->turbo);
     m->turbo = NULL;
