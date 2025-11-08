@@ -64,7 +64,7 @@ int apple2_configure(APPLE2 *m) {
     // Init RAM to a fixed pattern 
     util_memset32(m->RAM_MAIN, 0x0000ffff, m->ram_size / 4);
     // And IO area floating bus is a lot of 160's
-    memset(&m->RAM_MAIN[0xC001], 0xA0, 0xFFFF);
+    memset(&m->RAM_MAIN[0xC001], 0xA0, 0x0FFE);
 
     // The language_card has 16 KB.  It is set up as
     // 4K ($0000 - $0FFF) Bank 1 @ $D000 - $DFFF
@@ -165,10 +165,16 @@ void apple2_machine_reset(APPLE2 *m) {
     
     cpu_init(m);
 
-    language_card_init(m);
-    set_memory_map(m);
+    // Clear the screen
     memset(&m->RAM_MAIN[0x0400], 0xA0, 0x400);
-    apple2_softswitch_write_callback_IIe(m, CLRCXROM, 0);
+
+    language_card_init(m);
+
+    //e - Set up soft-switches
+    if(m->model) {
+        set_memory_map(m);
+        apple2_softswitch_write_callback_IIe(m, CLRCXROM, 0);
+    }
 }
 
 void apple2_machine_setup(APPLE2 *m) {

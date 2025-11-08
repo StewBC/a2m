@@ -102,6 +102,9 @@ static SDL_Texture *load_png_texture_from_ram(SDL_Renderer *r, uint8_t *image, i
 int viewport_init(APPLE2 *m, int w, int h) {
 
     VIEWPORT *v = m->viewport;
+    if(!v) {
+        return A2_OK;
+    }
 
     // Clear the whole viewport struct to 0's
     memset(v, 0, sizeof(VIEWPORT));
@@ -807,6 +810,9 @@ void viewport_show_help(APPLE2 *m) {
 }
 
 void viewport_shutdown(VIEWPORT *v) {
+    if(!v) {
+        return;
+    }
     // Shut nuklear down
     nk_sdl_shutdown();
     // Then the debugger
@@ -835,7 +841,10 @@ void viewport_update(APPLE2 *m) {
     // Commit changes to the texture
     // And update renderer with the texture
     VIEWPORT *v = m->viewport;
-    if(v->shadow_flags.b.col80set && (v->shadow_flags.b.dhires || v->shadow_flags.b.text)) {
+    if(!v) {
+        return;
+    }
+    if(m->franklin80active || v->shadow_flags.b.col80set && (v->shadow_flags.b.dhires || v->shadow_flags.b.text)) {
         SDL_UpdateTexture(v->texture_wide, NULL, v->surface_wide->pixels, v->surface_wide->pitch);
         SDL_RenderCopy(v->renderer, v->texture_wide, NULL, &v->target_rect);
     } else {

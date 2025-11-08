@@ -245,7 +245,11 @@ void viewapl2_feed_clipboard_key(APPLE2 *m) {
 
 // Initialize the color_table once, outside the rendering function
 void viewapl2_init_color_table(APPLE2 *m) {
-    SDL_PixelFormat *format = m->viewport->surface->format;
+    VIEWPORT *v = m->viewport;
+    if(!v) {
+        return;
+    }
+    SDL_PixelFormat *format = v->surface->format;
     for(int bit_stream = 0; bit_stream < 8; bit_stream++) {
         for(int column = 0; column < 2; column++) {
             for(int phase = 0; phase < 2; phase++) {
@@ -304,6 +308,10 @@ void viewapl2_init_color_table(APPLE2 *m) {
 
 void viewapl2_process_event(APPLE2 *m, SDL_Event *e) {
     VIEWPORT *v = m->viewport;
+    if(!v) {
+        return;
+    }
+
     DEBUGGER *d = &v->debugger;
 
     // Get joystick states
@@ -419,17 +427,25 @@ void viewapl2_process_event(APPLE2 *m, SDL_Event *e) {
 
 // Select which screen to display based on what mode is active
 void viewapl2_screen_apple2(APPLE2 *m) {
+    VIEWPORT *v = m->viewport;
+    if(!v) {
+        return;
+    }
     uint32_t mode = (
-        m->viewport->shadow_flags.b.col80set << 4) |
-        (m->viewport->shadow_flags.b.dhires << 3)  | (m->viewport->shadow_flags.b.hires << 2) |
-        (m->viewport->shadow_flags.b.mixed << 1)   | (m->viewport->shadow_flags.b.text);
+        v->shadow_flags.b.col80set << 4) |
+        (v->shadow_flags.b.dhires << 3)  | (v->shadow_flags.b.hires << 2) |
+        (v->shadow_flags.b.mixed << 1)   | (m->viewport->shadow_flags.b.text);
                     // The bits are col80, dhgr, hgr, mixed, text, (followed by bin, hex)
     switch(mode) {
         case 0x00: // 0 ,0 ,0 ,0 ,0 ,00000,00
             viewapl2_screen_lores(m, 0, 24);
         break;
         case 0x01: // 0 ,0 ,0 ,0 ,1 ,00001,01
-            viewapl2_screen_txt40(m, 0, 24);
+            if(m->franklin80active) {
+                viewapl2_screen_franklin80col(m, 0, 24);
+            } else {
+                viewapl2_screen_txt40(m, 0, 24);
+            }
         break;
         case 0x02: // 0 ,0 ,0 ,1 ,0 ,00010,02
             viewapl2_screen_lores(m, 0, 20);

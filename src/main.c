@@ -7,6 +7,7 @@
 #define TARGET_FPS              60
 
 int main(int argc, char *argv[]) {
+    int ret_val = A2_OK;
     int quit = 0;
     APPLE2 m;                                               // The Apple II machine
     VIEWPORT v;                                             // The view that will display the Apple II machine
@@ -16,9 +17,8 @@ int main(int argc, char *argv[]) {
 
     // Make this machine an Apple II
     if(A2_OK != apple2_configure(&m)) {
-        free(m.RAM_MAIN);
-        free(m.RAM_WATCH);
-        return A2_ERR;
+        ret_val = A2_ERR;
+        goto error;
     }
 
     // Give the Apple II a viewport
@@ -26,7 +26,8 @@ int main(int argc, char *argv[]) {
 
     // Init the viewport
     if(A2_OK != viewport_init(&m, 1120, 840)) {
-        return A2_ERR;
+        ret_val = A2_ERR;
+        goto error;
     }
 
     // Set up a table to speed up rendering HGR
@@ -37,7 +38,8 @@ int main(int argc, char *argv[]) {
 
     // The speaker is in the machine but only a machine in view makes sounds
     if(A2_OK != speaker_init(&m.speaker, CPU_FREQUENCY, 48000, 2, 40.0f, 256)) {
-        return A2_ERR;
+        ret_val = A2_ERR;
+        goto error;
     }
 
     // Start the audio (ie, un-pause)
@@ -98,7 +100,6 @@ int main(int argc, char *argv[]) {
         viewapl2_screen_apple2(&m);
         viewport_update(&m);
         uint64_t frame_end_ticks = SDL_GetPerformanceCounter();
-
         // Delay to get the MHz emulation right for the desired FPS - no vsync
         if(frame_end_ticks < desired_frame_end_ticks) {
             uint32_t sleep_ms = (desired_frame_end_ticks - frame_end_ticks) / ticks_per_ms;
@@ -119,10 +120,11 @@ int main(int argc, char *argv[]) {
         }
     }
 
+error:
     // Cleanup, Apple II first and then the viewport for it
     apple2_shutdown(&m);
     viewport_shutdown(&v);
     errlog_shutdown();
 
-    return 0;
+    return ret_val;
 }
