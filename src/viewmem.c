@@ -32,6 +32,13 @@ RANGE_COLORS viewmem_range_colors[16] = {
     { { 0X00, 0X00, 0X00, 0XFF}, { 0XFF, 0XFF, 0XFF, 0XFF} },
 };
 
+static inline void set_memline_block_flags(MEMSHOW *ms, MEMLINE *line, uint8_t flags) {
+    for(int i = line->first_line; i <= line->last_line; i++) {
+        MEMLINE *memline = ARRAY_GET(ms->lines, MEMLINE, i);
+        memline->memview_flags = line->memview_flags;
+    }
+}
+
 void viewmem_active_range(APPLE2 *m, int id) {
     MEMSHOW *ms = &m->viewport->memshow;
     MEMLINE *memline = ARRAY_GET(ms->lines, MEMLINE, 0);
@@ -163,6 +170,7 @@ int viewmem_init(MEMSHOW *ms, int num_lines) {
         if(!memline->line_text) {
             return A2_ERR;
         }
+        set_mem_flag(memline->memview_flags, mem6502);
         // null terminate the text and set up the address this line will show
         *memline->line_text = 0;
         memline->address = i * MEMSHOW_BYTES_PER_ROW;
@@ -173,7 +181,6 @@ int viewmem_init(MEMSHOW *ms, int num_lines) {
         return A2_ERR;
     }
     // Start by showing whatever memory is mapped into the 6502's space
-    ms->mem6502 = 1;
     return A2_OK;
 }
 
@@ -349,7 +356,7 @@ int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window) {
                 }
                 break;
 
-            case SDLK_s:                                        // CTRL S - New Range (Split)
+            case SDLK_s:                                        // CTRL S - Search
                 global_entry_length = 0;
                 v->viewdlg_modal = 1;
                 v->dlg_symbol_lookup_mem = 1;
@@ -360,7 +367,7 @@ int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window) {
                 ms->cursor_x = (ms->edit_mode_ascii ? (ms->cursor_x / 2 + 32) : ((ms->cursor_x - 32) * 2));
                 break;
 
-            case SDLK_v:
+            case SDLK_v:                                        // CTRL v - New Range (Split)
                 viewmem_new_range(m);
                 break;
 
@@ -460,6 +467,7 @@ void viewmem_show(APPLE2 *m) {
         nk_layout_row_static(ctx, 10, w, 1);
         struct nk_color active_background = ctx->style.window.background;
         struct nk_color last_c;
+        MEMLINE *active_line;
         for(int i = 0; i < ms->num_lines; i++) {
             MEMLINE *memline = ARRAY_GET(ms->lines, MEMLINE, i);
             last_c = ctx->style.window.background = viewmem_range_colors[memline->id].background_color;
@@ -474,6 +482,7 @@ void viewmem_show(APPLE2 *m) {
                 nk_draw_text(&ctx->active->buffer, r, &memline->line_text[cx], 1, ctx->style.font,
                              viewmem_range_colors[memline->id].text_color, viewmem_range_colors[memline->id].background_color);
                 ms->cursor_address = memline->address + (ms->cursor_x <= 31 ? (ms->cursor_x / 2) : (ms->cursor_x - 32));
+                active_line = memline;
             }
         }
         ctx->style.window.background = active_background;
@@ -482,19 +491,35 @@ void viewmem_show(APPLE2 *m) {
         nk_layout_row_push(ctx, 0.4);
         nk_labelf(ctx, NK_TEXT_ALIGN_LEFT, "Address: %04X", ms->cursor_address);
         nk_layout_row_push(ctx, 0.14);
-        if(nk_option_label(ctx, "6502", ms->mem6502) && !ms->mem6502) {
-            ms->mem64 = ms->mem128 = 0;
-            ms->mem6502 = 1;
+        if(nk_option_label(ctx, "6502", tst_mem_flag(active_line->memview_flags, mem6502)) && !tst_mem_flag(active_line->memview_flags, mem6502)) {
+            uint8_t new_flag = mem64 | mem128;
+            clr_mem_flag(active_line->memview_flags, mem64);
+            clr_mem_flag(active_line->memview_flags, mem128);
+            set_mem_flag(active_line->memview_flags, mem6502);
+            set_memline_block_flags(ms, active_line, active_line->memview_flags);
         }
-        if(nk_option_label(ctx, "64K", ms->mem64) && !ms->mem64) {
-            ms->mem6502 = ms->mem128 = 0;
-            ms->mem64 = 1;
+        if(nk_option_label(ctx, "64K", tst_mem_flag(active_line->memview_flags, mem64)) && !tst_mem_flag(active_line->memview_flags, mem64)) {
+            clr_mem_flag(active_line->memview_flags, mem6502);
+            clr_mem_flag(active_line->memview_flags, mem128);
+            set_mem_flag(active_line->memview_flags, mem64);
+            set_memline_block_flags(ms, active_line, active_line->memview_flags);
         }
-        if(nk_option_label(ctx, "128K", ms->mem128) && !ms->mem128) {
-            ms->mem6502 = ms->mem64 = 0;
-            ms->mem128 = 1;
+        if(nk_option_label(ctx, "128K", tst_mem_flag(active_line->memview_flags, mem128)) && !tst_mem_flag(active_line->memview_flags, mem128)) {
+            clr_mem_flag(active_line->memview_flags, mem6502);
+            clr_mem_flag(active_line->memview_flags, mem64);
+            set_mem_flag(active_line->memview_flags, mem128);
+            set_memline_block_flags(ms, active_line, active_line->memview_flags);
         }
-        ms->memlcb2 = nk_option_label(ctx, "LC Bank2", ms->memlcb2);
+        int before = tst_mem_flag(active_line->memview_flags, memlcb2);
+        int after = nk_option_label(ctx, "LC Bank2", before);
+        if(after != before) {
+            if(after) {
+                set_mem_flag(active_line->memview_flags, memlcb2);
+            } else {
+                clr_mem_flag(active_line->memview_flags, memlcb2);
+            }
+            set_memline_block_flags(ms, active_line, active_line->memview_flags);
+        }
     }
     if(v->dlg_memory_go) {
         int ret;
@@ -558,13 +583,13 @@ void viewmem_update(APPLE2 *m) {
         MEMLINE *memline = ARRAY_GET(ms->lines, MEMLINE, i);
         uint16_t address = memline->address;
         sprintf(memline->line_text, "%X:%04X:", memline->id, address);
-        if(ms->mem6502) {
+        if(tst_mem_flag(memline->memview_flags, mem6502)) {
             for(j = 0; j < MEMSHOW_BYTES_PER_ROW; j++) {
                 characters[j] = read_from_memory_debug(m, address++);
                 sprintf(memline->line_text + 7 + j * 3, "%02X ", characters[j]);
             }
-        } else if(ms->mem64) {
-            uint32_t mem_base = -0xD000 + (ms->memlcb2 ? 0x1000 : 0x0000);
+        } else if(tst_mem_flag(memline->memview_flags, mem64)) {
+            uint32_t mem_base = -0xD000 + (tst_mem_flag(memline->memview_flags, memlcb2) ? 0x1000 : 0x0000);
             for(j = 0; j < MEMSHOW_BYTES_PER_ROW; j++) {
                 if(address >= 0xD000) {
                     if(address < 0xE000) {
@@ -579,7 +604,7 @@ void viewmem_update(APPLE2 *m) {
             }
         } else {
             // mem128
-            uint32_t mem_base = -0xD000 + (ms->memlcb2 ? 0x5000 : 0x4000);
+            uint32_t mem_base = -0xD000 + (tst_mem_flag(memline->memview_flags, memlcb2) ? 0x5000 : 0x4000);
             for(j = 0; j < MEMSHOW_BYTES_PER_ROW; j++) {
                 if(address >= 0xD000) {
                     if(address < 0xE000) {

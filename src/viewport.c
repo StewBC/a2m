@@ -810,7 +810,7 @@ void viewport_update(APPLE2 *m) {
     // Commit changes to the texture
     // And update renderer with the texture
     VIEWPORT *v = m->viewport;
-    if(v->shadow_flags.b.col80set) {
+    if(v->shadow_flags.b.col80set && (v->shadow_flags.b.dhires || v->shadow_flags.b.text)) {
         SDL_UpdateTexture(v->texture_wide, NULL, v->surface_wide->pixels, v->surface_wide->pitch);
         SDL_RenderCopy(v->renderer, v->texture_wide, NULL, &v->target_rect);
     } else {

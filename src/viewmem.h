@@ -6,12 +6,24 @@
 
 #define MEMSHOW_ROWS                16
 
+typedef enum MEMVIEW_FLAGS {
+    mem6502     = (1<<0),
+    mem64       = (1<<1),
+    mem128      = (1<<2),
+    memlcb2     = (1<<3),
+} MEMVIEW_FLAGS;
+
+#define set_mem_flag(status, flag_mask)       ((status) |= (flag_mask))
+#define tst_mem_flag(status, flag_mask)       ((status) & (flag_mask))
+#define clr_mem_flag(status, flag_mask)       ((status) &= ~(flag_mask))
+
 typedef struct MEMLINE {
     uint16_t address;
     uint16_t id;                                            // This split ID
     uint16_t first_line;                                    // First line of this split
     uint16_t last_line;                                     // Last line of this split
     char *line_text;
+    uint8_t memview_flags;
 } MEMLINE;
 
 typedef struct MEMSHOW {
@@ -25,10 +37,6 @@ typedef struct MEMSHOW {
     int find_string_len;
     int last_found_address;
     uint32_t edit_mode_ascii: 1;
-    uint32_t mem6502: 1;
-    uint32_t mem64: 1;
-    uint32_t mem128: 1;
-    uint32_t memlcb2: 1;
 } MEMSHOW;
 
 void viewmem_active_range(APPLE2 *m, int id);
