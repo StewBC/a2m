@@ -513,7 +513,7 @@ void viewmem_show(APPLE2 *m) {
             }
             set_memline_block_flags(ms, active_line, active_line->memview_flags);
         }
-        if(nk_option_label(ctx, "128K", tst_mem_flag(active_line->memview_flags, mem128)) && !tst_mem_flag(active_line->memview_flags, mem128)) {
+        if(nk_option_label_disabled(ctx, "128K", tst_mem_flag(active_line->memview_flags, mem128), !m->model) && !tst_mem_flag(active_line->memview_flags, mem128)) {
             clr_mem_flag(active_line->memview_flags, mem6502);
             clr_mem_flag(active_line->memview_flags, mem64);
             set_mem_flag(active_line->memview_flags, mem128);

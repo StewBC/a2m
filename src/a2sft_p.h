@@ -280,7 +280,7 @@ static inline void apple2_softswitch_write_callback_IIplus(APPLE2 *m, uint16_t a
                 break;
             break;
         }
-    } else if(address >= 0xc100 && address < 0xCFFE) {
+    } else if(address >= 0xc100 && address < 0xC800) {
         // IO Select
         int slot = (address >> 8) & 0x7;
         // Only if slot isn't mapped, and only if ROM isn't active
@@ -292,6 +292,8 @@ static inline void apple2_softswitch_write_callback_IIplus(APPLE2 *m, uint16_t a
             }
             m->mapped_slot = slot;
         }
+    } else if(m->franklin80installed && address >= 0xCC00 && address < 0xCE00) {
+        m->franklin_display.display_ram[(address & 0x01ff) + m->franklin_display.bank * 0x200] = value;
     } else if(address == CLRROM) {
         m->mapped_slot = 0;
         for(int i = 1; i < 8; i++) {

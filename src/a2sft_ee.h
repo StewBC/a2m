@@ -377,7 +377,7 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
 }
 
 static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t address, uint8_t value) {
-    if(address >= 0xc100 && address < 0xC7FF) {
+    if(address >= 0xc100 && address < 0xC800) {
         slot_io(m, address);
     } else if(address == CLRROM) {
         slot_clrrom(m, address);
