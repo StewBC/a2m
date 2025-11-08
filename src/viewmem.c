@@ -110,10 +110,12 @@ void viewmem_cursor_up(APPLE2 *m) {
 
 void viewmem_find_string(APPLE2 *m) {
     MEMSHOW *ms = &m->viewport->memshow;
+    MEMLINE *memline = ARRAY_GET(ms->lines, MEMLINE, ms->cursor_y);
+    uint8_t flags = memline->memview_flags;
     uint16_t index = 0;
     for(size_t i = ms->last_found_address + 1; i < ms->last_found_address + 65537; i++) {
         uint16_t pc = i;
-        while(read_from_memory_debug(m, pc + index) == ms->find_string[index]) {
+        while(read_from_memory_selected(m, pc + index, flags) == ms->find_string[index]) {
             if(++index == ms->find_string_len) {
                 viewmem_set_range_pc(m, pc);
                 ms->last_found_address = pc;
@@ -128,10 +130,12 @@ void viewmem_find_string(APPLE2 *m) {
 
 void viewmem_find_string_reverse(APPLE2 *m) {
     MEMSHOW *ms = &m->viewport->memshow;
+    MEMLINE *memline = ARRAY_GET(ms->lines, MEMLINE, ms->cursor_y);
+    uint8_t flags = memline->memview_flags;
     uint16_t index = ms->find_string_len - 1;
     for(int i = ms->last_found_address - 1; i > ms->last_found_address - 65537; i--) {
         uint16_t pc = i;
-        while(read_from_memory_debug(m, pc + index) == ms->find_string[index]) {
+        while(read_from_memory_selected(m, pc + index, flags) == ms->find_string[index]) {
             if(index == 0) {
                 pc += index;
                 viewmem_set_range_pc(m, pc);
@@ -492,9 +496,9 @@ void viewmem_show(APPLE2 *m) {
         nk_labelf(ctx, NK_TEXT_ALIGN_LEFT, "Address: %04X", ms->cursor_address);
         nk_layout_row_push(ctx, 0.14);
         if(nk_option_label(ctx, "6502", tst_mem_flag(active_line->memview_flags, mem6502)) && !tst_mem_flag(active_line->memview_flags, mem6502)) {
-            uint8_t new_flag = mem64 | mem128;
             clr_mem_flag(active_line->memview_flags, mem64);
             clr_mem_flag(active_line->memview_flags, mem128);
+            clr_mem_flag(active_line->memview_flags, memlcb2);
             set_mem_flag(active_line->memview_flags, mem6502);
             set_memline_block_flags(ms, active_line, active_line->memview_flags);
         }
@@ -502,16 +506,26 @@ void viewmem_show(APPLE2 *m) {
             clr_mem_flag(active_line->memview_flags, mem6502);
             clr_mem_flag(active_line->memview_flags, mem128);
             set_mem_flag(active_line->memview_flags, mem64);
+            if(m->lc_bank2_enable) {
+                set_mem_flag(active_line->memview_flags, memlcb2);
+            } else {
+                clr_mem_flag(active_line->memview_flags, memlcb2);
+            }
             set_memline_block_flags(ms, active_line, active_line->memview_flags);
         }
         if(nk_option_label(ctx, "128K", tst_mem_flag(active_line->memview_flags, mem128)) && !tst_mem_flag(active_line->memview_flags, mem128)) {
             clr_mem_flag(active_line->memview_flags, mem6502);
             clr_mem_flag(active_line->memview_flags, mem64);
             set_mem_flag(active_line->memview_flags, mem128);
+            if(m->lc_bank2_enable) {
+                set_mem_flag(active_line->memview_flags, memlcb2);
+            } else {
+                clr_mem_flag(active_line->memview_flags, memlcb2);
+            }
             set_memline_block_flags(ms, active_line, active_line->memview_flags);
         }
         int before = tst_mem_flag(active_line->memview_flags, memlcb2);
-        int after = nk_option_label(ctx, "LC Bank2", before);
+        int after = nk_option_label_disabled(ctx, "LC Bank2", before, tst_mem_flag(active_line->memview_flags, mem6502));
         if(after != before) {
             if(after) {
                 set_mem_flag(active_line->memview_flags, memlcb2);
@@ -583,40 +597,9 @@ void viewmem_update(APPLE2 *m) {
         MEMLINE *memline = ARRAY_GET(ms->lines, MEMLINE, i);
         uint16_t address = memline->address;
         sprintf(memline->line_text, "%X:%04X:", memline->id, address);
-        if(tst_mem_flag(memline->memview_flags, mem6502)) {
-            for(j = 0; j < MEMSHOW_BYTES_PER_ROW; j++) {
-                characters[j] = read_from_memory_debug(m, address++);
-                sprintf(memline->line_text + 7 + j * 3, "%02X ", characters[j]);
-            }
-        } else if(tst_mem_flag(memline->memview_flags, mem64)) {
-            uint32_t mem_base = -0xD000 + (tst_mem_flag(memline->memview_flags, memlcb2) ? 0x1000 : 0x0000);
-            for(j = 0; j < MEMSHOW_BYTES_PER_ROW; j++) {
-                if(address >= 0xD000) {
-                    if(address < 0xE000) {
-                        characters[j] = m->RAM_LC[mem_base + address++];
-                    } else {
-                        characters[j] = m->RAM_LC[-0x4000 + address++];
-                    }
-                } else {
-                    characters[j] = m->RAM_MAIN[address++];
-                }
-                sprintf(memline->line_text + 7 + j * 3, "%02X ", characters[j]);
-            }
-        } else {
-            // mem128
-            uint32_t mem_base = -0xD000 + (tst_mem_flag(memline->memview_flags, memlcb2) ? 0x5000 : 0x4000);
-            for(j = 0; j < MEMSHOW_BYTES_PER_ROW; j++) {
-                if(address >= 0xD000) {
-                    if(address < 0xE000) {
-                        characters[j] = m->RAM_LC[mem_base + address++];
-                    } else {
-                        characters[j] = m->RAM_LC[-0x8000 + address++];
-                    }
-                } else {
-                    characters[j] = m->RAM_MAIN[address++];
-                }
-                sprintf(memline->line_text + 7 + j * 3, "%02X ", characters[j]);
-            }
+        for(j = 0; j < MEMSHOW_BYTES_PER_ROW; j++) {
+            characters[j] = read_from_memory_selected(m, address++, memline->memview_flags);
+            sprintf(memline->line_text + 7 + j * 3, "%02X ", characters[j]);
         }
         for(j = 0; j < MEMSHOW_BYTES_PER_ROW; j++) {
             sprintf(memline->line_text + 7 + MEMSHOW_BYTES_PER_ROW * 3 + j, "%c",

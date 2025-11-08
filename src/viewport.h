@@ -71,6 +71,9 @@ typedef struct VIEWPORT {
     uint32_t display_override: 1;
 } VIEWPORT;
 
+// a helper to make a Nuklear function a bit nicer
+int nk_option_label_disabled(struct nk_context *ctx, const char *label, int state, int disabled);
+
 int viewport_init(APPLE2 *m, int w, int h);
 void viewport_init_nuklear(VIEWPORT *v);
 int viewport_process_events(APPLE2 *m);

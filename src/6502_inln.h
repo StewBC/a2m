@@ -30,6 +30,48 @@ static inline uint8_t read_from_memory_debug(APPLE2 *m, uint16_t address) {
     return m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
 }
 
+static inline uint8_t read_from_memory_selected(APPLE2 *m, uint16_t address, int selected) {
+    // assert(address / PAGE_SIZE < m->read_pages.num_pages);
+    // return m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
+    switch(selected & (mem6502 | mem64 | mem128)) {
+        case mem6502:
+            return m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
+        case mem64:
+            if(address < 0xD000) {
+                return m->RAM_MAIN[address];
+            }
+            if(address < 0xE000) {
+                if(!(selected & memlcb2)) {
+                    // D123 + 1000 = e123 & 1fff =  123 (bank1)
+                    // d123               & 1fff = 1123 (bank2)
+                    // So set bank 1 address to exxx.
+                    address += 0x1000;
+                }
+                return m->RAM_LC[(address & 0x1fff)];
+            }
+            // LC 0x2000+
+            return m->RAM_LC[(address & 0x3fff)];
+        case mem128:
+            if(address < 0xD000) {
+                return m->RAM_MAIN[address + 0x10000];
+            }
+            if(address < 0xE000) {
+                if(!(selected & memlcb2)) {
+                    // D123 + 1000 = e123 & 5fff = 4123 (aux bank1)
+                    // d123               & 5fff = 5123 (aux bank2)
+                    // So set bank 1 address to exxx.
+                    address += 0x1000;
+                }
+                return m->RAM_LC[(address & 0x5fff)];
+            }
+            // exxx-ffff & 7fggg = aux lc ram
+            return m->RAM_LC[(address & 0x7fff)];
+        default:
+            assert(0);
+            return 0;
+    }
+}
+
 static inline void write_to_memory(APPLE2 *m, uint16_t address, uint8_t value) {
     size_t page = address >> 8;
     size_t offset = address & 0xff;

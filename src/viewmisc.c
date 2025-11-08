@@ -7,31 +7,6 @@
 // Display variables
 static const char *access_mode[3] = { "R", "W", "RW" };
 
-// returns changes to state when enabled, otherwise state
-static int nk_option_label_disabled(struct nk_context *ctx, const char *label, int state, int disabled) {
-    struct nk_style_toggle saved = ctx->style.option;
-
-    if (disabled) {
-        struct nk_style_toggle t = saved;
-        t.normal        = nk_style_item_color(nk_rgba(70,70,70,255));
-        t.hover         = t.normal;
-        t.active        = t.normal;
-        t.cursor_normal = nk_style_item_color(nk_rgba(110,110,110,255));
-        t.cursor_hover  = t.cursor_normal;
-        t.text_normal   = nk_rgba(150,150,150,255);
-        ctx->style.option = t;
-    }
-
-    // Draw and process
-    int new_state = nk_option_label(ctx, label, state);
-
-    // Restore style
-    ctx->style.option = saved;
-
-    // Ignore processed result if disabled
-    return disabled ? state : new_state;
-}
-
 void viewmisc_show(APPLE2 *m) {
     static int last_state = 0;
     VIEWPORT *v = m->viewport;
@@ -291,6 +266,7 @@ void viewmisc_show(APPLE2 *m) {
         }
         if(nk_tree_push(ctx, NK_TREE_TAB, "Soft Switches", NK_MAXIMIZED)) {
             uint32_t pre_flags = v->shadow_flags.u32;
+            int pre_display_override = v->display_override;
             nk_layout_row_dynamic(ctx, 13, 4);
             v->shadow_flags.b.store80set = nk_option_label_disabled(ctx, "C000-80STORE", v->shadow_flags.b.store80set, 1);
             v->shadow_flags.b.ramrdset   = nk_option_label_disabled(ctx, "C003-RAMRD"  , v->shadow_flags.b.ramrdset, 1);
@@ -302,13 +278,13 @@ void viewmisc_show(APPLE2 *m) {
             nk_spacer(ctx);
             v->display_override          = nk_option_label(ctx, "Display override", v->display_override);
             nk_layout_row_dynamic(ctx, 13, 4);
-            v->shadow_flags.b.col80set   = nk_option_label_disabled(ctx, "C00D-80COL"  , v->shadow_flags.b.col80set  , !(m->stopped | v->display_override));
-            v->shadow_flags.b.altcharset = nk_option_label_disabled(ctx, "C00F-ALTCHAR", v->shadow_flags.b.altcharset, !(m->stopped | v->display_override));
-            v->shadow_flags.b.text       = nk_option_label_disabled(ctx, "C051-TEXT"   , v->shadow_flags.b.text      , !(m->stopped | v->display_override));
-            v->shadow_flags.b.mixed      = nk_option_label_disabled(ctx, "C053-MIXED"  , v->shadow_flags.b.mixed     , !(m->stopped | v->display_override));
-            v->shadow_flags.b.page2set   = nk_option_label_disabled(ctx, "C055-PAGE2"  , v->shadow_flags.b.page2set  , !(m->stopped | v->display_override));
-            v->shadow_flags.b.hires      = nk_option_label_disabled(ctx, "C057-HIRES"  , v->shadow_flags.b.hires     , !(m->stopped | v->display_override));
-            v->shadow_flags.b.dhires     = nk_option_label_disabled(ctx, "C05E-DHGR"   , v->shadow_flags.b.dhires    , !(m->stopped | v->display_override));
+            v->shadow_flags.b.col80set   = nk_option_label_disabled(ctx, "C00D-80COL"  , v->shadow_flags.b.col80set  , !v->display_override);
+            v->shadow_flags.b.altcharset = nk_option_label_disabled(ctx, "C00F-ALTCHAR", v->shadow_flags.b.altcharset, !v->display_override);
+            v->shadow_flags.b.text       = nk_option_label_disabled(ctx, "C051-TEXT"   , v->shadow_flags.b.text      , !v->display_override);
+            v->shadow_flags.b.mixed      = nk_option_label_disabled(ctx, "C053-MIXED"  , v->shadow_flags.b.mixed     , !v->display_override);
+            v->shadow_flags.b.page2set   = nk_option_label_disabled(ctx, "C055-PAGE2"  , v->shadow_flags.b.page2set  , !v->display_override);
+            v->shadow_flags.b.hires      = nk_option_label_disabled(ctx, "C057-HIRES"  , v->shadow_flags.b.hires     , !v->display_override);
+            v->shadow_flags.b.dhires     = nk_option_label_disabled(ctx, "C05E-DHGR"   , v->shadow_flags.b.dhires    , !v->display_override);
             nk_layout_row_dynamic(ctx, 13, 1);
             nk_spacer(ctx);
             nk_label(ctx, "Language Card", NK_TEXT_LEFT);
@@ -317,7 +293,10 @@ void viewmisc_show(APPLE2 *m) {
             v->shadow_flags.b.lc_read_ram_enable  = nk_option_label_disabled(ctx, "LCREAD"      , v->shadow_flags.b.lc_read_ram_enable, 1);
             v->shadow_flags.b.lc_pre_write        = nk_option_label_disabled(ctx, "LCPREWRITE"  , v->shadow_flags.b.lc_pre_write, 1);
             v->shadow_flags.b.lc_write_enable     = nk_option_label_disabled(ctx, "LCWRITE"     , v->shadow_flags.b.lc_write_enable, 1);
-            if(pre_flags != v->shadow_flags.u32) {
+            if(pre_flags != v->shadow_flags.u32 || pre_display_override != v->display_override) {
+                if(!v->display_override) {
+                    v->shadow_flags.u32 = m->state_flags;
+                }
                 // Change were made, so update the Apple II display
                 viewapl2_screen_apple2(m);
             }

@@ -31,6 +31,31 @@
 // These values are picked up in nuklrsdl.h
 float sdl_x_scale, sdl_y_scale;
 
+// returns changes to state when enabled, otherwise state
+int nk_option_label_disabled(struct nk_context *ctx, const char *label, int state, int disabled) {
+    struct nk_style_toggle saved = ctx->style.option;
+
+    if (disabled) {
+        struct nk_style_toggle t = saved;
+        t.normal        = nk_style_item_color(nk_rgba(70,70,70,255));
+        t.hover         = t.normal;
+        t.active        = t.normal;
+        t.cursor_normal = nk_style_item_color(nk_rgba(110,110,110,255));
+        t.cursor_hover  = t.cursor_normal;
+        t.text_normal   = nk_rgba(150,150,150,255);
+        ctx->style.option = t;
+    }
+
+    // Draw and process
+    int new_state = nk_option_label(ctx, label, state);
+
+    // Restore style
+    ctx->style.option = saved;
+
+    // Ignore processed result if disabled
+    return disabled ? state : new_state;
+}
+
 void viewport_config(APPLE2 *m) {
     INI_SECTION *s;
     VIEWPORT *v = (VIEWPORT *)m->viewport;
