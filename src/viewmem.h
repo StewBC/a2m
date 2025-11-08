@@ -24,7 +24,11 @@ typedef struct MEMSHOW {
     uint8_t *find_string;
     int find_string_len;
     int last_found_address;
-    int edit_mode_ascii: 1;
+    uint32_t edit_mode_ascii: 1;
+    uint32_t mem6502: 1;
+    uint32_t mem64: 1;
+    uint32_t mem128: 1;
+    uint32_t memlcb2: 1;
 } MEMSHOW;
 
 void viewmem_active_range(APPLE2 *m, int id);

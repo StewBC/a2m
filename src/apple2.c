@@ -75,6 +75,7 @@ int apple2_configure(APPLE2 *m) {
     if(!m->RAM_LC) {
         return A2_ERR;
     }
+    util_memset32(m->RAM_LC, 0x0000ffff, 32 * 1024 / 4);
 
     // RAM
     if(!memory_init(&m->ram, m->model ? 2 : 1)) {

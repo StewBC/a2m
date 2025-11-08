@@ -41,7 +41,7 @@ void language_card_init(APPLE2 *m) {
 
 void language_card_map_memory(APPLE2 *m) {
     uint16_t bank_addr = m->lc_bank2_enable ? 0x1000 : 0x0000;
-    uint16_t aux_addr =       m->altzpset ? 0x4000 : 0x0000; // Note - offset in LC RAM_LC, not RAM_MAIN
+    uint16_t aux_addr  =        m->altzpset ? 0x4000 : 0x0000; // Note - offset in LC RAM_LC, not RAM_MAIN
     if(m->lc_read_ram_enable) {
         pages_map(&m->read_pages, 0xD000 / PAGE_SIZE, 0x1000 / PAGE_SIZE, &m->RAM_LC[bank_addr + aux_addr]);
         pages_map(&m->read_pages, 0xE000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_LC[0x2000 + aux_addr]);

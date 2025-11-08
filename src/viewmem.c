@@ -172,6 +172,8 @@ int viewmem_init(MEMSHOW *ms, int num_lines) {
     if(!ms->find_string) {
         return A2_ERR;
     }
+    // Start by showing whatever memory is mapped into the 6502's space
+    ms->mem6502 = 1;
     return A2_OK;
 }
 
@@ -476,7 +478,23 @@ void viewmem_show(APPLE2 *m) {
         }
         ctx->style.window.background = active_background;
         nk_style_set_font(ctx, &v->font->handle);
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 4);
+        nk_layout_row_push(ctx, 0.4);
         nk_labelf(ctx, NK_TEXT_ALIGN_LEFT, "Address: %04X", ms->cursor_address);
+        nk_layout_row_push(ctx, 0.14);
+        if(nk_option_label(ctx, "6502", ms->mem6502) && !ms->mem6502) {
+            ms->mem64 = ms->mem128 = 0;
+            ms->mem6502 = 1;
+        }
+        if(nk_option_label(ctx, "64K", ms->mem64) && !ms->mem64) {
+            ms->mem6502 = ms->mem128 = 0;
+            ms->mem64 = 1;
+        }
+        if(nk_option_label(ctx, "128K", ms->mem128) && !ms->mem128) {
+            ms->mem6502 = ms->mem64 = 0;
+            ms->mem128 = 1;
+        }
+        ms->memlcb2 = nk_option_label(ctx, "LC Bank2", ms->memlcb2);
     }
     if(v->dlg_memory_go) {
         int ret;
@@ -540,9 +558,40 @@ void viewmem_update(APPLE2 *m) {
         MEMLINE *memline = ARRAY_GET(ms->lines, MEMLINE, i);
         uint16_t address = memline->address;
         sprintf(memline->line_text, "%X:%04X:", memline->id, address);
-        for(j = 0; j < MEMSHOW_BYTES_PER_ROW; j++) {
-            characters[j] = read_from_memory_debug(m, address++);
-            sprintf(memline->line_text + 7 + j * 3, "%02X ", characters[j]);
+        if(ms->mem6502) {
+            for(j = 0; j < MEMSHOW_BYTES_PER_ROW; j++) {
+                characters[j] = read_from_memory_debug(m, address++);
+                sprintf(memline->line_text + 7 + j * 3, "%02X ", characters[j]);
+            }
+        } else if(ms->mem64) {
+            uint32_t mem_base = -0xD000 + (ms->memlcb2 ? 0x1000 : 0x0000);
+            for(j = 0; j < MEMSHOW_BYTES_PER_ROW; j++) {
+                if(address >= 0xD000) {
+                    if(address < 0xE000) {
+                        characters[j] = m->RAM_LC[mem_base + address++];
+                    } else {
+                        characters[j] = m->RAM_LC[-0x4000 + address++];
+                    }
+                } else {
+                    characters[j] = m->RAM_MAIN[address++];
+                }
+                sprintf(memline->line_text + 7 + j * 3, "%02X ", characters[j]);
+            }
+        } else {
+            // mem128
+            uint32_t mem_base = -0xD000 + (ms->memlcb2 ? 0x5000 : 0x4000);
+            for(j = 0; j < MEMSHOW_BYTES_PER_ROW; j++) {
+                if(address >= 0xD000) {
+                    if(address < 0xE000) {
+                        characters[j] = m->RAM_LC[mem_base + address++];
+                    } else {
+                        characters[j] = m->RAM_LC[-0x8000 + address++];
+                    }
+                } else {
+                    characters[j] = m->RAM_MAIN[address++];
+                }
+                sprintf(memline->line_text + 7 + j * 3, "%02X ", characters[j]);
+            }
         }
         for(j = 0; j < MEMSHOW_BYTES_PER_ROW; j++) {
             sprintf(memline->line_text + 7 + MEMSHOW_BYTES_PER_ROW * 3 + j, "%c",
