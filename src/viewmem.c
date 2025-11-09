@@ -387,8 +387,10 @@ int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window) {
         // Regular, unmodified keys
         uint8_t key = e->key.keysym.sym;
         if((key >= SDLK_0 && key <= SDLK_9) || (key >= SDLK_a && key <= SDLK_f)) {
+            MEMLINE *memline = ARRAY_GET(ms->lines, MEMLINE, ms->cursor_y);
+            uint8_t selected = memline->memview_flags;
             // This is HEX mode only as ascii mode was handled at the start
-            uint8_t byte = read_from_memory_debug(m, ms->cursor_address);
+            uint8_t byte = read_from_memory_selected(m, ms->cursor_address, selected);
             key -= key >= SDLK_a ? SDLK_a - 10 : SDLK_0;
             if(ms->cursor_x & 1) {
                 byte &= 0xf0;
@@ -397,7 +399,8 @@ int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window) {
                 byte &= 0x0F;
                 byte |= (key << 4);
             }
-            write_to_memory(m, ms->cursor_address, byte);
+            write_to_memory_selected(m, ms->cursor_address, selected, byte);
+            // write_to_memory_debug(m, ms->cursor_address, byte);
             viewmem_cursor_right(m);
             return 0;
         }

@@ -10,8 +10,8 @@
 
 // Memory access
 static inline uint8_t read_from_memory(APPLE2 *m, uint16_t address) {
-    size_t page = address >> 8;
-    size_t offset = address & 0xff;
+    size_t page = address / PAGE_SIZE;
+    size_t offset = address % PAGE_SIZE;
     assert(page < m->read_pages.num_pages);
     uint8_t cb_mask = m->watch_pages.pages[page].bytes[offset];
     if(cb_mask) {
@@ -31,8 +31,6 @@ static inline uint8_t read_from_memory_debug(APPLE2 *m, uint16_t address) {
 }
 
 static inline uint8_t read_from_memory_selected(APPLE2 *m, uint16_t address, int selected) {
-    // assert(address / PAGE_SIZE < m->read_pages.num_pages);
-    // return m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
     switch(selected & (mem6502 | mem64 | mem128)) {
         case mem6502:
             return m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
@@ -73,8 +71,8 @@ static inline uint8_t read_from_memory_selected(APPLE2 *m, uint16_t address, int
 }
 
 static inline void write_to_memory(APPLE2 *m, uint16_t address, uint8_t value) {
-    size_t page = address >> 8;
-    size_t offset = address & 0xff;
+    size_t page = address / PAGE_SIZE;
+    size_t offset = address % PAGE_SIZE;
     assert(page < m->write_pages.num_pages);
     uint8_t cb_mask = m->watch_pages.pages[page].bytes[offset];
     if(cb_mask) {
@@ -87,6 +85,52 @@ static inline void write_to_memory(APPLE2 *m, uint16_t address, uint8_t value) {
     }
     if(!(cb_mask & 1)) {
         m->write_pages.pages[page].bytes[offset] = value;
+    }
+}
+
+static inline void write_to_memory_selected(APPLE2 *m, uint16_t address, uint8_t selected, uint8_t value) {
+    switch(selected & (mem6502 | mem64 | mem128)) {
+        case mem6502:
+            m->write_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE] = value;
+            break;
+        case mem64:
+            if(address < 0xD000) {
+                m->RAM_MAIN[address] = value;
+                break;
+            }
+            if(address < 0xE000) {
+                if(!(selected & memlcb2)) {
+                    // D123 + 1000 = e123 & 1fff =  123 (bank1)
+                    // d123               & 1fff = 1123 (bank2)
+                    // So set bank 1 address to exxx.
+                    address += 0x1000;
+                }
+                m->RAM_LC[(address & 0x1fff)] = value;
+                break;
+            }
+            // LC 0x2000+
+            m->RAM_LC[(address & 0x3fff)] = value;
+            break;
+        case mem128:
+            if(address < 0xD000) {
+                m->RAM_MAIN[address + 0x10000] = value;
+                break;
+            }
+            if(address < 0xE000) {
+                if(!(selected & memlcb2)) {
+                    // D123 + 1000 = e123 & 5fff = 4123 (aux bank1)
+                    // d123               & 5fff = 5123 (aux bank2)
+                    // So set bank 1 address to exxx.
+                    address += 0x1000;
+                }
+                m->RAM_LC[(address & 0x5fff)] = value;
+                break;
+            }
+            // exxx-ffff & 7fggg = aux lc ram
+            m->RAM_LC[(address & 0x7fff)] = value;
+            break;
+        default:
+            assert(0);
     }
 }
 

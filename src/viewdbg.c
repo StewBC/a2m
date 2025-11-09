@@ -566,7 +566,17 @@ int viewdbg_process_event(APPLE2 *m, SDL_Event *e) {
                     m->franklin80active ^= 1;
                 }
             } else {
-                m->monitor_type ^= 1;
+                if(m->dhires && m->col80set && m->hires) {
+                    if(++m->monitor_type > MONITOR_RGB) {
+                        m->monitor_type = MONITOR_COLOR;
+                    }
+                } else {
+                    m->monitor_type ^= 1;
+                }
+            }
+            // Make sure screen re-draws if stopped in debugger
+            if(m->stopped && !m->step) {
+                viewapl2_screen_apple2(m);
             }
             return 1;
 

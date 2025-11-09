@@ -19,6 +19,12 @@ enum {
     MODEL_APPLE_IIEE,
 };
 
+enum {
+    MONITOR_COLOR,
+    MONITOR_MONO,
+    MONITOR_RGB
+};
+
 // RAM
 enum {
     MAIN_RAM,

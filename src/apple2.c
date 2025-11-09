@@ -127,9 +127,8 @@ int apple2_configure(APPLE2 *m) {
     m->callback_breakpoint = breakpoint_callback;
     // Map watch area checks - start with no watch
     memset(m->RAM_WATCH, WATCH_NONE, BANK_SIZE);
-    // Add the IO ports by flagging them as 1 in the RAM watch (Skip keyboard so it can be written
-    // from the debugger)
-    memset(&m->RAM_WATCH[0xC001], WATCH_IO_PORT, 0xFE);
+    // Add the IO ports by flagging them as 1 in the RAM watch
+    memset(&m->RAM_WATCH[0xC000], WATCH_IO_PORT, 0xFF);
     if(m->model) {
         // On a //e, also watch Slot 3
         memset(&m->RAM_WATCH[0xC300], WATCH_IO_PORT, 0xFF);

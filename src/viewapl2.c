@@ -551,7 +551,7 @@ void viewapl2_screen_apple2(APPLE2 *m) {
 }
 
 void viewapl2_screen_dlores(APPLE2 *m, int start, int end) {
-    if(m->monitor_type) {
+    if(m->monitor_type & MONITOR_MONO) {
         // SQW
         viewapl2_screen_dlores_mono(m, start, end);
         return;
@@ -636,7 +636,7 @@ void viewapl2_screen_dlores_mono(APPLE2 *m, int start, int end) {
 
 // Display the lores screen in color
 void viewapl2_screen_lores(APPLE2 *m, int start, int end) {
-    if(m->monitor_type) {
+    if(m->monitor_type & MONITOR_MONO) {
         viewapl2_screen_lores_mono(m, start, end);
         return;
     }
@@ -710,8 +710,11 @@ void viewapl2_screen_lores_mono(APPLE2 *m, int start, int end) {
 // Display the double hires screen
 void viewapl2_screen_dhgr(APPLE2 *m, int start, int end) {
     if(m->monitor_type) {
-        // SQW
-        viewapl2_screen_dhgr_rgb(m, start, end);
+        if(m->monitor_type & MONITOR_MONO) {
+            // SQW - Need mono rendering
+        } else {
+            viewapl2_screen_dhgr_rgb(m, start, end);
+        }
         return;
     }
 
@@ -873,7 +876,7 @@ void viewapl2_screen_dhgr_rgb(APPLE2 *m, int start, int end) {
 }
 
 void viewapl2_screen_hgr(APPLE2 *m, int start, int end) {
-    if(m->monitor_type) {
+    if(m->monitor_type & MONITOR_MONO) {
         viewapl2_screen_hgr_mono(m, start, end);
         return;
     }
