@@ -93,10 +93,6 @@ typedef struct APPLE2 {
     uint8_t *rom_shadow_pages[(0xC800-0xC000)/PAGE_SIZE];   // Slot ram page mappings when SETC?ROM active
     uint8_t mapped_slot;                                    // 0 = not mapped, 1-7 means that slot card is strobe mapped (to C800)
 
-    // keyboard
-    uint8_t open_apple;
-    uint8_t closed_apple;
-
     // Emu Status flags
     union {
         uint32_t emu_flags;

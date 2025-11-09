@@ -333,10 +333,10 @@ void viewapl2_process_event(APPLE2 *m, SDL_Event *e) {
         SDL_Keymod mod = SDL_GetModState();
 
         if(e->key.keysym.sym == SDLK_LALT) {
-            m->open_apple = 0x80;
+            m->open_apple = 1;
         }
         if(e->key.keysym.sym == SDLK_RALT) {
-            m->closed_apple = 0x80;
+            m->closed_apple = 1;
         }
 
         if(mod & KMOD_CTRL) {

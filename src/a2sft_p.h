@@ -118,7 +118,7 @@ static inline uint8_t apple2_softswitch_read_callback_IIplus(APPLE2 *m, uint16_t
                 m->hires = 1;
                 break;
             case BUTN0: {
-                uint8_t button = m->open_apple;
+                uint8_t button = m->open_apple ? 0x80 : 0x00;
                 VIEWPORT *v = m->viewport;
                 if(v) {
                     for(int i = 0; i < v->num_controllers; i++) {
@@ -129,7 +129,7 @@ static inline uint8_t apple2_softswitch_read_callback_IIplus(APPLE2 *m, uint16_t
             }
             break;
             case BUTN1: {
-                uint8_t button = m->closed_apple;
+                uint8_t button = m->closed_apple ? 0x80 : 0x00;
                 VIEWPORT *v = m->viewport;
                 if(v) {
                     for(int i = 0; i < v->num_controllers; i++) {
