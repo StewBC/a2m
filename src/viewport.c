@@ -1,4 +1,4 @@
-// Apple ][+ emulator
+// Apple ][+ and //e Emhanced emulator
 // Stefan Wessels, 2024
 // This is free and unencumbered software released into the public domain.
 
@@ -31,21 +31,52 @@
 // These values are picked up in nuklrsdl.h
 float sdl_x_scale, sdl_y_scale;
 
-void viewport_ini_load_callback(void *user_data, char *section, char *key, char *value) {
-    VIEWPORT *v = (VIEWPORT *) user_data;
-    // Uniform scale factor for the display
-    if(0 == stricmp(section, "display")) {
-        if(0 == stricmp(key, "scale")) {
-            float scale = 1.0f;
-            sscanf(value, "%f", &scale);
-            if(scale > 0.0f) {
-                v->display_scale = scale;
-            }
-        } else if(0 == stricmp(key, "disk_leds")) {
-            int state = 0;
-            sscanf(value, "%d", &state);
-            if(state == 1) {
-                v->show_leds = -1;
+// returns changes to state when enabled, otherwise state
+int nk_option_label_disabled(struct nk_context *ctx, const char *label, int state, int disabled) {
+    struct nk_style_toggle saved = ctx->style.option;
+
+    if (disabled) {
+        struct nk_style_toggle t = saved;
+        t.normal        = nk_style_item_color(nk_rgba(70,70,70,255));
+        t.hover         = t.normal;
+        t.active        = t.normal;
+        t.cursor_normal = nk_style_item_color(nk_rgba(110,110,110,255));
+        t.cursor_hover  = t.cursor_normal;
+        t.text_normal   = nk_rgba(150,150,150,255);
+        ctx->style.option = t;
+    }
+
+    // Draw and process
+    int new_state = nk_option_label(ctx, label, state);
+
+    // Restore style
+    ctx->style.option = saved;
+
+    // Ignore processed result if disabled
+    return disabled ? state : new_state;
+}
+
+void viewport_config(APPLE2 *m) {
+    INI_SECTION *s;
+    VIEWPORT *v = (VIEWPORT *)m->viewport;
+    s = ini_find_section(&m->ini_store, "display");
+    if(s) {
+        for(int i = 0; i < s->kv.items; i++) {
+            INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
+            const char *key = kv->key;
+            const char *val = kv->val;
+            if(0 == stricmp(key, "scale")) {
+                float scale = 1.0f;
+                sscanf(val, "%f", &scale);
+                if(scale > 0.0f) {
+                    v->display_scale = scale;
+                }
+            } else if(0 == stricmp(key, "disk_leds")) {
+                int state = 0;
+                sscanf(val, "%d", &state);
+                if(state == 1) {
+                    v->show_leds = 1;
+                }
             }
         }
     }
@@ -68,15 +99,20 @@ static SDL_Texture *load_png_texture_from_ram(SDL_Renderer *r, uint8_t *image, i
     return tex;
 }
 
-int viewport_init(VIEWPORT *v, int w, int h) {
+int viewport_init(APPLE2 *m, int w, int h) {
+
+    VIEWPORT *v = m->viewport;
+    if(!v) {
+        return A2_OK;
+    }
 
     // Clear the whole viewport struct to 0's
     memset(v, 0, sizeof(VIEWPORT));
 
     v->display_scale = 1.0f;
 
-    // Configure display_scale from the ini file -- SQW ini file now read/parsed multiple times
-    util_ini_load_file("./apple2.ini", viewport_ini_load_callback, (void *) v);
+    // Configure display_scale from the ini file
+    viewport_config(m);
 
     // Scale the window, and set the SDL render scale accordingly
     w *= v->display_scale;
@@ -89,7 +125,7 @@ int viewport_init(VIEWPORT *v, int w, int h) {
     v->full_window_rect = v->target_rect;                   // And remember the setting
 
     // Initialize SDL with video and audio
-    if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER) < 0) {
+    if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) < 0) {
         printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
         goto error;
     }
@@ -117,12 +153,12 @@ int viewport_init(VIEWPORT *v, int w, int h) {
     }
     SDL_FillRect(v->surface, NULL, SDL_MapRGB(v->surface->format, 0, 0, 0));
 
-    v->surface640 = SDL_CreateRGBSurfaceWithFormat(0, 80 * 8, 24 * 8, 32, SDL_PIXELFORMAT_ARGB8888);
-    if(v->surface640 == NULL) {
+    v->surface_wide = SDL_CreateRGBSurfaceWithFormat(0, 80 * (m->model ? 7 : 8), 24 * 8, 32, SDL_PIXELFORMAT_ARGB8888);
+    if(v->surface_wide == NULL) {
         printf("Surface640 could not be created! SDL_Error: %s\n", SDL_GetError());
         goto error;
     }
-    SDL_FillRect(v->surface640, NULL, SDL_MapRGB(v->surface640->format, 0, 0, 0));
+    SDL_FillRect(v->surface_wide, NULL, SDL_MapRGB(v->surface_wide->format, 0, 0, 0));
 
     // Create texture for pixel rendering
     v->texture = SDL_CreateTextureFromSurface(v->renderer, v->surface);
@@ -131,8 +167,8 @@ int viewport_init(VIEWPORT *v, int w, int h) {
         goto error;
     }
     // Create texture for pixel rendering
-    v->texture640 = SDL_CreateTextureFromSurface(v->renderer, v->surface640);
-    if(v->texture640 == NULL) {
+    v->texture_wide = SDL_CreateTextureFromSurface(v->renderer, v->surface_wide);
+    if(v->texture_wide == NULL) {
         printf("Texture could not be created! SDL_Error: %s\n", SDL_GetError());
         goto error;
     }
@@ -151,7 +187,7 @@ int viewport_init(VIEWPORT *v, int w, int h) {
         goto error;
     }
 
-    if(A2_OK != viewdbg_init(&v->debugger, CODE_LINES_COUNT)) {
+    if(A2_OK != viewdbg_init(m, CODE_LINES_COUNT)) {
         goto error;
     }
 
@@ -175,15 +211,26 @@ int viewport_init(VIEWPORT *v, int w, int h) {
     v->ctx->style.window.header.active.data.color = color_active_win;
     v->ctx->style.window.popup_border_color = color_popup_border;
 
-
     // Init the file_broswer dynamic array
     array_init(&v->viewmisc.file_browser.dir_contents, sizeof(FILE_INFO));
 
     // Currently, all windows are always visible when any are visible
-    v->viewcpu_show = -1;
-    v->viewdbg_show = -1;
-    v->viewmem_show = -1;
-    v->viewmisc_show = -1;
+    v->viewcpu_show = 1;
+    v->viewdbg_show = 1;
+    v->viewmem_show = 1;
+    v->viewmisc_show = 1;
+
+    // See if there's a game controller
+    v->num_controllers = 0;
+    for(int i = 0; i < SDL_NumJoysticks() && v->num_controllers < 2; i++) {
+        if (!SDL_IsGameController(i)) {
+            continue;
+        }
+        v->game_controller[v->num_controllers] = SDL_GameControllerOpen(i);
+        if(v->game_controller[v->num_controllers]) {
+            v->num_controllers++;
+        }
+    }
     return A2_OK;
 
 error:
@@ -200,25 +247,15 @@ int viewport_process_events(APPLE2 *m) {
     if(!v) {
         return 0;
     }
+
     // Update the CPU view to the latest stats
     if(m->stopped && v->debug_view) {
         viewcpu_update(m);
     }
 
-    if(v->shadow_stopped != m->stopped || v->shadow_free_run != m->free_run) {
-        char sdl_window_title[48];
-        v->shadow_stopped = m->stopped;
-        v->shadow_free_run = m->free_run;
-        strcpy(sdl_window_title, "Apple ][+ Emulator ");
-        strcat(sdl_window_title, v->shadow_stopped ? "[stopped]" : "[running]");
-        strcat(sdl_window_title, v->shadow_free_run ? " @ Fast" : " @ 1 MHz");
-        SDL_SetWindowTitle(v->window, sdl_window_title);
-    }
-
     nk_input_begin(v->ctx);
     // Process all SDL events, and keep doing if stopped and not stepping
     while(SDL_PollEvent(&e) != 0 || (m->stopped && !m->step)) {
-        int force_update = v->show_help;
         if(e.type == SDL_QUIT) {
             ret = 1;
             break;
@@ -228,7 +265,7 @@ int viewport_process_events(APPLE2 *m) {
 
         // Function keys all go to the disassembly view no matter what is active
         if(e.type == SDL_KEYDOWN && e.key.keysym.sym >= SDLK_F1 && e.key.keysym.sym <= SDLK_F12) {
-            force_update = viewdbg_process_event(m, &e);
+            viewdbg_process_event(m, &e);
         } else if(m->stopped) {
             // Stopped means input does not go to the Apple II
             if(v->debug_view && e.type == SDL_KEYDOWN || e.type == SDL_TEXTINPUT) {
@@ -259,7 +296,7 @@ int viewport_process_events(APPLE2 *m) {
             viewapl2_process_event(m, &e);
         }
 
-        if(m->stopped && !m->step) {
+        if((m->stopped && !m->step)) {
             viewport_show(m);
             viewport_update(m);
             // The begin is needed to clear out keys that were handled
@@ -269,6 +306,7 @@ int viewport_process_events(APPLE2 *m) {
         }
     }
     nk_input_end(v->ctx);
+
     return ret;
 }
 
@@ -337,9 +375,9 @@ void viewport_show_help(APPLE2 *m) {
                 nk_label(ctx, "F5  - Run (Go) when emulation is stopped.", NK_TEXT_ALIGN_LEFT);
                 nk_label(ctx, "F11 + Shift - Step out - Step past RTS at this calling level.", NK_TEXT_ALIGN_LEFT);
                 nk_label(ctx, "F6  - Set Program Counter (PC) to cursor PC.", NK_TEXT_ALIGN_LEFT);
-                nk_label(ctx, "F12 - Switch between color/mono (graphics mode) or 40/80 cols (text mode).", NK_TEXT_ALIGN_LEFT);
+                nk_label(ctx, "F12 - Switch between color/mono and also RGB mode if double hires.", NK_TEXT_ALIGN_LEFT);
                 nk_label(ctx, "CTRL + SCRLK/PAUSE - Reset the machine.", NK_TEXT_ALIGN_LEFT);
-                nk_label(ctx, "F12 + Shift - Force switch color/mono and 40/80 col regardless of screen mode.", NK_TEXT_ALIGN_LEFT);
+                nk_label(ctx, "F12 + Shift - Switch to Franklin 80 col, if available, on ][+.", NK_TEXT_ALIGN_LEFT);
                 nk_layout_row_dynamic(ctx, 13, 1);
                 nk_label_colored(ctx, "While emulation is stopped:", NK_TEXT_ALIGN_LEFT, color_help_notice);
                 nk_label_colored(ctx, "If the debug view is visible, all keys go to the debug window over which the mouse is hovered.", NK_TEXT_ALIGN_LEFT, color_help_key_heading);
@@ -772,6 +810,9 @@ void viewport_show_help(APPLE2 *m) {
 }
 
 void viewport_shutdown(VIEWPORT *v) {
+    if(!v) {
+        return;
+    }
     // Shut nuklear down
     nk_sdl_shutdown();
     // Then the debugger
@@ -790,6 +831,7 @@ void viewport_toggle_debug(APPLE2 *m) {
         m->viewport->target_rect.h *= 0.667f;
         SDL_SetRenderDrawColor(m->viewport->renderer, 0, 0, 0, 255);
         SDL_RenderClear(m->viewport->renderer);
+        viewcpu_update(m);
     } else {
         m->viewport->target_rect = m->viewport->full_window_rect;
     }
@@ -799,19 +841,23 @@ void viewport_update(APPLE2 *m) {
     // Commit changes to the texture
     // And update renderer with the texture
     VIEWPORT *v = m->viewport;
-    if(m->cols80active) {
-        SDL_UpdateTexture(v->texture640, NULL, v->surface640->pixels, v->surface640->pitch);
-        SDL_RenderCopy(v->renderer, v->texture640, NULL, &v->target_rect);
+    if(!v) {
+        return;
+    }
+    if(m->franklin80active || v->shadow_flags.b.col80set && (v->shadow_flags.b.dhires || v->shadow_flags.b.text)) {
+        SDL_UpdateTexture(v->texture_wide, NULL, v->surface_wide->pixels, v->surface_wide->pitch);
+        SDL_RenderCopy(v->renderer, v->texture_wide, NULL, &v->target_rect);
     } else {
         SDL_UpdateTexture(v->texture, NULL, v->surface->pixels, v->surface->pitch);
         SDL_RenderCopy(v->renderer, v->texture, NULL, &v->target_rect);
     }
-    if(v->debug_view) {
-        // In debug view, the A2 screen is maybe small black on black so outline it
-        SDL_SetRenderDrawColor(v->renderer, 255, 255, 255, 255);
-        SDL_RenderDrawRect(v->renderer, &v->target_rect);
+
+    // if the help screen is open, or any debug windows are up, nuklear must be updated
+    if(v->debug_view | v->show_help) {
+        nk_sdl_render(NK_ANTI_ALIASING_ON);
     }
-    nk_sdl_render(NK_ANTI_ALIASING_ON);
+
+    // Add after nuklear so that the LEDs render over any nuklear windows
     if(v->show_leds) {
         if(m->disk_activity_read) {
             SDL_Rect led = {v->full_window_rect.w - 16, v->full_window_rect.h - 16, 16, 16};
@@ -824,5 +870,29 @@ void viewport_update(APPLE2 *m) {
             m->disk_activity_write = 0;
         }
     }
+
+    // Finally show the user
     SDL_RenderPresent(v->renderer);
+
+    // Show the window title after calculating a moving average MHz
+    if(1) {
+        char sdl_window_title[80];
+        if(!m->stopped) {
+            uint64_t freq = SDL_GetPerformanceFrequency();
+            uint64_t now_ticks = SDL_GetPerformanceCounter();
+            uint64_t dt_ticks = now_ticks - v->prev_ticks;
+            uint64_t dc = m->cpu.cycles - v->prev_cycles;
+            v->prev_ticks  = now_ticks;
+            v->prev_cycles = m->cpu.cycles;
+
+            double mhz = (double)(dc * freq) / ((double)dt_ticks * 1e6);
+            v->mhz_moving_average = 0.1 * mhz + (1 - 0.1) * v->mhz_moving_average;
+
+            double fps = (1.0 / (double)dt_ticks) * freq;
+            v->fps_moving_average  = 0.1 * fps + (1 - 0.1) * v->fps_moving_average;
+        }
+
+        sprintf(sdl_window_title, "Apple %s Emulator %s : %2.1f MHz @ %2.1f FPS", m->model ? "//e" : "][+", m->stopped ? "[stopped] " : "[running]", v->mhz_moving_average, v->fps_moving_average);
+        SDL_SetWindowTitle(v->window, sdl_window_title);
+    }
 }

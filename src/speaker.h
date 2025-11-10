@@ -1,3 +1,7 @@
+// Apple ][+ and //e Emhanced emulator
+// Stefan Wessels, 2024
+// This is free and unencumbered software released into the public domain.
+
 #pragma once
 
 #define SOFT_RING_FRAMES   16384  // 16384 mono frames (~341ms at 48k)

@@ -1,4 +1,4 @@
-// Apple ][+ emulator
+// Apple ][+ and //e Emhanced emulator
 // Stefan Wessels, 2024
 // This is free and unencumbered software released into the public domain.
 
@@ -42,6 +42,17 @@ int txt_row_start[] = {
 
 // Use the Holger Picker sliding window method
 // https://groups.google.com/g/comp.sys.apple2.programmer/c/iSmIAVA95WA/m/KKsYkTgfWSEJ
+//
+// 000 = black
+// 001 = black
+// 010 = purple/blue
+// 011 = white
+// 100 = black
+// 101 = green/orange
+// 110 = white
+// 111 = white
+// 2 x with phase selecting alternate color
+
 mRGB palette[16] = {
     { 0X00, 0X00, 0X00 },                                   // HGR_BLACK
     { 0X00, 0X00, 0X00 },                                   // HGR_BLACK
@@ -63,21 +74,40 @@ mRGB palette[16] = {
 
 mRGB lores_palette[16] = {
     { 0x00, 0x00, 0x00 },                                   // Black
-    { 0x9D, 0x09, 0x66 },                                   // Red
+    { 0x9D, 0x09, 0x66 },                                   // Violet
     { 0x2A, 0x2A, 0xE5 },                                   // Dark blue
-    { 0xC7, 0x34, 0xFF },                                   // Purple
+    { 0xC7, 0x34, 0xFF },                                   // Purple/Magenta
     { 0x00, 0x80, 0x00 },                                   // Dark green
-    { 0x80, 0x80, 0x80 },                                   // Gray
-    { 0x0D, 0xA1, 0xFF },                                   // Blue-cyan
-    { 0xAA, 0xAA, 0xFF },                                   // Light blue
+    { 0x80, 0x80, 0x80 },                                   // Gray1
+    { 0x0D, 0xA1, 0xFF },                                   // Light Blue
+    { 0xAA, 0xAA, 0xFF },                                   // Meduim blue
     { 0x55, 0x55, 0x00 },                                   // Brown
     { 0xF2, 0x5E, 0x00 },                                   // Orange
-    { 0xC0, 0xC0, 0xC0 },                                   // Gray
+    { 0xC0, 0xC0, 0xC0 },                                   // Gray2
     { 0xFF, 0x89, 0xE5 },                                   // Pink
-    { 0x38, 0xCB, 0x00 },                                   // Bright green
+    { 0x38, 0xCB, 0x00 },                                   // Green
     { 0xD5, 0xD5, 0x1A },                                   // Yellow
-    { 0x62, 0xF6, 0x99 },                                   // Cyan
+    { 0x62, 0xF6, 0x99 },                                   // Aqua (Cyan)
     { 0xFF, 0xFF, 0xFF },                                   // White
+};
+
+mRGB dhgr_palette[16] = {
+    { 0x00, 0x00, 0x00 },                                   // Black
+    { 0xC7, 0x34, 0xFF },                                   // Magenta
+    { 0x55, 0x55, 0x00 },                                   // Brown
+    { 0xF2, 0x5E, 0x00 },                                   // Orange
+    { 0x00, 0x80, 0x00 },                                   // Dark Green
+    { 0x80, 0x80, 0x80 },                                   // Grey1
+    { 0x38, 0xCB, 0x00 },                                   // Green
+    { 0xD5, 0xD5, 0x1A },                                   // Yellow
+    { 0x2A, 0x2A, 0xE5 },                                   // Dark Blue
+    { 0x9D, 0x09, 0x66 },                                   // Violet
+    { 0xC0, 0xC0, 0xC0 },                                   // Grey2
+    { 0xFF, 0x89, 0xE5 },                                   // Pink
+    { 0xAA, 0xAA, 0xFF },                                   // Medium Blue
+    { 0x0D, 0xA1, 0xFF },                                   // Light Blue
+    { 0x62, 0xF6, 0x99 },                                   // Aqua (Cyan)
+    { 0xFF, 0xFF, 0xFF }                                    // White
 };
 
 mRGB lores_palette_mono[16] = {
@@ -99,11 +129,127 @@ mRGB lores_palette_mono[16] = {
     { 0xFF, 0xFF, 0xFF },
 };
 
-uint32_t color_table[8][2][2];                              // [bit_stream][column][phase]
+uint8_t double_aux_map[] = {
+    0x00,
+    0x02,
+    0x04,
+    0x06,
+    0x08,
+    0x0A,
+    0x0C,
+    0x0E,
+    0x01,
+    0x03,
+    0x05,
+    0x07,
+    0x09,
+    0x0B,
+    0x0D,
+    0x0F
+};
+
+// color_table
+uint32_t color_table[8][2][2]; // [bit_stream, 3 bits][column, even/odd][phase]
+
+// Look Up Table with all cobinations of pixel values for color
+typedef struct {
+    uint32_t pixel[7];   // final RGBA pixels for p[px..px+6]
+} HGRLUTENTRY;
+// byte      : 0..127   (128) - byte & 0x7F (the 7 pixel bits)
+// next_lsb  : 0..1     (2)   - next_byte & 1
+// prev_bit  : 0..1     (2)   - previous bit from the prior column
+// phase     : 0..1     (2)   - (byte >> 7) & 1
+// start_bit : 0..1     (2)   - bit_column & 1
+// --------------------------------
+// total entries = 128 * 2 * 2 * 2 * 2 = 2048
+static HGRLUTENTRY hgr_lut[128][2][2][2][2];
+// Look Up Table with monochrome
+typedef struct {
+    uint32_t pixel[7];
+} HGRMONOLUTENTRY;
+static HGRMONOLUTENTRY hgr_mono_lut[128];
+// Lookup tables for lores
+static uint32_t gr_lut[16];
+static uint32_t gr_mono_lut[16];
+// A character width line of pixels for lores
+static uint32_t gr_line[16][7];
+static uint32_t gr_mono_line[16][7];
+
+static const uint8_t rev4_lut[16] = {
+    0x0, 0x8, 0x4, 0xC,
+    0x2, 0xA, 0x6, 0xE,
+    0x1, 0x9, 0x5, 0xD,
+    0x3, 0xB, 0x7, 0xF
+};
+
+// I just recenly learnt that (for modern compilers) small memcpy's turn into better,
+// safer, code than a cast assign
+static inline uint32_t load_u32_unaligned(const void *p) {
+    uint32_t v; memcpy(&v, p, sizeof v); return v;
+}
+
+static inline uint16_t load_u16_unaligned(const void *p) {
+    uint16_t v; memcpy(&v, p, sizeof v); return v;
+}
+
+static inline uint32_t clamp8i(int v) {
+    if(v < 0) {
+        return 0;
+    }
+
+    if(v > 255){
+        return 255;
+    }
+
+    return v; 
+}
+
+// Put the next clipboard character into the KBD
+void viewapl2_feed_clipboard_key(APPLE2 *m) {
+    while(1) {
+        uint8_t byte = !m->clipboard_text ? 0 : (uint8_t)m->clipboard_text[m->clipboard_index++];
+
+        // End of buffer: cleanup + clear bit7 of $C000
+        if (byte == 0) {
+            SDL_free(m->clipboard_text);
+            m->clipboard_text = NULL;
+            m->clipboard_index = 0;
+            m->write_pages.pages[KBD / PAGE_SIZE].bytes[KBD % PAGE_SIZE] &= 0x7F;
+            return;
+        }
+
+        // ASCII path
+        if (byte < 0x80) {
+            if (byte == '\n') {
+                // Skip LF
+                continue;
+            }
+            if (byte == '\r') {
+                byte = 0x0D;           // keep CR
+            } else if (byte == '\t') {
+                byte = ' ';            // tabs to space
+            } else if (!m->model && byte >= 0x20 && byte <= 0x7E) {
+                byte = (uint8_t)toupper(byte); // BASIC-friendly
+            }
+            // Emit whatever we have (including other control chars unchanged)
+            m->RAM_MAIN[KBD] = byte | 0x80;
+            return;
+        }
+
+        // Non-ASCII start byte: skip the UTF-8 multibyte sequence (drop it)
+        while ((m->clipboard_text[m->clipboard_index] & 0xC0) == 0x80) {
+            m->clipboard_index++;
+        }
+    }
+}
 
 // Initialize the color_table once, outside the rendering function
 void viewapl2_init_color_table(APPLE2 *m) {
-    SDL_PixelFormat *format = m->viewport->surface->format;
+    VIEWPORT *v = m->viewport;
+    if(!v) {
+        return;
+    }
+    SDL_PixelFormat *format = v->surface->format;
     for(int bit_stream = 0; bit_stream < 8; bit_stream++) {
         for(int column = 0; column < 2; column++) {
             for(int phase = 0; phase < 2; phase++) {
@@ -116,11 +262,68 @@ void viewapl2_init_color_table(APPLE2 *m) {
             }
         }
     }
+
+    // Init the hgr_lut table
+    for(int byte = 0; byte < 128; ++byte) {
+        for(int next_lsb = 0; next_lsb < 2; ++next_lsb) {
+            for(int prev_bit = 0; prev_bit < 2; ++prev_bit) {
+                for(int phase = 0; phase < 2; ++phase) {
+                    for(int start_bit = 0; start_bit < 2; ++start_bit) {
+                        int stream = (next_lsb << 8) | (byte << 1) | prev_bit;
+                        int parity = start_bit;
+
+                        for(int b = 0; b < 7; ++b) {
+                            int bit_stream = stream & 0b111;                 // same 3-bit window
+                            hgr_lut[byte][next_lsb][prev_bit][phase][start_bit].pixel[b] =
+                                color_table[bit_stream][parity][phase];
+                            stream >>= 1;                                    // slide window
+                            parity ^= 1;                                     // flip each pixel
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Init the hgr_mono_lut table
+    for(int byte = 0; byte < 128; ++byte) {
+        uint8_t x = byte;
+        for(int i = 0; i < 7; ++i) {
+            hgr_mono_lut[byte].pixel[i] = (x & 1) ? color_table[7][0][0] : color_table[0][0][0];
+            x >>= 1;
+        }
+    }
+
+    // Init lores
+    for(int byte = 0; byte < 16; ++byte) {
+        gr_lut[byte] = SDL_MapRGB(format, lores_palette[byte].r, lores_palette[byte].g, lores_palette[byte].b);
+        gr_mono_lut[byte] = SDL_MapRGB(format, lores_palette_mono[byte].r, lores_palette_mono[byte].g, lores_palette_mono[byte].b);
+        for(int i = 0; i < 7; ++i) {
+            gr_line[byte][i] = gr_lut[byte];
+            gr_mono_line[byte][i] = gr_mono_lut[byte];
+        }
+    }
+
 }
 
 void viewapl2_process_event(APPLE2 *m, SDL_Event *e) {
     VIEWPORT *v = m->viewport;
+    if(!v) {
+        return;
+    }
+
     DEBUGGER *d = &v->debugger;
+
+    // Get joystick states
+    for(int i = 0; i < v->num_controllers; i++) {
+        if(v->game_controller[i]) {
+            v->axis_left_x[i] = (32768 + SDL_GameControllerGetAxis(v->game_controller[i], SDL_CONTROLLER_AXIS_LEFTX)) >> 8;
+            v->axis_left_y[i] = (32768 + SDL_GameControllerGetAxis(v->game_controller[i], SDL_CONTROLLER_AXIS_LEFTY)) >> 8;
+            v->button_a[i] = SDL_GameControllerGetButton(v->game_controller[i], SDL_CONTROLLER_BUTTON_A);
+            v->button_b[i] = SDL_GameControllerGetButton(v->game_controller[i], SDL_CONTROLLER_BUTTON_B);
+            v->button_x[i] = SDL_GameControllerGetButton(v->game_controller[i], SDL_CONTROLLER_BUTTON_X);
+        }
+    }
 
     // Keyboard keys directly to emulator
     if(e->type == SDL_TEXTINPUT) {
@@ -130,115 +333,310 @@ void viewapl2_process_event(APPLE2 *m, SDL_Event *e) {
         SDL_Keymod mod = SDL_GetModState();
 
         if(e->key.keysym.sym == SDLK_LALT) {
-            m->open_apple = 0x80;
+            m->open_apple = 1;
         }
         if(e->key.keysym.sym == SDLK_RALT) {
-            m->closed_apple = 0x80;
+            m->closed_apple = 1;
         }
 
         if(mod & KMOD_CTRL) {
             // CTRL is held down, now check which key is pressed
             if(e->key.keysym.scancode != SDL_SCANCODE_LCTRL) {
-                switch (e->key.keysym.sym) {
-                case SDLK_SCROLLLOCK:                       // CTRL+PAUSE generates SDLK_SCROLLLOCK on my PC
-                case SDLK_PAUSE:
-                    cpu_init(m);
-                    diskii_reset(m);
-                    break;
-                default:
-                    // CTRL+A = 1, etc.
-                    m->RAM_MAIN[KBD] = 0x80 | (e->key.keysym.sym - 0x60);
-                    break;
+                switch(e->key.keysym.sym) {
+                    case SDLK_SCROLLLOCK:                       // CTRL+PAUSE generates SDLK_SCROLLLOCK on my PC
+                    case SDLK_PAUSE:
+                        // Reset the machine
+                        apple2_machine_reset(m);
+                        v->prev_cycles = 0;                     // So MHz doesn't jump massively
+                        diskii_reset(m);
+                        break;
+                    default:
+                        // CTRL+A = 1, etc.
+                        m->RAM_MAIN[KBD] = 0x80 | (e->key.keysym.sym - 0x60);
+                        break;
                 }
             }
         } else {
             // Handle special keys like ENTER, BACKSPACE, etc.
-            switch (e->key.keysym.sym) {
-            case SDLK_BACKSPACE:
-                if(m->original_del) {                       // Apple ][ key for del
-                    m->RAM_MAIN[KBD] = 0x80 + 127;
-                } else {                                    // CRSR left on del
+            switch(e->key.keysym.sym) {
+                case SDLK_BACKSPACE:
+                    if(m->original_del) {                       // Apple ][ key for del
+                        m->RAM_MAIN[KBD] = 0x80 + 127;
+                    } else {                                    // CRSR left on del
+                        m->RAM_MAIN[KBD] = 0x80 | e->key.keysym.sym;
+                    }
+                    break;
+
+                case SDLK_RETURN:
+                case SDLK_ESCAPE:
+                case SDLK_TAB:
+                    if(m->clipboard_text) {
+                        // Kill any paste that's busy happening
+                        SDL_free(m->clipboard_text);
+                        m->clipboard_text = 0;
+                        m->clipboard_index = 0;
+                    }
                     m->RAM_MAIN[KBD] = 0x80 | e->key.keysym.sym;
-                }
-                break;
+                    break;
 
-            case SDLK_RETURN:
-            case SDLK_ESCAPE:
-            case SDLK_TAB:
-                m->RAM_MAIN[KBD] = 0x80 | e->key.keysym.sym;
-                break;
+                case SDLK_UP:
+                    m->RAM_MAIN[KBD] = 0x8B;                    // UP arrow
+                    break;
 
-            case SDLK_UP:
-                m->RAM_MAIN[KBD] = 0x8B;                    // UP arrow
-                break;
+                case SDLK_DOWN:
+                    m->RAM_MAIN[KBD] = 0x8A;                    // DOWN arrow
+                    break;
 
-            case SDLK_DOWN:
-                m->RAM_MAIN[KBD] = 0x8A;                    // DOWN arrow
-                break;
+                case SDLK_LEFT:
+                    m->RAM_MAIN[KBD] = 0x88;                    // LEFT arrow
+                    break;
 
-            case SDLK_LEFT:
-                m->RAM_MAIN[KBD] = 0x88;                    // LEFT arrow
-                break;
+                case SDLK_RIGHT:
+                    m->RAM_MAIN[KBD] = 0x95;                    // RIGHT arrow
+                    break;
 
-            case SDLK_RIGHT:
-                m->RAM_MAIN[KBD] = 0x95;                    // RIGHT arrow
-                break;
+                case SDLK_INSERT:
+                    if(mod & KMOD_SHIFT) {
+                        if(SDL_HasClipboardText()) {
+                            if(m->clipboard_text) {
+                                SDL_free(m->clipboard_text);
+                            }
+                            m->clipboard_text = SDL_GetClipboardText();
+                            m->clipboard_index = 0;
+                            viewapl2_feed_clipboard_key(m);
+                        }
+                    }
+                    break;
 
-            default:
-                break;
+                default:
+                    break;
             }
         }
     } else if(e->type == SDL_KEYUP) {
-        switch (e->key.keysym.sym) {
-        case SDLK_LALT:
-            m->open_apple = 0;
-            break;
+        switch(e->key.keysym.sym) {
+            case SDLK_LALT:
+                m->open_apple = 0;
+                break;
 
-        case SDLK_RALT:
-            m->closed_apple = 0;
-            break;
+            case SDLK_RALT:
+                m->closed_apple = 0;
+                break;
         }
     }
 }
 
 // Select which screen to display based on what mode is active
 void viewapl2_screen_apple2(APPLE2 *m) {
-    switch (m->viewport->shadow_screen_mode) {
-    case 0b001:                                             // lores
-        viewapl2_screen_lores(m, 0, 24);
+    VIEWPORT *v = m->viewport;
+    if(!v) {
+        return;
+    }
+    uint32_t mode = (
+        v->shadow_flags.b.col80set << 4) |
+        (v->shadow_flags.b.dhires << 3)  | (v->shadow_flags.b.hires << 2) |
+        (v->shadow_flags.b.mixed << 1)   | (m->viewport->shadow_flags.b.text);
+                    // The bits are col80, dhgr, hgr, mixed, text, (followed by bin, hex)
+    switch(mode) {
+        case 0x00: // 0 ,0 ,0 ,0 ,0 ,00000,00
+            viewapl2_screen_lores(m, 0, 24);
         break;
-
-    case 0b011:                                             // mixed lores
-        viewapl2_screen_lores(m, 0, 20);
-        viewapl2_screen_txt(m, 20, 24);
+        case 0x01: // 0 ,0 ,0 ,0 ,1 ,00001,01
+            if(m->franklin80active) {
+                viewapl2_screen_franklin80col(m, 0, 24);
+            } else {
+                viewapl2_screen_txt40(m, 0, 24);
+            }
         break;
-
-    case 0b101:                                             // hgr graphics
-        viewapl2_screen_hgr(m, 0, 192);
+        case 0x02: // 0 ,0 ,0 ,1 ,0 ,00010,02
+            viewapl2_screen_lores(m, 0, 20);
+            viewapl2_screen_txt40(m, 20, 24);
         break;
-
-    case 0b111:                                             // hgr, mixed graphics
-        viewapl2_screen_hgr(m, 0, 160);
-        viewapl2_screen_txt(m, 20, 24);
+        case 0x03: // 0 ,0 ,0 ,1 ,1 ,00011,03
+            viewapl2_screen_txt40(m, 0, 20);
+            viewapl2_screen_lores(m, 20, 24);
         break;
+        case 0x04: // 0 ,0 ,1 ,0 ,0 ,00100,04
+            viewapl2_screen_hgr(m, 0, 192);
+        break;
+        case 0x05: // 0 ,0 ,1 ,0 ,1 ,00101,05
+            viewapl2_screen_txt40(m, 0, 24);
+        break;
+        case 0x06: // 0 ,0 ,1 ,1 ,0 ,00110,06
+            viewapl2_screen_hgr(m, 0, 160);
+            viewapl2_screen_txt40(m, 20, 24);
+        break;
+        case 0x07: // 0 ,0 ,1 ,1 ,1 ,00111,07
+            viewapl2_screen_txt40(m, 0, 24);
+        break;
+        case 0x08: // 0 ,1 ,0 ,0 ,0 ,01000,08
+            viewapl2_screen_lores(m, 0, 24);
+        break;
+        case 0x09: // 0 ,1 ,0 ,0 ,1 ,01001,09
+            viewapl2_screen_txt40(m, 0, 24);
+        break;
+        case 0x0A: // 0 ,1 ,0 ,1 ,0 ,01010,0A
+            viewapl2_screen_lores(m, 0, 20);
+            viewapl2_screen_txt40(m, 20, 24);
+        break;
+        case 0x0B: // 0 ,1 ,0 ,1 ,1 ,01011,0B
+            viewapl2_screen_txt40(m, 0, 24);
+        break;
+        case 0x0C: // 0 ,1 ,1 ,0 ,0 ,01100,0C
+            viewapl2_screen_hgr(m, 0, 192);
+        break;
+        case 0x0D: // 0 ,1 ,1 ,0 ,1 ,01101,0D
+            viewapl2_screen_txt40(m, 0, 24);
+        break;
+        case 0x0E: // 0 ,1 ,1 ,1 ,0 ,01110,0E
+            viewapl2_screen_hgr(m, 0, 160);
+            viewapl2_screen_txt40(m, 20, 24);
+        break;
+        case 0x0F: // 0 ,1 ,1 ,1 ,1 ,01111,0F
+            viewapl2_screen_txt40(m, 0, 24);
+        break;
+        case 0x10: // 1 ,0 ,0 ,0 ,0 ,10000,10
+            viewapl2_screen_dlores(m, 0, 24);
+        break;
+        case 0x11: // 1 ,0 ,0 ,0 ,1 ,10001,11
+            viewapl2_screen_txt80(m, 0, 24);
+        break;
+        case 0x12: // 1 ,0 ,0 ,1 ,0 ,10010,12
+            viewapl2_screen_dlores(m, 0, 20);
+            viewapl2_screen_txt80(m, 20, 24);
+        break;
+        case 0x13: // 1 ,0 ,0 ,1 ,1 ,10011,13
+            viewapl2_screen_txt80(m, 0, 24);
+        break;
+        case 0x14: // 1 ,0 ,1 ,0 ,0 ,10100,14
+            viewapl2_screen_hgr(m, 0, 192);
+        break;
+        case 0x15: // 1 ,0 ,1 ,0 ,1 ,10101,15
+            viewapl2_screen_txt80(m, 0, 24);
+        break;
+        case 0x16: // 1 ,0 ,1 ,1 ,0 ,10110,16
+            viewapl2_screen_hgr(m, 0, 160);
+            viewapl2_screen_txt80(m, 20, 24);
+        break;
+        case 0x17: // 1 ,0 ,1 ,1 ,1 ,10111,17
+            viewapl2_screen_txt80(m, 0, 24);
+        break;
+        case 0x18: // 1 ,1 ,0 ,0 ,0 ,11000,18
+            viewapl2_screen_dlores(m, 0, 24);
+        break;
+        case 0x19: // 1 ,1 ,0 ,0 ,1 ,11001,19
+            viewapl2_screen_txt80(m, 0, 24);
+        break;
+        case 0x1A: // 1 ,1 ,0 ,1 ,0 ,11010,1A
+            viewapl2_screen_dlores(m, 0, 20);
+            viewapl2_screen_txt80(m, 20, 24);
+        break;
+        case 0x1B: // 1 ,1 ,0 ,1 ,1 ,11011,1B
+            viewapl2_screen_dlores(m, 0, 20);
+            viewapl2_screen_txt80(m, 20, 24);
+        break;
+        case 0x1C: // 1 ,1 ,1 ,0 ,0 ,11100,1C
+            viewapl2_screen_dhgr(m, 0, 192);
+        break;
+        case 0x1D: // 1 ,1 ,1 ,0 ,1 ,11101,1D
+            viewapl2_screen_txt80(m, 0, 24);
+        break;
+        case 0x1E: // 1 ,1 ,1 ,1 ,0 ,11110,1E
+            viewapl2_screen_dhgr(m, 0, 160);
+            viewapl2_screen_txt80(m, 20, 24);
+        break;
+        case 0x1F: // 1 ,1 ,1 ,1 ,1 ,11111,1F
+            viewapl2_screen_txt80(m, 0, 24);
+        break;
+    }
+}
 
-    default:
-        // case 0b000: // text
-        // case 0b010: // mixed text (also just text)
-        // case 0b100: // hgr but not graphics, so text
-        // case 0b110: // hgr, mixed but not graphics, so text
-        if(m->cols80active) {
-            viewapl2_screen_80col(m, 0, 24);
-        } else {
-            viewapl2_screen_txt(m, 0, 24);
+void viewapl2_screen_dlores(APPLE2 *m, int start, int end) {
+    if(m->monitor_type & MONITOR_MONO) {
+        // SQW
+        viewapl2_screen_dlores_mono(m, start, end);
+        return;
+    }
+
+    int y;
+    SDL_Surface *surface = m->viewport->surface_wide;
+    uint32_t *pixels = (uint32_t *) surface->pixels;
+    int surface_width = surface->w;
+
+    for(y = start; y < end; y++) {
+        uint32_t *p = &pixels[y * 8 * surface_width];
+        const uint8_t *man = m->RAM_MAIN + 0x00400 + txt_row_start[y];
+        const uint8_t *aux = m->RAM_MAIN + 0x10400 + txt_row_start[y];
+
+        for(int col = 0; col < 80; col++) {
+            int r;
+            uint8_t index = col >> 1;
+            uint8_t character, upper, lower;
+            if(col & 0x1) {
+                character = man[index];
+                upper = character & 0x0F;
+                lower = (character >> 4) & 0X0F;
+            }else {
+                character = aux[index];
+                upper = double_aux_map[character & 0x0F];
+                lower = double_aux_map[(character >> 4) & 0X0F];
+            }
+
+            uint32_t *pr = p;
+            for(r = 0; r < 4; r++) {
+                memcpy(pr, gr_line[upper], sizeof(gr_line[upper]));
+                pr += surface->w;
+            }
+            for(r = 0; r < 4; r++) {
+                memcpy(pr, gr_line[lower], sizeof(gr_line[lower]));
+                pr += surface->w;
+            }
+            p += 7;
         }
-        break;
+    }
+}
+
+void viewapl2_screen_dlores_mono(APPLE2 *m, int start, int end) {
+    int y;
+    SDL_Surface *surface = m->viewport->surface_wide;
+    uint32_t *pixels = (uint32_t *) surface->pixels;
+    int surface_width = surface->w;
+
+    for(y = start; y < end; y++) {
+        uint32_t *p = &pixels[y * 8 * surface_width];
+        const uint8_t *man = m->RAM_MAIN + 0x00400 + txt_row_start[y];
+        const uint8_t *aux = m->RAM_MAIN + 0x10400 + txt_row_start[y];
+
+        for(int col = 0; col < 80; col++) {
+            int r;
+            uint8_t index = col >> 1;
+            uint8_t character, upper, lower;
+            if(col & 0x1) {
+                character = man[index];
+                upper = character & 0x0F;
+                lower = (character >> 4) & 0X0F;
+            }else {
+                character = aux[index];
+                upper = double_aux_map[character & 0x0F];
+                lower = double_aux_map[(character >> 4) & 0X0F];
+            }
+
+            uint32_t *pr = p;
+            for(r = 0; r < 4; r++) {
+                memcpy(pr, gr_mono_line[upper], sizeof(gr_mono_line[upper]));
+                pr += surface->w;
+            }
+            for(r = 0; r < 4; r++) {
+                memcpy(pr, gr_mono_line[lower], sizeof(gr_mono_line[lower]));
+                pr += surface->w;
+            }
+            p += 7;
+        }
     }
 }
 
 // Display the lores screen in color
 void viewapl2_screen_lores(APPLE2 *m, int start, int end) {
-    if(m->monitor_type) {
+    if(m->monitor_type & MONITOR_MONO) {
         viewapl2_screen_lores_mono(m, start, end);
         return;
     }
@@ -246,7 +644,7 @@ void viewapl2_screen_lores(APPLE2 *m, int start, int end) {
     int x, y;
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    int page = m->viewport->shadow_active_page ? 0x0800 : 0x0400;
+    uint16_t page = m->viewport->shadow_flags.b.page2set ? 0x0800 : 0x0400;
 
     // Loop through each row
     for(y = start; y < end; y++) {
@@ -262,28 +660,12 @@ void viewapl2_screen_lores(APPLE2 *m, int start, int end) {
             uint8_t upper = character & 0x0f;
             uint8_t lower = (character >> 4) & 0X0F;
             uint32_t *pr = p;
-            uint32_t pu = SDL_MapRGB(surface->format, lores_palette[upper].r, lores_palette[upper].g, lores_palette[upper].b);
-            uint32_t pl = SDL_MapRGB(surface->format, lores_palette[lower].r, lores_palette[lower].g, lores_palette[lower].b);
-
             for(r = 0; r < 4; r++) {
-                pr[0] = pu;
-                pr[1] = pu;
-                pr[2] = pu;
-                pr[3] = pu;
-                pr[4] = pu;
-                pr[5] = pu;
-                pr[6] = pu;
+                memcpy(pr, gr_line[upper], sizeof(gr_line[upper]));
                 pr += surface->w;
             }
-
             for(r = 0; r < 4; r++) {
-                pr[0] = pl;
-                pr[1] = pl;
-                pr[2] = pl;
-                pr[3] = pl;
-                pr[4] = pl;
-                pr[5] = pl;
-                pr[6] = pl;
+                memcpy(pr, gr_line[lower], sizeof(gr_line[lower]));
                 pr += surface->w;
             }
             p += 7;
@@ -296,7 +678,7 @@ void viewapl2_screen_lores_mono(APPLE2 *m, int start, int end) {
     int x, y;
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    int page = m->viewport->shadow_active_page ? 0x0800 : 0x0400;
+    uint16_t page = m->viewport->shadow_flags.b.page2set ? 0x0800 : 0x0400;
 
     // Loop through each row
     for(y = start; y < end; y++) {
@@ -312,30 +694,12 @@ void viewapl2_screen_lores_mono(APPLE2 *m, int start, int end) {
             uint8_t upper = character & 0x0f;
             uint8_t lower = (character >> 4) & 0X0F;
             uint32_t *pr = p;
-            uint32_t pu =
-                SDL_MapRGB(surface->format, lores_palette_mono[upper].r, lores_palette_mono[upper].g, lores_palette_mono[upper].b);
-            uint32_t pl =
-                SDL_MapRGB(surface->format, lores_palette_mono[lower].r, lores_palette_mono[lower].g, lores_palette_mono[lower].b);
-
             for(r = 0; r < 4; r++) {
-                pr[0] = pu;
-                pr[1] = pu;
-                pr[2] = pu;
-                pr[3] = pu;
-                pr[4] = pu;
-                pr[5] = pu;
-                pr[6] = pu;
+                memcpy(pr, gr_mono_line[upper], sizeof(gr_mono_line[upper]));
                 pr += surface->w;
             }
-
             for(r = 0; r < 4; r++) {
-                pr[0] = pl;
-                pr[1] = pl;
-                pr[2] = pl;
-                pr[3] = pl;
-                pr[4] = pl;
-                pr[5] = pl;
-                pr[6] = pl;
+                memcpy(pr, gr_mono_line[lower], sizeof(gr_mono_line[lower]));
                 pr += surface->w;
             }
             p += 7;
@@ -343,9 +707,176 @@ void viewapl2_screen_lores_mono(APPLE2 *m, int start, int end) {
     }
 }
 
-// Display the hires screen
-void viewapl2_screen_hgr(APPLE2 *m, int start, int end) {
+// Display the double hires screen
+void viewapl2_screen_dhgr(APPLE2 *m, int start, int end) {
     if(m->monitor_type) {
+        if(m->monitor_type & MONITOR_MONO) {
+            // SQW - Need mono rendering
+        } else {
+            viewapl2_screen_dhgr_rgb(m, start, end);
+        }
+        return;
+    }
+
+    int y;
+    SDL_Surface *surface = m->viewport->surface_wide;
+    uint32_t *pixels = (uint32_t *) surface->pixels;
+    uint16_t page = m->viewport->shadow_flags.b.page2set ? 0x4000 : 0x2000;
+    int surface_width = surface->w;
+    SDL_PixelFormat *format = m->viewport->surface->format; // (unused here but keeping your locals)
+
+    for(y = start; y < end; y++) {
+        uint32_t *p = &pixels[y * surface_width];
+        uint16_t address = page + hgr_row_start[y];
+        const uint8_t *aux = m->RAM_MAIN + page + hgr_row_start[y] + 0x10000;  // b0,b2,b4 live here
+        const uint8_t *man = m->RAM_MAIN + page + hgr_row_start[y];            // b1,b3 live here
+        uint8_t R = 0, G = 0, B = 0;                                           // exponential moving average
+
+        for(int col = 0; col < 40; col += 2) {
+            // Pull 3 aux bytes (b0,b2,b4) and 2 main bytes (b1,b3) at once, clear bit7 in bulk.
+            uint32_t AUX = load_u32_unaligned(aux + col) & 0x7F7F7F7Fu; // b0=AUX0, b2=AUX1, b4=AUX2, (AUX3 unused)
+            uint16_t MAN = load_u16_unaligned(man + col) & 0x7F7Fu;     // b1=MAN0, b3=MAN1
+
+            // Extract the bytes, interleaving aux / main
+            uint8_t b0 = (uint8_t)(AUX     );
+            uint8_t b1 = (uint8_t)(MAN     );
+            uint8_t b2 = (uint8_t)(AUX >> 8);
+            uint8_t b3 = (uint8_t)(MAN >> 8);
+            uint8_t b4 = (col < 38) ? (uint8_t)(AUX >> 16) : 0;
+
+            // Make nibbles 
+            uint8_t t0 =  (b0     ) & 0x0F;
+            uint8_t t1 =  (b0 >> 4) | ((b1 & 0x1) << 3);
+            uint8_t t2 =  (b1 >> 1) & 0x0F;
+            uint8_t t3 = ((b1 >> 5) & 0x03) | ((b2 & 0x3) << 2);
+            uint8_t t4 =  (b2 >> 2) & 0x0F;
+            uint8_t t5 =  (b2 >> 6) | ((b3 & 0x7) << 1);
+            uint8_t t6 =  (b3 >> 3)       ;
+            uint8_t t7 =  (b4     ) & 0x0F;
+
+            // Put the bits in a stream (reverse display order)
+            uint32_t stream = t7 << 28 | t6 << 24 | t5 << 20 | t4 << 16 | t3 << 12 | t2 << 8 | t1 << 4 | t0;
+
+            // Tunables:
+            const int phase0  = 1;  // flip 0/1 if whole image hue is inverted
+            const int phase90 = 1;  // shift 0..3 to rotate hue
+            const int kY = 20;      // brightness gain
+            const int kI = 32;      // saturation (I axis)
+            const int kQ = 24;      // saturation (Q axis)
+            const int dead = 3;     // chroma deadzone to keep near-grays neutral
+
+            for(int x = 0; x < 28; x++) {
+                uint8_t px = stream & 0x0f;
+                stream >>= 1;
+
+                int fx = x;
+
+                int b0 = (px & 1);
+                int b1 = (px & 2) >> 1;
+                int b2 = (px & 4) >> 2;
+                int b3 = (px & 8) >> 3;
+
+                int s0 = b0 ? +1 : -1;
+                int s1 = b1 ? +1 : -1;
+                int s2 = b2 ? +1 : -1;
+                int s3 = b3 ? +1 : -1;
+
+                int r0 = (((fx + 0 + phase0 ) & 1) ? -1 : +1);
+                int r1 = (((fx + 0 + phase0 ) & 1) ? -1 : +1);
+                int r2 = (((fx + 1 + phase0 ) & 1) ? -1 : +1);
+                int r3 = (((fx + 1 + phase0 ) & 1) ? -1 : +1);
+
+                int t0 =   (fx + 0 + phase90) & 3;
+                int t1 =   (fx + 0 + phase90) & 3;
+                int t2 =   (fx + 1 + phase90) & 3;
+                int t3 =   (fx + 1 + phase90) & 3;
+
+                int q0 = (t0 == 0) ? +1 : (t0 == 2) ? -1 : 0;
+                int q1 = (t1 == 0) ? +1 : (t1 == 2) ? -1 : 0;
+                int q2 = (t2 == 0) ? +1 : (t2 == 2) ? -1 : 0;
+                int q3 = (t3 == 0) ? +1 : (t3 == 2) ? -1 : 0;
+
+                int Iraw = s0*r0 + s1*r1 + s2*r2 + s3*r3;
+                int Qraw = s0*q0 + s1*q1 + s2*q2 + s3*q3;
+
+                // Deadzone: keep near-gray neutral
+                int amag = (Iraw < 0 ? -Iraw : Iraw) + (Qraw < 0 ? -Qraw : Qraw);
+                if (amag <= dead) {
+                    Iraw = 0;
+                    Qraw = 0; 
+                }
+
+                int Y = kY * px;
+                int I = kI * Iraw;
+                int Q = kQ * Qraw;
+
+                uint8_t R0 = clamp8i(Y + 245*I + 159*Q);
+                uint8_t G0 = clamp8i(Y -  70*I - 166*Q);
+                uint8_t B0 = clamp8i(Y - 283*I + 436*Q);
+
+                R = (R0 + R) / 2; // R = (1-0.5)R + 0.5R
+                G = (G0 + G) / 2;
+                B = (B0 + B) / 2;
+                
+                *p++ = SDL_MapRGB(format, R, G, B);
+            }
+        }
+    }
+}
+
+// Display the double hires screen
+void viewapl2_screen_dhgr_rgb(APPLE2 *m, int start, int end) {
+    int y;
+    SDL_Surface *surface = m->viewport->surface_wide;
+    uint32_t *pixels = (uint32_t *) surface->pixels;
+    uint16_t page = m->viewport->shadow_flags.b.page2set ? 0x4000 : 0x2000;
+    int surface_width = surface->w;
+    SDL_PixelFormat *format = m->viewport->surface->format; // (unused here but keeping your locals)
+
+    for(y = start; y < end; y++) {
+        uint32_t *p = &pixels[y * surface_width];
+        uint16_t address = page + hgr_row_start[y];
+        const uint8_t *aux = m->RAM_MAIN + page + hgr_row_start[y] + 0x10000;  // b0,b2,b4 live here
+        const uint8_t *man = m->RAM_MAIN + page + hgr_row_start[y];            // b1,b3 live here
+
+        for(int col = 0; col < 40; col += 2) {
+            // Pull 2 aux bytes (b0,b2) and 2 main bytes (b1,b3) at once, clear bit7 in bulk.
+            uint32_t A = load_u16_unaligned(aux + col) & 0x7F7Fu;   // b0=A0, b2=A1
+            uint16_t B = load_u16_unaligned(man + col) & 0x7F7Fu;   // b1=B0, b3=B1
+
+            // Extract the bytes, interleaving aux / main
+            uint8_t b0 = (uint8_t)(A      );
+            uint8_t b1 = (uint8_t)(B      );
+            uint8_t b2 = (uint8_t)(A >>  8);
+            uint8_t b3 = (uint8_t)(B >>  8);
+
+            // Make nibbles (SQW and the reverse bits seem to work better but I don't know...)
+            uint8_t t0 = rev4_lut[  (b0     ) & 0x0F];
+            uint8_t t1 = rev4_lut[  (b0 >> 4) | ((b1 & 0x1) << 3)];
+            uint8_t t2 = rev4_lut[  (b1 >> 1) & 0x0F];
+            uint8_t t3 = rev4_lut[ ((b1 >> 5) & 0x03) | ((b2 & 0x3) << 2)];
+            uint8_t t4 = rev4_lut[  (b2 >> 2) & 0x0F];
+            uint8_t t5 = rev4_lut[  (b2 >> 6) | ((b3 & 0x7) << 1)];
+            uint8_t t6 = rev4_lut[  (b3 >> 3)       ];
+
+            // Put the bits in a stream
+            uint32_t stream = t6 << 24 | t5 << 20 | t4 << 16 | t3 << 12 | t2 << 8 | t1 << 4 | t0;
+
+            for (int x = 0; x < 28/4; ++x) {
+                int bits = stream & 0x0f;
+                uint32_t rgb_pixel = SDL_MapRGB(format, dhgr_palette[bits].r, dhgr_palette[bits].g, dhgr_palette[bits].b);
+                *p++ = rgb_pixel;
+                *p++ = rgb_pixel;
+                *p++ = rgb_pixel;
+                *p++ = rgb_pixel;
+                stream >>= 4;
+            }
+        }
+    }
+}
+
+void viewapl2_screen_hgr(APPLE2 *m, int start, int end) {
+    if(m->monitor_type & MONITOR_MONO) {
         viewapl2_screen_hgr_mono(m, start, end);
         return;
     }
@@ -353,7 +884,7 @@ void viewapl2_screen_hgr(APPLE2 *m, int start, int end) {
     int y;
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    uint16_t page = m->viewport->shadow_active_page ? 0x4000 : 0x2000;
+    uint16_t page = m->viewport->shadow_flags.b.page2set ? 0x4000 : 0x2000;
     int surface_width = surface->w;
 
     for(y = start; y < end; y++) {
@@ -362,34 +893,29 @@ void viewapl2_screen_hgr(APPLE2 *m, int start, int end) {
         uint16_t address = page + hgr_row_start[y];
         uint8_t byte = m->RAM_MAIN[address];
 
-        int current_stream = 0;
-        for(int column = 0, bit_column = 0; column < 40; column++) {
-            // Extract the phase from the byte
-            int phase = (byte & 0x80) >> 7;
+        int bit_column = 0;                 // start of scanline
+        int prev_bit = 0;                   // first column "left neighbor" is 0
 
-            // Read the next byte
-            uint8_t next_byte = 0;
-            if(column + 1 < 40) {
-                next_byte = m->RAM_MAIN[address + column + 1];
-            }
-            // Prepare the current stream as the next byte (for lsb), the current byte and the last
-            // current bit (now prev bit)
-            current_stream = ((next_byte & 0x01) << 8) | ((byte & 0x7F) << 1) | (current_stream & 1);
+        for(int col = 0; col < 40; ++col) {
+            uint8_t next_byte = (col + 1 < 40) ? m->RAM_MAIN[address + col + 1] : 0;
+            int next_lsb = next_byte & 1;
+            int phase   = (byte >> 7) & 1;
 
-            // Process the 7 bits
-            for(int bit_position = 0; bit_position < 7; bit_position++) {
-                // Get the 3 bits that matter
-                int bit_stream = current_stream & 0b111;
-                // and shift right so that the current bit becomes the prev bit
-                current_stream >>= 1;
+            const HGRLUTENTRY *e = &hgr_lut[byte & 0x7F][next_lsb][prev_bit][phase][bit_column];
 
-                // Find the pixel color, and plot it
-                uint32_t pixel_rgb = color_table[bit_stream][bit_column][phase];
-                p[px++] = pixel_rgb;
-                bit_column ^= 1;
-            }
+            // emit the 7 pixels already expanded in the LUT
+            p[px + 0] = e->pixel[0];
+            p[px + 1] = e->pixel[1];
+            p[px + 2] = e->pixel[2];
+            p[px + 3] = e->pixel[3];
+            p[px + 4] = e->pixel[4];
+            p[px + 5] = e->pixel[5];
+            p[px + 6] = e->pixel[6];
+            px += 7;
 
-            // Prepare for the next iteration
+            // prepare for next column
+            bit_column ^= 1;                // 7 flips net to one flip per column
+            prev_bit = (byte >> 6) & 1;     // current byte's bit 6 (msb ignoring phase bit)
             byte = next_byte;
         }
     }
@@ -400,7 +926,7 @@ void viewapl2_screen_hgr_mono(APPLE2 *m, int start, int end) {
     int x, y;
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    int page = m->viewport->shadow_active_page ? 0x4000 : 0x2000;
+    uint16_t page = m->viewport->shadow_flags.b.page2set ? 0x4000 : 0x2000;
     uint32_t c[2] = { color_table[0][0][0], color_table[7][0][0] };
 
     // Loop through each row
@@ -409,35 +935,33 @@ void viewapl2_screen_hgr_mono(APPLE2 *m, int start, int end) {
         uint32_t *p = &pixels[y * surface->w];
         int address = page + hgr_row_start[y];
 
-        // Loop through every bytes (40 iterations for each 280-pixel row)
+        // Loop through every column (40 iterations for each 280-pixel row)
         uint8_t *bytes = &m->RAM_MAIN[address];
         for(int x = 0; x < 40; x++) {
-            uint8_t pixels = *bytes++;
-            p[0] = c[pixels & 1];
-            pixels >>= 1;
-            p[1] = c[pixels & 1];
-            pixels >>= 1;
-            p[2] = c[pixels & 1];
-            pixels >>= 1;
-            p[3] = c[pixels & 1];
-            pixels >>= 1;
-            p[4] = c[pixels & 1];
-            pixels >>= 1;
-            p[5] = c[pixels & 1];
-            pixels >>= 1;
-            p[6] = c[pixels & 1];
+            const HGRMONOLUTENTRY *e = &hgr_mono_lut[*bytes++ & 0x7F];
+            p[0] = e->pixel[0];
+            p[1] = e->pixel[1];
+            p[2] = e->pixel[2];
+            p[3] = e->pixel[3];
+            p[4] = e->pixel[4];
+            p[5] = e->pixel[5];
+            p[6] = e->pixel[6];
             p += 7;
         }
     }
 }
 
 // Display the text screen
-void viewapl2_screen_txt(APPLE2 *m, int start, int end) {
+void viewapl2_screen_txt40(APPLE2 *m, int start, int end) {
     int x, y;
     SDL_Surface *surface = m->viewport->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    int page = m->viewport->shadow_active_page ? 0x0800 : 0x0400;
-    uint32_t c[2] = { color_table[0][0][0], color_table[7][0][0] };
+    uint16_t page = m->viewport->shadow_flags.b.page2set ? 0x0800 : 0x0400;
+    Uint64 now = SDL_GetPerformanceCounter();
+    double freq = (double)SDL_GetPerformanceFrequency();
+    // I got 3.7 from recording a flash on my Platinum //e - 0.17 to 0.44 for a change so 0.27
+    uint8_t time_inv = (((uint64_t)(now * 3.7 / freq)) & 1) ? 0xFF : 0x00;
+    int alt_charset = m->model ? m->model && m->altcharset : 0;
 
     // Loop through each row
     for(y = start; y < end; y++) {
@@ -448,25 +972,28 @@ void viewapl2_screen_txt(APPLE2 *m, int start, int end) {
         // Loop through every col (byte)
         for(int x = 0; x < 40; x++) {
             int r;
-            // Get the character on screen
-            int character = m->RAM_MAIN[address + x];
-            // See if inverse
-            uint8_t inv = (~character >> 7) & 1;
+            uint8_t inv = 0x00;
+            uint8_t character = m->RAM_MAIN[address + x];   // Get the character on screen
+            if(character < 0x80) {
+                if(character >= 0x40) {
+                    if(!alt_charset) {
+                        character &= 0x3F;
+                        inv = time_inv;
+                    }
+                } else if(!m->model) {
+                    inv = 0xFF;
+                }
+            }
             // Get the font offset in the font blocks
-            uint8_t *character_font = &m->roms.blocks[ROM_CHARACTER].bytes[character * 8];
+            uint8_t *character_font = &m->roms.blocks[ROM_APPLE2_CHARACTER].bytes[character * 8];
             // "Plot" the character to the SDL graphics screen
             uint32_t *pr = p;
             for(r = 0; r < 8; r++) {
-                uint8_t pixels = *character_font++;
+                uint8_t pixels = inv ^ *character_font++;
                 for(int i = 6; i >= 0; i--) {
-                    pr[i] = c[inv ^ (pixels & 1)];
+                    pr[i] = gr_lut[(pixels & 1) ? 15 : 0];
                     pixels >>= 1;
                 }
-                // This is for //e font
-                // for(int i=0; i < 7 ; i++) {
-                //     pr[i] = c[inv ^ (pixels & 1)];
-                //     pixels >>= 1;
-                // }
                 pr += surface->w;
             }
             p += 7;
@@ -474,13 +1001,61 @@ void viewapl2_screen_txt(APPLE2 *m, int start, int end) {
     }
 }
 
-// Display the 80 col text screen
-void viewapl2_screen_80col(APPLE2 *m, int start, int end) {
+void viewapl2_screen_txt80(APPLE2 *m, int start, int end) {
+    int x, y;
+    SDL_Surface *surface = m->viewport->surface_wide;
+    uint32_t *pixels = (uint32_t *) surface->pixels;
+    Uint64 now = SDL_GetPerformanceCounter();
+    double freq = (double)SDL_GetPerformanceFrequency();
+    // I got 3.7 from recording a flash on my Platinum //e - 0.17 to 0.44 for a change so 0.27
+    uint8_t time_inv = (((uint64_t)(now * 3.7 / freq)) & 1) ? 0xFF : 0x00;
+    int alt_charset = m->model ? m->model && m->altcharset : 0;
+
+    // Loop through each row
+    for(y = start; y < end; y++) {
+        // Get the pointer to the start of the row in the SDL surface
+        uint32_t *p = &pixels[y * 8 * surface->w];
+        int address = 0x0400 + txt_row_start[y];
+
+        // Loop through every col (byte)
+        for(int x = 0; x < 80; x++) {
+            int r;
+            uint8_t inv = 0x00;
+            int char_in_bank = (x & 1) ? (x >> 1) : (x >> 1) + 0x10000;
+            uint8_t character = m->RAM_MAIN[address + char_in_bank];   // Get the character on screen
+            if(character < 0x80) {
+                if(character >= 0x40) {
+                    if(!alt_charset) {
+                        character &= 0x3F;
+                        inv = time_inv;
+                    }
+                } else if(!m->model) {
+                    inv = 0xFF;
+                }
+            }
+            // Get the font offset in the font blocks
+            uint8_t *character_font = &m->roms.blocks[ROM_APPLE2_CHARACTER].bytes[character * 8];
+            // "Plot" the character to the SDL graphics screen
+            uint32_t *pr = p;
+            for(r = 0; r < 8; r++) {
+                uint8_t pixels = inv ^ *character_font++;
+                for(int i = 6; i >= 0; i--) {
+                    pr[i] = gr_lut[(pixels & 1) ? 15 : 0];
+                    pixels >>= 1;
+                }
+                pr += surface->w;
+            }
+            p += 7;
+        }
+    }
+}
+
+// Display the 80 col text screen in franklin 80 mode
+void viewapl2_screen_franklin80col(APPLE2 *m, int start, int end) {
     int x, y;
     FRANKLIN_DISPLAY *fd80 = &m->franklin_display;
-    SDL_Surface *surface = m->viewport->surface640;
+    SDL_Surface *surface = m->viewport->surface_wide;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    // int page = m->viewport->shadow_active_page ? 0x0800 : 0x0400;
     uint32_t c[2] = { color_table[0][0][0], color_table[7][0][0] };
     uint16_t display_offset = 256 * fd80->registers[0x0c] + fd80->registers[0x0d];
 
@@ -496,15 +1071,15 @@ void viewapl2_screen_80col(APPLE2 *m, int start, int end) {
             // Get the character on screen
             int character = fd80->display_ram[(address + x) & 0x7ff];
             // See if inverse
-            uint8_t inv = (character >> 7) & 1;
+            uint8_t inv = (character >> 7) & 1 ? 0xff : 0;
             // Get the font offset in the font blocks
             uint8_t *character_font = &m->roms.blocks[ROM_FRANKLIN_ACE_CHARACTER].bytes[character * 16];
             // "Plot" the character to the SDL graphics screen
             uint32_t *pr = p;
             for(r = 0; r < 8; r++) {
-                uint8_t pixels = *character_font++;
+                uint8_t pixels = inv ^ *character_font++;
                 for(int i = 7; i >= 0; i--) {
-                    pr[i] = c[inv ^ (pixels & 1)];
+                    pr[i] = c[pixels & 1];
                     pixels >>= 1;
                 }
                 pr += surface->w;

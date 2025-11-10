@@ -1,4 +1,4 @@
-// Apple ][+ emulator and assembler
+// Apple ][+ and //e Emhanced emulator and assembler
 // Stefan Wessels, 2024
 // This is free and unencumbered software released into the public domain.
 
@@ -233,7 +233,7 @@ void emit(uint8_t byte_value);
 void write_opcode();
 void write_bytes(uint64_t value, int width, int order);
 void write_values(int width, int order);
-int anonymous_symbol_lookup(uint16_t * address, int direction);
+int anonymous_symbol_lookup(uint16_t *address, int direction);
 void symbol_clear(const char *symbol_name, uint32_t symbol_name_length);
 SYMBOL_LABEL *symbol_lookup(uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length);
 int symbol_sort(const void *lhs, const void *rhs);
@@ -265,6 +265,6 @@ void parse_dot_command();
 void parse_label();
 void parse_opcode();
 void parse_variable();
-int assembler_init(APPLE2 * m);
+int assembler_init(APPLE2 *m);
 int assembler_assemble(const char *input_file, uint16_t address);
 void assembler_shutdown();

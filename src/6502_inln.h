@@ -1,4 +1,4 @@
-// Apple ][+ emulator
+// Apple ][+ and //e Emhanced emulator
 // Stefan Wessels, 2024
 // This is free and unencumbered software released into the public domain.
 
@@ -10,8 +10,10 @@
 
 // Memory access
 static inline uint8_t read_from_memory(APPLE2 *m, uint16_t address) {
-    assert(address / PAGE_SIZE < m->read_pages.num_pages);
-    uint8_t cb_mask = m->watch_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
+    size_t page = address / PAGE_SIZE;
+    size_t offset = address % PAGE_SIZE;
+    assert(page < m->read_pages.num_pages);
+    uint8_t cb_mask = m->watch_pages.pages[page].bytes[offset];
     if(cb_mask) {
         if(cb_mask & 2) {
             m->callback_breakpoint(m, address);
@@ -20,7 +22,7 @@ static inline uint8_t read_from_memory(APPLE2 *m, uint16_t address) {
             return m->callback_read(m, address);
         }
     }
-    return m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
+    return m->read_pages.pages[page].bytes[offset];
 }
 
 static inline uint8_t read_from_memory_debug(APPLE2 *m, uint16_t address) {
@@ -28,9 +30,49 @@ static inline uint8_t read_from_memory_debug(APPLE2 *m, uint16_t address) {
     return m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
 }
 
+static inline uint8_t read_from_memory_selected(APPLE2 *m, uint16_t address, int selected) {
+    switch(selected & (mem6502 | mem64 | mem128)) {
+        case mem6502:
+            return m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
+        case mem64:
+            if(address < 0xD000) {
+                return m->RAM_MAIN[address];
+            }
+            if(address < 0xE000) {
+                if(!(selected & memlcb2)) {
+                    // D123 + 1000 = e123 & 1fff =  123 (bank1)
+                    // d123               & 1fff = 1123 (bank2)
+                    // So set bank 1 address to exxx.
+                    address += 0x1000;
+                }
+                return m->RAM_LC[(address & 0x1fff)];
+            }
+            // LC 0x2000+
+            return m->RAM_LC[(address & 0x3fff)];
+        case mem128:
+            if(address < 0xD000) {
+                return m->RAM_MAIN[address + 0x10000];
+            }
+            if(address < 0xE000) {
+                if(!(selected & memlcb2)) {
+                    // D123 + 1000 = e123 & 5fff = 4123 (aux bank1)
+                    // d123               & 5fff = 5123 (aux bank2)
+                    // So set bank 1 address to exxx.
+                    address += 0x1000;
+                }
+                return m->RAM_LC[(address & 0x5fff)];
+            }
+            // exxx-ffff & 7fggg = aux lc ram
+            return m->RAM_LC[(address & 0x7fff)];
+        default:
+            assert(0);
+            return 0;
+    }
+}
+
 static inline void write_to_memory(APPLE2 *m, uint16_t address, uint8_t value) {
-    uint16_t page = address / PAGE_SIZE;
-    uint16_t offset = address % PAGE_SIZE;
+    size_t page = address / PAGE_SIZE;
+    size_t offset = address % PAGE_SIZE;
     assert(page < m->write_pages.num_pages);
     uint8_t cb_mask = m->watch_pages.pages[page].bytes[offset];
     if(cb_mask) {
@@ -43,6 +85,52 @@ static inline void write_to_memory(APPLE2 *m, uint16_t address, uint8_t value) {
     }
     if(!(cb_mask & 1)) {
         m->write_pages.pages[page].bytes[offset] = value;
+    }
+}
+
+static inline void write_to_memory_selected(APPLE2 *m, uint16_t address, uint8_t selected, uint8_t value) {
+    switch(selected & (mem6502 | mem64 | mem128)) {
+        case mem6502:
+            m->write_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE] = value;
+            break;
+        case mem64:
+            if(address < 0xD000) {
+                m->RAM_MAIN[address] = value;
+                break;
+            }
+            if(address < 0xE000) {
+                if(!(selected & memlcb2)) {
+                    // D123 + 1000 = e123 & 1fff =  123 (bank1)
+                    // d123               & 1fff = 1123 (bank2)
+                    // So set bank 1 address to exxx.
+                    address += 0x1000;
+                }
+                m->RAM_LC[(address & 0x1fff)] = value;
+                break;
+            }
+            // LC 0x2000+
+            m->RAM_LC[(address & 0x3fff)] = value;
+            break;
+        case mem128:
+            if(address < 0xD000) {
+                m->RAM_MAIN[address + 0x10000] = value;
+                break;
+            }
+            if(address < 0xE000) {
+                if(!(selected & memlcb2)) {
+                    // D123 + 1000 = e123 & 5fff = 4123 (aux bank1)
+                    // d123               & 5fff = 5123 (aux bank2)
+                    // So set bank 1 address to exxx.
+                    address += 0x1000;
+                }
+                m->RAM_LC[(address & 0x5fff)] = value;
+                break;
+            }
+            // exxx-ffff & 7fggg = aux lc ram
+            m->RAM_LC[(address & 0x7fff)] = value;
+            break;
+        default:
+            assert(0);
     }
 }
 
@@ -63,16 +151,16 @@ static inline void add_value_to_accumulator(APPLE2 *m, uint8_t value) {
     m->cpu.C = m->cpu.scratch_hi;
     if(m->cpu.D) {
         m->cpu.scratch_hi = (a >> 4) + (value >> 4);
-        if (m->cpu.scratch_lo > 9) {
+        if(m->cpu.scratch_lo > 9) {
             m->cpu.scratch_lo += 6;
             m->cpu.scratch_hi++;
         }
-        if (m->cpu.scratch_hi > 9) {
+        if(m->cpu.scratch_hi > 9) {
             m->cpu.scratch_hi += 6;
             m->cpu.C = 1;
         }
         m->cpu.A = (m->cpu.scratch_hi << 4) | (m->cpu.scratch_lo & 0x0F);
-        if(m->cpu.class == CPU_65c02) {            
+        if(m->cpu.class == CPU_65c02) {
             read_from_memory(m, m->cpu.address_16);
             CYCLE(m);
             set_register_to_value(m, &m->cpu.A, m->cpu.A);
@@ -104,18 +192,18 @@ static inline void subtract_value_from_accumulator(APPLE2 *m, uint8_t value) {
     uint8_t a = m->cpu.A;
     m->cpu.C ^= 1;
     m->cpu.scratch_16 = a - value - m->cpu.C;
-    
+
     if(m->cpu.class == CPU_6502) {
         set_register_to_value(m, &m->cpu.A, m->cpu.scratch_lo);
         m->cpu.V = ((a ^ value) & (a ^ m->cpu.A) & 0x80) != 0 ? 1 : 0;
         if(m->cpu.D) {
             uint8_t lo = (a & 0x0F) - (value & 0x0F) - m->cpu.C;
             uint8_t hi = (a >> 4) - (value >> 4);
-            if (lo & 0x10) {
+            if(lo & 0x10) {
                 lo -= 6;
                 hi--;
             }
-            if (hi & 0xF0) {
+            if(hi & 0xF0) {
                 hi -= 6;
             }
             m->cpu.A = (hi << 4) | (lo & 0x0F);
@@ -125,10 +213,10 @@ static inline void subtract_value_from_accumulator(APPLE2 *m, uint8_t value) {
         m->cpu.A = m->cpu.scratch_lo;
         m->cpu.V = ((a ^ m->cpu.A) & (a ^ value) & 0x80) ? 1 : 0;
         if(m->cpu.D) {
-            if ((a & 0x0F) < ((value & 0x0F) + m->cpu.C)) {
+            if((a & 0x0F) < ((value & 0x0F) + m->cpu.C)) {
                 m->cpu.scratch_lo -= 0x06;
             }
-            if (a < value + m->cpu.C) {
+            if(a < value + m->cpu.C) {
                 m->cpu.scratch_lo -= 0x60;
             }
             read_from_memory(m, m->cpu.address_16);
@@ -182,10 +270,10 @@ static inline void branch(APPLE2 *m) {
     m->cpu.pc += (int8_t)m->cpu.scratch_lo;
 }
 
-static inline void brk_pc(APPLE2 *m) {
-    m->cpu.pc = 0xFFFE;
-    al_read_pc(m);
-}
+// static inline void brk_pc(APPLE2 *m) {
+//     m->cpu.pc = 0xFFFE;
+//     al_read_pc(m);
+// }
 
 static inline void p_from_stack(APPLE2 *m) {
     m->cpu.flags = (pull(m) & ~0b00010000) | 0b00100000;
@@ -258,7 +346,7 @@ static inline void aix(APPLE2 *m) {
         if(m->cpu.class == CPU_6502) {
             read_from_memory(m, m->cpu.address_16);
         } else {
-            read_from_memory(m, m->cpu.pc-1);
+            read_from_memory(m, m->cpu.pc - 1);
         }
         m->cpu.address_hi++;
         CYCLE(m);
@@ -272,7 +360,7 @@ static inline void aipxr(APPLE2 *m) {
     if(m->cpu.class == CPU_6502) {
         read_from_memory(m, m->cpu.address_16);
     } else {
-        read_from_memory(m, m->cpu.pc-1);
+        read_from_memory(m, m->cpu.pc - 1);
     }
     CYCLE(m);
     if(m->cpu.address_lo < lo) {
@@ -304,7 +392,7 @@ static inline void aiy(APPLE2 *m) {
         if(m->cpu.class == CPU_6502) {
             read_from_memory(m, m->cpu.address_16);
         } else {
-            read_from_memory(m, m->cpu.pc-1);
+            read_from_memory(m, m->cpu.pc - 1);
         }
         m->cpu.address_hi++;
         CYCLE(m);
@@ -318,7 +406,7 @@ static inline void aiyr(APPLE2 *m) {
     if(m->cpu.class == CPU_6502) {
         read_from_memory(m, m->cpu.address_16);
     } else {
-        read_from_memory(m, m->cpu.pc-1);
+        read_from_memory(m, m->cpu.pc - 1);
     }
     CYCLE(m);
     if(m->cpu.address_lo < lo) {
@@ -357,7 +445,7 @@ static inline void miy(APPLE2 *m) {
         if(m->cpu.class == CPU_6502) {
             read_from_memory(m, m->cpu.address_16);
         } else {
-            read_from_memory(m, m->cpu.pc-1);
+            read_from_memory(m, m->cpu.pc - 1);
         }
         m->cpu.address_hi++;
         CYCLE(m);
@@ -373,7 +461,7 @@ static inline void miyr(APPLE2 *m) {
     if(m->cpu.class == CPU_6502) {
         read_from_memory(m, m->cpu.address_16);
     } else {
-        read_from_memory(m, m->cpu.pc-1);
+        read_from_memory(m, m->cpu.pc - 1);
     }
     CYCLE(m);
     if(m->cpu.address_lo < lo) {
@@ -418,10 +506,11 @@ static inline void unimplemented(APPLE2 *m) {
 
 // Pipeline selectors
 static inline void aixr_sel(APPLE2 *m) {
-    if (m->cpu.class == CPU_6502)
+    if(m->cpu.class == CPU_6502) {
         aipxrw(m);
-    else
+    } else {
         aixrr(m);
+    }
 }
 
 // Instructions
@@ -563,19 +652,21 @@ static inline void bvs(APPLE2 *m) {
 }
 
 static inline void brk(APPLE2 *m) {
-    m->cpu.pc = 0xFFFE;
-    a(m);
-    m->cpu.pc = m->cpu.address_16;
-    if(m->cpu.class == CPU_6502) {
-        // Interrupt flag on at break
-        m->cpu.flags |= 0b00000100;
-    } else {
-        m->cpu.flags &= ~0b00001000;
-        if(m->cpu.flags & 0b00100000) {
-            // Interrupt flag on at break, if '-' flag is set
-            m->cpu.flags |= 0b00000100;
-        }
-    }
+    // m->cpu.pc = 0xFFFE;
+    // a(m);
+    // m->cpu.pc = m->cpu.address_16;
+    // if(m->cpu.class == CPU_6502) {
+    //     // Interrupt flag on at break
+    //     m->cpu.flags |= 0b00000100;
+    // } else {
+    //     m->cpu.flags &= ~0b00001000;
+    //     if(m->cpu.flags & 0b00100000) {
+    //         // Interrupt flag on at break, if '-' flag is set
+    //         m->cpu.flags |= 0b00000100;
+    //     }
+    // }
+    m->trace = 0;
+    m->stopped = 1;
 }
 
 static inline void clc(APPLE2 *m) {
@@ -641,7 +732,7 @@ static inline void cpy_imm(APPLE2 *m) {
     CYCLE(m);
 }
 
-static inline void dea(APPLE2 * m) {
+static inline void dea(APPLE2 *m) {
     read_from_memory(m, m->cpu.pc);
     set_register_to_value(m, &m->cpu.A, m->cpu.A - 1);
     CYCLE(m);
@@ -684,7 +775,7 @@ static inline void inc_a16(APPLE2 *m) {
     CYCLE(m);
 }
 
-static inline void ina(APPLE2 * m) {
+static inline void ina(APPLE2 *m) {
     read_from_memory(m, m->cpu.pc);
     set_register_to_value(m, &m->cpu.A, m->cpu.A + 1);
     CYCLE(m);

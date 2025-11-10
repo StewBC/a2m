@@ -1,4 +1,4 @@
-// Apple ][+ emulator
+// Apple ][+ and //e Emhanced emulator
 // Stefan Wessels, 2024
 // This is free and unencumbered software released into the public domain.
 
@@ -33,8 +33,8 @@ void viewcpu_show(APPLE2 *m) {
             nk_label(ctx, "PC", NK_TEXT_LEFT);
             nk_layout_row_push(ctx, 0.15f);
             if(NK_EDIT_COMMITED &
-               nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->registers[0],
-                              &vcpu->register_lengths[0], 5, nk_filter_hex)) {
+                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->registers[0],
+                                   &vcpu->register_lengths[0], 5, nk_filter_hex)) {
                 vcpu->registers[0][vcpu->register_lengths[0]] = 0;
                 ctx->current->edit.active = 0;
                 sscanf(vcpu->registers[0], "%x", &value);
@@ -44,8 +44,8 @@ void viewcpu_show(APPLE2 *m) {
             nk_label(ctx, "SP", NK_TEXT_LEFT);
             nk_layout_row_push(ctx, 0.15f);
             if(NK_EDIT_COMMITED &
-               nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->registers[1],
-                              &vcpu->register_lengths[1], 5, nk_filter_hex)) {
+                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->registers[1],
+                                   &vcpu->register_lengths[1], 5, nk_filter_hex)) {
                 vcpu->registers[1][vcpu->register_lengths[1]] = 0;
                 ctx->current->edit.active = 0;
                 sscanf(vcpu->registers[1], "%x", &value);
@@ -55,8 +55,8 @@ void viewcpu_show(APPLE2 *m) {
             nk_label(ctx, "A", NK_TEXT_LEFT);
             nk_layout_row_push(ctx, 0.10f);
             if(NK_EDIT_COMMITED &
-               nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->registers[2],
-                              &vcpu->register_lengths[2], 3, nk_filter_hex)) {
+                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->registers[2],
+                                   &vcpu->register_lengths[2], 3, nk_filter_hex)) {
                 vcpu->registers[2][vcpu->register_lengths[2]] = 0;
                 ctx->current->edit.active = 0;
                 sscanf(vcpu->registers[2], "%x", &value);
@@ -66,8 +66,8 @@ void viewcpu_show(APPLE2 *m) {
             nk_label(ctx, "X", NK_TEXT_LEFT);
             nk_layout_row_push(ctx, 0.10f);
             if(NK_EDIT_COMMITED &
-               nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->registers[3],
-                              &vcpu->register_lengths[3], 3, nk_filter_hex)) {
+                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->registers[3],
+                                   &vcpu->register_lengths[3], 3, nk_filter_hex)) {
                 vcpu->registers[3][vcpu->register_lengths[3]] = 0;
                 ctx->current->edit.active = 0;
                 sscanf(vcpu->registers[3], "%x", &value);
@@ -77,8 +77,8 @@ void viewcpu_show(APPLE2 *m) {
             nk_label(ctx, "Y", NK_TEXT_LEFT);
             nk_layout_row_push(ctx, 0.10f);
             if(NK_EDIT_COMMITED &
-               nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->registers[4],
-                              &vcpu->register_lengths[4], 3, nk_filter_hex)) {
+                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->registers[4],
+                                   &vcpu->register_lengths[4], 3, nk_filter_hex)) {
                 vcpu->registers[4][vcpu->register_lengths[4]] = 0;
                 ctx->current->edit.active = 0;
                 sscanf(vcpu->registers[4], "%x", &value);
@@ -92,8 +92,8 @@ void viewcpu_show(APPLE2 *m) {
                 nk_labelf(ctx, NK_TEXT_LEFT, "%c", (i)["NVEBDIZC"]);
                 nk_layout_row_push(ctx, 0.075f);
                 if(NK_EDIT_COMMITED &
-                   nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->flags[i], &vcpu->flag_lengths[i],
-                                  2, nk_filter_binary)) {
+                        nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->flags[i], &vcpu->flag_lengths[i],
+                                       2, nk_filter_binary)) {
                     vcpu->flags[i][vcpu->flag_lengths[i]] = 0;
                     ctx->current->edit.active = 0;
                     sscanf(vcpu->flags[i], "%d", &value);

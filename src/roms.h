@@ -1,16 +1,24 @@
-// Apple ][+ emulator
+// Apple ][+ and //e Emhanced emulator
 // Stefan Wessels, 2024
 // This is free and unencumbered software released into the public domain.
 
 #pragma once
 
 // Apple II Applesoft and ROM (D000 - FFFF)
-extern uint8_t apple2_rom[];
-extern const int apple2_rom_size;
+extern uint8_t a2p_rom[];
+extern const int a2p_rom_size;
 
 // Character ROM (Not mapped, used by drawing code)
-extern uint8_t apple_character_rom[];
-extern const int apple_character_rom_size;
+extern uint8_t a2p_character_rom[];
+extern const int a2p_character_rom_size;
+
+// Apple //e Enhanced ROM (C000 - FFFF but mapped in parts from C100)
+extern uint8_t a2ee_rom[];
+extern const int a2ee_rom_size;
+
+// //e Enhanced Character ROM (Not mapped, used by drawing code)
+extern uint8_t a2ee_character_rom[];
+extern const int a2ee_character_rom_size;
 
 // 2 disk ii roms - 13 sector and 16 sector
 extern uint8_t disk2_rom[2][256];

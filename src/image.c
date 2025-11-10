@@ -1,4 +1,4 @@
-// Apple ][+ emulator
+// Apple ][+ and //e Emhanced emulator
 // Stefan Wessels, 2024
 // This is free and unencumbered software released into the public domain.
 
@@ -16,15 +16,16 @@ uint8_t image_get_byte(APPLE2 *m, diskii_drive_t *d) {
 
         case IMG_NIB: {
                 image_nib_t *nib = (image_nib_t *)image->image_specifics;
+                // How many cpu cycles since last read
                 uint64_t delta   = m->cpu.cycles - d->q6_last_read_cycles;
+                // Advance by as many bytes as would pass in 32 cpu cycles
                 uint64_t nbytes  = delta / 32;
                 if(nbytes) {
                     nib->track_read_pos = (nib->track_read_pos + nbytes) % nib->track_size;
+                    // The byte was read at a 32 cycle increment (not at m->cpu.cycles)
                     d->q6_last_read_cycles += nbytes * 32;
                 }
                 byte = image->file.file_data[nib->track_index_pos + nib->track_read_pos];
-                // if(!(pos++ % 16)) { printf("\n%04X: ", nib->track_index_pos + nib->track_read_pos);}
-                // printf("%02X ", byte);
             }
             break;
 

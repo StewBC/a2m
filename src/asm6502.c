@@ -1,4 +1,4 @@
-// Apple ][+ emulator and assembler
+// Apple ][+ and //e Emhanced emulator and assembler
 // Stefan Wessels, 2024
 // This is free and unencumbered software released into the public domain.
 
@@ -269,29 +269,28 @@ void write_opcode() {
     // First the opcode
     emit(opcode);
     // Then the operand (0, ie implied, will do nothing more)
-    switch (as->opcode_info.width) {
-    case 1:                                                 // Relative - 1 byte
-        {
-            int32_t delta = as->opcode_info.value - 1 - as->current_address;
-            if(delta > 128 || delta < -128) {
-                errlog("Relative branch out of range $%X", delta);
+    switch(as->opcode_info.width) {
+        case 1: {                                               // Relative - 1 byte
+                int32_t delta = as->opcode_info.value - 1 - as->current_address;
+                if(delta > 128 || delta < -128) {
+                    errlog("Relative branch out of range $%X", delta);
+                }
+                emit(delta);
             }
-            emit(delta);
-        }
-        break;
-    case 8:                                                 // 1 byte
-        if(as->opcode_info.value >= 256) {
-            errlog("8-bit value expected but value = $%X", as->opcode_info.value);
-        }
-        emit(as->opcode_info.value);
-        break;
-    case 16:                                                // 2 bytes
-        if(as->opcode_info.value >= 65536) {
-            errlog("16-bit value expected but value = $%X", as->opcode_info.value);
-        }
-        emit(as->opcode_info.value);
-        emit(as->opcode_info.value >> 8);
-        break;
+            break;
+        case 8:                                                 // 1 byte
+            if(as->opcode_info.value >= 256) {
+                errlog("8-bit value expected but value = $%X", as->opcode_info.value);
+            }
+            emit(as->opcode_info.value);
+            break;
+        case 16:                                                // 2 bytes
+            if(as->opcode_info.value >= 65536) {
+                errlog("16-bit value expected but value = $%X", as->opcode_info.value);
+            }
+            emit(as->opcode_info.value);
+            emit(as->opcode_info.value >> 8);
+            break;
     }
 }
 
@@ -452,7 +451,7 @@ SYMBOL_LABEL *symbol_lookup(uint32_t name_hash, const char *symbol_name, uint32_
 }
 
 int symbol_sort(const void *lhs, const void *rhs) {
-    return (uint16_t) (((SYMBOL_LABEL *) lhs)->symbol_value) - (uint16_t) (((SYMBOL_LABEL *) rhs)->symbol_value);
+    return (uint16_t)(((SYMBOL_LABEL *) lhs)->symbol_value) - (uint16_t)(((SYMBOL_LABEL *) rhs)->symbol_value);
 }
 
 SYMBOL_LABEL *symbol_store(const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TYPE symbol_type, uint64_t value) {
@@ -591,22 +590,22 @@ void decode_abs_rel_zp_opcode() {
         if(as->current_token.op == ',') {
             // Make sure a comma is followed by x or y
             get_token();
-            switch (tolower(*as->token_start)) {
-            case 'x':
-                as->opcode_info.addressing_mode++;
-                break;
-            case 'y':
-                if(as->opcode_info.width < 16 && as->opcode_info.addressing_mode == ADDRESS_MODE_ZEROPAGE) {
-                    // lda 23, y is valid, but it's 16 bit, not ZP, it's absolute
-                    as->opcode_info.addressing_mode = ADDRESS_MODE_ABSOLUTE_Y;
-                    as->opcode_info.width = 16;
-                } else {
-                    as->opcode_info.addressing_mode += 2;
-                }
-                break;
-            default:
-                errlog("Unexpected ,%c", *as->token_start);
-                break;
+            switch(tolower(*as->token_start)) {
+                case 'x':
+                    as->opcode_info.addressing_mode++;
+                    break;
+                case 'y':
+                    if(as->opcode_info.width < 16 && as->opcode_info.addressing_mode == ADDRESS_MODE_ZEROPAGE) {
+                        // lda 23, y is valid, but it's 16 bit, not ZP, it's absolute
+                        as->opcode_info.addressing_mode = ADDRESS_MODE_ABSOLUTE_Y;
+                        as->opcode_info.width = 16;
+                    } else {
+                        as->opcode_info.addressing_mode += 2;
+                    }
+                    break;
+                default:
+                    errlog("Unexpected ,%c", *as->token_start);
+                    break;
             }
         }
     }
@@ -666,7 +665,7 @@ int is_label() {
     return 1;
 }
 
-// In this case, also do the work since finding the macro is 
+// In this case, also do the work since finding the macro is
 // already a significant effort
 int is_macro_parse_macro() {
     size_t i;
@@ -690,7 +689,7 @@ int is_macro_parse_macro() {
             input_stack_push(); // save current parse point
             ARRAY_ADD(&as->input_stack, macro->macro_body_input); // add macro parse point
             input_stack_pop(); // make that the current parse point
-            
+
             return 1;
         }
     }
@@ -727,22 +726,22 @@ int is_variable() {
 }
 
 int is_valid_instruction_only() {
-    switch (as->opcode_info.opcode_id) {
-    case GPERF_OPCODE_ASL:
-    case GPERF_OPCODE_LSR:
-    case GPERF_OPCODE_ROL:
-    case GPERF_OPCODE_ROR:
-        if(as->current_token.type == TOKEN_VAR) {
-            if(as->current_token.name_length == 1 && tolower(*as->token_start) == 'a') {
-                next_token();
+    switch(as->opcode_info.opcode_id) {
+        case GPERF_OPCODE_ASL:
+        case GPERF_OPCODE_LSR:
+        case GPERF_OPCODE_ROL:
+        case GPERF_OPCODE_ROR:
+            if(as->current_token.type == TOKEN_VAR) {
+                if(as->current_token.name_length == 1 && tolower(*as->token_start) == 'a') {
+                    next_token();
+                }
             }
-        }
-        return as->current_token.type == TOKEN_END;
+            return as->current_token.type == TOKEN_END;
 
-    default:
-        if(!as->opcode_info.width) {
-            return 1;
-        }
+        default:
+            if(!as->opcode_info.width) {
+                return 1;
+            }
     }
     return 0;
 }
@@ -882,7 +881,7 @@ void process_dot_incbin() {
         if(f) {
             // if is now in memory, either previously or newly loaded
             size_t data_size = f->file_size;
-            uint8_t *data = (uint8_t*)f->file_data;
+            uint8_t *data = (uint8_t *)f->file_data;
             while(data_size--) {
                 emit(*data++);
             }
@@ -945,7 +944,7 @@ void process_dot_macro() {
         errlog("Macro defenition error");
     }
     // Save the parse point as the macro body start point
-    input_stack_push(); 
+    input_stack_push();
     macro.macro_body_input = *ARRAY_GET(&as->input_stack, INPUT_STACK, as->input_stack.items - 1);
     input_stack_pop();
     // Look for .endmacro, ignoring the macro body
@@ -1072,14 +1071,14 @@ void parse_address() {
         next_token();
     }
     int64_t value = evaluate_expression();
-    switch (op) {
-    case 0:
-    case 1:
-        address = as->current_address + value;
-        break;
-    case 2:
-        address = value;
-        break;
+    switch(op) {
+        case 0:
+        case 1:
+            address = as->current_address + value;
+            break;
+        case 2:
+            address = value;
+            break;
     }
     if(as->current_address > address) {
         errlog("Assigning address %04X when address is already %04X error", address, as->current_address);
@@ -1100,15 +1099,15 @@ uint16_t parse_anonymous_address() {
         direction++;
         next_token();
     }
-    switch (op) {
-    case '+':
-        break;
-    case '-':
-        direction = -direction;
-        break;
-      defailt:
-        errlog("Unexpected symbol after anonymoys : (%c)", op);
-        break;
+    switch(op) {
+        case '+':
+            break;
+        case '-':
+            direction = -direction;
+            break;
+defailt:
+            errlog("Unexpected symbol after anonymoys : (%c)", op);
+            break;
     }
     // The opcode has not been emitted so + 1
     uint16_t address = as->current_address + 1;
@@ -1119,70 +1118,69 @@ uint16_t parse_anonymous_address() {
 }
 
 void parse_dot_command() {
-    switch (as->opcode_info.opcode_id) {
-    case GPERF_DOT_ALIGN:
-        {
-            uint64_t value = evaluate_expression();
-            as->current_address = (as->current_address + (value - 1)) & ~(value - 1);
-        }
-        break;
-    case GPERF_DOT_BYTE:
-        write_values(8, BYTE_ORDER_LO);
-        break;
-    case GPERF_DOT_DROW:
-        write_values(16, BYTE_ORDER_HI);
-        break;
-    case GPERF_DOT_DROWD:
-        write_values(32, BYTE_ORDER_HI);
-        break;
-    case GPERF_DOT_DROWQ:
-        write_values(64, BYTE_ORDER_HI);
-        break;
-    case GPERF_DOT_DWORD:
-        write_values(32, BYTE_ORDER_LO);
-        break;
-    case GPERF_DOT_ELSE:
-        parse_dot_else();
-        break;
-    case GPERF_DOT_ENDFOR:
-        parse_dot_endfor();
-        break;
-    case GPERF_DOT_ENDIF:
-        parse_dot_endif();
-        break;
-    case GPERF_DOT_ENDMACRO:
-        parse_dot_endmacro();
-        break;
-    case GPERF_DOT_FOR:
-        parse_dot_for();
-        break;
-    case GPERF_DOT_IF:
-        parse_dot_if();
-        break;
-    case GPERF_DOT_INCBIN:
-        process_dot_incbin();
-        break;
-    case GPERF_DOT_INCLUDE:
-        process_dot_include();
-        break;
-    case GPERF_DOT_MACRO:
-        process_dot_macro();
-        break;
-    case GPERF_DOT_ORG:
-        process_dot_org();
-        break;
-    case GPERF_DOT_QWORD:
-        write_values(64, BYTE_ORDER_LO);
-        break;
-    case GPERF_DOT_STRCODE:
-        process_dot_strcode();
-        break;
-    case GPERF_DOT_STRING:
-        process_dot_string();
-        break;
-    case GPERF_DOT_WORD:
-        write_values(16, BYTE_ORDER_LO);
-        break;
+    switch(as->opcode_info.opcode_id) {
+        case GPERF_DOT_ALIGN: {
+                uint64_t value = evaluate_expression();
+                as->current_address = (as->current_address + (value - 1)) & ~(value - 1);
+            }
+            break;
+        case GPERF_DOT_BYTE:
+            write_values(8, BYTE_ORDER_LO);
+            break;
+        case GPERF_DOT_DROW:
+            write_values(16, BYTE_ORDER_HI);
+            break;
+        case GPERF_DOT_DROWD:
+            write_values(32, BYTE_ORDER_HI);
+            break;
+        case GPERF_DOT_DROWQ:
+            write_values(64, BYTE_ORDER_HI);
+            break;
+        case GPERF_DOT_DWORD:
+            write_values(32, BYTE_ORDER_LO);
+            break;
+        case GPERF_DOT_ELSE:
+            parse_dot_else();
+            break;
+        case GPERF_DOT_ENDFOR:
+            parse_dot_endfor();
+            break;
+        case GPERF_DOT_ENDIF:
+            parse_dot_endif();
+            break;
+        case GPERF_DOT_ENDMACRO:
+            parse_dot_endmacro();
+            break;
+        case GPERF_DOT_FOR:
+            parse_dot_for();
+            break;
+        case GPERF_DOT_IF:
+            parse_dot_if();
+            break;
+        case GPERF_DOT_INCBIN:
+            process_dot_incbin();
+            break;
+        case GPERF_DOT_INCLUDE:
+            process_dot_include();
+            break;
+        case GPERF_DOT_MACRO:
+            process_dot_macro();
+            break;
+        case GPERF_DOT_ORG:
+            process_dot_org();
+            break;
+        case GPERF_DOT_QWORD:
+            write_values(64, BYTE_ORDER_LO);
+            break;
+        case GPERF_DOT_STRCODE:
+            process_dot_strcode();
+            break;
+        case GPERF_DOT_STRING:
+            process_dot_string();
+            break;
+        case GPERF_DOT_WORD:
+            write_values(16, BYTE_ORDER_LO);
+            break;
     }
 }
 
@@ -1207,49 +1205,49 @@ void parse_opcode() {
         emit(asm_opcode[as->opcode_info.opcode_id][ADDRESS_MODE_ACCUMULATOR]);
     } else {
         int processed = 0;
-        switch (as->current_token.op) {
-        case '#':
-            // Immediate
-            as->opcode_info.value = evaluate_expression();
-            as->opcode_info.addressing_mode = ADDRESS_MODE_IMMEDIATE;
-            write_opcode();
-            processed = 1;
-            break;
-        case '(':
-            if(as->opcode_info.opcode_id == GPERF_OPCODE_JMP) {
-                // jmp (INDIRECT) is a special case
-                as->opcode_info.value = parse_expression();
+        switch(as->current_token.op) {
+            case '#':
+                // Immediate
+                as->opcode_info.value = evaluate_expression();
                 as->opcode_info.addressing_mode = ADDRESS_MODE_IMMEDIATE;
                 write_opcode();
                 processed = 1;
-            } else {
-                char reg;
-                int indexed_indirect = is_indexed_indirect(&reg);
-                if(indexed_indirect) {
-                    // Already inside bracket
-                    if(reg == 'x') {
-                        // , in ,x ends expression so evaluate to ignore active open (
-                        as->opcode_info.value = evaluate_expression();
-                    } else {
-                        // start with the "active" ( and end in ) so parse
-                        as->opcode_info.value = parse_expression();
-                    }
-                    as->opcode_info.addressing_mode = indexed_indirect;
+                break;
+            case '(':
+                if(as->opcode_info.opcode_id == GPERF_OPCODE_JMP) {
+                    // jmp (INDIRECT) is a special case
+                    as->opcode_info.value = parse_expression();
+                    as->opcode_info.addressing_mode = ADDRESS_MODE_IMMEDIATE;
                     write_opcode();
-                    next_token();
-                    // Make sure it was ,x or ,y
-                    if(tolower(*as->token_start) != reg) {
-                        errlog("Expected ,%c", reg);
-                    }
-                    next_token();
-                    // If it was ,x go past the closing )
-                    if(as->current_token.op == ')') {
-                        next_token();
-                    }
                     processed = 1;
+                } else {
+                    char reg;
+                    int indexed_indirect = is_indexed_indirect(&reg);
+                    if(indexed_indirect) {
+                        // Already inside bracket
+                        if(reg == 'x') {
+                            // , in ,x ends expression so evaluate to ignore active open (
+                            as->opcode_info.value = evaluate_expression();
+                        } else {
+                            // start with the "active" ( and end in ) so parse
+                            as->opcode_info.value = parse_expression();
+                        }
+                        as->opcode_info.addressing_mode = indexed_indirect;
+                        write_opcode();
+                        next_token();
+                        // Make sure it was ,x or ,y
+                        if(tolower(*as->token_start) != reg) {
+                            errlog("Expected ,%c", reg);
+                        }
+                        next_token();
+                        // If it was ,x go past the closing )
+                        if(as->current_token.op == ')') {
+                            next_token();
+                        }
+                        processed = 1;
+                    }
                 }
-            }
-            break;
+                break;
         }
         if(!processed) {
             // general case
@@ -1283,7 +1281,7 @@ int assembler_init(APPLE2 *m) {
     ARRAY_INIT(&as->input_stack, INPUT_STACK);
 
     int bucket;
-    as->symbol_table = (DYNARRAY*)malloc(sizeof(DYNARRAY) * 256);
+    as->symbol_table = (DYNARRAY *)malloc(sizeof(DYNARRAY) * 256);
     for(bucket = 0; bucket < 256; bucket++) {
         ARRAY_INIT(&as->symbol_table[bucket], SYMBOL_LABEL);
     }
@@ -1320,7 +1318,7 @@ int assembler_assemble(const char *input_file, uint16_t address) {
                     errlog(".if without .endif");
                 }
                 if(as->loop_stack.items) {
-                    errlog(".for L:%05zu, without .endfor", ARRAY_GET(&as->loop_stack, FOR_LOOP, as->loop_stack.items-1)->body_line-1);
+                    errlog(".for L:%05zu, without .endfor", ARRAY_GET(&as->loop_stack, FOR_LOOP, as->loop_stack.items - 1)->body_line - 1);
                     as->loop_stack.items = 0;
                 }
                 // The end of the file has been reached so if it was an included file

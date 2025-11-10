@@ -1,4 +1,4 @@
-// Apple ][+ emulator
+// Apple ][+ and //e Emhanced emulator and assembler
 // Stefan Wessels, 2024
 // This is free and unencumbered software released into the public domain.
 
@@ -256,12 +256,15 @@ int util_file_open(UTIL_FILE *f, const char *file_name, const char *file_mode) {
     f->file_mode = strdup(file_mode);
     f->file_display_name = util_strrtok(f->file_path, "\\/");
     f->file_display_name = f->file_display_name ? (f->file_display_name + 1) : f->file_path;
+    f->is_used = 1;
 
     // Get size (and validate regular file) via stat
     uint64_t fsz = 0, mt = 0;
     if(file_stat_regular_utf8(file_name, &fsz, &mt) != 0) {
-        util_file_discard(f);
-        return A2_ERR;
+        if(file_mode[0] != 'w') {
+            util_file_discard(f);
+            return A2_ERR;
+        }
     }
     f->file_size = (int64_t)fsz;
 
@@ -387,6 +390,42 @@ int util_ini_load_file(char *filename, INI_PAIR_CALLBACK callback, void *user_da
     return A2_OK;
 }
 
+int util_ini_save_file(char *filename, INI_STORE *ini_store) {
+    if(!ini_store || !ini_store->sections.items) {
+        return A2_OK;
+    }
+    UTIL_FILE ini_file;
+    int rval = A2_OK;
+    memset(&ini_file, 0, sizeof(UTIL_FILE));
+    ini_file.load_padding = 1;
+    char *section = 0;
+    char *key = 0;
+    char *value = 0;
+    if(A2_OK != util_file_open(&ini_file, filename, "w")) {
+        return A2_ERR;
+    }
+    for(int sidx = 0; sidx < ini_store->sections.items; sidx++) {
+        INI_SECTION *s = ARRAY_GET(&ini_store->sections, INI_SECTION, sidx);
+        if(0 > fprintf(ini_file.fp, "[%s]\n", s->name)) {
+            rval = A2_ERR;
+            break;
+        }
+        for(int kvidx = 0; kvidx < s->kv.items; kvidx++) {
+            INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, kvidx);
+            if(0 > fprintf(ini_file.fp, "%s = %s\n", kv->key, kv->val)) {
+                rval = A2_ERR;
+                break;
+            }
+        }
+        if(rval == A2_ERR || 0 > fprintf(ini_file.fp, "\n")) {
+            rval = A2_ERR;
+            break;
+        }
+    }
+    util_file_discard(&ini_file);
+    return rval;
+}
+
 // Misc helpers
 int util_qsort_cmp(const void *p1, const void *p2) {
     FILE_INFO *fip1 = (FILE_INFO *) p1;
@@ -435,4 +474,12 @@ char *util_strrtok(char *str, const char *delim) {
         }
     }
     return NULL;
+}
+
+void *util_memset32(void *ptr, uint32_t value, size_t count) {
+    uint32_t *p = ptr;
+    while (count--) {
+        *p++ = value;
+    }
+    return ptr;
 }

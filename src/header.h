@@ -1,4 +1,4 @@
-// Apple ][+ emulator
+// Apple ][+ and //e Emhanced emulator
 // Stefan Wessels, 2024
 // This is free and unencumbered software released into the public domain.
 
@@ -85,30 +85,34 @@ typedef struct DEBUGGER DEBUGGER;
 
 #endif                                                      // IS_EMULATOR
 
-#include "util.h"
 #include "dynarray.h"
+#include "inifiles.h"
+#include "util.h"
 
 #ifdef IS_EMULATOR
 
+// State info in APPLE2 but also shadowed outside
+#include "a2flags.h"
+#include "trace.h"
+
 // Machine
 #include "6502.h"
+#include "a2sft_defs.h"
 #include "diskii.h"
 #include "frankdisp.h"
-#include "ramcard.h"
+#include "langcard.h"
 #include "roms.h"
-#include "sftswtch.h"
 #include "slot.h"
-#include "speaker.h"
 #include "smrtprt.h"
+#include "speaker.h"
 
 // Debugger/Viewer
 #include "breakpnt.h"
+#include "breakprs.h"
 #include "viewapl2.h"
 #include "viewcpu.h"
 #include "viewdlg.h"                                        // ASSEMBLER_CONFIG before DEBUGGER
 #include "viewdbg.h"
-#include "viewdbg.h"
-#include "viewmem.h"
 #include "viewmem.h"
 #include "viewmisc.h"
 #include "viewport.h"

@@ -4,9 +4,6 @@
 
 #pragma once
 
-typedef struct VIEWMISC {
-    FILE_BROWSER file_browser;
-    BREAKPOINT_EDIT breakpoint_edit;
-} VIEWMISC;
-
-void viewmisc_show(APPLE2 *m);
+uint8_t language_card(APPLE2 *m, uint16_t address, uint16_t value);
+void language_card_init(APPLE2 *m);
+void language_card_map_memory(APPLE2 *m);

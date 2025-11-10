@@ -4,4 +4,6 @@
 
 #pragma once
 
-OpcodeInfo *in_word_set(register const char *str, register size_t len);
+int trace_log(UTIL_FILE *f, APPLE2 *m);
+void trace_off(UTIL_FILE *f);
+int trace_on(UTIL_FILE *f, const char *filename, const char *file_mode);

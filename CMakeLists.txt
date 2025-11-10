@@ -1,16 +1,12 @@
 #-----------------------------------------------------------------------------
 # Stefan Wessels, November 2024
-# Builds an Apple ][+ emulator, called apple2
+# Builds an Apple ][+ and //e Emhanced emulator, called apple2
 # Builds a 6502 assembler, called asm6502
 
 cmake_minimum_required(VERSION 3.16)
 
 # Set project name
 project(a2m LANGUAGES C)
-
-# Set the C++ standard
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Find SDL2, and SDL2_mixer
 find_package(SDL2 CONFIG REQUIRED)
@@ -22,25 +18,29 @@ find_package(SDL2_mixer CONFIG REQUIRED)
 
 # Add the executable
 add_executable(apple2
-    src/6502.c
     src/6502_core.c
+    src/6502.c
     src/apple2.c
     src/asm6502.c
     src/asmexpr.c
     src/asmgperf.c
     src/breakpnt.c
+    src/breakprs.c
     src/dbgopcds.c
     src/diskii.c
     src/dynarray.c
     src/errorlog.c
     src/frankdisp.c
     src/image.c
+    src/inifiles.c
+    src/langcard.c
+    src/leds.c
     src/main.c
-    src/ramcard.c
     src/roms.c
     src/slot.c
     src/smrtprt.c
     src/speaker.c
+    src/trace.c
     src/util.c
     src/viewapl2.c
     src/viewcpu.c
@@ -133,3 +133,18 @@ target_compile_definitions(asm6502 PRIVATE IS_ASSEMBLER)
 target_link_libraries(asm6502
     $<$<PLATFORM_ID:Linux>:m>
 )
+
+# RelWithDebInfo gets special flags for profiling
+foreach(tgt IN ITEMS apple2 asm6502)
+  if(TARGET ${tgt})
+    if(MSVC)
+      target_compile_options(${tgt} PRIVATE
+        $<$<CONFIG:RelWithDebInfo>:/O2;/Zi;/Oy->)
+      target_link_options(${tgt} PRIVATE
+        $<$<CONFIG:RelWithDebInfo>:/DEBUG>)
+    elseif(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+      target_compile_options(${tgt} PRIVATE
+        $<$<CONFIG:RelWithDebInfo>:-O2;-g;-fno-omit-frame-pointer;-fno-optimize-sibling-calls>)
+    endif()
+  endif()
+endforeach()

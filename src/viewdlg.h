@@ -1,4 +1,4 @@
-// Apple ][+ emulator
+// Apple ][+ and //e Emhanced emulator
 // Stefan Wessels, 2024
 // This is free and unencumbered software released into the public domain.
 
@@ -35,10 +35,10 @@ typedef struct ASSEMBLER_CONFIG {
 extern char global_entry_buffer[256];
 extern int global_entry_length;
 
-int viewdlg_assembler_config(struct nk_context *ctx, struct nk_rect r, ASSEMBLER_CONFIG * ac);
+int viewdlg_assembler_config(struct nk_context *ctx, struct nk_rect r, ASSEMBLER_CONFIG *ac);
 int viewdlg_assembler_errors(struct nk_context *ctx, struct nk_rect r);
-int viewdlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT_EDIT * bpe);
-int viewdlg_file_browser(struct nk_context *ctx, FILE_BROWSER * fb);
+int viewdlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT_EDIT *bpe);
+int viewdlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb);
 int viewdlg_find(struct nk_context *ctx, struct nk_rect r, char *address, int *address_length, int max_len);
 int viewdlg_hex_address(struct nk_context *ctx, struct nk_rect r, char *address, int *address_length);
 int viewdlg_symbol_lookup(struct nk_context *ctx, struct nk_rect r, DYNARRAY *symbols_search, char *name, int *name_length, uint16_t *pc);

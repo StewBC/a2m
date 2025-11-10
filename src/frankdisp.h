@@ -1,4 +1,4 @@
-// Apple ][+ emulator
+// Apple ][+ and //e Emhanced emulator
 // Stefan Wessels, 2024
 // This is free and unencumbered software released into the public domain.
 
@@ -33,6 +33,6 @@ typedef struct FRANKLIN_DISPLAY {
     uint8_t registers[18];
 } FRANKLIN_DISPLAY;
 
-int franklin_display_init(FRANKLIN_DISPLAY * fd80);
-void franklin_display_map_cx_rom(APPLE2 * m, uint16_t address);
-void franklin_display_set(APPLE2 * m, uint16_t address, uint8_t value);
+int franklin_display_init(FRANKLIN_DISPLAY *fd80);
+void franklin_display_map_cx_rom(APPLE2 *m, uint16_t address);
+void franklin_display_set(APPLE2 *m, uint16_t address, uint8_t value);

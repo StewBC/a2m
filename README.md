@@ -421,7 +421,7 @@ nuklrsdl.h | SDL draw of Nuklear GUI - comes with nuklear.h
 ramcard.c | Language card
 roms.c | Apple ][+, Smartport & character ROMS.  Also Disk II (unused)
 slot.c | Tracks plug-in cards in slots and activates C800 ROM as needed
-sftswtch.h | Addresses where the emulator cares about soft switches
+a2sft_defs.h | Addresses where the emulator cares about soft switches
 smrtprt.c | SmarPort block device
 util.c | File and folder utilities, ini parser, etc.
 viewapl2.c | HGR & Lowres drawing - view the Apple ][+ screens

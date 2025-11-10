@@ -1,4 +1,4 @@
-// Apple ][+ emulator
+// Apple ][+ and //e Emhanced emulator
 // Stefan Wessels, 2024
 // This is free and unencumbered software released into the public domain.
 
@@ -8,13 +8,20 @@ typedef struct VIEWPORT {
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Surface *surface;
-    SDL_Surface *surface640;
+    SDL_Surface *surface_wide;  // The 80 col / double res surface
     SDL_Texture *texture;
-    SDL_Texture *texture640;
+    SDL_Texture *texture_wide;  // The 80 col / double res backing texture
     SDL_Texture *greenLED;
     SDL_Texture *redLED;
+    SDL_GameController *game_controller[2];
     SDL_Rect target_rect;
     SDL_Rect full_window_rect;
+
+    // Window title MHz display helpers
+    uint64_t prev_cycles;
+    uint64_t prev_ticks;
+    double mhz_moving_average;
+    double fps_moving_average;
 
     float display_scale;
 
@@ -29,33 +36,45 @@ typedef struct VIEWPORT {
     VIEWMISC viewmisc;
 
     // Shadow of machine states
-    int shadow_screen_mode;
+    // int shadow_flags;
+    A2FLAGSPACK shadow_flags;
     int help_page;
 
-    // Flags
-    int debug_view: 1;
-    int dlg_assassembler_config: 1;
-    int dlg_assassembler_errors: 1;
-    int dlg_breakpoint: 1;
-    int dlg_disassembler_go: 1;
-    int dlg_filebrowser: 1;
-    int dlg_memory_find: 1;
-    int dlg_memory_go: 1;
-    int dlg_symbol_lookup_dbg: 1;
-    int dlg_symbol_lookup_mem: 1;
-    int shadow_active_page: 1;                              // Flags that shadow machine states
-    int shadow_free_run: 1;
-    int shadow_stopped: 1;
-    int show_help: 1;
-    int show_leds: 1;
-    int viewcpu_show: 1;
-    int viewdbg_show: 1;
-    int viewdlg_modal: 1;
-    int viewmem_show: 1;
-    int viewmisc_show: 1;
+    // Game controller values
+    int8_t num_controllers;
+    uint8_t button_a[2];
+    uint8_t button_b[2];
+    uint8_t button_x[2];
+    uint8_t axis_left_x[2];
+    uint8_t axis_left_y[2];
+    uint64_t ptrig_cycle;
+
+    // Flags that contain machine states
+    uint32_t debug_view: 1;
+    uint32_t dlg_assassembler_config: 1;
+    uint32_t dlg_assassembler_errors: 1;
+    uint32_t dlg_breakpoint: 1;
+    uint32_t dlg_disassembler_go: 1;
+    uint32_t dlg_filebrowser: 1;
+    uint32_t dlg_memory_find: 1;
+    uint32_t dlg_memory_go: 1;
+    uint32_t dlg_symbol_lookup_dbg: 1;
+    uint32_t dlg_symbol_lookup_mem: 1;
+    uint32_t shadow_stopped: 1;
+    uint32_t show_help: 1;
+    uint32_t show_leds: 1;
+    uint32_t viewcpu_show: 1;
+    uint32_t viewdbg_show: 1;
+    uint32_t viewdlg_modal: 1;
+    uint32_t viewmem_show: 1;
+    uint32_t viewmisc_show: 1;
+    uint32_t display_override: 1;
 } VIEWPORT;
 
-int viewport_init(VIEWPORT *v, int w, int h);
+// a helper to make a Nuklear function a bit nicer
+int nk_option_label_disabled(struct nk_context *ctx, const char *label, int state, int disabled);
+
+int viewport_init(APPLE2 *m, int w, int h);
 void viewport_init_nuklear(VIEWPORT *v);
 int viewport_process_events(APPLE2 *m);
 void viewport_show(APPLE2 *m);
