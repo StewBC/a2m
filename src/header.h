@@ -113,8 +113,6 @@ typedef struct DEBUGGER DEBUGGER;
 #include "viewcpu.h"
 #include "viewdlg.h"                                        // ASSEMBLER_CONFIG before DEBUGGER
 #include "viewdbg.h"
-#include "viewdbg.h"
-#include "viewmem.h"
 #include "viewmem.h"
 #include "viewmisc.h"
 #include "viewport.h"
