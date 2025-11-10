@@ -33,7 +33,7 @@ typedef struct MEMSHOW {
     int cursor_x;
     int cursor_y;
     uint16_t cursor_address;
-    uint8_t *find_string;
+    char *find_string;
     int find_string_len;
     int last_found_address;
     uint32_t edit_mode_ascii: 1;

@@ -5,7 +5,8 @@
 #include "header.h"
 
 //  Set key to value in section (allows duplicates). Returns 0 on success.
-int ini_add(INI_STORE *st, const char *section, const char *key, const char *value) {
+int ini_add(void *user_data, const char *section, const char *key, const char *value) {
+    INI_STORE *st = user_data;
     if(!section || !key) {
         return -1;
     }

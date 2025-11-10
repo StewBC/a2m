@@ -651,7 +651,7 @@ static inline void bvs(APPLE2 *m) {
     }
 }
 
-static inline void brk(APPLE2 *m) {
+static inline void a2_brk(APPLE2 *m) {
     // m->cpu.pc = 0xFFFE;
     // a(m);
     // m->cpu.pc = m->cpu.address_16;

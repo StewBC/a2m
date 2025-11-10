@@ -93,16 +93,51 @@ typedef struct APPLE2 {
     uint8_t *rom_shadow_pages[(0xC800-0xC000)/PAGE_SIZE];   // Slot ram page mappings when SETC?ROM active
     uint8_t mapped_slot;                                    // 0 = not mapped, 1-7 means that slot card is strobe mapped (to C800)
 
-    // Emu Status flags
+    // Emu Status flags - These and the versions in a2flags.h MUST BE EXACTLY THE SAME // SQW Resolve this nonsense
     union {
         uint32_t emu_flags;
-        EMUFLAGS;
+        struct {
+            uint32_t debug_view: 1;
+            uint32_t disk_activity_read: 1;
+            uint32_t disk_activity_write: 1;
+            uint32_t franklin80installed: 1;
+            uint32_t model: 1;
+            uint32_t monitor_type: 2;
+            uint32_t original_del: 1;
+            uint32_t step: 1;
+            uint32_t stopped: 1;
+            uint32_t trace: 1;
+            uint32_t emuflags_pad: 21;
+        };
     };
 
-    // A2 Status flags
+    // A2 Status flags - These and the versions in a2flags.h MUST BE EXACTLY THE SAME // SQW Resolve this nonsense
     union {
         uint32_t state_flags;
-        A2FLAGS;
+        struct {
+            uint32_t altcharset: 1;
+            uint32_t altzpset: 1;
+            uint32_t c3slotrom: 1;
+            uint32_t closed_apple: 1;
+            uint32_t col80set: 1;
+            uint32_t cxromset: 1;
+            uint32_t dhires: 1;
+            uint32_t franklin80active: 1;
+            uint32_t hires: 1;
+            uint32_t lc_bank2_enable: 1;
+            uint32_t lc_pre_write: 1;
+            uint32_t lc_read_ram_enable: 1;
+            uint32_t lc_write_enable: 1;
+            uint32_t mixed: 1;
+            uint32_t open_apple: 1;
+            uint32_t page2set: 1;
+            uint32_t ramrdset: 1;
+            uint32_t ramwrtset: 1;
+            uint32_t store80set: 1;
+            uint32_t strobed: 1;
+            uint32_t text: 1;
+            uint32_t a2flags_pad: 11;
+        };
     };
 
     // Configuration
@@ -133,6 +168,7 @@ static inline uint8_t clamp_u8(uint32_t x, uint8_t lo, uint8_t hi) {
 }
 
 int apple2_configure(APPLE2 *m);
+void apple2_machine_reset(APPLE2 *m);
 void apple2_machine_setup(APPLE2 *m);
 void apple2_slot_setup(APPLE2 *m);
 void apple2_shutdown(APPLE2 *m);

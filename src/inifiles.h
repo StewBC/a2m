@@ -18,7 +18,7 @@ typedef struct {
     DYNARRAY sections; // dynamic array of sections
 } INI_STORE;
 
-int ini_add(INI_STORE *st, const char *section, const char *key, const char *value);
+int ini_add(void *user_data, const char *section, const char *key, const char *value);
 INI_KV *ini_find_kv(INI_SECTION *s, const char *key);
 INI_SECTION *ini_find_section(INI_STORE *st, const char *name);
 const char *ini_get(INI_STORE *st, const char *section, const char *key);

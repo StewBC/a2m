@@ -10,6 +10,7 @@ static char *ltrim(char *s) {
     }
     return s;
 }
+
 static void rtrim(char *s) {
     char *e = s + strlen(s);
     while(e > s && isspace(e[-1])) {

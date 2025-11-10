@@ -7,13 +7,22 @@
 // Standard Includes
 #include <assert.h>
 #include <ctype.h>
+#include <errno.h>
 #include <inttypes.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
+
+#ifndef max
+#define max(a,b) (( (a) > (b) ) ? (a) : (b))
+#endif
+
+#ifndef min
+#define min(a,b) (( (a) < (b) ) ? (a) : (b))
+#endif
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN

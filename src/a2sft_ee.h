@@ -534,10 +534,11 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                 break;
             case 0xC060:
                 break;
-            case 0xC070: 
-                VIEWPORT *v = m->viewport;
-                if(v && v->num_controllers) {
-                    v->ptrig_cycle = m->cpu.cycles;
+            case 0xC070: {
+                    VIEWPORT *v = m->viewport;
+                    if(v && v->num_controllers) {
+                        v->ptrig_cycle = m->cpu.cycles;
+                    }
                 }
                 break;
             case 0xC080:

@@ -63,7 +63,7 @@ size_t machine_run_opcode(APPLE2 *m) {
     CYCLE(m);
     m->cpu.pc++;
     switch(opcode) {
-        case BRK:       { al_read_pc(m); pc_hi_to_stack(m); pc_lo_to_stack(m); php(m); brk(m); } break; // 00
+        case BRK:       { al_read_pc(m); pc_hi_to_stack(m); pc_lo_to_stack(m); php(m); a2_brk(m); } break; // 00
         case ORA_X_ind: { mixa(m); ora_a16(m); } break; // 01
         case UND_02:    { al_read_pc(m); } break; // 02
         case UND_03:    { ; } break; // 03
