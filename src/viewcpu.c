@@ -23,12 +23,14 @@ void viewcpu_show(APPLE2 *m) {
     DEBUGGER *d = &v->debugger;
     VIEWCPU *vcpu = &v->viewcpu;
 
-    int w = m->viewport->full_window_rect.w - m->viewport->target_rect.w;
-    if(nk_begin(ctx, "CPU", nk_rect(747, 0, 373, 89), NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
-        if(m->stopped) {
+    int w = v->layout.cpu.w;
+    viewcpu_update(m);
+    if(nk_begin(ctx, "CPU", v->layout.cpu, NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
+        if(1) {
+        // if(m->stopped) {
             // I don't know what I have to set this
             ctx->current->edit.mode = NK_TEXT_EDIT_MODE_REPLACE;
-            nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 10);
+            nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 10);   
             nk_layout_row_push(ctx, 0.05f);
             nk_label(ctx, "PC", NK_TEXT_LEFT);
             nk_layout_row_push(ctx, 0.15f);

@@ -469,7 +469,7 @@ void viewmem_show(APPLE2 *m) {
     MEMSHOW *ms = &v->memshow;
     int w = 512;
     viewmem_update(m);
-    if(nk_begin(ctx, "Memory", nk_rect(0, 560, 512, 280), NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
+    if(nk_begin(ctx, "Memory", v->layout.mem, NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
         nk_style_set_font(ctx, &v->font->handle);
         nk_layout_row_static(ctx, 10, w, 1);
         struct nk_color active_background = ctx->style.window.background;
@@ -486,8 +486,9 @@ void viewmem_show(APPLE2 *m) {
                 r.y += ctx->style.edit.cursor_size + ((r.h + 1) * i); // empirically determined
                 int cx = (ms->cursor_x <= 31 ? (7 + (ms->cursor_x / 2) * 3 + (ms->cursor_x % 2)) : (ms->cursor_x + 23));
                 r.x += cx * r.w;
-                nk_draw_text(&ctx->active->buffer, r, &memline->line_text[cx], 1, ctx->style.font,
-                             viewmem_range_colors[memline->id].text_color, viewmem_range_colors[memline->id].background_color);
+                // SQW This cursor draw call locks up
+                // nk_draw_text(&ctx->active->buffer, r, &memline->line_text[cx], 1, ctx->style.font,
+                //              viewmem_range_colors[memline->id].text_color, viewmem_range_colors[memline->id].background_color);
                 ms->cursor_address = memline->address + (ms->cursor_x <= 31 ? (ms->cursor_x / 2) : (ms->cursor_x - 32));
                 active_line = memline;
             }

@@ -431,7 +431,7 @@ int util_qsort_cmp(const void *p1, const void *p2) {
     FILE_INFO *fip1 = (FILE_INFO *) p1;
     FILE_INFO *fip2 = (FILE_INFO *) p2;
     if(fip1->is_directory != fip2->is_directory) {
-        return fip1->is_directory - fip2->is_directory;
+        return fip2->is_directory - fip1->is_directory;
     }
     return stricmp(fip1->name, fip2->name);
 }

@@ -34,6 +34,7 @@ add_executable(apple2
     src/image.c
     src/inifiles.c
     src/langcard.c
+    src/layout.c
     src/leds.c
     src/main.c
     src/roms.c
@@ -46,6 +47,7 @@ add_executable(apple2
     src/viewcpu.c
     src/viewdbg.c
     src/viewdlg.c
+    src/viewhelp.c
     src/viewmem.c
     src/viewmisc.c
     src/viewport.c

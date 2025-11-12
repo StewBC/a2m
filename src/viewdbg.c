@@ -617,9 +617,9 @@ void viewdbg_show(APPLE2 *m) {
 
     // Populate the disassembly lines
     viewdbg_build_code_lines(m, d->cursor_pc, d->num_lines);
-    int w = m->viewport->full_window_rect.w - m->viewport->target_rect.w;
+    int w = v->layout.disasm.w;
     // Now draw the windows showing the lines
-    if(nk_begin(ctx, "Disassembly", nk_rect(747, 90, 373, 470), NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
+    if(nk_begin(ctx, "Disassembly", v->layout.disasm, NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
         DEBUGGER *d = &v->debugger;
         for(int i = 0; i < d->num_lines; i++) {
             CODE_LINE *code_line = ARRAY_GET(d->code_lines, CODE_LINE, i);

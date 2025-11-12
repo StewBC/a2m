@@ -17,8 +17,8 @@ void viewmisc_show(APPLE2 *m) {
 
     struct nk_color ob = ctx->style.window.background;
     int x = 512;
-    int w = m->viewport->full_window_rect.w - x;
-    if(nk_begin(ctx, "Miscellaneous", nk_rect(512, 560, 608, 280), NK_WINDOW_SCROLL_AUTO_HIDE | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
+    int w = v->layout.misc.w;
+    if(nk_begin(ctx, "Miscellaneous", v->layout.misc, NK_WINDOW_SCROLL_AUTO_HIDE | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
         // Show the slot if it has a card in it
         if(nk_tree_push(ctx, NK_TREE_TAB, "Slots", NK_MAXIMIZED)) {
             for(int i = 2; i < 8; i++) {
@@ -115,7 +115,7 @@ void viewmisc_show(APPLE2 *m) {
             nk_label(ctx, "Debug Status", NK_TEXT_LEFT);
             nk_layout_row_begin(ctx, NK_DYNAMIC, 120, 2);
             nk_layout_row_push(ctx, 0.40f);
-            if(nk_group_begin(ctx, "run status group", NK_WINDOW_BORDER)) {
+            if(nk_group_begin(ctx, "run status group", NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_BORDER)) {
                 nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 2);
                 nk_layout_row_push(ctx, 0.49f);
                 nk_option_label(ctx, "Run to PC", fm->run_to_pc_set);
@@ -137,6 +137,7 @@ void viewmisc_show(APPLE2 *m) {
                 nk_layout_row_dynamic(ctx, 18, 1);
                 nk_label(ctx, "Call Stack", NK_TEXT_LEFT);
                 nk_layout_row_dynamic(ctx, 75, 1);
+                // SQW  - Probably need a manual scrollbarV
                 if(nk_group_begin(ctx, "Callstack", NK_WINDOW_BORDER)) {
                     char callstack_display[256];
                     uint16_t address = m->cpu.sp + 1;

@@ -15,8 +15,13 @@ typedef struct VIEWPORT {
     SDL_Texture *redLED;
     SDL_GameController *game_controller[2];
     SDL_Rect target_rect;
-    SDL_Rect full_window_rect;
+    SDL_Rect sdl_os_rect;
+    SDL_Rect *draw_rect;
+    struct nk_rect nk_os_rect;
 
+    LAYOUT layout; 
+    LAYOUT_LIMITS lim;
+	
     // Window title MHz display helpers
     uint64_t prev_cycles;
     uint64_t prev_ticks;
@@ -63,13 +68,21 @@ typedef struct VIEWPORT {
     uint32_t shadow_stopped: 1;
     uint32_t show_help: 1;
     uint32_t show_leds: 1;
-    uint32_t viewcpu_show: 1;
-    uint32_t viewdbg_show: 1;
     uint32_t viewdlg_modal: 1;
-    uint32_t viewmem_show: 1;
-    uint32_t viewmisc_show: 1;
     uint32_t display_override: 1;
+    uint32_t clear_a2_view: 1;
 } VIEWPORT;
+
+#define color_active_win        nk_rgb( 50,100, 50)
+#define color_popup_border      nk_rgb(255,  0,  0)
+#define color_help_master       nk_rgb(  0,255,255)
+#define color_help_heading      nk_rgb(255,255,255)
+#define color_help_sub_heading  nk_rgb(  0,128,255)
+#define color_help_notice       nk_rgb(255,255,  0)
+#define color_help_key_heading  nk_rgb(  0,255,128)
+
+// These values are picked up in nuklrsdl.h
+extern float sdl_x_scale, sdl_y_scale;
 
 // a helper to make a Nuklear function a bit nicer
 int nk_option_label_disabled(struct nk_context *ctx, const char *label, int state, int disabled);
@@ -78,7 +91,7 @@ int viewport_init(APPLE2 *m, int w, int h);
 void viewport_init_nuklear(VIEWPORT *v);
 int viewport_process_events(APPLE2 *m);
 void viewport_show(APPLE2 *m);
-void viewport_show_help(APPLE2 *m);
+void viewhelp_show(APPLE2 *m);
 void viewport_shutdown(VIEWPORT *v);
 void viewport_toggle_debug(APPLE2 *m);
 void viewport_update(APPLE2 *m);

@@ -118,6 +118,7 @@ typedef struct DEBUGGER DEBUGGER;
 // Debugger/Viewer
 #include "breakpnt.h"
 #include "breakprs.h"
+#include "layout.h"
 #include "viewapl2.h"
 #include "viewcpu.h"
 #include "viewdlg.h"                                        // ASSEMBLER_CONFIG before DEBUGGER
@@ -125,6 +126,7 @@ typedef struct DEBUGGER DEBUGGER;
 #include "viewmem.h"
 #include "viewmisc.h"
 #include "viewport.h"
+#include "viewhelp.h"                                       // After viewport
 
 // It all comes together
 #include "apple2.h"
