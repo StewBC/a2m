@@ -4,9 +4,10 @@
 
 #include "header.h"
 
-#define MEMSHOW_INITIAL_LINE_LENGTH 73
-#define MEMSHOW_BYTES_PER_ROW       16
-#define MAX_FIND_STRING_LENGTH      128
+#define SCROLLBAR_W             10
+#define ADDRESS_LABEL_H         20
+#define ROW_H                   v->font_height
+#define MAX_FIND_STRING_LENGTH  256
 
 typedef struct RANGE_COLORS {
     struct nk_color text_color;
@@ -32,95 +33,39 @@ RANGE_COLORS viewmem_range_colors[16] = {
     { { 0X00, 0X00, 0X00, 0XFF}, { 0XFF, 0XFF, 0XFF, 0XFF} },
 };
 
-static inline void set_memline_block_flags(MEMSHOW *ms, MEMLINE *line, uint8_t flags) {
-    for(int i = line->first_line; i <= line->last_line; i++) {
-        MEMLINE *memline = ARRAY_GET(ms->lines, MEMLINE, i);
-        memline->memview_flags = line->memview_flags;
+static inline int viewmem_circular_delta(uint16_t cursor, uint16_t view) {
+    uint16_t u = (uint16_t)(cursor - view);   // always wraps correctly
+    if (u <= 0x7FFF)
+        return (int)u;            // forward short distance
+    else
+        return (int)u - 0x10000;  // backward short distance
+}
+
+static inline uint16_t viewmem_wrap16_add(uint16_t a, int b) {
+    return (uint16_t)(a + b);
+}
+
+static inline void viewmem_recenter_view(MEMSHOW *ms, MEMVIEW *mv) {
+    int delta = viewmem_circular_delta(mv->cursor_address, mv->view_address);
+
+    int row = delta >= 0 ? delta / ms->cols : -1 + ((delta + 1) / ms->cols);
+    int col = delta - row * ms->cols;
+
+    if (row < 0) {
+        mv->view_address = viewmem_wrap16_add(mv->cursor_address, -col);
+    } else if (row >= ms->rows) {
+        mv->view_address = viewmem_wrap16_add(mv->cursor_address, -col - (ms->rows - 1) * ms->cols);
     }
 }
 
-void viewmem_active_range(APPLE2 *m, int id) {
-    MEMSHOW *ms = &m->viewport->memshow;
-    MEMLINE *memline = ARRAY_GET(ms->lines, MEMLINE, 0);
-    while(memline->id < id && memline->last_line < ms->num_lines - 1) {
-        memline = ARRAY_GET(ms->lines, MEMLINE, memline->last_line + 1);
-    }
-    if(memline->id == id) {
-        ms->cursor_y = memline->first_line;
-    }
-}
-
-void viewmem_cursor_home(APPLE2 *m, int mod) {
-    MEMSHOW *ms = &m->viewport->memshow;
-    if(!mod) {
-        ms->cursor_x = (ms->edit_mode_ascii ? 32 : 0);
-    } else {
-        ms->cursor_y = ARRAY_GET(ms->lines, MEMLINE, ms->cursor_y)->first_line;
-    }
-}
-
-void viewmem_cursor_end(APPLE2 *m, int mod) {
-    MEMSHOW *ms = &m->viewport->memshow;
-    if(!mod) {
-        ms->cursor_x = (ms->edit_mode_ascii ? 47 : 30);
-    } else {
-        ms->cursor_y = ARRAY_GET(ms->lines, MEMLINE, ms->cursor_y)->last_line;
-    }
-}
-
-void viewmem_cursor_down(APPLE2 *m) {
-    MEMSHOW *ms = &m->viewport->memshow;
-    if(ARRAY_GET(ms->lines, MEMLINE, ms->cursor_y)->last_line == ms->cursor_y) {
-        int top = ARRAY_GET(ms->lines, MEMLINE, ms->cursor_y)->first_line;
-        viewmem_set_range_pc(m, ARRAY_GET(ms->lines, MEMLINE, top)->address + MEMSHOW_BYTES_PER_ROW);
-    } else {
-        ms->cursor_y++;
-    }
-}
-
-void viewmem_cursor_left(APPLE2 *m) {
-    MEMSHOW *ms = &m->viewport->memshow;
-    if(ms->cursor_x > (ms->edit_mode_ascii ? 32 : 0)) {
-        ms->cursor_x--;
-    } else {
-        ms->cursor_x = (ms->edit_mode_ascii ? 47 : 31);
-        viewmem_cursor_up(m);
-    }
-}
-
-void viewmem_cursor_right(APPLE2 *m) {
-    MEMSHOW *ms = &m->viewport->memshow;
-    if(ms->cursor_x < (ms->edit_mode_ascii ? 47 : 31)) {
-        ms->cursor_x++;
-    } else {
-        ms->cursor_x = (ms->edit_mode_ascii ? 32 : 0);
-        viewmem_cursor_down(m);
-    }
-}
-
-void viewmem_cursor_up(APPLE2 *m) {
-    MEMSHOW *ms = &m->viewport->memshow;
-    if(ARRAY_GET(ms->lines, MEMLINE, ms->cursor_y)->first_line == ms->cursor_y) {
-        int top = ARRAY_GET(ms->lines, MEMLINE, ms->cursor_y)->first_line;
-        viewmem_set_range_pc(m, ARRAY_GET(ms->lines, MEMLINE, top)->address - MEMSHOW_BYTES_PER_ROW);
-    } else {
-        ms->cursor_y--;
-    }
-}
-
-void viewmem_find_string(APPLE2 *m) {
-    MEMSHOW *ms = &m->viewport->memshow;
-    MEMLINE *memline = ARRAY_GET(ms->lines, MEMLINE, ms->cursor_y);
-    uint8_t flags = memline->memview_flags;
+void viewmem_find_string(APPLE2 *m, MEMSHOW *ms, MEMVIEW *mv) {
+    uint8_t flags = mv->flags;
     uint16_t index = 0;
     for(size_t i = ms->last_found_address + 1; i < ms->last_found_address + 65537; i++) {
         uint16_t pc = i;
         while(read_from_memory_selected(m, pc + index, flags) == ms->find_string[index]) {
             if(++index == ms->find_string_len) {
-                viewmem_set_range_pc(m, pc);
-                ms->last_found_address = pc;
-                ms->cursor_x = 0;
-                ms->cursor_y = ARRAY_GET(ms->lines, MEMLINE, ms->cursor_y)->first_line;
+                mv->cursor_address = mv->view_address = ms->last_found_address = pc;
                 return;
             }
         }
@@ -128,20 +73,15 @@ void viewmem_find_string(APPLE2 *m) {
     }
 }
 
-void viewmem_find_string_reverse(APPLE2 *m) {
-    MEMSHOW *ms = &m->viewport->memshow;
-    MEMLINE *memline = ARRAY_GET(ms->lines, MEMLINE, ms->cursor_y);
-    uint8_t flags = memline->memview_flags;
+void viewmem_find_string_reverse(APPLE2 *m, MEMSHOW *ms, MEMVIEW *mv) {
+    uint8_t flags = mv->flags;
     uint16_t index = ms->find_string_len - 1;
     for(int i = ms->last_found_address - 1; i > ms->last_found_address - 65537; i--) {
         uint16_t pc = i;
         while(read_from_memory_selected(m, pc + index, flags) == ms->find_string[index]) {
             if(index == 0) {
                 pc += index;
-                viewmem_set_range_pc(m, pc);
-                ms->last_found_address = pc;
-                ms->cursor_x = 0;
-                ms->cursor_y = ARRAY_GET(ms->lines, MEMLINE, ms->cursor_y)->first_line;
+                mv->cursor_address = mv->view_address = ms->last_found_address = pc;
                 return;
             }
             --index;
@@ -150,166 +90,383 @@ void viewmem_find_string_reverse(APPLE2 *m) {
     }
 }
 
-int viewmem_init(MEMSHOW *ms, int num_lines) {
-    // Clear the memshow structure
+int viewmem_init(MEMSHOW *ms) {
+    MEMVIEW memview;
+    memset(&memview, 0, sizeof(MEMVIEW));
     memset(ms, 0, sizeof(MEMSHOW));
-    // Allocate the dynamic array structure
-    ms->lines = (DYNARRAY *) malloc(sizeof(DYNARRAY));
-    if(!ms->lines) {
+    memview.flags = mem6502;
+
+    ms->mem_views = (DYNARRAY *) malloc(sizeof(DYNARRAY));
+    if(!ms->mem_views) {
         return A2_ERR;
     }
-    // Init the array and size it to the number of lines needed
-    ARRAY_INIT(ms->lines, MEMLINE);
-    if(A2_OK != array_resize(ms->lines, num_lines)) {
-        return A2_ERR;
+    // Init the array
+    ARRAY_INIT(ms->mem_views, MEMVIEW);
+    ARRAY_ADD(ms->mem_views, &memview);
+    ms->find_string = (char *)malloc(MAX_FIND_STRING_LENGTH);
+    if(ms->find_string) {
+        ms->find_string_len = MAX_FIND_STRING_LENGTH;
     }
-    // Set all of the MEMLINE structures to 0
-    memset(ms->lines->data, 0, sizeof(MEMLINE) * num_lines);
-    ms->num_lines = num_lines;
-    ms->line_length = MEMSHOW_INITIAL_LINE_LENGTH;
-    // Init each memline structure and allocate the space for the text
-    for(int i = 0; i < num_lines; i++) {
-        MEMLINE *memline = ARRAY_GET(ms->lines, MEMLINE, i);
-        memline->line_text = (char *) malloc(MEMSHOW_INITIAL_LINE_LENGTH);
-        if(!memline->line_text) {
-            return A2_ERR;
-        }
-        set_mem_flag(memline->memview_flags, mem6502);
-        // null terminate the text and set up the address this line will show
-        *memline->line_text = 0;
-        memline->address = i * MEMSHOW_BYTES_PER_ROW;
-        memline->last_line = num_lines - 1;
-    }
-    ms->find_string = (char *) malloc(MAX_FIND_STRING_LENGTH + 1);
-    if(!ms->find_string) {
-        return A2_ERR;
-    }
-    // Start by showing whatever memory is mapped into the 6502's space
     return A2_OK;
 }
 
-void viewmem_join_range(APPLE2 *m, int direction) {
-    MEMSHOW *ms = &m->viewport->memshow;
-    int line = ms->cursor_y;
-    MEMLINE *memline = ARRAY_GET(ms->lines, MEMLINE, line);
-    if(direction < 0) {
-        // Join with the block before
-        if(memline->first_line != 0) {
-            // Only if this block isn't already the 1st block (block 0)
-            MEMLINE *block = ARRAY_GET(ms->lines, MEMLINE, memline->first_line - 1);
-            uint16_t id = block->id;
-            uint16_t address = ARRAY_GET(ms->lines, MEMLINE, memline->first_line)->address;
-            uint16_t last_line = memline->last_line;
-            line = block->first_line;
-            while(line <= last_line) {
-                // Set the new combined block id and other parameters
-                memline = ARRAY_GET(ms->lines, MEMLINE, line);
-                memline->first_line = block->first_line;
-                memline->last_line = last_line;
-                memline->id = id;
-                line++;
-            }
-            // Set the start of the block to the start of the block that was
-            // active when the join happened
-            viewmem_set_range_pc(m, address);
-            // Renumber all following blocks down by 1
-            while(line < ms->num_lines) {
-                memline = ARRAY_GET(ms->lines, MEMLINE, line);
-                memline->id--;
-                line++;
-            }
+void viewmem_cursor_home(MEMSHOW *ms, MEMVIEW *mv, int mod) {
+    if (mv->cursor_field != CURSOR_ADDRESS) {
+        if (!mod) {
+            // move to column 0 of current row
+            int delta = viewmem_circular_delta(mv->cursor_address, mv->view_address);
+            int row = delta >= 0 ? delta / ms->cols : -1 + ((delta + 1) / ms->cols);
+            mv->cursor_address = viewmem_wrap16_add(mv->cursor_address, -(delta - row * ms->cols));
+        } else {
+            // move to top-left of view
+            mv->cursor_address = mv->view_address;
         }
-    } else {
-        if(memline->last_line < ms->num_lines - 1) {
-            MEMLINE *block = ARRAY_GET(ms->lines, MEMLINE, memline->last_line + 1);
-            uint16_t id = memline->id;
-            uint16_t address = ARRAY_GET(ms->lines, MEMLINE, memline->first_line)->address;
-            uint16_t first_line = memline->first_line;
-            uint16_t last_line = block->last_line;
-            line = memline->first_line;
-            while(line <= last_line) {
-                memline = ARRAY_GET(ms->lines, MEMLINE, line);
-                memline->first_line = first_line;
-                memline->last_line = last_line;
-                memline->id = id;
-                line++;
-            }
-            viewmem_set_range_pc(m, address);
-            while(line < ms->num_lines) {
-                memline = ARRAY_GET(ms->lines, MEMLINE, line);
-                memline->id--;
-                line++;
-            }
-        }
+        viewmem_recenter_view(ms, mv);
     }
+    mv->cursor_digit = CURSOR_DIGIT0;
 }
 
-void viewmem_new_range(APPLE2 *m) {
-    MEMSHOW *ms = &m->viewport->memshow;
-    int line = ms->cursor_y;
-    int id = ARRAY_GET(ms->lines, MEMLINE, line)->id;
-    if(!line) {
-        // The first line can't be a new block
+void viewmem_cursor_end(MEMSHOW *ms, MEMVIEW *mv, int mod) {
+    if (mv->cursor_field == CURSOR_ADDRESS) {
+        mv->cursor_digit = CURSOR_DIGIT3;
         return;
-    } else if(line == ms->num_lines - 1) {
-        // The last line can only be a new block if it is part of a block with the next to last line
-        if(id != ARRAY_GET(ms->lines, MEMLINE, ms->num_lines - 2)->id) {
-            return;
-        }
-    } else {
-        // The line can only be a new block if it is part of a block on the line before
-        if(id != ARRAY_GET(ms->lines, MEMLINE, line - 1)->id) {
-            return;
-        }
     }
-    // This line passes tests and can become a new block
-    // Set the last line in the block that is before the new block to the line before the new block
-    int block_line = line - 1;
-    MEMLINE *block;
-    do {
-        block = ARRAY_GET(ms->lines, MEMLINE, block_line);
-        if(block->id == id) {
-            block->last_line = line - 1;
-            block_line--;
-        }
-    } while(block->id == id && block_line >= 0);
-    // Set the first line in the new block and update the id in new block and all subsequent blocks
-    block_line = line;
-    while(block_line < ms->num_lines) {
-        block = ARRAY_GET(ms->lines, MEMLINE, block_line);
-        if(block->id == id) {
-            block->first_line = line;
-        }
-        block->id++;
-        block_line++;
+
+    if (mod) {
+        // Move to the last row
+        mv->cursor_address = mv->view_address + ms->cols * (ms->rows - 1);
+    }
+
+    int delta = viewmem_circular_delta(mv->cursor_address, mv->view_address);
+    int row = delta >= 0 ? delta / ms->cols : -1 + ((delta + 1) / ms->cols);
+    int col = delta - row * ms->cols;
+
+    // move to last column of row
+    mv->cursor_address = viewmem_wrap16_add(mv->cursor_address, (ms->cols - 1 - col));
+
+    viewmem_recenter_view(ms, mv);
+    mv->cursor_digit = CURSOR_DIGIT0;
+}
+
+
+void viewmem_cursor_down(MEMSHOW *ms, MEMVIEW *mv) {
+    if (mv->cursor_field != CURSOR_ADDRESS) {
+        mv->cursor_address = viewmem_wrap16_add(mv->cursor_address, ms->cols);
+        viewmem_recenter_view(ms, mv);
     }
 }
 
-void viewmem_page_down(APPLE2 *m) {
-    MEMSHOW *ms = &m->viewport->memshow;
-    MEMLINE *line = ARRAY_GET(ms->lines, MEMLINE, ms->cursor_y);
-    // MEMLINE *first_line = ARRAY_GET(ms->lines, MEMLINE, line->first_line);
-    MEMLINE *last_line = ARRAY_GET(ms->lines, MEMLINE, line->last_line);
-    viewmem_set_range_pc(m, last_line->address + MEMSHOW_BYTES_PER_ROW);
+
+void viewmem_cursor_left(MEMSHOW *ms, MEMVIEW *mv) {
+    switch (mv->cursor_field) {
+        case CURSOR_HEX:
+            if (mv->cursor_digit == CURSOR_DIGIT0) {
+                mv->cursor_address = viewmem_wrap16_add(mv->cursor_address, -1);
+                mv->cursor_digit = CURSOR_DIGIT1;
+            } else {
+                mv->cursor_digit--;
+            }
+            break;
+
+        case CURSOR_ASCII:
+            mv->cursor_address = viewmem_wrap16_add(mv->cursor_address, -1);
+            break;
+
+        case CURSOR_ADDRESS:
+            if (mv->cursor_digit != CURSOR_DIGIT0)
+                mv->cursor_digit--;
+            return; // no recenter needed
+    }
+
+    viewmem_recenter_view(ms, mv);
 }
 
-void viewmem_page_up(APPLE2 *m) {
-    MEMSHOW *ms = &m->viewport->memshow;
-    MEMLINE *line = ARRAY_GET(ms->lines, MEMLINE, ms->cursor_y);
-    MEMLINE *first_line = ARRAY_GET(ms->lines, MEMLINE, line->first_line);
-    MEMLINE *last_line = ARRAY_GET(ms->lines, MEMLINE, line->last_line);
-    viewmem_set_range_pc(m, first_line->address - (last_line->address - first_line->address) - MEMSHOW_BYTES_PER_ROW);
+
+void viewmem_cursor_right(MEMSHOW *ms, MEMVIEW *mv) {
+    switch (mv->cursor_field) {
+        case CURSOR_HEX:
+            if (mv->cursor_digit == CURSOR_DIGIT1) {
+                mv->cursor_address = viewmem_wrap16_add(mv->cursor_address, 1);
+                mv->cursor_digit = CURSOR_DIGIT0;
+            } else {
+                mv->cursor_digit++;
+            }
+            break;
+
+        case CURSOR_ASCII:
+            mv->cursor_address = viewmem_wrap16_add(mv->cursor_address, 1);
+            break;
+
+        case CURSOR_ADDRESS:
+            if (mv->cursor_digit != CURSOR_DIGIT3) {
+                mv->cursor_digit++;
+            } else {
+                mv->cursor_field = mv->prev_field;
+                mv->cursor_digit = mv->cursor_prev_digit;
+            }
+            return; // no view math
+    }
+
+    viewmem_recenter_view(ms, mv);
+}
+
+
+void viewmem_cursor_up(MEMSHOW *ms, MEMVIEW *mv) {
+    if (mv->cursor_field != CURSOR_ADDRESS) {
+        mv->cursor_address = viewmem_wrap16_add(mv->cursor_address, -ms->cols);
+        viewmem_recenter_view(ms, mv);
+    }
+}
+
+
+void viewmem_cursor_page_up(MEMSHOW *ms, MEMVIEW *mv) {
+    if (mv->cursor_field != CURSOR_ADDRESS) {
+        mv->view_address = viewmem_wrap16_add(mv->view_address, -(ms->cols * ms->rows));
+    }
+}
+
+void viewmem_cursor_page_down(MEMSHOW *ms, MEMVIEW *mv) {
+    if (mv->cursor_field != CURSOR_ADDRESS) {
+        mv->view_address = viewmem_wrap16_add(mv->view_address, (ms->cols * ms->rows));
+    }
+}
+
+
+void viewmem_show(APPLE2 *m) {
+    VIEWPORT *v = m->viewport;
+    if(!v) {
+        return;
+    }
+    MEMSHOW *ms = &v->memshow;
+    struct nk_context *ctx = m->viewport->ctx;
+    struct nk_vec2 pad = ctx->style.window.padding;
+    struct nk_vec2 spc = ctx->style.window.spacing;
+    struct nk_vec2 gpd = ctx->style.window.group_padding;
+    float border = ctx->style.window.border;
+    if(nk_begin(ctx, "Memory", v->layout.mem, NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
+        MEMVIEW *active_view;
+
+        float w_offset = ctx->current->layout->bounds.x;
+        ctx->current->layout->bounds.w += w_offset;
+        ctx->current->layout->bounds.x = 0;
+        ctx->style.window.padding       = nk_vec2(0,0);
+        ctx->style.window.spacing       = nk_vec2(0,0);
+        ctx->style.window.group_padding = nk_vec2(0,0);
+        ctx->style.window.border        = 0.0f;
+
+        int num_views = v->memshow.mem_views->items;
+        struct nk_color active_background = ctx->style.window.background;
+
+        nk_style_set_font(ctx, &v->font->handle);
+        nk_layout_row_begin(ctx, NK_STATIC, v->layout.mem.h, 2);
+        nk_layout_row_push(ctx, v->layout.mem.w - ADDRESS_LABEL_H);
+        if(nk_group_begin(ctx, "mem-views", NK_WINDOW_NO_SCROLLBAR)) {
+            for(int view = 0; view < num_views; view++) {
+                MEMVIEW *mv = ARRAY_GET(ms->mem_views, MEMVIEW, view);
+                if(ms->active_view == view) {
+                    active_view = mv;
+                }
+                uint16_t view_address = mv->view_address;
+                nk_layout_row_dynamic(ctx, ROW_H*ms->rows, 1);
+                if(nk_group_begin(ctx, "mem-ms->rows", NK_WINDOW_NO_SCROLLBAR)) {
+                    nk_layout_row_dynamic(ctx, ROW_H, 1);
+                    struct nk_color last_c = ctx->style.window.background = viewmem_range_colors[view].background_color;
+                    for(int row = 0; row < ms->rows; row++) {
+                        snprintf(ms->str_buf, ms->str_buf_len, "%04X:",view_address);
+                        for(int col = 0; col < ms->cols; col++) {
+                            uint8_t c = ms->u8_buf[col] = read_from_memory_selected(m, view_address + col, mv->flags);
+                            snprintf(&ms->str_buf[5+col*3], ms->str_buf_len - 5 - (ms->cols * 3), "%02X ", c);
+                        }
+                        for(int col = 0; col < ms->cols; col++) {
+                            uint8_t c = ms->u8_buf[col];
+                            snprintf(&ms->str_buf[5+ms->cols*3+col], ms->str_buf_len - 5 - (ms->cols * 3) - col, "%c", isprint(c) ? c : '.');
+                        }
+                        view_address += ms->cols;
+                        nk_label(ctx, ms->str_buf, NK_TEXT_LEFT);
+                    }
+                    nk_group_end(ctx);
+                }
+            }
+            
+            // Cursor
+            if(m->stopped) {
+                MEMVIEW *mv = active_view;
+                int delta = viewmem_circular_delta(mv->cursor_address, mv->view_address);
+                if (delta >= 0 && delta < (ms->rows * ms->cols)) {
+                    int row = delta / ms->cols;
+                    int col = delta % ms->cols;
+                    struct nk_rect r = ctx->current->layout->bounds;
+                    r.h = ROW_H;
+                    r.w = v->font_width;
+                    // -2 is a hack to get the cursor (size 13 due to font height) "over" the text looking good
+                    r.y += ((ms->active_view * ms->rows) + row) * ROW_H;
+                    uint8_t dc, c = read_from_memory_selected(m, mv->cursor_address, mv->flags);
+                    switch(mv->cursor_field) {
+                        case CURSOR_ADDRESS: {
+                                r.x = ctx->current->layout->at_x + v->font_width * mv->cursor_digit;
+                                uint16_t row_address = mv->cursor_address - col;
+                                uint8_t shift = (4 * (3 - mv->cursor_digit));
+                                dc = (row_address >> shift) & 0x0f;
+                                dc += (dc > 9) ? 'A' - 10 : '0';
+                            }
+                            break;
+                        case CURSOR_HEX: {
+                                r.x = v->font_width * ((col * 3 + 6) + mv->cursor_digit);
+                                uint8_t shift = (4 * (1 - mv->cursor_digit));
+                                dc = (c >> shift) & 0x0f;
+                                dc += (dc > 9) ? 'A' - 10 : '0';
+                            }
+                            break;
+                        case CURSOR_ASCII:
+                            r.x = v->font_width * ((ms->cols * 3 + 6) + col);
+                            dc = isprint(c) ? c : '.';
+                            break;
+                    }
+                    nk_draw_text(&ctx->active->buffer, r, &dc, 1, ctx->style.font, viewmem_range_colors[ms->active_view].text_color, viewmem_range_colors[ms->active_view].background_color); 
+                }
+            }
+
+            ctx->style.window.background = active_background;
+            nk_style_set_font(ctx, &v->font->handle);
+            nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 4);
+            nk_layout_row_push(ctx, 0.4);
+            nk_labelf(ctx, NK_TEXT_ALIGN_LEFT, "Address: %04X", active_view->cursor_address);
+            nk_layout_row_push(ctx, 0.14);
+            if(nk_option_label(ctx, "6502", tst_mem_flag(active_view->flags, mem6502)) && !tst_mem_flag(active_view->flags, mem6502)) {
+                clr_mem_flag(active_view->flags, mem64);
+                clr_mem_flag(active_view->flags, mem128);
+                clr_mem_flag(active_view->flags, memlcb2);
+                set_mem_flag(active_view->flags, mem6502);
+            }
+            if(nk_option_label(ctx, "64K", tst_mem_flag(active_view->flags, mem64)) && !tst_mem_flag(active_view->flags, mem64)) {
+                clr_mem_flag(active_view->flags, mem6502);
+                clr_mem_flag(active_view->flags, mem128);
+                set_mem_flag(active_view->flags, mem64);
+                if(m->lc_bank2_enable) {
+                    set_mem_flag(active_view->flags, memlcb2);
+                } else {
+                    clr_mem_flag(active_view->flags, memlcb2);
+                }
+            }
+            if(nk_option_label_disabled(ctx, "128K", tst_mem_flag(active_view->flags, mem128), !m->model) && !tst_mem_flag(active_view->flags, mem128)) {
+                clr_mem_flag(active_view->flags, mem6502);
+                clr_mem_flag(active_view->flags, mem64);
+                set_mem_flag(active_view->flags, mem128);
+                if(m->lc_bank2_enable) {
+                    set_mem_flag(active_view->flags, memlcb2);
+                } else {
+                    clr_mem_flag(active_view->flags, memlcb2);
+                }
+            }
+            int before = tst_mem_flag(active_view->flags, memlcb2);
+            int after = nk_option_label_disabled(ctx, "LC Bank2", before, tst_mem_flag(active_view->flags, mem6502));
+            if(after != before) {
+                if(after) {
+                    set_mem_flag(active_view->flags, memlcb2);
+                } else {
+                    clr_mem_flag(active_view->flags, memlcb2);
+                }
+            }
+            nk_group_end(ctx);
+        }
+
+        // Lower down uses this
+        MEMVIEW *mv = ARRAY_GET(ms->mem_views, MEMVIEW, ms->active_view);
+
+        // Scrollbar
+        nk_layout_row_push(ctx, SCROLLBAR_W);
+        struct nk_rect bounds = v->layout.mem;
+        bounds.x += bounds.w - SCROLLBAR_W;
+        bounds.w = SCROLLBAR_W;
+        bounds.h -= 28;
+        bounds.y += 5;
+        struct nk_color sc = { 255, 255, 255, 255}; 
+        struct nk_command_buffer *cb = nk_window_get_canvas(ctx);
+        nk_fill_rect(cb, bounds, 1.0f, sc);
+        ctx->style.window.padding       = pad;
+        ctx->style.window.spacing       = spc;
+        ctx->style.window.group_padding = gpd;
+        ctx->style.window.border        = border;
+
+        if(v->dlg_memory_find) {
+            int ret;
+            if((ret = viewdlg_find(ctx, nk_rect(10, 10, 400, 120), ms->find_string, &ms->find_string_len, MAX_FIND_STRING_LENGTH))) {
+                if(ret && ret != 3) {
+                    int value;
+                    ms->find_string[ms->find_string_len] = 0;
+                    if(ret == 2) {
+                        for(int i = 0; i < ms->find_string_len; i += 2) {
+                            int value;
+                            if(1 == sscanf(ms->find_string + i, "%02x", &value)) {
+                                ms->find_string[i / 2] = value;
+                            }
+                        }
+                        ms->find_string_len /= 2;
+                    }
+                    ms->last_found_address = mv->cursor_address;
+                    viewmem_find_string(m, ms, mv);
+                }
+                v->viewdlg_modal = 0;
+                v->dlg_memory_find = 0;
+            }
+        }
+        if(v->dlg_symbol_lookup_mem) {
+            static uint16_t pc = 0;
+            int ret;
+            DEBUGGER *d = &v->debugger;
+            if((ret = viewdlg_symbol_lookup(ctx, nk_rect(0, 0, 500, 240), &d->symbols_search, global_entry_buffer, &global_entry_length, &pc))) {
+                if(ret == 1) {
+                    mv->view_address = pc;  // Consider delta calc and -col
+                    mv->cursor_address = pc;
+                }
+                v->dlg_symbol_lookup_mem = 0;
+                v->viewdlg_modal = 0;
+            }
+        }
+    }
+    nk_end(ctx);
+}
+
+void viewmem_resize_view(APPLE2 *m) {
+    VIEWPORT *v = m->viewport;
+    MEMSHOW *ms = &v->memshow;
+
+    struct nk_context *ctx = m->viewport->ctx;
+    struct nk_style *style = &ctx->style;
+    // calc is from nk_begin_titled
+    float title_height = style->font->height + 2.0f * style->window.header.padding.y + (2.0f * style->window.header.label_padding.y);
+    struct nk_rect parent = v->layout.mem;
+    int view_height = (parent.h - (ADDRESS_LABEL_H + title_height)) / ms->mem_views->items;
+    float view_width = parent.w - SCROLLBAR_W;
+    int visible_cols = view_width / v->font_width;
+    ms->rows = max(1, view_height / ROW_H); // row height is forced to ROW_H
+    // 16 cols at 4 chars/col (hex 'XX ' and char ' ') + xxxx:
+    int cvt_size = visible_cols > (5 + 16*4) ? visible_cols : (5 + 16*4); 
+    if(ms->str_buf_len < cvt_size) {
+        char *new_cvt_buf = (char *)realloc(ms->str_buf, cvt_size + 1);
+        char *new_u8_buf = (uint8_t *)realloc(ms->u8_buf, cvt_size);
+        if(new_u8_buf && new_cvt_buf) {
+            ms->str_buf = new_cvt_buf;
+            ms->u8_buf = new_u8_buf;
+            ms->str_buf_len = cvt_size;
+        } else {
+            free(new_cvt_buf);
+            free(new_u8_buf);
+        }
+    }
+    ms->cols = visible_cols <= ms->str_buf_len ? (visible_cols - 5) / 4 : (ms->str_buf_len - 5) / 4;
 }
 
 int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window) {
     SDL_Keymod mod = SDL_GetModState();
     VIEWPORT *v = m->viewport;
     MEMSHOW *ms = &v->memshow;
+    MEMVIEW *mv = ARRAY_GET(ms->mem_views, MEMVIEW, ms->active_view);
 
-    if(ms->edit_mode_ascii) {
+    if(mv->cursor_field == CURSOR_ASCII) {
         if(e->type == SDL_TEXTINPUT) {
-            write_to_memory(m, ms->cursor_address, e->text.text[0]);
-            viewmem_cursor_right(m);
+            write_to_memory_selected(m, mv->cursor_address, mv->flags, e->text.text[0]);
+            viewmem_cursor_right(ms, mv);
         } else if(!(mod & (KMOD_CTRL | KMOD_ALT)) && e->key.keysym.sym >= 32 && e->key.keysym.sym < 127) {
             // SDL_TEXTINPUT also has SDL_KEYDOWN for same key, so filter out keys that were already
             // processed, but keep keys that want/need processing - like ENTER or cursor, or CTRL/ALT mod, etc.
@@ -322,14 +479,29 @@ int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window) {
     }
     // Seperate into MOD codes and regular keys for better clarity
     if(mod & KMOD_ALT) {
-        // ALT - 0 .. f - Switch zone
-        uint8_t key = e->key.keysym.sym;
-        if((key >= SDLK_0 && key <= SDLK_9) || (key >= SDLK_a && key <= SDLK_f)) {
-            key -= key >= SDLK_a ? SDLK_a - 10 : SDLK_0;
-            viewmem_active_range(m, key);
+        switch(e->key.keysym.sym) {
+            case SDLK_DOWN:
+                ms->active_view = (ms->active_view + 1) % ms->mem_views->items;
+                break;
+
+            case SDLK_UP:
+                ms->active_view = (ms->active_view - 1) % ms->mem_views->items;
+                break;
         }
     } else if(mod & KMOD_CTRL) {
         switch(e->key.keysym.sym) {
+            case SDLK_a:                                        // CTRL G - Goto view_address
+                if(mv->cursor_field == CURSOR_ADDRESS) {
+                    mv->cursor_field = mv->prev_field;
+                    mv->cursor_digit = mv->cursor_prev_digit;
+                } else {
+                    mv->prev_field = mv->cursor_field;
+                    mv->cursor_prev_digit = mv->cursor_digit;
+                    mv->cursor_digit = CURSOR_DIGIT0;
+                    mv->cursor_field = CURSOR_ADDRESS;
+                }
+                break;
+
             case SDLK_f:                                        // CTRL F - Find
                 if(!v->viewdlg_modal) {
                     ms->find_string_len = 0;
@@ -338,25 +510,25 @@ int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window) {
                 }
                 break;
 
-            case SDLK_g:                                        // CTRL G - Goto address
-                if(!v->viewdlg_modal) {
-                    v->viewdlg_modal = 1;
-                    v->dlg_memory_go = 1;
-                }
-                break;
-
             case SDLK_h:                                        // CTRL H - Find & Replace
                 break;
 
             case SDLK_j:                                        // CTRL J - Join (down) CTRL SHIFT J - Join Up
-                viewmem_join_range(m, (mod & KMOD_SHIFT) ? -1 : 1);
+                // viewmem_join_range(m, (mod & KMOD_SHIFT) ? -1 : 1);
+                if(ms->mem_views->items > 1) {
+                    array_remove(ms->mem_views, mv);
+                    if(ms->active_view >= ms->mem_views->items) {
+                        ms->active_view--;
+                    }
+                    viewmem_resize_view(m);
+                }
                 break;
 
             case SDLK_n:                                        // CTRL (shift) N - Find (prev) Next
                 if(mod & KMOD_SHIFT) {
-                    viewmem_find_string_reverse(m);
+                    viewmem_find_string_reverse(m, ms, mv);
                 } else {
-                    viewmem_find_string(m);
+                    viewmem_find_string(m, ms, mv);
                 }
                 break;
 
@@ -367,247 +539,110 @@ int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window) {
                 break;
 
             case SDLK_t:                                        // CTRL T - Toggle between ascii and hex edit
-                ms->edit_mode_ascii ^= 1;
-                ms->cursor_x = (ms->edit_mode_ascii ? (ms->cursor_x / 2 + 32) : ((ms->cursor_x - 32) * 2));
+                mv->cursor_field = CURSOR_ASCII - mv->cursor_field;
                 break;
 
             case SDLK_v:                                        // CTRL v - New Range (Split)
-                viewmem_new_range(m);
+                if(ms->mem_views->items < 16) {
+                    MEMVIEW v;
+                    memset(&v, 0, sizeof(v));
+                    v.view_address = v.cursor_address = mv->cursor_address;
+                    v.flags = mv->flags;
+                    ARRAY_ADD(ms->mem_views, &v);
+                    viewmem_resize_view(m);
+                }
                 break;
 
             case SDLK_HOME:
-                viewmem_cursor_home(m, 1);
+                viewmem_cursor_home(ms, mv, 1);
                 break;
 
             case SDLK_END:
-                viewmem_cursor_end(m, 1);
+                viewmem_cursor_end(ms, mv, 1);
+                break;
+
+            case SDLK_DOWN:
+                mv->view_address -= ms->cols;
+                break;
+
+            case SDLK_UP:
+                mv->view_address += ms->cols;
                 break;
         }
     } else {
         // Regular, unmodified keys
         uint8_t key = e->key.keysym.sym;
         if((key >= SDLK_0 && key <= SDLK_9) || (key >= SDLK_a && key <= SDLK_f)) {
-            MEMLINE *memline = ARRAY_GET(ms->lines, MEMLINE, ms->cursor_y);
-            uint8_t selected = memline->memview_flags;
-            // This is HEX mode only as ascii mode was handled at the start
-            uint8_t byte = read_from_memory_selected(m, ms->cursor_address, selected);
             key -= key >= SDLK_a ? SDLK_a - 10 : SDLK_0;
-            if(ms->cursor_x & 1) {
-                byte &= 0xf0;
-                byte |= key;
+            if(mv->cursor_field == CURSOR_HEX) {
+                // This is HEX mode only as ascii mode was handled at the start
+                uint8_t byte = read_from_memory_selected(m, mv->cursor_address, mv->flags);
+                if(mv->cursor_digit == CURSOR_DIGIT1) {
+                    byte &= 0xf0;
+                    byte |= key;
+                } else {
+                    byte &= 0x0F;
+                    byte |= (key << 4);
+                }
+                write_to_memory_selected(m, mv->cursor_address, mv->flags, byte);
             } else {
-                byte &= 0x0F;
-                byte |= (key << 4);
+                // This is address mode
+                int delta = viewmem_circular_delta(mv->cursor_address, mv->view_address);
+                int row = delta / ms->cols;
+                int col = delta % ms->cols;
+                uint8_t shift = (4 * (3 - mv->cursor_digit));
+                uint16_t address = mv->cursor_address - col;
+                address &= ~(0x0f << shift);
+                address |= (key << shift);
+                mv->cursor_address = address;
+                mv->view_address = address - delta;
             }
-            write_to_memory_selected(m, ms->cursor_address, selected, byte);
-            // write_to_memory_debug(m, ms->cursor_address, byte);
-            viewmem_cursor_right(m);
+            viewmem_cursor_right(ms, mv);
             return 0;
         }
         // Unmodified special keys
         switch(e->key.keysym.sym) {
             case SDLK_HOME:
-                viewmem_cursor_home(m, 0);
+                viewmem_cursor_home(ms, mv, 0);
                 break;
 
             case SDLK_END:
-                viewmem_cursor_end(m, 0);
+                viewmem_cursor_end(ms, mv, 0);
                 break;
 
             case SDLK_UP:
-                viewmem_cursor_up(m);
+                viewmem_cursor_up(ms, mv);
                 break;
 
             case SDLK_DOWN:
-                viewmem_cursor_down(m);
+                viewmem_cursor_down(ms, mv);
                 break;
 
             case SDLK_LEFT:
-                viewmem_cursor_left(m);
+                viewmem_cursor_left(ms, mv);
                 break;
 
             case SDLK_RIGHT:
-                viewmem_cursor_right(m);
+                viewmem_cursor_right(ms, mv);
                 break;
 
             case SDLK_PAGEUP:
-                viewmem_page_up(m);
+                viewmem_cursor_page_up(ms, mv);
                 break;
 
             case SDLK_PAGEDOWN:
-                viewmem_page_down(m);
+                viewmem_cursor_page_down(ms, mv);
                 break;
 
             default:
-                if(ms->edit_mode_ascii) {
-                    write_to_memory(m, ms->cursor_address, e->key.keysym.sym);
-                    viewmem_cursor_right(m);
+                // This is where ENTER will come, for example
+                if(mv->cursor_field == CURSOR_ASCII) {
+                    write_to_memory(m, mv->cursor_address, e->key.keysym.sym);
+                    viewmem_cursor_right(ms, mv);
                 }
                 break;
         }
     }
 
     return 0;
-}
-
-void viewmem_set_range_pc(APPLE2 *m, uint16_t address) {
-    MEMSHOW *ms = &m->viewport->memshow;
-    int line = ms->cursor_y;
-    MEMLINE *memline = ARRAY_GET(ms->lines, MEMLINE, line);
-    int end_line = memline->last_line;
-    line = memline->first_line;
-    while(line <= end_line) {
-        ARRAY_GET(ms->lines, MEMLINE, line)->address = address;
-        address += MEMSHOW_BYTES_PER_ROW;
-        line++;
-    }
-}
-
-void viewmem_show(APPLE2 *m) {
-    struct nk_context *ctx = m->viewport->ctx;
-    VIEWPORT *v = m->viewport;
-    MEMSHOW *ms = &v->memshow;
-    int w = 512;
-    viewmem_update(m);
-    if(nk_begin(ctx, "Memory", v->layout.mem, NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
-        nk_style_set_font(ctx, &v->font->handle);
-        nk_layout_row_static(ctx, 10, w, 1);
-        struct nk_color active_background = ctx->style.window.background;
-        struct nk_color last_c;
-        MEMLINE *active_line;
-        for(int i = 0; i < ms->num_lines; i++) {
-            MEMLINE *memline = ARRAY_GET(ms->lines, MEMLINE, i);
-            last_c = ctx->style.window.background = viewmem_range_colors[memline->id].background_color;
-            nk_label_colored(ctx, memline->line_text, NK_TEXT_ALIGN_LEFT, viewmem_range_colors[memline->id].text_color);
-            if(i == ms->cursor_y) {
-                struct nk_rect r = ctx->current->layout->bounds;
-                r.h = v->font_height;
-                r.w = v->font_width;
-                r.y += ctx->style.edit.cursor_size + ((r.h + 1) * i); // empirically determined
-                int cx = (ms->cursor_x <= 31 ? (7 + (ms->cursor_x / 2) * 3 + (ms->cursor_x % 2)) : (ms->cursor_x + 23));
-                r.x += cx * r.w;
-                // SQW This cursor draw call locks up
-                // nk_draw_text(&ctx->active->buffer, r, &memline->line_text[cx], 1, ctx->style.font,
-                //              viewmem_range_colors[memline->id].text_color, viewmem_range_colors[memline->id].background_color);
-                ms->cursor_address = memline->address + (ms->cursor_x <= 31 ? (ms->cursor_x / 2) : (ms->cursor_x - 32));
-                active_line = memline;
-            }
-        }
-        ctx->style.window.background = active_background;
-        nk_style_set_font(ctx, &v->font->handle);
-        nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 4);
-        nk_layout_row_push(ctx, 0.4);
-        nk_labelf(ctx, NK_TEXT_ALIGN_LEFT, "Address: %04X", ms->cursor_address);
-        nk_layout_row_push(ctx, 0.14);
-        if(nk_option_label(ctx, "6502", tst_mem_flag(active_line->memview_flags, mem6502)) && !tst_mem_flag(active_line->memview_flags, mem6502)) {
-            clr_mem_flag(active_line->memview_flags, mem64);
-            clr_mem_flag(active_line->memview_flags, mem128);
-            clr_mem_flag(active_line->memview_flags, memlcb2);
-            set_mem_flag(active_line->memview_flags, mem6502);
-            set_memline_block_flags(ms, active_line, active_line->memview_flags);
-        }
-        if(nk_option_label(ctx, "64K", tst_mem_flag(active_line->memview_flags, mem64)) && !tst_mem_flag(active_line->memview_flags, mem64)) {
-            clr_mem_flag(active_line->memview_flags, mem6502);
-            clr_mem_flag(active_line->memview_flags, mem128);
-            set_mem_flag(active_line->memview_flags, mem64);
-            if(m->lc_bank2_enable) {
-                set_mem_flag(active_line->memview_flags, memlcb2);
-            } else {
-                clr_mem_flag(active_line->memview_flags, memlcb2);
-            }
-            set_memline_block_flags(ms, active_line, active_line->memview_flags);
-        }
-        if(nk_option_label_disabled(ctx, "128K", tst_mem_flag(active_line->memview_flags, mem128), !m->model) && !tst_mem_flag(active_line->memview_flags, mem128)) {
-            clr_mem_flag(active_line->memview_flags, mem6502);
-            clr_mem_flag(active_line->memview_flags, mem64);
-            set_mem_flag(active_line->memview_flags, mem128);
-            if(m->lc_bank2_enable) {
-                set_mem_flag(active_line->memview_flags, memlcb2);
-            } else {
-                clr_mem_flag(active_line->memview_flags, memlcb2);
-            }
-            set_memline_block_flags(ms, active_line, active_line->memview_flags);
-        }
-        int before = tst_mem_flag(active_line->memview_flags, memlcb2);
-        int after = nk_option_label_disabled(ctx, "LC Bank2", before, tst_mem_flag(active_line->memview_flags, mem6502));
-        if(after != before) {
-            if(after) {
-                set_mem_flag(active_line->memview_flags, memlcb2);
-            } else {
-                clr_mem_flag(active_line->memview_flags, memlcb2);
-            }
-            set_memline_block_flags(ms, active_line, active_line->memview_flags);
-        }
-    }
-    if(v->dlg_memory_go) {
-        int ret;
-        static char address[5] = { 0, 0, 0, 0, 0 };
-        static int address_length = 0;
-        if((ret = viewdlg_hex_address(ctx, nk_rect(80, 10, 280, 80), address, &address_length))) {
-            if(ret == 1) {
-                int value;
-                address[address_length] = 0;
-                if(1 == sscanf(address, "%x", &value)) {
-                    viewmem_set_range_pc(m, value);
-                }
-            }
-            v->viewdlg_modal = 0;
-            v->dlg_memory_go = 0;
-        }
-    }
-    if(v->dlg_memory_find) {
-        int ret;
-        if((ret = viewdlg_find(ctx, nk_rect(10, 10, 400, 120), ms->find_string, &ms->find_string_len, MAX_FIND_STRING_LENGTH))) {
-            if(ret && ret != 3) {
-                int value;
-                ms->find_string[ms->find_string_len] = 0;
-                if(ret == 2) {
-                    for(int i = 0; i < ms->find_string_len; i += 2) {
-                        int value;
-                        if(1 == sscanf(ms->find_string + i, "%02x", &value)) {
-                            ms->find_string[i / 2] = value;
-                        }
-                    }
-                    ms->find_string_len /= 2;
-                }
-                ms->last_found_address = ms->cursor_address;
-                viewmem_find_string(m);
-            }
-            v->viewdlg_modal = 0;
-            v->dlg_memory_find = 0;
-        }
-    }
-    if(v->dlg_symbol_lookup_mem) {
-        static uint16_t pc = 0;
-        int ret;
-        DEBUGGER *d = &v->debugger;
-        if((ret = viewdlg_symbol_lookup(ctx, nk_rect(0, 0, 500, 240), &d->symbols_search, global_entry_buffer, &global_entry_length, &pc))) {
-            if(ret == 1) {
-                viewmem_set_range_pc(m, pc);
-            }
-            v->dlg_symbol_lookup_mem = 0;
-            v->viewdlg_modal = 0;
-        }
-    }
-    nk_end(ctx);
-}
-
-void viewmem_update(APPLE2 *m) {
-    uint8_t characters[MEMSHOW_BYTES_PER_ROW];
-    MEMSHOW *ms = &m->viewport->memshow;
-    // Populate the memshow rows
-    for(int i = 0; i < ms->num_lines; i++) {
-        int j;
-        MEMLINE *memline = ARRAY_GET(ms->lines, MEMLINE, i);
-        uint16_t address = memline->address;
-        sprintf(memline->line_text, "%X:%04X:", memline->id, address);
-        for(j = 0; j < MEMSHOW_BYTES_PER_ROW; j++) {
-            characters[j] = read_from_memory_selected(m, address++, memline->memview_flags);
-            sprintf(memline->line_text + 7 + j * 3, "%02X ", characters[j]);
-        }
-        for(j = 0; j < MEMSHOW_BYTES_PER_ROW; j++) {
-            sprintf(memline->line_text + 7 + MEMSHOW_BYTES_PER_ROW * 3 + j, "%c",
-                    isprint(characters[j]) ? characters[j] : isprint(characters[j] & 0x7f) ? characters[j] & 0x7f : '.');
-        }
-    }
 }

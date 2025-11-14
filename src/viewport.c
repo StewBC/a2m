@@ -227,7 +227,7 @@ int viewport_init(APPLE2 *m, int w, int h) {
         goto error;
     }
 
-    if(A2_OK != viewmem_init(&v->memshow, MEMSHOW_ROWS)) {
+    if(A2_OK != viewmem_init(&v->memshow)) {
         goto error;
     }
     // Init nuklear
@@ -273,7 +273,7 @@ int viewport_init(APPLE2 *m, int w, int h) {
     v->lim.corner_px = 16;
 
     v->nk_os_rect = sdl_to_nk_rect(v->sdl_os_rect);
-    layout_init_apple2(&v->layout, v->nk_os_rect, v->target_rect.w * 0.60f, v->target_rect.h * 0.60f, /*mem ratio*/ 0.45f);
+    layout_init_apple2(&v->layout, v->nk_os_rect, v->target_rect.w * 0.60f, v->target_rect.h * 0.60f, /*mem ratio*/ 0.452f);
     return A2_OK;
 
 error:
@@ -339,6 +339,7 @@ int viewport_process_events(APPLE2 *m) {
                 layout_on_window_resize(l, v->nk_os_rect, &v->lim);
                 layout_compute(l, v->nk_os_rect, &v->lim);
                 v->target_rect = nk_to_sdl_rect(nk_rect_fit_4x3_center(l->apple2));
+                viewmem_resize_view(m);
                 v->clear_a2_view = 1;
             }
         }      
@@ -414,6 +415,7 @@ void viewport_show(APPLE2 *m) {
 	if(layout_handle_drag(&v->layout, &v->ctx->input, v->nk_os_rect, &v->lim)) {
         struct nk_rect tr = nk_rect_fit_4x3_center(v->layout.apple2);
         v->target_rect = nk_to_sdl_rect(tr);
+        viewmem_resize_view(m);
         v->clear_a2_view = 1;
     }
     viewcpu_show(m);

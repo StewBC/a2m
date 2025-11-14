@@ -4,8 +4,6 @@
 
 #pragma once
 
-#define MEMSHOW_ROWS                16
-
 typedef enum MEMVIEW_FLAGS {
     mem6502     = (1<<0),
     mem64       = (1<<1),
@@ -13,45 +11,47 @@ typedef enum MEMVIEW_FLAGS {
     memlcb2     = (1<<3),
 } MEMVIEW_FLAGS;
 
+typedef enum CURSOR_FIELD {
+    CURSOR_HEX,
+    CURSOR_ASCII,
+    CURSOR_ADDRESS,
+} CURSOR_FIELD;
+
+typedef enum CURSOR_DIGIT {
+    CURSOR_DIGIT0,
+    CURSOR_DIGIT1,
+    CURSOR_DIGIT2,
+    CURSOR_DIGIT3,
+} CURSOR_DIGIT;
+
 #define set_mem_flag(status, flag_mask)       ((status) |= (flag_mask))
 #define tst_mem_flag(status, flag_mask)       ((status) & (flag_mask))
 #define clr_mem_flag(status, flag_mask)       ((status) &= ~(flag_mask))
 
-typedef struct MEMLINE {
-    uint16_t address;
-    uint16_t id;                                            // This split ID
-    uint16_t first_line;                                    // First line of this split
-    uint16_t last_line;                                     // Last line of this split
-    char *line_text;
-    uint8_t memview_flags;
-} MEMLINE;
+typedef struct MEMVIEW {
+    uint16_t view_address;
+    uint16_t cursor_address;
+    CURSOR_FIELD cursor_field;
+    CURSOR_FIELD prev_field;
+    CURSOR_DIGIT cursor_digit;
+    CURSOR_DIGIT cursor_prev_digit;
+    MEMVIEW_FLAGS flags;
+} MEMVIEW;
 
 typedef struct MEMSHOW {
-    DYNARRAY *lines;
-    int num_lines;
-    int line_length;
-    int cursor_x;
-    int cursor_y;
-    uint16_t cursor_address;
+    uint32_t active_view;       // the # of the view that's active
+    uint32_t str_buf_len;       // the length of this char array
+    uint32_t find_string_len;   // the length of this char array
+    uint16_t last_found_address;
+    int rows;                   // how many rows each view shows
+    int cols;                   // how many cols each view shows
+    DYNARRAY *mem_views;        // the array of views
+    char *str_buf;              // the buffer that holds a complete row of text
+    char *u8_buf;               // the buffer that holds the uint8_t's from memory (in that row)
     char *find_string;
-    int find_string_len;
-    int last_found_address;
-    uint32_t edit_mode_ascii: 1;
 } MEMSHOW;
 
-void viewmem_active_range(APPLE2 *m, int id);
-void viewmem_cursor_down(APPLE2 *m);
-void viewmem_cursor_left(APPLE2 *m);
-void viewmem_cursor_right(APPLE2 *m);
-void viewmem_cursor_up(APPLE2 *m);
-void viewmem_find_string(APPLE2 *m);
-void viewmem_find_string_reverse(APPLE2 *m);
-int viewmem_init(MEMSHOW *ms, int num_lines);
-void viewmem_join_range(APPLE2 *m, int direction);
-void viewmem_new_range(APPLE2 *m);
-void viewmem_page_down(APPLE2 *m);
-void viewmem_page_up(APPLE2 *m);
+int viewmem_init(MEMSHOW *ms);
 int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window);
-void viewmem_set_range_pc(APPLE2 *m, uint16_t address);
 void viewmem_show(APPLE2 *m);
-void viewmem_update(APPLE2 *m);
+void viewmem_resize_view(APPLE2 *m);

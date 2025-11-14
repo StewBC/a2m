@@ -9748,7 +9748,7 @@ nk_draw_text(struct nk_command_buffer *b, struct nk_rect r,
     }
 
     if (!length) return;
-    r.h += 4; // SQW
+    r.h = font->height; // SQW
     nk_fill_rect(b, r, 0, bg);
 
     cmd = (struct nk_command_text*)
