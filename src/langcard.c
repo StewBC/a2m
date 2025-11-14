@@ -26,7 +26,7 @@ uint8_t language_card(APPLE2 *m, uint16_t address, uint16_t value) {
         // odd sets pre_write
         m->lc_pre_write = 1;
     }
-    
+
     language_card_map_memory(m);
     return m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
 }

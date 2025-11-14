@@ -53,12 +53,12 @@ enum {
     SLOT_TYPE_VIDEX_API,
 };
 
-// The mask for the bits in the RAM_WATCH array 
+// The mask for the bits in the RAM_WATCH array
 enum RAM_WATCH_MASK {
     WATCH_NONE             = 0,                             // Nothing to watch
-    WATCH_IO_PORT          = 1<<0,                          // Call an IO callback function
-    WATCH_READ_BREAKPOINT  = 1<<1,                          // When !use_pc
-    WATCH_WRITE_BREAKPOINT = 1<<2,                          // When !use_pc
+    WATCH_IO_PORT          = 1 << 0,                        // Call an IO callback function
+    WATCH_READ_BREAKPOINT  = 1 << 1,                        // When !use_pc
+    WATCH_WRITE_BREAKPOINT = 1 << 2,                        // When !use_pc
 };
 
 // Prototypes for callbacks when cpu accesses a port
@@ -90,7 +90,7 @@ typedef struct APPLE2 {
     uint8_t *RAM_WATCH;                                     // IO "mask" (0 = not watched). See RAM_WATCH_MASK
     uint8_t *RAM_LC;                                        // 16 KB LC Ram (Always 2*16 for ease with //e)
 
-    uint8_t *rom_shadow_pages[(0xC800-0xC000)/PAGE_SIZE];   // Slot ram page mappings when SETC?ROM active
+    uint8_t *rom_shadow_pages[(0xC800 - 0xC000) / PAGE_SIZE]; // Slot ram page mappings when SETC?ROM active
     uint8_t mapped_slot;                                    // 0 = not mapped, 1-7 means that slot card is strobe mapped (to C800)
 
     // Emu Status flags - These and the versions in a2flags.h MUST BE EXACTLY THE SAME // SQW Resolve this nonsense

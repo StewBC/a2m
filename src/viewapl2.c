@@ -185,11 +185,15 @@ static const uint8_t rev4_lut[16] = {
 // I just recenly learnt that (for modern compilers) small memcpy's turn into better,
 // safer, code than a cast assign
 static inline uint32_t load_u32_unaligned(const void *p) {
-    uint32_t v; memcpy(&v, p, sizeof v); return v;
+    uint32_t v;
+    memcpy(&v, p, sizeof v);
+    return v;
 }
 
 static inline uint16_t load_u16_unaligned(const void *p) {
-    uint16_t v; memcpy(&v, p, sizeof v); return v;
+    uint16_t v;
+    memcpy(&v, p, sizeof v);
+    return v;
 }
 
 static inline uint32_t clamp8i(int v) {
@@ -197,11 +201,11 @@ static inline uint32_t clamp8i(int v) {
         return 0;
     }
 
-    if(v > 255){
+    if(v > 255) {
         return 255;
     }
 
-    return v; 
+    return v;
 }
 
 // Put the next clipboard character into the KBD
@@ -210,7 +214,7 @@ void viewapl2_feed_clipboard_key(APPLE2 *m) {
         uint8_t byte = !m->clipboard_text ? 0 : (uint8_t)m->clipboard_text[m->clipboard_index++];
 
         // End of buffer: cleanup + clear bit7 of $C000
-        if (byte == 0) {
+        if(byte == 0) {
             SDL_free(m->clipboard_text);
             m->clipboard_text = NULL;
             m->clipboard_index = 0;
@@ -219,16 +223,16 @@ void viewapl2_feed_clipboard_key(APPLE2 *m) {
         }
 
         // ASCII path
-        if (byte < 0x80) {
-            if (byte == '\n') {
+        if(byte < 0x80) {
+            if(byte == '\n') {
                 // Skip LF
                 continue;
             }
-            if (byte == '\r') {
+            if(byte == '\r') {
                 byte = 0x0D;           // keep CR
-            } else if (byte == '\t') {
+            } else if(byte == '\t') {
                 byte = ' ';            // tabs to space
-            } else if (!m->model && byte >= 0x20 && byte <= 0x7E) {
+            } else if(!m->model && byte >= 0x20 && byte <= 0x7E) {
                 byte = (uint8_t)toupper(byte); // BASIC-friendly
             }
             // Emit whatever we have (including other control chars unchanged)
@@ -237,7 +241,7 @@ void viewapl2_feed_clipboard_key(APPLE2 *m) {
         }
 
         // Non-ASCII start byte: skip the UTF-8 multibyte sequence (drop it)
-        while ((m->clipboard_text[m->clipboard_index] & 0xC0) == 0x80) {
+        while((m->clipboard_text[m->clipboard_index] & 0xC0) == 0x80) {
             m->clipboard_index++;
         }
     }
@@ -432,121 +436,121 @@ void viewapl2_screen_apple2(APPLE2 *m) {
         return;
     }
     uint32_t mode = (
-        v->shadow_flags.b.col80set << 4) |
-        (v->shadow_flags.b.dhires << 3)  | (v->shadow_flags.b.hires << 2) |
-        (v->shadow_flags.b.mixed << 1)   | (m->viewport->shadow_flags.b.text);
-                    // The bits are col80, dhgr, hgr, mixed, text, (followed by bin, hex)
+                        v->shadow_flags.b.col80set << 4) |
+                    (v->shadow_flags.b.dhires << 3)  | (v->shadow_flags.b.hires << 2) |
+                    (v->shadow_flags.b.mixed << 1)   | (m->viewport->shadow_flags.b.text);
+    // The bits are col80, dhgr, hgr, mixed, text, (followed by bin, hex)
     switch(mode) {
         case 0x00: // 0 ,0 ,0 ,0 ,0 ,00000,00
             viewapl2_screen_lores(m, 0, 24);
-        break;
+            break;
         case 0x01: // 0 ,0 ,0 ,0 ,1 ,00001,01
             if(m->franklin80active) {
                 viewapl2_screen_franklin80col(m, 0, 24);
             } else {
                 viewapl2_screen_txt40(m, 0, 24);
             }
-        break;
+            break;
         case 0x02: // 0 ,0 ,0 ,1 ,0 ,00010,02
             viewapl2_screen_lores(m, 0, 20);
             viewapl2_screen_txt40(m, 20, 24);
-        break;
+            break;
         case 0x03: // 0 ,0 ,0 ,1 ,1 ,00011,03
             viewapl2_screen_txt40(m, 0, 20);
             viewapl2_screen_lores(m, 20, 24);
-        break;
+            break;
         case 0x04: // 0 ,0 ,1 ,0 ,0 ,00100,04
             viewapl2_screen_hgr(m, 0, 192);
-        break;
+            break;
         case 0x05: // 0 ,0 ,1 ,0 ,1 ,00101,05
             viewapl2_screen_txt40(m, 0, 24);
-        break;
+            break;
         case 0x06: // 0 ,0 ,1 ,1 ,0 ,00110,06
             viewapl2_screen_hgr(m, 0, 160);
             viewapl2_screen_txt40(m, 20, 24);
-        break;
+            break;
         case 0x07: // 0 ,0 ,1 ,1 ,1 ,00111,07
             viewapl2_screen_txt40(m, 0, 24);
-        break;
+            break;
         case 0x08: // 0 ,1 ,0 ,0 ,0 ,01000,08
             viewapl2_screen_lores(m, 0, 24);
-        break;
+            break;
         case 0x09: // 0 ,1 ,0 ,0 ,1 ,01001,09
             viewapl2_screen_txt40(m, 0, 24);
-        break;
+            break;
         case 0x0A: // 0 ,1 ,0 ,1 ,0 ,01010,0A
             viewapl2_screen_lores(m, 0, 20);
             viewapl2_screen_txt40(m, 20, 24);
-        break;
+            break;
         case 0x0B: // 0 ,1 ,0 ,1 ,1 ,01011,0B
             viewapl2_screen_txt40(m, 0, 24);
-        break;
+            break;
         case 0x0C: // 0 ,1 ,1 ,0 ,0 ,01100,0C
             viewapl2_screen_hgr(m, 0, 192);
-        break;
+            break;
         case 0x0D: // 0 ,1 ,1 ,0 ,1 ,01101,0D
             viewapl2_screen_txt40(m, 0, 24);
-        break;
+            break;
         case 0x0E: // 0 ,1 ,1 ,1 ,0 ,01110,0E
             viewapl2_screen_hgr(m, 0, 160);
             viewapl2_screen_txt40(m, 20, 24);
-        break;
+            break;
         case 0x0F: // 0 ,1 ,1 ,1 ,1 ,01111,0F
             viewapl2_screen_txt40(m, 0, 24);
-        break;
+            break;
         case 0x10: // 1 ,0 ,0 ,0 ,0 ,10000,10
             viewapl2_screen_dlores(m, 0, 24);
-        break;
+            break;
         case 0x11: // 1 ,0 ,0 ,0 ,1 ,10001,11
             viewapl2_screen_txt80(m, 0, 24);
-        break;
+            break;
         case 0x12: // 1 ,0 ,0 ,1 ,0 ,10010,12
             viewapl2_screen_dlores(m, 0, 20);
             viewapl2_screen_txt80(m, 20, 24);
-        break;
+            break;
         case 0x13: // 1 ,0 ,0 ,1 ,1 ,10011,13
             viewapl2_screen_txt80(m, 0, 24);
-        break;
+            break;
         case 0x14: // 1 ,0 ,1 ,0 ,0 ,10100,14
             viewapl2_screen_hgr(m, 0, 192);
-        break;
+            break;
         case 0x15: // 1 ,0 ,1 ,0 ,1 ,10101,15
             viewapl2_screen_txt80(m, 0, 24);
-        break;
+            break;
         case 0x16: // 1 ,0 ,1 ,1 ,0 ,10110,16
             viewapl2_screen_hgr(m, 0, 160);
             viewapl2_screen_txt80(m, 20, 24);
-        break;
+            break;
         case 0x17: // 1 ,0 ,1 ,1 ,1 ,10111,17
             viewapl2_screen_txt80(m, 0, 24);
-        break;
+            break;
         case 0x18: // 1 ,1 ,0 ,0 ,0 ,11000,18
             viewapl2_screen_dlores(m, 0, 24);
-        break;
+            break;
         case 0x19: // 1 ,1 ,0 ,0 ,1 ,11001,19
             viewapl2_screen_txt80(m, 0, 24);
-        break;
+            break;
         case 0x1A: // 1 ,1 ,0 ,1 ,0 ,11010,1A
             viewapl2_screen_dlores(m, 0, 20);
             viewapl2_screen_txt80(m, 20, 24);
-        break;
+            break;
         case 0x1B: // 1 ,1 ,0 ,1 ,1 ,11011,1B
             viewapl2_screen_dlores(m, 0, 20);
             viewapl2_screen_txt80(m, 20, 24);
-        break;
+            break;
         case 0x1C: // 1 ,1 ,1 ,0 ,0 ,11100,1C
             viewapl2_screen_dhgr(m, 0, 192);
-        break;
+            break;
         case 0x1D: // 1 ,1 ,1 ,0 ,1 ,11101,1D
             viewapl2_screen_txt80(m, 0, 24);
-        break;
+            break;
         case 0x1E: // 1 ,1 ,1 ,1 ,0 ,11110,1E
             viewapl2_screen_dhgr(m, 0, 160);
             viewapl2_screen_txt80(m, 20, 24);
-        break;
+            break;
         case 0x1F: // 1 ,1 ,1 ,1 ,1 ,11111,1F
             viewapl2_screen_txt80(m, 0, 24);
-        break;
+            break;
     }
 }
 
@@ -575,7 +579,7 @@ void viewapl2_screen_dlores(APPLE2 *m, int start, int end) {
                 character = man[index];
                 upper = character & 0x0F;
                 lower = (character >> 4) & 0X0F;
-            }else {
+            } else {
                 character = aux[index];
                 upper = double_aux_map[character & 0x0F];
                 lower = double_aux_map[(character >> 4) & 0X0F];
@@ -614,7 +618,7 @@ void viewapl2_screen_dlores_mono(APPLE2 *m, int start, int end) {
                 character = man[index];
                 upper = character & 0x0F;
                 lower = (character >> 4) & 0X0F;
-            }else {
+            } else {
                 character = aux[index];
                 upper = double_aux_map[character & 0x0F];
                 lower = double_aux_map[(character >> 4) & 0X0F];
@@ -738,21 +742,21 @@ void viewapl2_screen_dhgr(APPLE2 *m, int start, int end) {
             uint16_t MAN = load_u16_unaligned(man + col) & 0x7F7Fu;     // b1=MAN0, b3=MAN1
 
             // Extract the bytes, interleaving aux / main
-            uint8_t b0 = (uint8_t)(AUX     );
-            uint8_t b1 = (uint8_t)(MAN     );
+            uint8_t b0 = (uint8_t)(AUX);
+            uint8_t b1 = (uint8_t)(MAN);
             uint8_t b2 = (uint8_t)(AUX >> 8);
             uint8_t b3 = (uint8_t)(MAN >> 8);
             uint8_t b4 = (col < 38) ? (uint8_t)(AUX >> 16) : 0;
 
-            // Make nibbles 
-            uint8_t t0 =  (b0     ) & 0x0F;
-            uint8_t t1 =  (b0 >> 4) | ((b1 & 0x1) << 3);
-            uint8_t t2 =  (b1 >> 1) & 0x0F;
+            // Make nibbles
+            uint8_t t0 = (b0) & 0x0F;
+            uint8_t t1 = (b0 >> 4) | ((b1 & 0x1) << 3);
+            uint8_t t2 = (b1 >> 1) & 0x0F;
             uint8_t t3 = ((b1 >> 5) & 0x03) | ((b2 & 0x3) << 2);
-            uint8_t t4 =  (b2 >> 2) & 0x0F;
-            uint8_t t5 =  (b2 >> 6) | ((b3 & 0x7) << 1);
-            uint8_t t6 =  (b3 >> 3)       ;
-            uint8_t t7 =  (b4     ) & 0x0F;
+            uint8_t t4 = (b2 >> 2) & 0x0F;
+            uint8_t t5 = (b2 >> 6) | ((b3 & 0x7) << 1);
+            uint8_t t6 = (b3 >> 3)       ;
+            uint8_t t7 = (b4) & 0x0F;
 
             // Put the bits in a stream (reverse display order)
             uint32_t stream = t7 << 28 | t6 << 24 | t5 << 20 | t4 << 16 | t3 << 12 | t2 << 8 | t1 << 4 | t0;
@@ -781,43 +785,43 @@ void viewapl2_screen_dhgr(APPLE2 *m, int start, int end) {
                 int s2 = b2 ? +1 : -1;
                 int s3 = b3 ? +1 : -1;
 
-                int r0 = (((fx + 0 + phase0 ) & 1) ? -1 : +1);
-                int r1 = (((fx + 0 + phase0 ) & 1) ? -1 : +1);
-                int r2 = (((fx + 1 + phase0 ) & 1) ? -1 : +1);
-                int r3 = (((fx + 1 + phase0 ) & 1) ? -1 : +1);
+                int r0 = (((fx + 0 + phase0) & 1) ? -1 : +1);
+                int r1 = (((fx + 0 + phase0) & 1) ? -1 : +1);
+                int r2 = (((fx + 1 + phase0) & 1) ? -1 : +1);
+                int r3 = (((fx + 1 + phase0) & 1) ? -1 : +1);
 
-                int t0 =   (fx + 0 + phase90) & 3;
-                int t1 =   (fx + 0 + phase90) & 3;
-                int t2 =   (fx + 1 + phase90) & 3;
-                int t3 =   (fx + 1 + phase90) & 3;
+                int t0 = (fx + 0 + phase90) & 3;
+                int t1 = (fx + 0 + phase90) & 3;
+                int t2 = (fx + 1 + phase90) & 3;
+                int t3 = (fx + 1 + phase90) & 3;
 
                 int q0 = (t0 == 0) ? +1 : (t0 == 2) ? -1 : 0;
                 int q1 = (t1 == 0) ? +1 : (t1 == 2) ? -1 : 0;
                 int q2 = (t2 == 0) ? +1 : (t2 == 2) ? -1 : 0;
                 int q3 = (t3 == 0) ? +1 : (t3 == 2) ? -1 : 0;
 
-                int Iraw = s0*r0 + s1*r1 + s2*r2 + s3*r3;
-                int Qraw = s0*q0 + s1*q1 + s2*q2 + s3*q3;
+                int Iraw = s0 * r0 + s1 * r1 + s2 * r2 + s3 * r3;
+                int Qraw = s0 * q0 + s1 * q1 + s2 * q2 + s3 * q3;
 
                 // Deadzone: keep near-gray neutral
                 int amag = (Iraw < 0 ? -Iraw : Iraw) + (Qraw < 0 ? -Qraw : Qraw);
-                if (amag <= dead) {
+                if(amag <= dead) {
                     Iraw = 0;
-                    Qraw = 0; 
+                    Qraw = 0;
                 }
 
                 int Y = kY * px;
                 int I = kI * Iraw;
                 int Q = kQ * Qraw;
 
-                uint8_t R0 = clamp8i(Y + 245*I + 159*Q);
-                uint8_t G0 = clamp8i(Y -  70*I - 166*Q);
-                uint8_t B0 = clamp8i(Y - 283*I + 436*Q);
+                uint8_t R0 = clamp8i(Y + 245 * I + 159 * Q);
+                uint8_t G0 = clamp8i(Y -  70 * I - 166 * Q);
+                uint8_t B0 = clamp8i(Y - 283 * I + 436 * Q);
 
                 R = (R0 + R) / 2; // R = (1-0.5)R + 0.5R
                 G = (G0 + G) / 2;
                 B = (B0 + B) / 2;
-                
+
                 *p++ = SDL_MapRGB(format, R, G, B);
             }
         }
@@ -845,24 +849,24 @@ void viewapl2_screen_dhgr_rgb(APPLE2 *m, int start, int end) {
             uint16_t B = load_u16_unaligned(man + col) & 0x7F7Fu;   // b1=B0, b3=B1
 
             // Extract the bytes, interleaving aux / main
-            uint8_t b0 = (uint8_t)(A      );
-            uint8_t b1 = (uint8_t)(B      );
+            uint8_t b0 = (uint8_t)(A);
+            uint8_t b1 = (uint8_t)(B);
             uint8_t b2 = (uint8_t)(A >>  8);
             uint8_t b3 = (uint8_t)(B >>  8);
 
             // Make nibbles (SQW and the reverse bits seem to work better but I don't know...)
-            uint8_t t0 = rev4_lut[  (b0     ) & 0x0F];
-            uint8_t t1 = rev4_lut[  (b0 >> 4) | ((b1 & 0x1) << 3)];
-            uint8_t t2 = rev4_lut[  (b1 >> 1) & 0x0F];
-            uint8_t t3 = rev4_lut[ ((b1 >> 5) & 0x03) | ((b2 & 0x3) << 2)];
-            uint8_t t4 = rev4_lut[  (b2 >> 2) & 0x0F];
-            uint8_t t5 = rev4_lut[  (b2 >> 6) | ((b3 & 0x7) << 1)];
-            uint8_t t6 = rev4_lut[  (b3 >> 3)       ];
+            uint8_t t0 = rev4_lut[(b0) & 0x0F];
+            uint8_t t1 = rev4_lut[(b0 >> 4) | ((b1 & 0x1) << 3)];
+            uint8_t t2 = rev4_lut[(b1 >> 1) & 0x0F];
+            uint8_t t3 = rev4_lut[((b1 >> 5) & 0x03) | ((b2 & 0x3) << 2)];
+            uint8_t t4 = rev4_lut[(b2 >> 2) & 0x0F];
+            uint8_t t5 = rev4_lut[(b2 >> 6) | ((b3 & 0x7) << 1)];
+            uint8_t t6 = rev4_lut[(b3 >> 3)       ];
 
             // Put the bits in a stream
             uint32_t stream = t6 << 24 | t5 << 20 | t4 << 16 | t3 << 12 | t2 << 8 | t1 << 4 | t0;
 
-            for (int x = 0; x < 28/4; ++x) {
+            for(int x = 0; x < 28 / 4; ++x) {
                 int bits = stream & 0x0f;
                 uint32_t rgb_pixel = SDL_MapRGB(format, dhgr_palette[bits].r, dhgr_palette[bits].g, dhgr_palette[bits].b);
                 *p++ = rgb_pixel;

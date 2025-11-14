@@ -23,8 +23,7 @@
 // These values are picked up in nuklrsdl.h
 float sdl_x_scale, sdl_y_scale;
 
-static inline SDL_Rect nk_to_sdl_rect(struct nk_rect r)
-{
+static inline SDL_Rect nk_to_sdl_rect(struct nk_rect r) {
     SDL_Rect s;
     s.x = (int)lroundf(r.x);
     s.y = (int)lroundf(r.y);
@@ -33,8 +32,7 @@ static inline SDL_Rect nk_to_sdl_rect(struct nk_rect r)
     return s;
 }
 
-static inline struct nk_rect sdl_to_nk_rect(struct SDL_Rect r)
-{
+static inline struct nk_rect sdl_to_nk_rect(struct SDL_Rect r) {
     struct nk_rect n;
     n.x = (float)r.x;
     n.y = (float)r.y;
@@ -43,16 +41,17 @@ static inline struct nk_rect sdl_to_nk_rect(struct SDL_Rect r)
     return n;
 }
 
-static inline struct nk_rect nk_rect_fit_4x3_center(struct nk_rect r)
-{
-    if (r.w <= 0.0f || r.h <= 0.0f)
-        return (struct nk_rect){ r.x, r.y, 0.0f, 0.0f };
+static inline struct nk_rect nk_rect_fit_4x3_center(struct nk_rect r) {
+    if(r.w <= 0.0f || r.h <= 0.0f)
+        return (struct nk_rect) {
+        r.x, r.y, 0.0f, 0.0f
+    };
 
     const float target = 4.0f / 3.0f;
     const float rw = r.w, rh = r.h;
 
     float w, h;
-    if ((rw / rh) >= target) {
+    if((rw / rh) >= target) {
         // Height-limited: use full height, shrink width to 4:3
         h = rh;
         w = rh * target;
@@ -64,21 +63,23 @@ static inline struct nk_rect nk_rect_fit_4x3_center(struct nk_rect r)
 
     const float x = r.x + (rw - w) * 0.5f;
     const float y = r.y + (rh - h) * 0.5f;
-    return (struct nk_rect){ x, y, w, h };
+    return (struct nk_rect) {
+        x, y, w, h
+    };
 }
 
 // returns changes to state when enabled, otherwise state
 int nk_option_label_disabled(struct nk_context *ctx, const char *label, int state, int disabled) {
     struct nk_style_toggle saved = ctx->style.option;
 
-    if (disabled) {
+    if(disabled) {
         struct nk_style_toggle t = saved;
-        t.normal        = nk_style_item_color(nk_rgba(70,70,70,255));
+        t.normal        = nk_style_item_color(nk_rgba(70, 70, 70, 255));
         t.hover         = t.normal;
         t.active        = t.normal;
-        t.cursor_normal = nk_style_item_color(nk_rgba(110,110,110,255));
+        t.cursor_normal = nk_style_item_color(nk_rgba(110, 110, 110, 255));
         t.cursor_hover  = t.cursor_normal;
-        t.text_normal   = nk_rgba(150,150,150,255);
+        t.text_normal   = nk_rgba(150, 150, 150, 255);
         ctx->style.option = t;
     }
 
@@ -90,6 +91,69 @@ int nk_option_label_disabled(struct nk_context *ctx, const char *label, int stat
 
     // Ignore processed result if disabled
     return disabled ? state : new_state;
+}
+
+void nk_custom_scrollbarv(struct nk_context *ctx, struct nk_rect sbar, int total_rows, int rows_visible, int *top_row, int *dragging, float *grab_offset) {
+    // Visuals
+    struct nk_command_buffer *out = nk_window_get_canvas(ctx);
+    float pad = 2.0f;
+    struct nk_rect track = nk_rect(sbar.x + pad, sbar.y + pad,
+                                   sbar.w - 2 * pad, sbar.h - 2 * pad);
+
+    // Fixed thumb height (virtual scrollbar)
+    float thumb_h = 16.0f;
+    float range_px = NK_MAX(1.0f, track.h - thumb_h);
+
+    // Map top_row -> thumb_y
+    float t = (float)(*top_row) / (float)(total_rows);    // 0..1
+    float thumb_y = track.y + t * range_px;
+    struct nk_rect thumb = nk_rect(track.x, thumb_y, track.w, thumb_h);
+
+    // Draw track
+    nk_fill_rect(out, track, 2.0f, nk_rgb(60, 60, 60));
+    // Draw thumb (active color)
+    nk_fill_rect(out, thumb, 2.0f, nk_input_is_mouse_hovering_rect(&ctx->input, thumb) || *dragging ? nk_rgb(160, 160, 160) : nk_rgb(120, 120, 120));
+
+    // Mouse logic
+    const struct nk_mouse *m = &ctx->input.mouse;
+
+    // Begin drag if mouse pressed on thumb
+    if(nk_input_is_mouse_hovering_rect(&ctx->input, thumb) && nk_input_is_mouse_down(&ctx->input, NK_BUTTON_LEFT) && !*dragging) {
+        *dragging = 1;
+        *grab_offset = m->pos.y - thumb.y;
+    }
+
+    // End drag on release (anywhere)
+    if(!nk_input_is_mouse_down(&ctx->input, NK_BUTTON_LEFT)) {
+        *dragging = 0;
+    }
+
+    // Dragging: update top_row by mapping mouse to track
+    if(*dragging) {
+        float y = m->pos.y - *grab_offset;
+        // clamp to track
+        if(y < track.y) {
+            y = track.y;
+        }
+        if(y > track.y + range_px) {
+            y = track.y + range_px;
+        }
+        float new_t = (range_px > 0) ? (y - track.y) / range_px : 0.0f;
+        int new_top = (int)NK_CLAMP(0.0f, new_t * total_rows, (float)(total_rows - 1));
+        *top_row = new_top;
+    }
+
+    // Click on track (page jump)
+    if(nk_input_is_mouse_hovering_rect(&ctx->input, track) &&
+            nk_input_is_mouse_pressed(&ctx->input, NK_BUTTON_LEFT) &&
+            !nk_input_is_mouse_hovering_rect(&ctx->input, thumb)) {
+        // Jump by a page toward click
+        if(m->pos.y < thumb.y) {
+            *top_row = (*top_row - rows_visible + total_rows) % total_rows;
+        } else {
+            *top_row = (*top_row + rows_visible) % total_rows;
+        }
+    }
 }
 
 void viewport_config(APPLE2 *m) {
@@ -253,7 +317,7 @@ int viewport_init(APPLE2 *m, int w, int h) {
     // See if there's a game controller
     v->num_controllers = 0;
     for(int i = 0; i < SDL_NumJoysticks() && v->num_controllers < 2; i++) {
-        if (!SDL_IsGameController(i)) {
+        if(!SDL_IsGameController(i)) {
             continue;
         }
         v->game_controller[v->num_controllers] = SDL_GameControllerOpen(i);
@@ -261,7 +325,7 @@ int viewport_init(APPLE2 *m, int w, int h) {
             v->num_controllers++;
         }
     }
-	
+
     v->lim.cpu_h_px = 90;
     v->lim.min_a2_w_px = 320;
     v->lim.min_right_w_px = 240;
@@ -304,33 +368,24 @@ int viewport_process_events(APPLE2 *m) {
             break;
         }
 
-        if (e.type == SDL_WINDOWEVENT) {
+        if(e.type == SDL_WINDOWEVENT) {
             int update = 1;
-            switch (e.window.event) {
-            case SDL_WINDOWEVENT_SIZE_CHANGED:   // fires continuously while resizing, or programmatic changes
-                v->sdl_os_rect.w = e.window.data1;  // defined here
-                v->sdl_os_rect.h = e.window.data2;  // defined here
-                break;
+            switch(e.window.event) {
+                case SDL_WINDOWEVENT_SIZE_CHANGED:   // fires continuously while resizing, or programmatic changes
+                    v->sdl_os_rect.w = e.window.data1;  // defined here
+                    v->sdl_os_rect.h = e.window.data2;  // defined here
+                    break;
 
-            case SDL_WINDOWEVENT_RESIZED:        // often once at end of user drag
-                SDL_GetWindowSize(v->window, &v->sdl_os_rect.w, &v->sdl_os_rect.h);
-                break;
+                case SDL_WINDOWEVENT_RESIZED:        // often once at end of user drag
+                    SDL_GetWindowSize(v->window, &v->sdl_os_rect.w, &v->sdl_os_rect.h);
+                    break;
 
-            // case SDL_WINDOWEVENT_MINIMIZED:
-            //     // size may effectively be 0; ignore or special-case
-            //     break;
+                case SDL_WINDOWEVENT_SHOWN:
+                    break;
 
-            // case SDL_WINDOWEVENT_EXPOSED:
-            // case SDL_WINDOWEVENT_RESTORED:
-            // case SDL_WINDOWEVENT_MAXIMIZED:
-            case SDL_WINDOWEVENT_SHOWN:
-            //     // data1/data2 are NOT defined for these; if you need size, query it:
-            //     // SDL_GetWindowSize(v->window, &v->sdl_os_rect.w, &v->sdl_os_rect.h);
-                break;
-
-            default:
-                update = 0;
-                break;
+                default:
+                    update = 0;
+                    break;
             }
 
             if(update) {
@@ -342,7 +397,7 @@ int viewport_process_events(APPLE2 *m) {
                 viewmem_resize_view(m);
                 v->clear_a2_view = 1;
             }
-        }      
+        }
 
         nk_sdl_handle_event(&e);
 
@@ -412,7 +467,7 @@ void viewport_show(APPLE2 *m) {
         return;
     }
 
-	if(layout_handle_drag(&v->layout, &v->ctx->input, v->nk_os_rect, &v->lim)) {
+    if(layout_handle_drag(&v->layout, &v->ctx->input, v->nk_os_rect, &v->lim)) {
         struct nk_rect tr = nk_rect_fit_4x3_center(v->layout.apple2);
         v->target_rect = nk_to_sdl_rect(tr);
         viewmem_resize_view(m);

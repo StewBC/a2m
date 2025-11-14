@@ -5,10 +5,10 @@
 #pragma once
 
 typedef enum MEMVIEW_FLAGS {
-    MEM_MAPPED_6502     = (1<<0),
-    MEM_MAIN            = (1<<1),
-    MEM_AUX             = (1<<2),
-    MEM_LC_BANK2        = (1<<3),
+    MEM_MAPPED_6502     = (1 << 0),
+    MEM_MAIN            = (1 << 1),
+    MEM_AUX             = (1 << 2),
+    MEM_LC_BANK2        = (1 << 3),
 } MEMVIEW_FLAGS;
 
 typedef enum CURSOR_FIELD {
@@ -44,7 +44,10 @@ typedef struct MEMSHOW {
     uint32_t str_buf_len;           // the length of this char array
     uint32_t find_string_len;       // the length of this char array
     uint16_t last_found_address;    // used for find nex/prev
+    int header_height;              // height of the memory window header portion
     int cols;                       // how many cols each view shows
+    int dragging;					// scrollbar
+    float grab_offset;				// scrollbar
     DYNARRAY *mem_views;            // the array of views
     char *str_buf;                  // the buffer that holds a complete row of text
     char *u8_buf;                   // the buffer that holds the uint8_t's from memory (in that row)

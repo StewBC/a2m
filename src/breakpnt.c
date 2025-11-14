@@ -10,7 +10,7 @@ void breakpoints_init(APPLE2 *m) {
     memset(b, 0, sizeof(FLOWMANAGER));
     // Set the dynamic array up to hold breakpoints
     ARRAY_INIT(&b->breakpoints, BREAKPOINT);
-/*------*/    
+
     INI_SECTION *s;
     s = ini_find_section(&m->ini_store, "debug");
     if(s) {
@@ -30,7 +30,7 @@ void breakpoints_init(APPLE2 *m) {
                         bp.use_range = bp.address != bp.address_range_end;
                         bp.use_pc = MODE_PC == parsed_line.mode;
                         bp.break_on_read = MODE_READ & parsed_line.mode ? 1 : 0;
-                        bp.break_on_write = MODE_WRITE & parsed_line.mode ? 1: 0;
+                        bp.break_on_write = MODE_WRITE & parsed_line.mode ? 1 : 0;
                         // SQW Look at why you set this up the way it is
                         bp.access = (bp.break_on_write << 2) | (bp.break_on_read << 1);
                         bp.counter_stop_value = parsed_line.count;

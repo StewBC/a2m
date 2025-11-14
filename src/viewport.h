@@ -19,9 +19,9 @@ typedef struct VIEWPORT {
     SDL_Rect *draw_rect;
     struct nk_rect nk_os_rect;
 
-    LAYOUT layout; 
+    LAYOUT layout;
     LAYOUT_LIMITS lim;
-	
+
     // Window title MHz display helpers
     uint64_t prev_cycles;
     uint64_t prev_ticks;
@@ -86,6 +86,9 @@ extern float sdl_x_scale, sdl_y_scale;
 
 // a helper to make a Nuklear function a bit nicer
 int nk_option_label_disabled(struct nk_context *ctx, const char *label, int state, int disabled);
+
+// a helper to do a custom vertical scrollbar (I can't seem to just get a scrollbar v from nuklear but this is better anyway)
+void nk_custom_scrollbarv(struct nk_context *ctx, struct nk_rect sbar, int total_rows, int rows_visible, int *top_row, int *dragging, float *grab_offset);
 
 int viewport_init(APPLE2 *m, int w, int h);
 void viewport_init_nuklear(VIEWPORT *v);

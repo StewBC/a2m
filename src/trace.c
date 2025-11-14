@@ -7,7 +7,7 @@
 const char *u82binstr(uint8_t byte) {
     static char buffer[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0};
     for(int i = 0; i < 8 ; i++) {
-        buffer[7-i] = byte & (1 << i) ? '1' : '0';
+        buffer[7 - i] = byte & (1 << i) ? '1' : '0';
     }
     return buffer;
 }
@@ -17,37 +17,37 @@ const char *state2str(uint32_t state_flags) {
     static char buffer[128];
     state.u32 = state_flags;
     sprintf(buffer,
-        "s80 %d "\
-        "rd %d "\
-        "wr %d "\
-        "cx %d "\
-        "zp %d "\
-        "c3 %d "\
-        "c80 %d "\
-        "ac %d "\
-        "tx %d "\
-        "mx %d "\
-        "p2 %d "\
-        "hr %d "\
-        "dh %d "\
-        "st %d "\
-        "f80 %d ",
-        state.b.store80set,
-        state.b.ramrdset,
-        state.b.ramwrtset,
-        state.b.cxromset,
-        state.b.altzpset,
-        state.b.c3slotrom,
-        state.b.col80set,
-        state.b.altcharset,
-        state.b.text,
-        state.b.mixed,
-        state.b.page2set,
-        state.b.hires,
-        state.b.dhires,
-        state.b.strobed,
-        state.b.franklin80active
-    );
+            "s80 %d "\
+            "rd %d "\
+            "wr %d "\
+            "cx %d "\
+            "zp %d "\
+            "c3 %d "\
+            "c80 %d "\
+            "ac %d "\
+            "tx %d "\
+            "mx %d "\
+            "p2 %d "\
+            "hr %d "\
+            "dh %d "\
+            "st %d "\
+            "f80 %d ",
+            state.b.store80set,
+            state.b.ramrdset,
+            state.b.ramwrtset,
+            state.b.cxromset,
+            state.b.altzpset,
+            state.b.c3slotrom,
+            state.b.col80set,
+            state.b.altcharset,
+            state.b.text,
+            state.b.mixed,
+            state.b.page2set,
+            state.b.hires,
+            state.b.dhires,
+            state.b.strobed,
+            state.b.franklin80active
+           );
     return buffer;
 }
 
@@ -66,13 +66,13 @@ int trace_log(UTIL_FILE *f, APPLE2 *m) {
     return -1;
 }
 
-void trace_off(UTIL_FILE *f){
+void trace_off(UTIL_FILE *f) {
     if(f->is_file_open) {
         fflush(f->fp);
     }
 }
 
-int trace_on(UTIL_FILE *f, const char *filename, const char *file_mode){
+int trace_on(UTIL_FILE *f, const char *filename, const char *file_mode) {
     if(f->is_file_open) {
         return A2_OK;
     }

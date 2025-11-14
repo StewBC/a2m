@@ -43,10 +43,10 @@ int apple2_configure(APPLE2 *m) {
     // Set the Turbo state
     if(!m->turbo_count) {
         m->turbo_count = 2;
-        m->turbo = (double*)malloc(m->turbo_count * sizeof(double));
+        m->turbo = (double *)malloc(m->turbo_count * sizeof(double));
         if(m->turbo) {
             m->turbo[0] = 1.0;
-			m->turbo[1] = -1.0;
+            m->turbo[1] = -1.0;
         } else {
             return A2_ERR;
         }
@@ -61,7 +61,7 @@ int apple2_configure(APPLE2 *m) {
         return A2_ERR;
     }
 
-    // Init RAM to a fixed pattern 
+    // Init RAM to a fixed pattern
     util_memset32(m->RAM_MAIN, 0x0000ffff, m->ram_size / 4);
     // And IO area floating bus is a lot of 160's
     memset(&m->RAM_MAIN[0xC001], 0xA0, 0x0FFE);
@@ -162,7 +162,7 @@ void apple2_machine_reset(APPLE2 *m) {
     // A2 state_flags reset, setting text mode
     m->state_flags = 0;
     m->text = 1;
-    
+
     cpu_init(m);
 
     // Clear the screen
@@ -210,7 +210,7 @@ void apple2_machine_setup(APPLE2 *m) {
                     }
                 }
                 // Allocare the turbo's array
-                m->turbo = (double*)malloc(m->turbo_count * sizeof(double));
+                m->turbo = (double *)malloc(m->turbo_count * sizeof(double));
                 if(m->turbo) {
                     // Convert the nubers to +float and any unknowns (non-float)
                     // to -1 (max speed)
@@ -251,7 +251,7 @@ void apple2_machine_setup(APPLE2 *m) {
 void apple2_slot_setup(APPLE2 *m) {
     INI_SECTION *s;
     int slot_number = 0;
-    
+
     // No slot mapped in C800 range to start
     m->mapped_slot = 0;
 

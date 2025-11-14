@@ -118,96 +118,96 @@ static inline uint8_t apple2_softswitch_read_callback_IIplus(APPLE2 *m, uint16_t
                 m->hires = 1;
                 break;
             case BUTN0: {
-                uint8_t button = m->open_apple ? 0x80 : 0x00;
-                VIEWPORT *v = m->viewport;
-                if(v) {
-                    for(int i = 0; i < v->num_controllers; i++) {
-                        button |= v->button_a[i];
+                    uint8_t button = m->open_apple ? 0x80 : 0x00;
+                    VIEWPORT *v = m->viewport;
+                    if(v) {
+                        for(int i = 0; i < v->num_controllers; i++) {
+                            button |= v->button_a[i];
+                        }
                     }
+                    byte = button ? 0x80 : 0;
                 }
-                byte = button ? 0x80 : 0;
-            }
-            break;
+                break;
             case BUTN1: {
-                uint8_t button = m->closed_apple ? 0x80 : 0x00;
-                VIEWPORT *v = m->viewport;
-                if(v) {
-                    for(int i = 0; i < v->num_controllers; i++) {
-                        button |= v->button_b[i];
+                    uint8_t button = m->closed_apple ? 0x80 : 0x00;
+                    VIEWPORT *v = m->viewport;
+                    if(v) {
+                        for(int i = 0; i < v->num_controllers; i++) {
+                            button |= v->button_b[i];
+                        }
                     }
+                    byte = button ? 0x80 : 0;
                 }
-                byte = button ? 0x80 : 0;
-            }
-            break;
+                break;
             case BUTN2: {
-                uint8_t button = 0;
-                VIEWPORT *v = m->viewport;
-                if(v) {
-                    for(int i = 0; i < v->num_controllers; i++) {
-                        button |= v->button_x[i];
+                    uint8_t button = 0;
+                    VIEWPORT *v = m->viewport;
+                    if(v) {
+                        for(int i = 0; i < v->num_controllers; i++) {
+                            button |= v->button_x[i];
+                        }
                     }
+                    byte = button ? 0x80 : 0;
                 }
-                byte = button ? 0x80 : 0;
-            }
-            break;
+                break;
             case PADDL0: {
-                VIEWPORT *v = m->viewport;
-                if(v && v->game_controller[0]) {
-                    uint64_t cycle_delta = m->cpu.cycles - v->ptrig_cycle;
-                    uint8_t val = clamp_u8(cycle_delta * 255 / paddl_normalized, 0, 255 );
-                    if(val >= v->axis_left_x[0]) {
-                        byte = 0x0;
-                        break;
+                    VIEWPORT *v = m->viewport;
+                    if(v && v->game_controller[0]) {
+                        uint64_t cycle_delta = m->cpu.cycles - v->ptrig_cycle;
+                        uint8_t val = clamp_u8(cycle_delta * 255 / paddl_normalized, 0, 255);
+                        if(val >= v->axis_left_x[0]) {
+                            byte = 0x0;
+                            break;
+                        }
                     }
+                    byte = 0x80;
                 }
-                byte = 0x80;
-            }
-            break;
+                break;
             case PADDL1: {
-                VIEWPORT *v = m->viewport;
-                if(v && v->game_controller[0]) {
-                    uint64_t cycle_delta = m->cpu.cycles - v->ptrig_cycle;
-                    uint8_t val = clamp_u8(cycle_delta * 255 / paddl_normalized, 0, 255 );
-                    if(val >= v->axis_left_y[0]) {
-                        byte = 0x0;
-                        break;
+                    VIEWPORT *v = m->viewport;
+                    if(v && v->game_controller[0]) {
+                        uint64_t cycle_delta = m->cpu.cycles - v->ptrig_cycle;
+                        uint8_t val = clamp_u8(cycle_delta * 255 / paddl_normalized, 0, 255);
+                        if(val >= v->axis_left_y[0]) {
+                            byte = 0x0;
+                            break;
+                        }
                     }
+                    byte = 0x80;
                 }
-                byte = 0x80;
-            }
-            break;
+                break;
             case PADDL2: {
-                VIEWPORT *v = m->viewport;
-                if(v && v->game_controller[1]) {
-                    uint64_t cycle_delta = m->cpu.cycles - v->ptrig_cycle;
-                    uint8_t val = clamp_u8(cycle_delta * 255 / paddl_normalized, 0, 255 );
-                    if(val >= v->axis_left_x[1]) {
-                        byte = 0x0;
-                        break;
+                    VIEWPORT *v = m->viewport;
+                    if(v && v->game_controller[1]) {
+                        uint64_t cycle_delta = m->cpu.cycles - v->ptrig_cycle;
+                        uint8_t val = clamp_u8(cycle_delta * 255 / paddl_normalized, 0, 255);
+                        if(val >= v->axis_left_x[1]) {
+                            byte = 0x0;
+                            break;
+                        }
                     }
+                    byte = 0x80;
                 }
-                byte = 0x80;
-            }
-            break;
+                break;
             case PADDL3: {
-                VIEWPORT *v = m->viewport;
-                if(v && v->game_controller[1]) {
-                    uint64_t cycle_delta = m->cpu.cycles - v->ptrig_cycle;
-                    uint8_t val = clamp_u8(cycle_delta * 255 / paddl_normalized, 0, 255 );
-                    if(val >= v->axis_left_y[1]) {
-                        byte = 0x0;
-                        break;
+                    VIEWPORT *v = m->viewport;
+                    if(v && v->game_controller[1]) {
+                        uint64_t cycle_delta = m->cpu.cycles - v->ptrig_cycle;
+                        uint8_t val = clamp_u8(cycle_delta * 255 / paddl_normalized, 0, 255);
+                        if(val >= v->axis_left_y[1]) {
+                            byte = 0x0;
+                            break;
+                        }
+                    }
+                    byte = 0x80;
+                }
+            case PTRIG: {
+                    VIEWPORT *v = m->viewport;
+                    if(v && v->num_controllers) {
+                        v->ptrig_cycle = m->cpu.cycles;
                     }
                 }
-                byte = 0x80;
-            }
-            case PTRIG: {
-                VIEWPORT *v = m->viewport;
-                if(v && v->num_controllers) {
-                    v->ptrig_cycle = m->cpu.cycles;
-                }
-            }
-            break;
+                break;
         }
     }
     return byte;
@@ -249,7 +249,7 @@ static inline void apple2_softswitch_write_callback_IIplus(APPLE2 *m, uint16_t a
                 }
                 break;
 
-                case SLOT_TYPE_SMARTPORT:
+            case SLOT_TYPE_SMARTPORT:
                 switch(address & 0x0F) {
                     case SP_DATA:
                         m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_write_offset++] = value;
@@ -278,7 +278,7 @@ static inline void apple2_softswitch_write_callback_IIplus(APPLE2 *m, uint16_t a
             case SLOT_TYPE_VIDEX_API:
                 franklin_display_set(m, address, value);
                 break;
-            break;
+                break;
         }
     } else if(address >= 0xc100 && address < 0xC800) {
         // IO Select

@@ -14,7 +14,7 @@ static void slot_io(APPLE2 *m, uint16_t address) {
     } else if(!m->strobed && !m->cxromset && m->slot_cards[slot].slot_map_cx_rom) {
         // If nothing is strobed, and the rom is not active and the card has rom, map the rom
         m->slot_cards[slot].slot_map_cx_rom(m, address);
-        m->mapped_slot = slot;  
+        m->mapped_slot = slot;
         m->strobed = 1;
     }
 }
@@ -36,7 +36,7 @@ static inline void set_memory_map(APPLE2 *m) {
     pages_map(&m->read_pages,  0x0000 / PAGE_SIZE, 0xC000 / PAGE_SIZE, &m->RAM_MAIN[0x00000]);
     pages_map(&m->write_pages, 0x0000 / PAGE_SIZE, 0xC000 / PAGE_SIZE, &m->RAM_MAIN[0x00000]);
     language_card_map_memory(m);
-    
+
     // SETALTZP
     if(m->altzpset) {
         pages_map(&m->read_pages,  0x0000 / PAGE_SIZE, 0x0200 / PAGE_SIZE, &m->RAM_MAIN[0x10000]);
@@ -123,13 +123,13 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                         byte |= m->store80set << 7;
                         break;
                     case RDVBL: {     //e
-                                // CYCLES_PER_LINE  = 65,
-                                // LINES_PER_FRAME  = 262,
-                                // CYCLES_PER_FRAME = CYCLES_PER_LINE * LINES_PER_FRAME,  // 17030
-                                // VBL_LINES        = 21,                                 // ~NTSC VBI
-                                // VBL_CYCLES       = VBL_LINES * CYCLES_PER_LINE,        // 1365
-                                // VBL_START_CYCLE  = CYCLES_PER_FRAME - VBL_CYCLES       // 15665                            
-                                byte |= (m->cpu.cycles % 17030) >= 15665 ? 0x80 : 0;
+                            // CYCLES_PER_LINE  = 65,
+                            // LINES_PER_FRAME  = 262,
+                            // CYCLES_PER_FRAME = CYCLES_PER_LINE * LINES_PER_FRAME,  // 17030
+                            // VBL_LINES        = 21,                                 // ~NTSC VBI
+                            // VBL_CYCLES       = VBL_LINES * CYCLES_PER_LINE,        // 1365
+                            // VBL_START_CYCLE  = CYCLES_PER_FRAME - VBL_CYCLES       // 15665
+                            byte |= (m->cpu.cycles % 17030) >= 15665 ? 0x80 : 0;
                         }
                         break;
                     case RDTEXT:      //e
@@ -162,9 +162,9 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                 // C040 strobe - don't know what that is
                 break;
             case 0xC050:
-                switch (address) {
+                switch(address) {
                     case TXTCLR:
-                         m->text = 0;
+                        m->text = 0;
                         break;
                     case TXTSET:
                         m->text = 1;
@@ -207,94 +207,94 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                 }
                 break;
             case 0xC060:
-                switch(address & 0xFFF7) {   
+                switch(address & 0xFFF7) {
                     // c060 & c068, etc, all map to the same thing
                     case TAPEIN:
                         break;
                     case BUTN0: {
-                        uint8_t button = m->open_apple ? 0x80 : 0x00;
-                        VIEWPORT *v = m->viewport;
-                        if(v) {
-                            for(int i = 0; i < v->num_controllers; i++) {
-                                button |= v->button_a[i];
+                            uint8_t button = m->open_apple ? 0x80 : 0x00;
+                            VIEWPORT *v = m->viewport;
+                            if(v) {
+                                for(int i = 0; i < v->num_controllers; i++) {
+                                    button |= v->button_a[i];
+                                }
                             }
+                            byte = button ? 0x80 : 0;
                         }
-                        byte = button ? 0x80 : 0;
-                    }
-                    break;
+                        break;
                     case BUTN1: {
-                        uint8_t button = m->closed_apple ? 0x80 : 0x00;
-                        VIEWPORT *v = m->viewport;
-                        if(v) {
-                            for(int i = 0; i < v->num_controllers; i++) {
-                                button |= v->button_b[i];
+                            uint8_t button = m->closed_apple ? 0x80 : 0x00;
+                            VIEWPORT *v = m->viewport;
+                            if(v) {
+                                for(int i = 0; i < v->num_controllers; i++) {
+                                    button |= v->button_b[i];
+                                }
                             }
+                            byte = button ? 0x80 : 0;
                         }
-                        byte = button ? 0x80 : 0;
-                    }
-                    break;
+                        break;
                     case BUTN2: {
-                        uint8_t button = 0;
-                        VIEWPORT *v = m->viewport;
-                        if(v) {
-                            for(int i = 0; i < v->num_controllers; i++) {
-                                button |= v->button_x[i];
+                            uint8_t button = 0;
+                            VIEWPORT *v = m->viewport;
+                            if(v) {
+                                for(int i = 0; i < v->num_controllers; i++) {
+                                    button |= v->button_x[i];
+                                }
                             }
+                            byte = button ? 0x80 : 0;
                         }
-                        byte = button ? 0x80 : 0;
-                    }
-                    break;
+                        break;
                     case PADDL0: {
-                        VIEWPORT *v = m->viewport;
-                        if(v && v->game_controller[0]) {
-                            uint64_t cycle_delta = m->cpu.cycles - v->ptrig_cycle;
-                            uint8_t val = clamp_u8(cycle_delta * 255 / paddl_normalized, 0, 255 );
-                            if(val >= v->axis_left_x[0]) {
-                                byte = 0x0;
-                                break;
+                            VIEWPORT *v = m->viewport;
+                            if(v && v->game_controller[0]) {
+                                uint64_t cycle_delta = m->cpu.cycles - v->ptrig_cycle;
+                                uint8_t val = clamp_u8(cycle_delta * 255 / paddl_normalized, 0, 255);
+                                if(val >= v->axis_left_x[0]) {
+                                    byte = 0x0;
+                                    break;
+                                }
                             }
+                            byte = 0x80;
                         }
-                        byte = 0x80;
-                    }
-                    break;
+                        break;
                     case PADDL1: {
-                        VIEWPORT *v = m->viewport;
-                        if(v && v->game_controller[0]) {
-                            uint64_t cycle_delta = m->cpu.cycles - v->ptrig_cycle;
-                            uint8_t val = clamp_u8(cycle_delta * 255 / paddl_normalized, 0, 255 );
-                            if(val >= v->axis_left_y[0]) {
-                                byte = 0x0;
-                                break;
+                            VIEWPORT *v = m->viewport;
+                            if(v && v->game_controller[0]) {
+                                uint64_t cycle_delta = m->cpu.cycles - v->ptrig_cycle;
+                                uint8_t val = clamp_u8(cycle_delta * 255 / paddl_normalized, 0, 255);
+                                if(val >= v->axis_left_y[0]) {
+                                    byte = 0x0;
+                                    break;
+                                }
                             }
+                            byte = 0x80;
                         }
-                        byte = 0x80;
-                    }
-                    break;
+                        break;
                     case PADDL2: {
-                        VIEWPORT *v = m->viewport;
-                        if(v && v->game_controller[1]) {
-                            uint64_t cycle_delta = m->cpu.cycles - v->ptrig_cycle;
-                            uint8_t val = clamp_u8(cycle_delta * 255 / paddl_normalized, 0, 255 );
-                            if(val >= v->axis_left_x[1]) {
-                                byte = 0x0;
-                                break;
+                            VIEWPORT *v = m->viewport;
+                            if(v && v->game_controller[1]) {
+                                uint64_t cycle_delta = m->cpu.cycles - v->ptrig_cycle;
+                                uint8_t val = clamp_u8(cycle_delta * 255 / paddl_normalized, 0, 255);
+                                if(val >= v->axis_left_x[1]) {
+                                    byte = 0x0;
+                                    break;
+                                }
                             }
+                            byte = 0x80;
                         }
-                        byte = 0x80;
-                    }
-                    break;
+                        break;
                     case PADDL3: {
-                        VIEWPORT *v = m->viewport;
-                        if(v && v->game_controller[1]) {
-                            uint64_t cycle_delta = m->cpu.cycles - v->ptrig_cycle;
-                            uint8_t val = clamp_u8(cycle_delta * 255 / paddl_normalized, 0, 255 );
-                            if(val >= v->axis_left_y[1]) {
-                                byte = 0x0;
-                                break;
+                            VIEWPORT *v = m->viewport;
+                            if(v && v->game_controller[1]) {
+                                uint64_t cycle_delta = m->cpu.cycles - v->ptrig_cycle;
+                                uint8_t val = clamp_u8(cycle_delta * 255 / paddl_normalized, 0, 255);
+                                if(val >= v->axis_left_y[1]) {
+                                    byte = 0x0;
+                                    break;
+                                }
                             }
+                            byte = 0x80;
                         }
-                        byte = 0x80;
-                    }
                 }
                 break;
             case 0xC070: {
@@ -315,62 +315,62 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
             case 0xC0D0:
             case 0xC0E0:
             case 0xC0F0: {
-                // Device Select
-                int slot = (address >> 4) & 0x7;
-                byte = m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
-                switch(m->slot_cards[slot].slot_type) {
-                    case SLOT_TYPE_DISKII: {
-                            uint8_t soft_switch = address & 0x0f;
-                            if(soft_switch <= IWM_PH3_ON) {
-                                diskii_step_head(m, slot, soft_switch);
-                                break;
-                            }
-                            switch(soft_switch) {
-                                case IWM_MOTOR_ON:
-                                case IWM_MOTOR_OFF:
-                                    diskii_motor(m, slot, soft_switch);
+                    // Device Select
+                    int slot = (address >> 4) & 0x7;
+                    byte = m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
+                    switch(m->slot_cards[slot].slot_type) {
+                        case SLOT_TYPE_DISKII: {
+                                uint8_t soft_switch = address & 0x0f;
+                                if(soft_switch <= IWM_PH3_ON) {
+                                    diskii_step_head(m, slot, soft_switch);
                                     break;
-
-                                case IWM_SEL_DRIVE_1:
-                                case IWM_SEL_DRIVE_2:
-                                    diskii_drive_select(m, slot, soft_switch);
-                                    break;
-
-                                case IWM_Q6_OFF:
-                                case IWM_Q6_ON:
-                                    return diskii_q6_access(m, slot, soft_switch & 1);
-
-                                case IWM_Q7_OFF:
-                                case IWM_Q7_ON:
-                                    return diskii_q7_access(m, slot, soft_switch & 1);
-                            }
-                        }
-                        break;
-
-                    case SLOT_TYPE_SMARTPORT:
-                        switch(address & 0x0f) {
-                            case SP_DATA:
-                                if(m->sp_device[slot].sp_read_offset == sizeof(m->sp_device[slot].sp_buffer)) {
-                                    m->sp_device[slot].sp_read_offset = 0;
                                 }
-                                return m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_read_offset++];
-                                break;
+                                switch(soft_switch) {
+                                    case IWM_MOTOR_ON:
+                                    case IWM_MOTOR_OFF:
+                                        diskii_motor(m, slot, soft_switch);
+                                        break;
 
-                            case SP_STATUS:
-                                return m->sp_device[slot].sp_status;
-                                break;
-                        }
-                        break;
+                                    case IWM_SEL_DRIVE_1:
+                                    case IWM_SEL_DRIVE_2:
+                                        diskii_drive_select(m, slot, soft_switch);
+                                        break;
 
-                    case SLOT_TYPE_VIDEX_API: {
-                            FRANKLIN_DISPLAY *fd80 = &m->franklin_display;
-                            fd80->bank = (address & 0x0C) >> 2;
-                            return fd80->registers[address & 0x0F];
-                        }
-                        break;
+                                    case IWM_Q6_OFF:
+                                    case IWM_Q6_ON:
+                                        return diskii_q6_access(m, slot, soft_switch & 1);
+
+                                    case IWM_Q7_OFF:
+                                    case IWM_Q7_ON:
+                                        return diskii_q7_access(m, slot, soft_switch & 1);
+                                }
+                            }
+                            break;
+
+                        case SLOT_TYPE_SMARTPORT:
+                            switch(address & 0x0f) {
+                                case SP_DATA:
+                                    if(m->sp_device[slot].sp_read_offset == sizeof(m->sp_device[slot].sp_buffer)) {
+                                        m->sp_device[slot].sp_read_offset = 0;
+                                    }
+                                    return m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_read_offset++];
+                                    break;
+
+                                case SP_STATUS:
+                                    return m->sp_device[slot].sp_status;
+                                    break;
+                            }
+                            break;
+
+                        case SLOT_TYPE_VIDEX_API: {
+                                FRANKLIN_DISPLAY *fd80 = &m->franklin_display;
+                                fd80->bank = (address & 0x0C) >> 2;
+                                return fd80->registers[address & 0x0F];
+                            }
+                            break;
+                    }
+                    break;
                 }
-                break;
-            }
         }
     }
     return byte;
@@ -427,7 +427,7 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                         if(m->strobed) {
                             if(m->mapped_slot) {
                                 m->slot_cards[m->mapped_slot].slot_map_cx_rom(m, address);
-                            } 
+                            }
                         } else {
                             pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, 0x800 / PAGE_SIZE, &m->RAM_MAIN[0xC800]);
                         }
@@ -473,11 +473,11 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                 }
                 break;
             case 0xC010:
-                    if(m->clipboard_text) {
-                        viewapl2_feed_clipboard_key(m);
-                    } else {
-                        m->write_pages.pages[KBD / PAGE_SIZE].bytes[KBD % PAGE_SIZE] &= 0x7F;
-                    }
+                if(m->clipboard_text) {
+                    viewapl2_feed_clipboard_key(m);
+                } else {
+                    m->write_pages.pages[KBD / PAGE_SIZE].bytes[KBD % PAGE_SIZE] &= 0x7F;
+                }
                 break;
             case 0xC020:
                 break;
@@ -488,7 +488,7 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                 // GCStrobe - Ignore
                 break;
             case 0xC050:
-                switch (address) {
+                switch(address) {
                     case TXTCLR:
                         m->text = 0;
                         break;
@@ -517,7 +517,7 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                         m->hires = 1;
                         set_memory_map(m);
                         break;
-                    case CLRAN0: // SQW - hires or dhires if text off 
+                    case CLRAN0: // SQW - hires or dhires if text off
                     case SETAN0: // SQW
                     case CLRAN1: // SQW
                     case SETAN1: // SQW
@@ -551,72 +551,72 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
             case 0xC0D0:
             case 0xC0E0:
             case 0xC0F0: {
-                int slot = (address >> 4) & 0x7;
-                switch(m->slot_cards[slot].slot_type) {
-                    case SLOT_TYPE_DISKII: {
-                            uint8_t soft_switch = address & 0x0f;
-                            if(soft_switch <= IWM_PH3_ON) {
-                                diskii_step_head(m, slot, soft_switch);
-                                break;
-                            }
-                            switch(soft_switch) {
-                                case IWM_MOTOR_ON:
-                                case IWM_MOTOR_OFF:
-                                    diskii_motor(m, slot, soft_switch);
+                    int slot = (address >> 4) & 0x7;
+                    switch(m->slot_cards[slot].slot_type) {
+                        case SLOT_TYPE_DISKII: {
+                                uint8_t soft_switch = address & 0x0f;
+                                if(soft_switch <= IWM_PH3_ON) {
+                                    diskii_step_head(m, slot, soft_switch);
                                     break;
+                                }
+                                switch(soft_switch) {
+                                    case IWM_MOTOR_ON:
+                                    case IWM_MOTOR_OFF:
+                                        diskii_motor(m, slot, soft_switch);
+                                        break;
 
-                                case IWM_SEL_DRIVE_1:
-                                case IWM_SEL_DRIVE_2:
-                                    diskii_drive_select(m, slot, soft_switch);
-                                    break;
+                                    case IWM_SEL_DRIVE_1:
+                                    case IWM_SEL_DRIVE_2:
+                                        diskii_drive_select(m, slot, soft_switch);
+                                        break;
 
-                                // SQW - Do these trigger with write?
-                                case IWM_Q6_OFF:
-                                case IWM_Q6_ON:
-                                    diskii_q6_access(m, slot, soft_switch & 1);
+                                    // SQW - Do these trigger with write?
+                                    case IWM_Q6_OFF:
+                                    case IWM_Q6_ON:
+                                        diskii_q6_access(m, slot, soft_switch & 1);
 
-                                case IWM_Q7_OFF:
-                                case IWM_Q7_ON:
-                                    diskii_q7_access(m, slot, soft_switch & 1);
+                                    case IWM_Q7_OFF:
+                                    case IWM_Q7_ON:
+                                        diskii_q7_access(m, slot, soft_switch & 1);
+                                }
                             }
-                        }
-                        break;
+                            break;
 
                         case SLOT_TYPE_SMARTPORT:
-                        switch(address & 0x0F) {
-                            case SP_DATA:
-                                if(m->sp_device[slot].sp_write_offset == sizeof(m->sp_device[slot].sp_buffer)) {
+                            switch(address & 0x0F) {
+                                case SP_DATA:
+                                    if(m->sp_device[slot].sp_write_offset == sizeof(m->sp_device[slot].sp_buffer)) {
+                                        m->sp_device[slot].sp_write_offset = 0;
+                                    }
+                                    m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_write_offset++] = value;
+                                    return;
+
+                                case SP_STATUS:
+                                    m->sp_device[slot].sp_read_offset = 0;
                                     m->sp_device[slot].sp_write_offset = 0;
-                                }
-                                m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_write_offset++] = value;
-                                return;
 
-                            case SP_STATUS:
-                                m->sp_device[slot].sp_read_offset = 0;
-                                m->sp_device[slot].sp_write_offset = 0;
+                                    switch(m->sp_device[slot].sp_buffer[0]) {
+                                        case 0:
+                                            sp_status(m, slot);
+                                            break;
+                                        case 1:
+                                            sp_read(m, slot);
+                                            break;
+                                        case 2:
+                                            sp_write(m, slot);
+                                            break;
+                                    }
+                                    m->sp_device[slot].sp_status = 0x80;
+                                    return;
+                            }
+                            break;
 
-                                switch(m->sp_device[slot].sp_buffer[0]) {
-                                    case 0:
-                                        sp_status(m, slot);
-                                        break;
-                                    case 1:
-                                        sp_read(m, slot);
-                                        break;
-                                    case 2:
-                                        sp_write(m, slot);
-                                        break;
-                                }
-                                m->sp_device[slot].sp_status = 0x80;
-                                return;
-                        }
-                        break;
-
-                    case SLOT_TYPE_VIDEX_API:
-                        franklin_display_set(m, address, value);
-                        break;
-                    break;
+                        case SLOT_TYPE_VIDEX_API:
+                            franklin_display_set(m, address, value);
+                            break;
+                            break;
+                    }
                 }
-            }
         }
     }
 }
