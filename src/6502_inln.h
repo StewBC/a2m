@@ -31,15 +31,15 @@ static inline uint8_t read_from_memory_debug(APPLE2 *m, uint16_t address) {
 }
 
 static inline uint8_t read_from_memory_selected(APPLE2 *m, uint16_t address, int selected) {
-    switch(selected & (mem6502 | mem64 | mem128)) {
-        case mem6502:
+    switch(selected & (MEM_MAPPED_6502 | MEM_MAIN | MEM_AUX)) {
+        case MEM_MAPPED_6502:
             return m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
-        case mem64:
+        case MEM_MAIN:
             if(address < 0xD000) {
                 return m->RAM_MAIN[address];
             }
             if(address < 0xE000) {
-                if(!(selected & memlcb2)) {
+                if(!(selected & MEM_LC_BANK2)) {
                     // D123 + 1000 = e123 & 1fff =  123 (bank1)
                     // d123               & 1fff = 1123 (bank2)
                     // So set bank 1 address to exxx.
@@ -49,12 +49,12 @@ static inline uint8_t read_from_memory_selected(APPLE2 *m, uint16_t address, int
             }
             // LC 0x2000+
             return m->RAM_LC[(address & 0x3fff)];
-        case mem128:
+        case MEM_AUX:
             if(address < 0xD000) {
                 return m->RAM_MAIN[address + 0x10000];
             }
             if(address < 0xE000) {
-                if(!(selected & memlcb2)) {
+                if(!(selected & MEM_LC_BANK2)) {
                     // D123 + 1000 = e123 & 5fff = 4123 (aux bank1)
                     // d123               & 5fff = 5123 (aux bank2)
                     // So set bank 1 address to exxx.
@@ -89,17 +89,17 @@ static inline void write_to_memory(APPLE2 *m, uint16_t address, uint8_t value) {
 }
 
 static inline void write_to_memory_selected(APPLE2 *m, uint16_t address, uint8_t selected, uint8_t value) {
-    switch(selected & (mem6502 | mem64 | mem128)) {
-        case mem6502:
+    switch(selected & (MEM_MAPPED_6502 | MEM_MAIN | MEM_AUX)) {
+        case MEM_MAPPED_6502:
             m->write_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE] = value;
             break;
-        case mem64:
+        case MEM_MAIN:
             if(address < 0xD000) {
                 m->RAM_MAIN[address] = value;
                 break;
             }
             if(address < 0xE000) {
-                if(!(selected & memlcb2)) {
+                if(!(selected & MEM_LC_BANK2)) {
                     // D123 + 1000 = e123 & 1fff =  123 (bank1)
                     // d123               & 1fff = 1123 (bank2)
                     // So set bank 1 address to exxx.
@@ -111,13 +111,13 @@ static inline void write_to_memory_selected(APPLE2 *m, uint16_t address, uint8_t
             // LC 0x2000+
             m->RAM_LC[(address & 0x3fff)] = value;
             break;
-        case mem128:
+        case MEM_AUX:
             if(address < 0xD000) {
                 m->RAM_MAIN[address + 0x10000] = value;
                 break;
             }
             if(address < 0xE000) {
-                if(!(selected & memlcb2)) {
+                if(!(selected & MEM_LC_BANK2)) {
                     // D123 + 1000 = e123 & 5fff = 4123 (aux bank1)
                     // d123               & 5fff = 5123 (aux bank2)
                     // So set bank 1 address to exxx.

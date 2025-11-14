@@ -273,7 +273,7 @@ int viewport_init(APPLE2 *m, int w, int h) {
     v->lim.corner_px = 16;
 
     v->nk_os_rect = sdl_to_nk_rect(v->sdl_os_rect);
-    layout_init_apple2(&v->layout, v->nk_os_rect, v->target_rect.w * 0.60f, v->target_rect.h * 0.60f, /*mem ratio*/ 0.452f);
+    layout_init_apple2(&v->layout, v->nk_os_rect, v->target_rect.w * 0.60f, v->target_rect.h * 0.60f, /*mem ratio*/ 0.456f);
     return A2_OK;
 
 error:
