@@ -43,15 +43,15 @@ typedef struct MEMSHOW {
     uint32_t active_view_index;     // the # of the view that's active
     uint32_t str_buf_len;           // the length of this char array
     uint32_t find_string_cap;       // the size of the find_string array
-    uint32_t find_string_len;       // the length of this serach
-    uint16_t last_found_address;    // used for find nex/prev
+    int find_string_len;            // the length of this serach
     int header_height;              // height of the memory window header portion
     int cols;                       // how many cols each view shows
     int dragging;					// scrollbar
+    uint16_t last_found_address;    // used for find nex/prev
     float grab_offset;				// scrollbar
     DYNARRAY *mem_views;            // the array of views
     char *str_buf;                  // the buffer that holds a complete row of text
-    char *u8_buf;                   // the buffer that holds the uint8_t's from memory (in that row)
+    uint8_t *u8_buf;                // the buffer that holds the uint8_t's from memory (in that row)
     char *find_string;
 } MEMSHOW;
 

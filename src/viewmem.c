@@ -220,7 +220,7 @@ int viewmem_init(MEMSHOW *ms) {
     }
     // Init the array
     ARRAY_INIT(ms->mem_views, MEMVIEW);
-    ARRAY_ADD(ms->mem_views, &memview);
+    ARRAY_ADD(ms->mem_views, memview);
     ms->find_string = (char *)malloc(MAX_FIND_STRING_LENGTH + 1);
     if(ms->find_string) {
         ms->find_string_cap = MAX_FIND_STRING_LENGTH;
@@ -319,7 +319,7 @@ int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window) {
                     memset(&v, 0, sizeof(v));
                     v.view_address = v.cursor_address = mv->cursor_address;
                     v.flags = mv->flags;
-                    ARRAY_ADD(ms->mem_views, &v);
+                    ARRAY_ADD(ms->mem_views, v);
                     viewmem_resize_view(m);
                 }
                 break;
@@ -444,7 +444,7 @@ void viewmem_resize_view(APPLE2 *m) {
     int cvt_size = visible_cols > (5 + 16 * 4) ? visible_cols : (5 + 16 * 4);
     if(ms->str_buf_len < cvt_size) {
         char *new_cvt_buf = (char *)realloc(ms->str_buf, cvt_size + 1);
-        char *new_u8_buf = (uint8_t *)realloc(ms->u8_buf, cvt_size);
+        uint8_t *new_u8_buf = (uint8_t *)realloc(ms->u8_buf, cvt_size);
         if(new_u8_buf && new_cvt_buf) {
             ms->str_buf = new_cvt_buf;
             ms->u8_buf = new_u8_buf;
@@ -550,7 +550,7 @@ void viewmem_show(APPLE2 *m) {
                             dc = isprint(c) ? c : '.';
                             break;
                     }
-                    nk_draw_text(&ctx->active->buffer, r, &dc, 1, ctx->style.font, viewmem_range_colors[ms->active_view_index].text_color, viewmem_range_colors[ms->active_view_index].background_color);
+                    nk_draw_text(&ctx->active->buffer, r, (char*)&dc, 1, ctx->style.font, viewmem_range_colors[ms->active_view_index].text_color, viewmem_range_colors[ms->active_view_index].background_color);
                 }
             }
 
