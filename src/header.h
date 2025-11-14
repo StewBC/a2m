@@ -57,6 +57,7 @@
 #include <SDL2/SDL_image.h>
 
 // nuklear GUI includes
+#define NK_UINT_DRAW_INDEX
 #define NK_INCLUDE_FIXED_TYPES
 #define NK_INCLUDE_STANDARD_IO
 #define NK_INCLUDE_STANDARD_VARARGS

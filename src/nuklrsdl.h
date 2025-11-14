@@ -190,7 +190,7 @@ nk_sdl_render(enum nk_anti_aliasing AA)
                         (const SDL_Color*)((const nk_byte*)vertices + vc), vs,
                         (const float*)((const nk_byte*)vertices + vt), vs,
                         (vbuf.needed / vs),
-                        (void *) offset, cmd->elem_count, 2);
+                        (void *) offset, cmd->elem_count, 4); // SQW - from short 2 to int 4
 
                 offset += cmd->elem_count;
             }
