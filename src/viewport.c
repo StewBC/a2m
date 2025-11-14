@@ -467,7 +467,9 @@ void viewport_show(APPLE2 *m) {
         return;
     }
 
-    if(layout_handle_drag(&v->layout, &v->ctx->input, v->nk_os_rect, &v->lim)) {
+    // This memshow.dragging hack is needed otherwise I resize the window when I move the
+    // scrollbar 
+    if(!v->memshow.dragging && layout_handle_drag(&v->layout, &v->ctx->input, v->nk_os_rect, &v->lim)) {
         struct nk_rect tr = nk_rect_fit_4x3_center(v->layout.apple2);
         v->target_rect = nk_to_sdl_rect(tr);
         viewmem_resize_view(m);
