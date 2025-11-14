@@ -42,7 +42,8 @@ typedef struct MEMVIEW {
 typedef struct MEMSHOW {
     uint32_t active_view_index;     // the # of the view that's active
     uint32_t str_buf_len;           // the length of this char array
-    uint32_t find_string_len;       // the length of this char array
+    uint32_t find_string_cap;       // the size of the find_string array
+    uint32_t find_string_len;       // the length of this serach
     uint16_t last_found_address;    // used for find nex/prev
     int header_height;              // height of the memory window header portion
     int cols;                       // how many cols each view shows

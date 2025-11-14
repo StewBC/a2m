@@ -7,7 +7,7 @@
 #define SCROLLBAR_W             20
 #define ADDRESS_LABEL_H         20
 #define ROW_H                   v->font_height
-#define MAX_FIND_STRING_LENGTH  256
+#define MAX_FIND_STRING_LENGTH  255
 
 typedef struct RANGE_COLORS {
     struct nk_color text_color;
@@ -221,9 +221,9 @@ int viewmem_init(MEMSHOW *ms) {
     // Init the array
     ARRAY_INIT(ms->mem_views, MEMVIEW);
     ARRAY_ADD(ms->mem_views, &memview);
-    ms->find_string = (char *)malloc(MAX_FIND_STRING_LENGTH);
+    ms->find_string = (char *)malloc(MAX_FIND_STRING_LENGTH + 1);
     if(ms->find_string) {
-        ms->find_string_len = MAX_FIND_STRING_LENGTH;
+        ms->find_string_cap = MAX_FIND_STRING_LENGTH;
     }
     return A2_OK;
 }
@@ -626,9 +626,9 @@ void viewmem_show(APPLE2 *m) {
         ctx->style.window.group_padding = gpd;
         ctx->style.window.border        = border;
 
-        if(v->dlg_memory_find) {
+        if(v->dlg_memory_find && ms->find_string_cap) {
             int ret;
-            if((ret = viewdlg_find(ctx, nk_rect(10, 10, 400, 120), ms->find_string, &ms->find_string_len, MAX_FIND_STRING_LENGTH))) {
+            if((ret = viewdlg_find(ctx, nk_rect(10, 10, 400, 120), ms->find_string, &ms->find_string_len, ms->find_string_cap))) {
                 if(ret && ret != 3) {
                     int value;
                     ms->find_string[ms->find_string_len] = 0;
