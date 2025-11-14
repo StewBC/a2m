@@ -91,40 +91,11 @@ void viewmem_find_string_reverse(APPLE2 *m, MEMSHOW *ms, MEMVIEW *mv) {
     }
 }
 
-int viewmem_init(MEMSHOW *ms) {
-    MEMVIEW memview;
-    memset(&memview, 0, sizeof(MEMVIEW));
-    memset(ms, 0, sizeof(MEMSHOW));
-    memview.flags = MEM_MAPPED_6502;
-
-    ms->mem_views = (DYNARRAY *) malloc(sizeof(DYNARRAY));
-    if(!ms->mem_views) {
-        return A2_ERR;
-    }
-    // Init the array
-    ARRAY_INIT(ms->mem_views, MEMVIEW);
-    ARRAY_ADD(ms->mem_views, &memview);
-    ms->find_string = (char *)malloc(MAX_FIND_STRING_LENGTH);
-    if(ms->find_string) {
-        ms->find_string_len = MAX_FIND_STRING_LENGTH;
-    }
-    return A2_OK;
-}
-
-void viewmem_cursor_home(MEMSHOW *ms, MEMVIEW *mv, int mod) {
+void viewmem_cursor_down(MEMSHOW *ms, MEMVIEW *mv) {
     if(mv->cursor_field != CURSOR_ADDRESS) {
-        if(!mod) {
-            // move to column 0 of current row
-            int delta = viewmem_circular_delta(mv->cursor_address, mv->view_address);
-            int row = delta >= 0 ? delta / ms->cols : -1 + ((delta + 1) / ms->cols);
-            mv->cursor_address = viewmem_wrap16_add(mv->cursor_address, -(delta - row * ms->cols));
-        } else {
-            // move to top-left of view
-            mv->cursor_address = mv->view_address;
-        }
+        mv->cursor_address = viewmem_wrap16_add(mv->cursor_address, ms->cols);
         viewmem_recenter_view(ms, mv);
     }
-    mv->cursor_digit = CURSOR_DIGIT0;
 }
 
 void viewmem_cursor_end(MEMSHOW *ms, MEMVIEW *mv, int mod) {
@@ -149,14 +120,21 @@ void viewmem_cursor_end(MEMSHOW *ms, MEMVIEW *mv, int mod) {
     mv->cursor_digit = CURSOR_DIGIT0;
 }
 
-
-void viewmem_cursor_down(MEMSHOW *ms, MEMVIEW *mv) {
+void viewmem_cursor_home(MEMSHOW *ms, MEMVIEW *mv, int mod) {
     if(mv->cursor_field != CURSOR_ADDRESS) {
-        mv->cursor_address = viewmem_wrap16_add(mv->cursor_address, ms->cols);
+        if(!mod) {
+            // move to column 0 of current row
+            int delta = viewmem_circular_delta(mv->cursor_address, mv->view_address);
+            int row = delta >= 0 ? delta / ms->cols : -1 + ((delta + 1) / ms->cols);
+            mv->cursor_address = viewmem_wrap16_add(mv->cursor_address, -(delta - row * ms->cols));
+        } else {
+            // move to top-left of view
+            mv->cursor_address = mv->view_address;
+        }
         viewmem_recenter_view(ms, mv);
     }
+    mv->cursor_digit = CURSOR_DIGIT0;
 }
-
 
 void viewmem_cursor_left(MEMSHOW *ms, MEMVIEW *mv) {
     switch(mv->cursor_field) {
@@ -183,6 +161,17 @@ void viewmem_cursor_left(MEMSHOW *ms, MEMVIEW *mv) {
     viewmem_recenter_view(ms, mv);
 }
 
+void viewmem_cursor_page_up(MEMSHOW *ms, MEMVIEW *mv) {
+    if(mv->cursor_field != CURSOR_ADDRESS) {
+        mv->view_address = viewmem_wrap16_add(mv->view_address, -(ms->cols * mv->rows));
+    }
+}
+
+void viewmem_cursor_page_down(MEMSHOW *ms, MEMVIEW *mv) {
+    if(mv->cursor_field != CURSOR_ADDRESS) {
+        mv->view_address = viewmem_wrap16_add(mv->view_address, (ms->cols * mv->rows));
+    }
+}
 
 void viewmem_cursor_right(MEMSHOW *ms, MEMVIEW *mv) {
     switch(mv->cursor_field) {
@@ -212,7 +201,6 @@ void viewmem_cursor_right(MEMSHOW *ms, MEMVIEW *mv) {
     viewmem_recenter_view(ms, mv);
 }
 
-
 void viewmem_cursor_up(MEMSHOW *ms, MEMVIEW *mv) {
     if(mv->cursor_field != CURSOR_ADDRESS) {
         mv->cursor_address = viewmem_wrap16_add(mv->cursor_address, -ms->cols);
@@ -220,19 +208,254 @@ void viewmem_cursor_up(MEMSHOW *ms, MEMVIEW *mv) {
     }
 }
 
+int viewmem_init(MEMSHOW *ms) {
+    MEMVIEW memview;
+    memset(&memview, 0, sizeof(MEMVIEW));
+    memset(ms, 0, sizeof(MEMSHOW));
+    memview.flags = MEM_MAPPED_6502;
 
-void viewmem_cursor_page_up(MEMSHOW *ms, MEMVIEW *mv) {
-    if(mv->cursor_field != CURSOR_ADDRESS) {
-        mv->view_address = viewmem_wrap16_add(mv->view_address, -(ms->cols * mv->rows));
+    ms->mem_views = (DYNARRAY *) malloc(sizeof(DYNARRAY));
+    if(!ms->mem_views) {
+        return A2_ERR;
     }
+    // Init the array
+    ARRAY_INIT(ms->mem_views, MEMVIEW);
+    ARRAY_ADD(ms->mem_views, &memview);
+    ms->find_string = (char *)malloc(MAX_FIND_STRING_LENGTH);
+    if(ms->find_string) {
+        ms->find_string_len = MAX_FIND_STRING_LENGTH;
+    }
+    return A2_OK;
 }
 
-void viewmem_cursor_page_down(MEMSHOW *ms, MEMVIEW *mv) {
-    if(mv->cursor_field != CURSOR_ADDRESS) {
-        mv->view_address = viewmem_wrap16_add(mv->view_address, (ms->cols * mv->rows));
+int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window) {
+    SDL_Keymod mod = SDL_GetModState();
+    VIEWPORT *v = m->viewport;
+    MEMSHOW *ms = &v->memshow;
+    MEMVIEW *mv = ARRAY_GET(ms->mem_views, MEMVIEW, ms->active_view_index);
+
+    if(mv->cursor_field == CURSOR_ASCII) {
+        if(e->type == SDL_TEXTINPUT) {
+            write_to_memory_selected(m, mv->cursor_address, mv->flags, e->text.text[0]);
+            viewmem_cursor_right(ms, mv);
+        } else if(!(mod & (KMOD_CTRL | KMOD_ALT)) && e->key.keysym.sym >= 32 && e->key.keysym.sym < 127) {
+            // SDL_TEXTINPUT also has SDL_KEYDOWN for same key, so filter out keys that were already
+            // processed, but keep keys that want/need processing - like ENTER or cursor, or CTRL/ALT mod, etc.
+            return 0;
+        }
     }
+    // Only key events, and not for a modifier key by itself
+    if(e->type != SDL_KEYDOWN || e->key.keysym.scancode == SDL_SCANCODE_CAPSLOCK || e->key.keysym.scancode >= SDL_SCANCODE_LCTRL) {
+        return 0;
+    }
+    // Seperate into MOD codes and regular keys for better clarity
+    if(mod & KMOD_ALT) {
+        switch(e->key.keysym.sym) {
+            case SDLK_DOWN:
+                ms->active_view_index = (ms->active_view_index + 1) % ms->mem_views->items;
+                break;
+
+            case SDLK_UP:
+                ms->active_view_index = (ms->active_view_index - 1) % ms->mem_views->items;
+                break;
+        }
+    } else if(mod & KMOD_CTRL) {
+        switch(e->key.keysym.sym) {
+            case SDLK_a:                                        // CTRL G - Goto view_address
+                if(mv->cursor_field == CURSOR_ADDRESS) {
+                    mv->cursor_field = mv->prev_field;
+                    mv->cursor_digit = mv->cursor_prev_digit;
+                } else {
+                    mv->prev_field = mv->cursor_field;
+                    mv->cursor_prev_digit = mv->cursor_digit;
+                    mv->cursor_digit = CURSOR_DIGIT0;
+                    mv->cursor_field = CURSOR_ADDRESS;
+                }
+                break;
+
+            case SDLK_f:                                        // CTRL F - Find
+                if(!v->viewdlg_modal) {
+                    ms->find_string_len = 0;
+                    v->viewdlg_modal = 1;
+                    v->dlg_memory_find = 1;
+                }
+                break;
+
+            case SDLK_h:                                        // CTRL H - Find & Replace
+                break;
+
+            case SDLK_j:                                        // CTRL J - Join (down) CTRL SHIFT J - Join Up
+                // viewmem_join_range(m, (mod & KMOD_SHIFT) ? -1 : 1);
+                if(ms->mem_views->items > 1) {
+                    array_remove(ms->mem_views, mv);
+                    if(ms->active_view_index >= ms->mem_views->items) {
+                        ms->active_view_index--;
+                    }
+                    viewmem_resize_view(m);
+                }
+                break;
+
+            case SDLK_n:                                        // CTRL (shift) N - Find (prev) Next
+                if(mod & KMOD_SHIFT) {
+                    viewmem_find_string_reverse(m, ms, mv);
+                } else {
+                    viewmem_find_string(m, ms, mv);
+                }
+                break;
+
+            case SDLK_s:                                        // CTRL S - Search
+                global_entry_length = 0;
+                v->viewdlg_modal = 1;
+                v->dlg_symbol_lookup_mem = 1;
+                break;
+
+            case SDLK_t:                                        // CTRL T - Toggle between ascii and hex edit
+                mv->cursor_field = CURSOR_ASCII - mv->cursor_field;
+                break;
+
+            case SDLK_v:                                        // CTRL v - New Range (Split)
+                if(ms->mem_views->items < 16) {
+                    MEMVIEW v;
+                    memset(&v, 0, sizeof(v));
+                    v.view_address = v.cursor_address = mv->cursor_address;
+                    v.flags = mv->flags;
+                    ARRAY_ADD(ms->mem_views, &v);
+                    viewmem_resize_view(m);
+                }
+                break;
+
+            case SDLK_HOME:
+                viewmem_cursor_home(ms, mv, 1);
+                break;
+
+            case SDLK_END:
+                viewmem_cursor_end(ms, mv, 1);
+                break;
+
+            case SDLK_DOWN:
+                mv->view_address -= ms->cols;
+                break;
+
+            case SDLK_UP:
+                mv->view_address += ms->cols;
+                break;
+        }
+    } else {
+        // Regular, unmodified keys
+        uint8_t key = e->key.keysym.sym;
+        if((key >= SDLK_0 && key <= SDLK_9) || (key >= SDLK_a && key <= SDLK_f)) {
+            key -= key >= SDLK_a ? SDLK_a - 10 : SDLK_0;
+            if(mv->cursor_field == CURSOR_HEX) {
+                // This is HEX mode only as ascii mode was handled at the start
+                uint8_t byte = read_from_memory_selected(m, mv->cursor_address, mv->flags);
+                if(mv->cursor_digit == CURSOR_DIGIT1) {
+                    byte &= 0xf0;
+                    byte |= key;
+                } else {
+                    byte &= 0x0F;
+                    byte |= (key << 4);
+                }
+                write_to_memory_selected(m, mv->cursor_address, mv->flags, byte);
+            } else {
+                // This is address mode
+                int delta = viewmem_circular_delta(mv->cursor_address, mv->view_address);
+                int row = delta / ms->cols;
+                int col = delta % ms->cols;
+                uint8_t shift = (4 * (3 - mv->cursor_digit));
+                uint16_t address = mv->cursor_address - col;
+                address &= ~(0x0f << shift);
+                address |= (key << shift);
+                mv->cursor_address = address;
+                mv->view_address = address - delta;
+            }
+            viewmem_cursor_right(ms, mv);
+            return 0;
+        }
+        // Unmodified special keys
+        switch(e->key.keysym.sym) {
+            case SDLK_HOME:
+                viewmem_cursor_home(ms, mv, 0);
+                break;
+
+            case SDLK_END:
+                viewmem_cursor_end(ms, mv, 0);
+                break;
+
+            case SDLK_UP:
+                viewmem_cursor_up(ms, mv);
+                break;
+
+            case SDLK_DOWN:
+                viewmem_cursor_down(ms, mv);
+                break;
+
+            case SDLK_LEFT:
+                viewmem_cursor_left(ms, mv);
+                break;
+
+            case SDLK_RIGHT:
+                viewmem_cursor_right(ms, mv);
+                break;
+
+            case SDLK_PAGEUP:
+                viewmem_cursor_page_up(ms, mv);
+                break;
+
+            case SDLK_PAGEDOWN:
+                viewmem_cursor_page_down(ms, mv);
+                break;
+
+            default:
+                // This is where ENTER will come, for example
+                if(mv->cursor_field == CURSOR_ASCII) {
+                    write_to_memory(m, mv->cursor_address, e->key.keysym.sym);
+                    viewmem_cursor_right(ms, mv);
+                }
+                break;
+        }
+    }
+
+    return 0;
 }
 
+void viewmem_resize_view(APPLE2 *m) {
+    VIEWPORT *v = m->viewport;
+    MEMSHOW *ms = &v->memshow;
+
+    struct nk_context *ctx = m->viewport->ctx;
+    struct nk_style *style = &ctx->style;
+    // calc is from nk_begin_titled
+    ms->header_height = 2.0f * style->window.header.padding.y + 2.0f * style->window.header.label_padding.y + v->font_height;
+    struct nk_rect parent = v->layout.mem;
+
+    float view_width = parent.w - 3.0f * ctx->style.window.border - SCROLLBAR_W;
+    int visible_cols = view_width / v->font_width;
+
+    int view_total_rows = (parent.h - (ADDRESS_LABEL_H + ms->header_height)) / ROW_H;
+    int view_rows = view_total_rows / ms->mem_views->items;
+    int view_height_overflow = view_total_rows - (view_rows * ms->mem_views->items);
+
+    for(int view = 0; view < ms->mem_views->items; view++) {
+        MEMVIEW *mv = ARRAY_GET(ms->mem_views, MEMVIEW, view);
+        mv->rows = view_rows + (view_height_overflow ? (--view_height_overflow, 1) : 0);
+    }
+
+    // 16 cols at 4 chars/col (hex 'XX ' and char ' ') + xxxx:
+    int cvt_size = visible_cols > (5 + 16 * 4) ? visible_cols : (5 + 16 * 4);
+    if(ms->str_buf_len < cvt_size) {
+        char *new_cvt_buf = (char *)realloc(ms->str_buf, cvt_size + 1);
+        char *new_u8_buf = (uint8_t *)realloc(ms->u8_buf, cvt_size);
+        if(new_u8_buf && new_cvt_buf) {
+            ms->str_buf = new_cvt_buf;
+            ms->u8_buf = new_u8_buf;
+            ms->str_buf_len = cvt_size + 1;
+        } else {
+            free(new_cvt_buf);
+            free(new_u8_buf);
+        }
+    }
+    ms->cols = visible_cols <= ms->str_buf_len ? (visible_cols - 5) / 4 : (ms->str_buf_len - 5) / 4;
+}
 
 void viewmem_show(APPLE2 *m) {
     VIEWPORT *v = m->viewport;
@@ -441,233 +664,4 @@ void viewmem_show(APPLE2 *m) {
         }
     }
     nk_end(ctx);
-}
-
-void viewmem_resize_view(APPLE2 *m) {
-    VIEWPORT *v = m->viewport;
-    MEMSHOW *ms = &v->memshow;
-
-    struct nk_context *ctx = m->viewport->ctx;
-    struct nk_style *style = &ctx->style;
-    // calc is from nk_begin_titled
-    ms->header_height = 2.0f * style->window.header.padding.y + 2.0f * style->window.header.label_padding.y + v->font_height;
-    struct nk_rect parent = v->layout.mem;
-
-    float view_width = parent.w - 3.0f * ctx->style.window.border - SCROLLBAR_W;
-    int visible_cols = view_width / v->font_width;
-
-    int view_total_rows = (parent.h - (ADDRESS_LABEL_H + ms->header_height)) / ROW_H;
-    int view_rows = view_total_rows / ms->mem_views->items;
-    int view_height_overflow = view_total_rows - (view_rows * ms->mem_views->items);
-
-    for(int view = 0; view < ms->mem_views->items; view++) {
-        MEMVIEW *mv = ARRAY_GET(ms->mem_views, MEMVIEW, view);
-        mv->rows = view_rows + (view_height_overflow ? (--view_height_overflow, 1) : 0);
-    }
-
-    // 16 cols at 4 chars/col (hex 'XX ' and char ' ') + xxxx:
-    int cvt_size = visible_cols > (5 + 16 * 4) ? visible_cols : (5 + 16 * 4);
-    if(ms->str_buf_len < cvt_size) {
-        char *new_cvt_buf = (char *)realloc(ms->str_buf, cvt_size + 1);
-        char *new_u8_buf = (uint8_t *)realloc(ms->u8_buf, cvt_size);
-        if(new_u8_buf && new_cvt_buf) {
-            ms->str_buf = new_cvt_buf;
-            ms->u8_buf = new_u8_buf;
-            ms->str_buf_len = cvt_size + 1;
-        } else {
-            free(new_cvt_buf);
-            free(new_u8_buf);
-        }
-    }
-    ms->cols = visible_cols <= ms->str_buf_len ? (visible_cols - 5) / 4 : (ms->str_buf_len - 5) / 4;
-}
-
-int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window) {
-    SDL_Keymod mod = SDL_GetModState();
-    VIEWPORT *v = m->viewport;
-    MEMSHOW *ms = &v->memshow;
-    MEMVIEW *mv = ARRAY_GET(ms->mem_views, MEMVIEW, ms->active_view_index);
-
-    if(mv->cursor_field == CURSOR_ASCII) {
-        if(e->type == SDL_TEXTINPUT) {
-            write_to_memory_selected(m, mv->cursor_address, mv->flags, e->text.text[0]);
-            viewmem_cursor_right(ms, mv);
-        } else if(!(mod & (KMOD_CTRL | KMOD_ALT)) && e->key.keysym.sym >= 32 && e->key.keysym.sym < 127) {
-            // SDL_TEXTINPUT also has SDL_KEYDOWN for same key, so filter out keys that were already
-            // processed, but keep keys that want/need processing - like ENTER or cursor, or CTRL/ALT mod, etc.
-            return 0;
-        }
-    }
-    // Only key events, and not for a modifier key by itself
-    if(e->type != SDL_KEYDOWN || e->key.keysym.scancode == SDL_SCANCODE_CAPSLOCK || e->key.keysym.scancode >= SDL_SCANCODE_LCTRL) {
-        return 0;
-    }
-    // Seperate into MOD codes and regular keys for better clarity
-    if(mod & KMOD_ALT) {
-        switch(e->key.keysym.sym) {
-            case SDLK_DOWN:
-                ms->active_view_index = (ms->active_view_index + 1) % ms->mem_views->items;
-                break;
-
-            case SDLK_UP:
-                ms->active_view_index = (ms->active_view_index - 1) % ms->mem_views->items;
-                break;
-        }
-    } else if(mod & KMOD_CTRL) {
-        switch(e->key.keysym.sym) {
-            case SDLK_a:                                        // CTRL G - Goto view_address
-                if(mv->cursor_field == CURSOR_ADDRESS) {
-                    mv->cursor_field = mv->prev_field;
-                    mv->cursor_digit = mv->cursor_prev_digit;
-                } else {
-                    mv->prev_field = mv->cursor_field;
-                    mv->cursor_prev_digit = mv->cursor_digit;
-                    mv->cursor_digit = CURSOR_DIGIT0;
-                    mv->cursor_field = CURSOR_ADDRESS;
-                }
-                break;
-
-            case SDLK_f:                                        // CTRL F - Find
-                if(!v->viewdlg_modal) {
-                    ms->find_string_len = 0;
-                    v->viewdlg_modal = 1;
-                    v->dlg_memory_find = 1;
-                }
-                break;
-
-            case SDLK_h:                                        // CTRL H - Find & Replace
-                break;
-
-            case SDLK_j:                                        // CTRL J - Join (down) CTRL SHIFT J - Join Up
-                // viewmem_join_range(m, (mod & KMOD_SHIFT) ? -1 : 1);
-                if(ms->mem_views->items > 1) {
-                    array_remove(ms->mem_views, mv);
-                    if(ms->active_view_index >= ms->mem_views->items) {
-                        ms->active_view_index--;
-                    }
-                    viewmem_resize_view(m);
-                }
-                break;
-
-            case SDLK_n:                                        // CTRL (shift) N - Find (prev) Next
-                if(mod & KMOD_SHIFT) {
-                    viewmem_find_string_reverse(m, ms, mv);
-                } else {
-                    viewmem_find_string(m, ms, mv);
-                }
-                break;
-
-            case SDLK_s:                                        // CTRL S - Search
-                global_entry_length = 0;
-                v->viewdlg_modal = 1;
-                v->dlg_symbol_lookup_mem = 1;
-                break;
-
-            case SDLK_t:                                        // CTRL T - Toggle between ascii and hex edit
-                mv->cursor_field = CURSOR_ASCII - mv->cursor_field;
-                break;
-
-            case SDLK_v:                                        // CTRL v - New Range (Split)
-                if(ms->mem_views->items < 16) {
-                    MEMVIEW v;
-                    memset(&v, 0, sizeof(v));
-                    v.view_address = v.cursor_address = mv->cursor_address;
-                    v.flags = mv->flags;
-                    ARRAY_ADD(ms->mem_views, &v);
-                    viewmem_resize_view(m);
-                }
-                break;
-
-            case SDLK_HOME:
-                viewmem_cursor_home(ms, mv, 1);
-                break;
-
-            case SDLK_END:
-                viewmem_cursor_end(ms, mv, 1);
-                break;
-
-            case SDLK_DOWN:
-                mv->view_address -= ms->cols;
-                break;
-
-            case SDLK_UP:
-                mv->view_address += ms->cols;
-                break;
-        }
-    } else {
-        // Regular, unmodified keys
-        uint8_t key = e->key.keysym.sym;
-        if((key >= SDLK_0 && key <= SDLK_9) || (key >= SDLK_a && key <= SDLK_f)) {
-            key -= key >= SDLK_a ? SDLK_a - 10 : SDLK_0;
-            if(mv->cursor_field == CURSOR_HEX) {
-                // This is HEX mode only as ascii mode was handled at the start
-                uint8_t byte = read_from_memory_selected(m, mv->cursor_address, mv->flags);
-                if(mv->cursor_digit == CURSOR_DIGIT1) {
-                    byte &= 0xf0;
-                    byte |= key;
-                } else {
-                    byte &= 0x0F;
-                    byte |= (key << 4);
-                }
-                write_to_memory_selected(m, mv->cursor_address, mv->flags, byte);
-            } else {
-                // This is address mode
-                int delta = viewmem_circular_delta(mv->cursor_address, mv->view_address);
-                int row = delta / ms->cols;
-                int col = delta % ms->cols;
-                uint8_t shift = (4 * (3 - mv->cursor_digit));
-                uint16_t address = mv->cursor_address - col;
-                address &= ~(0x0f << shift);
-                address |= (key << shift);
-                mv->cursor_address = address;
-                mv->view_address = address - delta;
-            }
-            viewmem_cursor_right(ms, mv);
-            return 0;
-        }
-        // Unmodified special keys
-        switch(e->key.keysym.sym) {
-            case SDLK_HOME:
-                viewmem_cursor_home(ms, mv, 0);
-                break;
-
-            case SDLK_END:
-                viewmem_cursor_end(ms, mv, 0);
-                break;
-
-            case SDLK_UP:
-                viewmem_cursor_up(ms, mv);
-                break;
-
-            case SDLK_DOWN:
-                viewmem_cursor_down(ms, mv);
-                break;
-
-            case SDLK_LEFT:
-                viewmem_cursor_left(ms, mv);
-                break;
-
-            case SDLK_RIGHT:
-                viewmem_cursor_right(ms, mv);
-                break;
-
-            case SDLK_PAGEUP:
-                viewmem_cursor_page_up(ms, mv);
-                break;
-
-            case SDLK_PAGEDOWN:
-                viewmem_cursor_page_down(ms, mv);
-                break;
-
-            default:
-                // This is where ENTER will come, for example
-                if(mv->cursor_field == CURSOR_ASCII) {
-                    write_to_memory(m, mv->cursor_address, e->key.keysym.sym);
-                    viewmem_cursor_right(ms, mv);
-                }
-                break;
-        }
-    }
-
-    return 0;
 }

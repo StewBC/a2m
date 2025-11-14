@@ -56,5 +56,5 @@ typedef struct MEMSHOW {
 
 int viewmem_init(MEMSHOW *ms);
 int viewmem_process_event(APPLE2 *m, SDL_Event *e, int window);
-void viewmem_show(APPLE2 *m);
 void viewmem_resize_view(APPLE2 *m);
+void viewmem_show(APPLE2 *m);
