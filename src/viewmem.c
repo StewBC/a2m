@@ -282,7 +282,7 @@ void viewmem_show(APPLE2 *m) {
                             snprintf(&ms->str_buf[5+ms->cols*3+col], ms->str_buf_len - 5 - (ms->cols * 3) - col, "%c", isprint(c) ? c : '.');
                         }
                         view_address += ms->cols;
-                        nk_label(ctx, ms->str_buf, NK_TEXT_LEFT);
+                        nk_label_colored(ctx, ms->str_buf, NK_TEXT_LEFT, viewmem_range_colors[view].text_color);
                     }
                     nk_group_end(ctx);
                 }
