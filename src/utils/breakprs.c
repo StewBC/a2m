@@ -1,4 +1,4 @@
-// Apple ][+ and //e Emhanced emulator with assembler
+// Apple ][+ and //e Enhanced emulator with assembler
 // Stefan Wessels, 2025
 // This is free and unencumbered software released into the public domain.
 
@@ -27,7 +27,7 @@ static int parse_u32_auto(const char *s, char **end, uint32_t *out) {
     if(errno == ERANGE || *end == s) {
         return A2_ERR;
     }
-    // SQW was going to use 64K but maybe setting breakpoints in aux coyld be done this way?
+    // SQW was going to use 64K but maybe setting breakpoints in aux could be done this way?
     if(v > 0xFFFFFFFFul) {
         return A2_ERR;
     }

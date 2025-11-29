@@ -1121,8 +1121,8 @@ uint16_t parse_anonymous_address(ASSEMBLER *as) {
         case '-':
             direction = -direction;
             break;
-defailt:
-            asm_err(as, "Unexpected symbol after anonymoys : (%c)", op);
+        default:
+            asm_err(as, "Unexpected symbol after anonymous : (%c)", op);
             break;
     }
     // The opcode has not been emitted so + 1

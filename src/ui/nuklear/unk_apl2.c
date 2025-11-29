@@ -1,4 +1,4 @@
-// Apple ][+ and //e Emhanced emulator with assembler
+// Apple ][+ and //e Enhanced emulator with assembler
 // Stefan Wessels, 2025
 // This is free and unencumbered software released into the public domain.
 
@@ -151,7 +151,7 @@ uint8_t double_aux_map[] = {
 // color_table
 uint32_t color_table[8][2][2]; // [bit_stream, 3 bits][column, even/odd][phase]
 
-// Look Up Table with all cobinations of pixel values for color
+// Look Up Table with all combinations of pixel values for color
 typedef struct {
     uint32_t pixel[7];   // final RGBA pixels for p[px..px+6]
 } HGRLUTENTRY;

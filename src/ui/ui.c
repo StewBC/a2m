@@ -1,4 +1,4 @@
-// Apple ][+ and //e Emhanced emulator with assembler
+// Apple ][+ and //e Enhanced emulator with assembler
 // Stefan Wessels, 2025
 // This is free and unencumbered software released into the public domain.
 
@@ -12,7 +12,7 @@ const UI_OPS null_ops = {
     .speaker_on_cycles = NULL,
     .render            = NULL,
     .set_runtime       = NULL,
-    .set_shaddow_flags = NULL,
+    .set_shadow_flags = NULL,
     .shutdown          = NULL,
 };
 

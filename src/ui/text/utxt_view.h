@@ -1,4 +1,4 @@
-// Apple ][+ and //e Emhanced emulator with assembler
+// Apple ][+ and //e Enhanced emulator with assembler
 // Stefan Wessels, 2025
 // This is free and unencumbered software released into the public domain.
 
@@ -27,8 +27,8 @@ typedef struct UTXT {
 
     // Flags that contain machine states
     uint32_t debug_view: 1;
-    uint32_t dlg_assassembler_config: 1;
-    uint32_t dlg_assassembler_errors: 1;
+    uint32_t dlg_assembler_config: 1;
+    uint32_t dlg_assembler_errors: 1;
     uint32_t dlg_breakpoint: 1;
     uint32_t dlg_filebrowser: 1;
     uint32_t dlg_memory_find: 1;

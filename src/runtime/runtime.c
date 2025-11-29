@@ -1,4 +1,4 @@
-// Apple ][+ and //e Emhanced emulator with assembler
+// Apple ][+ and //e Enhanced emulator with assembler
 // Stefan Wessels, 2025
 // This is free and unencumbered software released into the public domain.
 
@@ -34,7 +34,7 @@ void runtime_apply_ini(RUNTIME *rt, INI_STORE *ini_store) {
                 // Allocare the turbo's array
                 rt->turbo = (double *)malloc(rt->turbo_count * sizeof(double));
                 if(rt->turbo) {
-                    // Convert the nubers to +float and any unknowns (non-float)
+                    // Convert the numbers to +float and any unknowns (non-float)
                     // to -1 (max speed)
                     s = val;
                     for(int i = 0; i < rt->turbo_count; i++) {
@@ -118,7 +118,7 @@ void runtime_bind(RUNTIME *rt, APPLE2 *m, UI *ui) {
     rt->m = m;
     ui->ops->set_runtime(ui, rt);
 
-    // The hardware is confgured, so start binding
+    // The hardware is configured, so start binding
     apple2_set_callbacks(m, &a2rt_cb);
     breakpoint_reapply_address_masks(rt);
 };
@@ -202,7 +202,7 @@ int runtime_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
         // ui.debugger.cursor_pc = m->cpu.pc;
 
         quit = ui->ops->process_events(ui, m);
-        ui->ops->set_shaddow_flags(ui, m->state_flags);
+        ui->ops->set_shadow_flags(ui, m->state_flags);
         ui->ops->render(ui, m, dirty);
 
         uint64_t frame_end_ticks = SDL_GetPerformanceCounter();
@@ -405,7 +405,7 @@ void runtime_machine_stop(RUNTIME *rt) {
     rt->jsr_counter = 0;
 }
 
-// Make a coopy of the clipboard text
+// Make a copy of the clipboard text
 void runtime_paste_clipboard(RUNTIME *rt, char *clipboard_text) {
     rt->clipboard_text = strdup(clipboard_text);
     rt->clipboard_index = 0;
@@ -479,7 +479,7 @@ int runtime_update(RUNTIME *rt) {
                 runtime_machine_stop(rt);
             } else {
                 switch(bp->action) {
-                    // SQW - optiomize access
+                    // SQW - optimize access
                     case ACTION_FAST:
                         rt->turbo_active = -1.0;
                         break;

@@ -224,7 +224,7 @@ int64_t exponentiation_by_squaring(int64_t base, int64_t exp) {
 // upwards, recursively, to parse expressions
 int64_t parse_primary(ASSEMBLER *as) {
     int64_t value;
-    // Expreesion starting with * is an address expression
+    // Expression starting with * is an address expression
     if(as->current_token.type == TOKEN_OP && as->current_token.op == '*') {
         next_token(as);
         value = 1 + as->current_address;

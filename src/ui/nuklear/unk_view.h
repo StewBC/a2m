@@ -1,4 +1,4 @@
-// Apple ][+ and //e Emhanced emulator with assembler
+// Apple ][+ and //e Enhanced emulator with assembler
 // Stefan Wessels, 2025
 // This is free and unencumbered software released into the public domain.
 
@@ -67,8 +67,8 @@ typedef struct UNK {
     uint32_t disk_activity_read: 1;
     uint32_t disk_activity_write: 1;
     uint32_t display_override: 1;
-    uint32_t dlg_assassembler_config: 1;
-    uint32_t dlg_assassembler_errors: 1;
+    uint32_t dlg_assembler_config: 1;
+    uint32_t dlg_assembler_errors: 1;
     uint32_t dlg_breakpoint: 1;
     uint32_t dlg_filebrowser: 1;
     uint32_t dlg_memory_find: 1;

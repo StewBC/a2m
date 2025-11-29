@@ -1,4 +1,4 @@
-// Apple ][+ and //e Emhanced emulator with assembler
+// Apple ][+ and //e Enhanced emulator with assembler
 // Stefan Wessels, 2025
 // This is free and unencumbered software released into the public domain.
 
@@ -314,7 +314,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
 
                         if(dv->errorlog.log_array.items) {
                             v->unk_dlg_modal = 1;
-                            v->dlg_assassembler_errors = 1;
+                            v->dlg_assembler_errors = 1;
                         } else {
                             if(ac->reset_stack) {
                                 runtime_machine_set_sp(rt, 0x1ff);
@@ -328,7 +328,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                 } else if((mod & (KMOD_CTRL | KMOD_SHIFT)) == (KMOD_CTRL | KMOD_SHIFT)) {
                     dv->temp_assembler_config = dv->assembler_config;
                     v->unk_dlg_modal = 1;
-                    v->dlg_assassembler_config = 1;
+                    v->dlg_assembler_config = 1;
                 }
             }
             break;
@@ -336,7 +336,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
         case SDLK_e:
             if(mod & KMOD_CTRL && !v->unk_dlg_modal) {
                 v->unk_dlg_modal = 1;
-                v->dlg_assassembler_errors = 1;
+                v->dlg_assembler_errors = 1;
             }
             break;
 
@@ -524,7 +524,7 @@ void unk_dasm_show(UNK *v, int dirty){
             nk_layout_row_dynamic(ctx, dv->rows * ROW_H, 1);
             if(nk_group_begin(ctx, "dasm-rows", NK_WINDOW_NO_SCROLLBAR)) {
                 nk_layout_row_dynamic(ctx, ROW_H, 1);
-                int cursor_y = 0; // SQW Because the PC is somethimes not on col 0 (asm didn't work out) this remains unset
+                int cursor_y = 0; // SQW Because the PC is sometimes not on col 0 (asm didn't work out) this remains unset
                 uint16_t current_pc = dv->top_address;
                 for(int i = 0; i < dv->rows; i++) {
                     current_pc = pc;
@@ -641,20 +641,20 @@ void unk_dasm_show(UNK *v, int dirty){
         ctx->style.window.group_padding = gpd;
         ctx->style.window.border        = border;
 
-        if(v->dlg_assassembler_config) {
+        if(v->dlg_assembler_config) {
             if((ret = unk_dlg_assembler_config(ctx, nk_rect(0, 0, 360, 115), &dv->temp_assembler_config))) {
                 dv->temp_assembler_config.dlg_asm_filebrowser = 0;
                 if(ret == 1) {
                     dv->assembler_config = dv->temp_assembler_config;
                 }
-                v->dlg_assassembler_config = 0;
+                v->dlg_assembler_config = 0;
                 v->unk_dlg_modal = 0;
             }
         }
-        if(v->dlg_assassembler_errors) {
+        if(v->dlg_assembler_errors) {
             if((ret = unk_dlg_assembler_errors(v, ctx, nk_rect(0, 0, 360, 430)))) {
                 errlog_clean(&dv->errorlog);
-                v->dlg_assassembler_errors = 0;
+                v->dlg_assembler_errors = 0;
                 v->unk_dlg_modal = 0;
             }
         }

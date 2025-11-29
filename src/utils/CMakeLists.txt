@@ -1,5 +1,5 @@
 # Stefan Wessels, November 2025
-# Builds a utilities library, utils, for use in an Apple ][+ and //e Emhanced emulator with assembler
+# Builds a utilities library, utils, for use in an Apple ][+ and //e Enhanced emulator with assembler
 # This is free and unencumbered software released into the public domain.
 
 cmake_minimum_required(VERSION 3.16)

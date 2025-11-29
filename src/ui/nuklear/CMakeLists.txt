@@ -1,5 +1,5 @@
 # Stefan Wessels, November 2025
-# Builds an Apple 2 emulator UI using Nuklear immidiate mode gui
+# Builds an Apple 2 emulator UI using Nuklear immediate mode gui
 # This is free and unencumbered software released into the public domain.
 
 cmake_minimum_required(VERSION 3.16)

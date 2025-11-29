@@ -1,4 +1,4 @@
-// Apple ][+ and //e Emhanced emulator with assembler
+// Apple ][+ and //e Enhanced emulator with assembler
 // Stefan Wessels, 2025
 // This is free and unencumbered software released into the public domain.
 
@@ -28,7 +28,7 @@ struct UI_OPS {
     void (*speaker_on_cycles)(UI *ui, uint32_t cycles_executed);
     void (*render)(UI *ui, APPLE2 *m, int cursor_sync);
     void (*set_runtime)(UI *ui, RUNTIME *rt);
-    void (*set_shaddow_flags)(UI *ui, uint32_t flags);
+    void (*set_shadow_flags)(UI *ui, uint32_t flags);
     void (*shutdown)(UI *ui);
 };
 

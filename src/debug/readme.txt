@@ -1,1 +1,1 @@
-The debug folde holds defenitions that are visible to both RUNTIME and UI.
+The debug folder holds definitions that are visible to both RUNTIME and UI.

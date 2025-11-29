@@ -1,4 +1,4 @@
-// Apple ][+ and //e Emhanced emulator with assembler
+// Apple ][+ and //e Enhanced emulator with assembler
 // Stefan Wessels, 2025
 // This is free and unencumbered software released into the public domain.
 
@@ -28,7 +28,7 @@ const UI_OPS unk_ops = {
     .speaker_on_cycles = unk_audio_speaker_on_cycles,
     .render            = unk_render_frame,
     .set_runtime       = unk_set_runtime,
-    .set_shaddow_flags = unk_set_shadow_flags,
+    .set_shadow_flags = unk_set_shadow_flags,
     .shutdown          = NULL,
 };
 
@@ -268,7 +268,7 @@ int unk_init(UNK *v, int model, INI_STORE *ini_store) {
         printf("Texture could not be created! SDL_Error: %s\n", SDL_GetError());
         goto error;
     }
-    // Create the green led for shoing disk read activity
+    // Create the green led for showing disk read activity
     SDL_RWops *rw = SDL_RWFromConstMem(led_green, (int)led_green_len);
     if(!rw) {
         goto error;
