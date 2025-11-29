@@ -25,8 +25,8 @@ struct UI_OPS {
     void (*disk_write_led)(UI *ui);
     int (*process_events)(UI *ui, APPLE2 *m);
     void (*ptrig)(UI *ui, uint64_t cycle);
-    void (*read_axis)(UI *ui, int controller_id, int axis_id, uint64_t cycle);
-    void (*read_button)(UI *ui, int controller_id, int button_id);
+    uint8_t (*read_axis)(UI *ui, int controller_id, int axis_id, uint64_t cycle);
+    uint8_t (*read_button)(UI *ui, int controller_id, int button_id);
     void (*render)(UI *ui, APPLE2 *m, int cursor_sync);
     void (*set_runtime)(UI *ui, RUNTIME *rt);
     void (*set_shadow_flags)(UI *ui, uint32_t flags);
