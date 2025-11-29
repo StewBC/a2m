@@ -292,7 +292,7 @@ int runtime_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, char 
                         symbol = symbols_find_symbols(rt, pc + 2 + (int8_t) operands);
                         // If no symbol but symbol view is on - resolve to an address and pretend that's the symbol
                         if(!symbol) {
-                            snprintf(address_symbol, remain, "$%02X [%04X]", (uint8_t) operands, (uint16_t)(pc + 2 + (int8_t) operands));
+                            snprintf(address_symbol, 11, "$%02X [%04X]", (uint8_t) operands, (uint16_t)(pc + 2 + (int8_t) operands));
                             symbol = address_symbol;
                         }
                     }
