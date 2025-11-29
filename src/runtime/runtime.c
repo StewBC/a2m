@@ -106,12 +106,12 @@ void runtime_bind(RUNTIME *rt, APPLE2 *m, UI *ui) {
     // Bind to the Apple 2 - This needs to be here because some
     // bindings are UI specific so what UI needs to be resolved first
     A2OUT_CB a2rt_cb = {
-        .cb_breakpoint_ctx =    {(void*)rt, breakpoint_callback},
-        .cb_brk_ctx =           {(void*)rt, (cb_breakpoint)runtime_brk_callback},
-        .cb_diskactivity_ctx =  {(void*)ui, (cb_diskread)ui->ops->disk_read_led, (cb_diskwrite)ui->ops->disk_write_led},
-        .cb_speaker_ctx =       {(void*)ui, (cb_speaker)ui->ops->speaker_toggle},
+        .cb_breakpoint_ctx =    {(void *)rt, breakpoint_callback},
+        .cb_brk_ctx =           {(void *)rt, (cb_breakpoint)runtime_brk_callback},
+        .cb_diskactivity_ctx =  {(void *)ui, (cb_diskread)ui->ops->disk_read_led, (cb_diskwrite)ui->ops->disk_write_led},
+        .cb_speaker_ctx =       {(void *)ui, (cb_speaker)ui->ops->speaker_toggle},
         .cb_inputdevice_ctx =   {NULL, NULL, NULL, NULL}, // user, ptrig, button, axis
-        .cb_clipboard_ctx =     {(void*)rt, (cb_clipboard)runtime_feed_clipboard_key},
+        .cb_clipboard_ctx =     {(void *)rt, (cb_clipboard)runtime_feed_clipboard_key},
     };
 
     // Set up the access helpers
@@ -140,10 +140,10 @@ int runtime_init(RUNTIME *rt, INI_STORE *ini_store) {
     // Create Turbo states if ini didn't
     if(!rt->turbo_count) {
         rt->turbo_count = 2;
-        rt->turbo = (double*)malloc(rt->turbo_count * sizeof(double));
+        rt->turbo = (double *)malloc(rt->turbo_count * sizeof(double));
         if(rt->turbo) {
             rt->turbo[0] = 1.0;
-			rt->turbo[1] = -1.0;
+            rt->turbo[1] = -1.0;
         } else {
             return A2_ERR;
         }
@@ -171,7 +171,7 @@ int runtime_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
         int dirty = 0;
 
         if(rt->run) {
-            dirty = (rt->run << 1) | rt->run_step | rt->run_to_pc; 
+            dirty = (rt->run << 1) | rt->run_step | rt->run_to_pc;
             // If not going at max speed, or stepping the debugger
             if(rt->turbo_active > 0.0) {
                 double cycles_per_frame = max(1, (CPU_FREQUENCY * rt->turbo_active) / TARGET_FPS - (overhead_ticks * clock_cycles_per_tick));

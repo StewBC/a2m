@@ -257,7 +257,7 @@ void apple2_machine_reset(APPLE2 *m) {
     }
 }
 
-void apple2_set_callbacks(APPLE2* m, A2OUT_CB *a2rt_cb) {
+void apple2_set_callbacks(APPLE2 *m, A2OUT_CB *a2rt_cb) {
     m->a2out_cb = *a2rt_cb;
 }
 

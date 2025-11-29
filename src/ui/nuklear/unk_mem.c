@@ -547,7 +547,7 @@ void unk_mem_show(UNK *v) {
                             break;
                     }
                     struct nk_command_buffer *canvas = nk_window_get_canvas(ctx);
-                    nk_draw_text(canvas, r, (char*)&dc, 1, ctx->style.font, unk_mem_range_colors[ms->active_view_index].text_color, unk_mem_range_colors[ms->active_view_index].background_color);
+                    nk_draw_text(canvas, r, (char *)&dc, 1, ctx->style.font, unk_mem_range_colors[ms->active_view_index].text_color, unk_mem_range_colors[ms->active_view_index].background_color);
                 }
             }
 

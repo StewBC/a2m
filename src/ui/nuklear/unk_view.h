@@ -45,7 +45,7 @@ typedef struct UNK {
     // APPLE2 *m is set/reset ever time RT calls UI so the UI can
     // be asked to display any APPLE2 machine at any time - the UI
     // doesn't hold state.  RT is persistant
-    APPLE2* m;
+    APPLE2 *m;
     RUNTIME *rt;
 
     // Shadow of machine states

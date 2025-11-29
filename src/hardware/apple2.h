@@ -73,7 +73,7 @@ enum {
 // Callback routines with a context
 // The context is a pointer to the installer of the cb - RUNTIME normally
 typedef struct CB_SOFTREAD_CTX {
-    void *user;                  
+    void *user;
     uint8_t(*cb_softread)(void *user, uint16_t address);
 } CB_SOFTREAD_CTX;
 
@@ -177,5 +177,5 @@ void apple2_softswitch_write_callback(APPLE2 *m, uint16_t address, uint8_t value
 
 int apple2_init(APPLE2 *m, INI_STORE *ini_store);
 void apple2_machine_reset(APPLE2 *m);
-void apple2_set_callbacks(APPLE2* m, A2OUT_CB *cbp);
+void apple2_set_callbacks(APPLE2 *m, A2OUT_CB *cbp);
 void apple2_shutdown(APPLE2 *m);

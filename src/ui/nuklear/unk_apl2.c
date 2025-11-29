@@ -359,7 +359,7 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
             case SDLK_LALT:
                 m->open_apple = 0;
                 break;
-                
+
             case SDLK_RALT:
                 m->closed_apple = 0;
                 break;
@@ -500,7 +500,7 @@ void unk_apl2_screen_dlores(UNK *v, int start, int end) {
     uint32_t *pixels = (uint32_t *) surface->pixels;
     int surface_width = surface->w;
     int y;
-    
+
     for(y = start; y < end; y++) {
         uint32_t *p = &pixels[y * 8 * surface_width];
         const uint8_t *man = m->RAM_MAIN + 0x00400 + txt_row_start[y];

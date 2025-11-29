@@ -345,7 +345,7 @@ int unk_init(UNK *v, int model, INI_STORE *ini_store) {
 
     // Enable text input since it handles the keys better
     SDL_StartTextInput();
-    
+
     return A2_OK;
 
 error:
@@ -354,7 +354,7 @@ error:
 }
 
 int unk_process_events(UI *ui, APPLE2 *m) {
-    UNK *v = (UNK*)ui->user;
+    UNK *v = (UNK *)ui->user;
     RUNTIME *rt = v->rt;
     v->m = m;
     SDL_Event e;
@@ -455,7 +455,7 @@ int unk_process_events(UI *ui, APPLE2 *m) {
 void unk_shutdown(UNK *v) {
     // Shut nuklear down
     nk_sdl_shutdown();
-    
+
     // Then the views
     unk_dasm_shutdown(&v->viewdasm);
     unk_audio_speaker_shutdown(&v->viewspeaker);
@@ -542,7 +542,7 @@ void unk_present(UNK *v) {
 
 void unk_render_frame(UI *ui, APPLE2 *m, int dirty) {
     // get the view
-    UNK *v = (UNK*)ui->user;
+    UNK *v = (UNK *)ui->user;
     // And in the view, set the APPLE2 that the view now services
     v->m = m;
     if(v->show_help) {
@@ -557,7 +557,7 @@ void unk_render_frame(UI *ui, APPLE2 *m, int dirty) {
                 unk_dasm_resize_view(v);
                 v->clear_a2_view = 1;
             }
-            
+
             unk_cpu_show(v, dirty);
             unk_dasm_show(v, dirty);
             unk_misc_show(v);
@@ -568,24 +568,24 @@ void unk_render_frame(UI *ui, APPLE2 *m, int dirty) {
 }
 
 void unk_set_runtime(UI *ui, RUNTIME *rt) {
-    UNK *v = (UNK*)ui->user;
+    UNK *v = (UNK *)ui->user;
     // Set the runtime that the view sits on top of
     v->rt = rt;
 }
 
 void unk_set_shadow_flags(UI *ui, uint32_t shadow_flags) {
-    UNK *v = (UNK*)ui->user;
+    UNK *v = (UNK *)ui->user;
     if(!v->display_override) {
         v->shadow_flags.u32 = shadow_flags;
     }
 }
 
 void unk_disk_read(UI *ui) {
-    UNK *v = (UNK*)ui->user;
+    UNK *v = (UNK *)ui->user;
     v->disk_activity_read = 1;
 }
 
 void unk_disk_write(UI *ui) {
-    UNK *v = (UNK*)ui->user;
+    UNK *v = (UNK *)ui->user;
     v->disk_activity_write = 1;
 }

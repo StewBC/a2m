@@ -79,7 +79,7 @@ static inline void write_to_memory(APPLE2 *m, uint16_t address, uint8_t value) {
     size_t offset = address % PAGE_SIZE;
     assert(page < m->write_pages.num_pages);
     uint8_t cb_mask = m->watch_pages.pages[page].bytes[offset];
-    // SQW insert this code when ready, when last_write_pc has been created as a 
+    // SQW insert this code when ready, when last_write_pc has been created as a
     // uint64_t last_write_pc[64 * 1024];
     // m->last_write_pc[address] <<= 16;
     // m->last_write_pc[address] |= m->pc; // This may be off a bit... may need to

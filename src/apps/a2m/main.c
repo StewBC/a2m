@@ -6,14 +6,19 @@
 
 static void *xmalloc(size_t n) {
     void *p = malloc(n ? n : 1);
-    if (!p) { fprintf(stderr, "Out of memory.\n"); exit(2); }
+    if(!p) {
+        fprintf(stderr, "Out of memory.\n");
+        exit(2);
+    }
     return p;
 }
 
 static char *xstrdup(const char *s) {
-    if (!s) return NULL;
+    if(!s) {
+        return NULL;
+    }
     size_t n = strlen(s) + 1;
-    char *p = (char*)xmalloc(n);
+    char *p = (char *)xmalloc(n);
     memcpy(p, s, n);
     return p;
 }
@@ -69,9 +74,21 @@ static void print_help(const char *prog) {
 
 static int match_long(const char *arg, const char *name, const char **out_val) {
     size_t n = strlen(name);
-    if (strncmp(arg, name, n) != 0) return 0;
-    if (arg[n] == '\0') { if (out_val) *out_val = NULL; return 1; }
-    if (arg[n] == '=')  { if (out_val) *out_val = arg + n + 1; return 1; }
+    if(strncmp(arg, name, n) != 0) {
+        return 0;
+    }
+    if(arg[n] == '\0') {
+        if(out_val) {
+            *out_val = NULL;
+        }
+        return 1;
+    }
+    if(arg[n] == '=')  {
+        if(out_val) {
+            *out_val = arg + n + 1;
+        }
+        return 1;
+    }
     return 0;
 }
 
@@ -83,52 +100,132 @@ int parse_args(Opts *o, int argc, char **argv) {
 
     // Opt parsing
     int i = 1;
-    while (i < argc) {
+    while(i < argc) {
         const char *arg = argv[i];
-        if (arg[0] != '-') break;
-        if (!strcmp(arg, "--")) { i++; break; }
+        if(arg[0] != '-') {
+            break;
+        }
+        if(!strcmp(arg, "--")) {
+            i++;
+            break;
+        }
 
         const char *val = NULL;
-        if (arg[1] == '-') {
-            if (match_long(arg, "--help", &val)) { print_help(argv[0]); return A2_ERR; }
-            if (match_long(arg, "--inifile", &val)) {
-                if (!val) { if (++i >= argc) { fprintf(stderr,"--inifile requires a value\n"); return A2_ERR; } val = argv[i]; }
-                free(o->inifile); o->inifile = xstrdup(val); i++; continue;
+        if(arg[1] == '-') {
+            if(match_long(arg, "--help", &val)) {
+                print_help(argv[0]);
+                return A2_ERR;
             }
-            if (match_long(arg, "--model", &val)) {
-                if (!val) { if (++i >= argc) { fprintf(stderr,"--prefix-hex requires a value\n"); return A2_ERR; } val = argv[i]; }
-                o->model = xmodel_parse(val); i++; continue;
+            if(match_long(arg, "--inifile", &val)) {
+                if(!val) {
+                    if(++i >= argc) {
+                        fprintf(stderr, "--inifile requires a value\n");
+                        return A2_ERR;
+                    }
+                    val = argv[i];
+                }
+                free(o->inifile);
+                o->inifile = xstrdup(val);
+                i++;
+                continue;
             }
-            if (match_long(arg, "--ui", &val)) {
-                if (!val) { if (++i >= argc) { fprintf(stderr,"--ui requires a value\n"); return A2_ERR; } val = argv[i]; }
-                o->ui = xui_parse(val); i++; continue;
+            if(match_long(arg, "--model", &val)) {
+                if(!val) {
+                    if(++i >= argc) {
+                        fprintf(stderr, "--prefix-hex requires a value\n");
+                        return A2_ERR;
+                    }
+                    val = argv[i];
+                }
+                o->model = xmodel_parse(val);
+                i++;
+                continue;
             }
-            if (match_long(arg, "--createini", &val)) {
-                o->createini = 1; i++; continue;
+            if(match_long(arg, "--ui", &val)) {
+                if(!val) {
+                    if(++i >= argc) {
+                        fprintf(stderr, "--ui requires a value\n");
+                        return A2_ERR;
+                    }
+                    val = argv[i];
+                }
+                o->ui = xui_parse(val);
+                i++;
+                continue;
             }
-            if (match_long(arg, "--merge", &val)) {
-                o->merge = 1; i++; continue;
+            if(match_long(arg, "--createini", &val)) {
+                o->createini = 1;
+                i++;
+                continue;
             }
-            if (match_long(arg, "--noini", &val)) {
-                o->noini = 1; i++; continue;
+            if(match_long(arg, "--merge", &val)) {
+                o->merge = 1;
+                i++;
+                continue;
             }
-            if (match_long(arg, "--saveini", &val)) {
-                o->saveini = 1; i++; continue;
+            if(match_long(arg, "--noini", &val)) {
+                o->noini = 1;
+                i++;
+                continue;
+            }
+            if(match_long(arg, "--saveini", &val)) {
+                o->saveini = 1;
+                i++;
+                continue;
             }
         }
 
         /* short options */
-        if (!strcmp(arg, "-h")) { print_help(argv[0]); return A2_ERR; }
-        else if (!strcmp(arg, "-i")) { if (++i>=argc){fprintf(stderr,"-mi requires value\n");return A2_ERR;} free(o->inifile); o->inifile = xstrdup(argv[i]); i++; continue; }        
-        else if (!strcmp(arg, "-m")) { if (++i>=argc){fprintf(stderr,"-m requires value\n");return A2_ERR;} o->model=xmodel_parse(argv[i]); i++; continue; }
-        else if (!strcmp(arg, "-u")) { if (++i>=argc){fprintf(stderr,"-u requires value\n");return A2_ERR;} o->ui=xui_parse(argv[i]); i++; continue; }
-        else if (!strcmp(arg, "-c")) { o->createini=1; i++; continue; }
-        else if (!strcmp(arg, "-m")) { o->merge=1; i++; continue; }
-        else if (!strcmp(arg, "-n")) { o->noini=1; i++; continue; }
-        else if (!strcmp(arg, "-s")) { o->saveini=1; i++; continue; }
-        else {fprintf(stderr,"unrecognised parameter %s\n", argv[i]);return A2_ERR;}
+        if(!strcmp(arg, "-h")) {
+            print_help(argv[0]);
+            return A2_ERR;
+        } else if(!strcmp(arg, "-i")) {
+            if(++i >= argc) {
+                fprintf(stderr, "-mi requires value\n");
+                return A2_ERR;
+            }
+            free(o->inifile);
+            o->inifile = xstrdup(argv[i]);
+            i++;
+            continue;
+        } else if(!strcmp(arg, "-m")) {
+            if(++i >= argc) {
+                fprintf(stderr, "-m requires value\n");
+                return A2_ERR;
+            }
+            o->model = xmodel_parse(argv[i]);
+            i++;
+            continue;
+        } else if(!strcmp(arg, "-u")) {
+            if(++i >= argc) {
+                fprintf(stderr, "-u requires value\n");
+                return A2_ERR;
+            }
+            o->ui = xui_parse(argv[i]);
+            i++;
+            continue;
+        } else if(!strcmp(arg, "-c")) {
+            o->createini = 1;
+            i++;
+            continue;
+        } else if(!strcmp(arg, "-m")) {
+            o->merge = 1;
+            i++;
+            continue;
+        } else if(!strcmp(arg, "-n")) {
+            o->noini = 1;
+            i++;
+            continue;
+        } else if(!strcmp(arg, "-s")) {
+            o->saveini = 1;
+            i++;
+            continue;
+        } else {
+            fprintf(stderr, "unrecognised parameter %s\n", argv[i]);
+            return A2_ERR;
+        }
     }
-    
+
     return A2_OK;
 }
 
@@ -205,7 +302,7 @@ int main(int argc, char **argv) {
         runtime_shutdown(&rt);
 
         // If a re-config is called for, go back and do it all over
-    } while (ui.reconfig);
+    } while(ui.reconfig);
 
     // If the ini file needs to be saved, save it
     if(ini_get(&ini_store, "State", "save")) {

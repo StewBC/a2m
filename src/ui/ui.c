@@ -29,7 +29,7 @@ void ui_apply_ini(UI *ui, INI_STORE *ini_store) {
             if(0 == stricmp(key, "instance")) {
                 if(0 == stricmp(val, "text")) {
                     ui->class = UI_CLASS_TEXT;
-               }
+                }
             }
         }
     }
@@ -43,8 +43,8 @@ void ui_init(UI *ui, int model, INI_STORE *ini_store) {
     // Instance the UI and have it configure itself
     if(ui->class == UI_CLASS_GUI) {
         // Instance UNK
-        UNK *v = (UNK*)malloc(sizeof(UNK));
-        // Clear all 
+        UNK *v = (UNK *)malloc(sizeof(UNK));
+        // Clear all
         memset(v, 0, sizeof(UNK));
 
         // Link through UI
@@ -59,7 +59,7 @@ void ui_init(UI *ui, int model, INI_STORE *ini_store) {
         unk_init(v, model, ini_store);
     } else {
         // Instance UTXT
-        UTXT *v = (UTXT*)malloc(sizeof(UTXT));
+        UTXT *v = (UTXT *)malloc(sizeof(UTXT));
         // Clear all
         memset(ui->user, 0, sizeof(UTXT));
         // Link through UI
@@ -73,9 +73,9 @@ void ui_init(UI *ui, int model, INI_STORE *ini_store) {
 
 void ui_shutdown(UI *ui) {
     if(ui->class == UI_CLASS_TEXT) {
-        utxt_shutdown((UTXT*)ui->user);
+        utxt_shutdown((UTXT *)ui->user);
     } else {
-        unk_shutdown((UNK*)ui->user);
+        unk_shutdown((UNK *)ui->user);
     }
     free(ui->user);
     ui->ops = &null_ops;

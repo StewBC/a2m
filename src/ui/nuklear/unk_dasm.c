@@ -49,7 +49,9 @@ static inline uint16_t unk_dasm_prev_opcode(APPLE2 *m, uint16_t address) {
             uint16_t next_pc = unk_dasm_next_opcode(m, search_pc);
             // If this matches up exactly, assume it's correct
             if(next_pc == address) {
-                if(iter > mx) mx = iter;
+                if(iter > mx) {
+                    mx = iter;
+                }
                 return search_pc;
             }
             if(unk_dasm_circular_delta(next_pc, address) > 0) {
@@ -60,12 +62,14 @@ static inline uint16_t unk_dasm_prev_opcode(APPLE2 *m, uint16_t address) {
         step_back--;
     }
     // Give up and step back one byte
-    if(iter > mx) mx = iter;
+    if(iter > mx) {
+        mx = iter;
+    }
     return address - 1;
 }
 
 void unk_dasm_top_line_address(VIEWDASM *dv, APPLE2 *m, uint16_t address, int lines_from_top, int set_bottom) {
-    while (lines_from_top--) {
+    while(lines_from_top--) {
         address = unk_dasm_prev_opcode(m, address);
     }
     dv->top_address = address;
@@ -87,10 +91,10 @@ void unk_dasm_recenter_view(UNK *v, int dirty) {
         address = dv->cursor_address = m->cpu.pc;
         // dirty & 2 == run; dirty & 1 == step (run always set if step set)
         // if(dirty) {
-            // I do this to lock the cursor to the middle for run, otherwise
-            // it really doesn't look good to see the cursor flying around
-            unk_dasm_top_line_address(dv, m, address, dv->rows / 2, 0);
-            return;
+        // I do this to lock the cursor to the middle for run, otherwise
+        // it really doesn't look good to see the cursor flying around
+        unk_dasm_top_line_address(dv, m, address, dv->rows / 2, 0);
+        return;
         // }
     } else {
         address = dv->cursor_address;
@@ -180,12 +184,12 @@ void unk_dasm_cursor_page_down(UNK *v, VIEWDASM *dv) {
 
 void unk_dasm_cursor_right(UNK *v, VIEWDASM *dv) {
     if(dv->cursor_field == CURSOR_ADDRESS) {
-            if(dv->cursor_digit != CURSOR_DIGIT3) {
-                dv->cursor_digit++;
-            } else {
-                dv->cursor_field = CURSOR_ASCII;
-            }
-            return; // no view math
+        if(dv->cursor_digit != CURSOR_DIGIT3) {
+            dv->cursor_digit++;
+        } else {
+            dv->cursor_field = CURSOR_ASCII;
+        }
+        return; // no view math
     }
 
     unk_dasm_recenter_view(v, 0);
@@ -274,15 +278,15 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
 
     switch(e->key.keysym.sym) {
         case SDLK_a:
-                if(mod & KMOD_CTRL) {
-                    if(dv->cursor_field == CURSOR_ASCII) {
-                        dv->cursor_field = CURSOR_ADDRESS;
-                        dv->cursor_digit = CURSOR_DIGIT0;
-                        unk_dasm_recenter_view(v, 0);
-                    } else {
-                        dv->cursor_field = CURSOR_ASCII;
-                    }
+            if(mod & KMOD_CTRL) {
+                if(dv->cursor_field == CURSOR_ASCII) {
+                    dv->cursor_field = CURSOR_ADDRESS;
+                    dv->cursor_digit = CURSOR_DIGIT0;
+                    unk_dasm_recenter_view(v, 0);
+                } else {
+                    dv->cursor_field = CURSOR_ASCII;
                 }
+            }
             break;
 
         case SDLK_b:
@@ -491,7 +495,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
     }
 }
 
-void unk_dasm_show(UNK *v, int dirty){
+void unk_dasm_show(UNK *v, int dirty) {
     APPLE2 *m = v->m;
     RUNTIME *rt = v->rt;
     VIEWDASM *dv = &v->viewdasm;
@@ -564,8 +568,8 @@ void unk_dasm_show(UNK *v, int dirty){
                     char dc = (row_address >> shift) & 0x0f;
                     dc += (dc > 9) ? 'A' - 10 : '0';
                     struct nk_command_buffer *canvas = nk_window_get_canvas(ctx);
-                    nk_draw_text(canvas, r, &dc, 1, ctx->style.font, nk_rgb(0,0,0), nk_rgb(255,255,255));
-                }                
+                    nk_draw_text(canvas, r, &dc, 1, ctx->style.font, nk_rgb(0, 0, 0), nk_rgb(255, 255, 255));
+                }
                 nk_group_end(ctx);
             }
 

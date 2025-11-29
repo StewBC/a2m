@@ -54,7 +54,7 @@ typedef struct RUNTIME {
     uint32_t turbo_count;                                   // entries in turbo array
     double *turbo;                                          // Array of multipliers (* 1MHz) to run at
 
-    // Flow 
+    // Flow
     uint16_t pc_to_run_to;
     int16_t jsr_counter;
 
@@ -64,7 +64,7 @@ typedef struct RUNTIME {
 
     // Flags
     uint16_t run: 1;                                    // 1 - not running, 0 - run
-    uint16_t run_step: 1;       
+    uint16_t run_step: 1;
     uint16_t run_to_pc: 1;                              // 1 - stepping / conditionally running
     uint16_t run_step_out: 1;                             // 1 - step out
     uint16_t pad: 13;

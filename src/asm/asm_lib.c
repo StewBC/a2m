@@ -13,10 +13,10 @@ void asm_err(ASSEMBLER *as, const char *format, ...) {
         ERROR_ENTRY e;
         char temp_string[ASM_ERR_MAX_STR_LEN];
         size_t entries = log->log_array.items;
-        
+
         if(entries > MAX_LOG_LINES) {
             return;
-        } 
+        }
 
         uint32_t current_file_name_hash = utils_fnv_1a_hash(as->current_file, strlen(as->current_file));
         if(entries < MAX_LOG_LINES) {
@@ -38,7 +38,7 @@ void asm_err(ASSEMBLER *as, const char *format, ...) {
         }
 
         memset(&e, 0, sizeof(ERROR_ENTRY));
-        e.err_str = (char*)malloc(ASM_ERR_MAX_STR_LEN);
+        e.err_str = (char *)malloc(ASM_ERR_MAX_STR_LEN);
         e.line_number = as->current_line;
         e.file_name_hash = current_file_name_hash;
         e.message_length = snprintf(e.err_str, ASM_ERR_MAX_STR_LEN, "File: %s L:%05zu C:%03zu: %s", as->current_file, as->current_line, as->token_start - as->line_start, temp_string);

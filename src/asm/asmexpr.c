@@ -395,7 +395,7 @@ int64_t parse_shift(ASSEMBLER *as) {
     while(as->current_token.type == TOKEN_OP && (as->current_token.op == '<' || as->current_token.op == '>')) {
         char op = as->current_token.op;
         next_token(as);
-        expect(as,op);                                         // Expect double operators for << and >>
+        expect(as, op);                                        // Expect double operators for << and >>
         int64_t right = parse_additive(as);
         if(op == '<') {
             value <<= right;

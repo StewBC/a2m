@@ -34,7 +34,7 @@ BREAKPOINT *get_breakpoint_at_address(RUNTIME *rt, uint16_t pc, int running) {
 }
 
 void breakpoint_callback(void *user, uint16_t address, uint8_t mask) {
-    RUNTIME *rt = (RUNTIME*)user;
+    RUNTIME *rt = (RUNTIME *)user;
     APPLE2 *m = rt->m;
     int items = rt->breakpoints.items;
     // Access triggered breakpoint - find the BP that set this

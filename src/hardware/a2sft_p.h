@@ -83,8 +83,8 @@ static inline uint8_t apple2_softswitch_read_callback_IIplus(APPLE2 *m, uint16_t
                 byte = m->RAM_MAIN[KBD];
                 break;
             case KBDSTRB:
-                if(m->a2out_cb.cb_clipboard_ctx.cb_clipboard && 
-                    !m->a2out_cb.cb_clipboard_ctx.cb_clipboard(m->a2out_cb.cb_clipboard_ctx.user)) {
+                if(m->a2out_cb.cb_clipboard_ctx.cb_clipboard &&
+                        !m->a2out_cb.cb_clipboard_ctx.cb_clipboard(m->a2out_cb.cb_clipboard_ctx.user)) {
                     m->RAM_MAIN[KBD] &= 0x7F;
                 }
                 break;
@@ -290,8 +290,8 @@ static inline void apple2_softswitch_write_callback_IIplus(APPLE2 *m, uint16_t a
         // All other addresses
         switch(address) {
             case KBDSTRB:
-                if(m->a2out_cb.cb_clipboard_ctx.cb_clipboard && 
-                    !m->a2out_cb.cb_clipboard_ctx.cb_clipboard(m->a2out_cb.cb_clipboard_ctx.user)) {
+                if(m->a2out_cb.cb_clipboard_ctx.cb_clipboard &&
+                        !m->a2out_cb.cb_clipboard_ctx.cb_clipboard(m->a2out_cb.cb_clipboard_ctx.user)) {
                     m->RAM_MAIN[KBD] &= 0x7F;
                 }
                 break;

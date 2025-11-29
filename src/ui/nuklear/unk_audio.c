@@ -94,7 +94,7 @@ int unk_audio_speaker_init(VIEWSPEAKER *speaker, double cpu_hz, int sample_rate,
 
 // Produce mono audio at exact emulated sample clock and push into ring
 void unk_audio_speaker_on_cycles(UI *ui, uint32_t cycles_executed) {
-    UNK *v = (UNK*)ui->user;
+    UNK *v = (UNK *)ui->user;
     VIEWSPEAKER *speaker = &v->viewspeaker;
 
     speaker->cycle_accum += (double)cycles_executed;
@@ -118,7 +118,7 @@ void unk_audio_speaker_shutdown(VIEWSPEAKER *speaker) {
 
 
 void unk_audio_speaker_toggle(UI *ui) {
-    UNK *v = (UNK*)ui->user;
+    UNK *v = (UNK *)ui->user;
     VIEWSPEAKER *speaker = &v->viewspeaker;
     speaker->level = -speaker->level;
 }

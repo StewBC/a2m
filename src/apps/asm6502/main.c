@@ -18,7 +18,7 @@ void write_to_memory_selected(MACHINE *m, RAMVIEW_FLAGS selected, uint16_t addre
     m->RAM_MAIN[address] = value;
 }
 
-void output_byte_at_address(void* user, RAMVIEW_FLAGS selected, uint16_t address, uint8_t byte_value) {
+void output_byte_at_address(void *user, RAMVIEW_FLAGS selected, uint16_t address, uint8_t byte_value) {
     MACHINE *m = (MACHINE *)user;
     if(m->as.verbose) {
         if(!(address % 16) || address != m->as.last_address) {

@@ -297,62 +297,62 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
             case 0xC0D0:
             case 0xC0E0:
             case 0xC0F0: {
-                // Device Select
-                int slot = (address >> 4) & 0x7;
-                byte = m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
-                switch(m->slot_cards[slot].slot_type) {
-                    case SLOT_TYPE_DISKII: {
-                            uint8_t soft_switch = address & 0x0f;
-                            if(soft_switch <= IWM_PH3_ON) {
-                                diskii_step_head(m, slot, soft_switch);
-                                break;
-                            }
-                            switch(soft_switch) {
-                                case IWM_MOTOR_ON:
-                                case IWM_MOTOR_OFF:
-                                    diskii_motor(m, slot, soft_switch);
+                    // Device Select
+                    int slot = (address >> 4) & 0x7;
+                    byte = m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
+                    switch(m->slot_cards[slot].slot_type) {
+                        case SLOT_TYPE_DISKII: {
+                                uint8_t soft_switch = address & 0x0f;
+                                if(soft_switch <= IWM_PH3_ON) {
+                                    diskii_step_head(m, slot, soft_switch);
                                     break;
-
-                                case IWM_SEL_DRIVE_1:
-                                case IWM_SEL_DRIVE_2:
-                                    diskii_drive_select(m, slot, soft_switch);
-                                    break;
-
-                                case IWM_Q6_OFF:
-                                case IWM_Q6_ON:
-                                    return diskii_q6_access(m, slot, soft_switch & 1);
-
-                                case IWM_Q7_OFF:
-                                case IWM_Q7_ON:
-                                    return diskii_q7_access(m, slot, soft_switch & 1);
-                            }
-                        }
-                        break;
-
-                    case SLOT_TYPE_SMARTPORT:
-                        switch(address & 0x0f) {
-                            case SP_DATA:
-                                if(m->sp_device[slot].sp_read_offset == sizeof(m->sp_device[slot].sp_buffer)) {
-                                    m->sp_device[slot].sp_read_offset = 0;
                                 }
-                                return m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_read_offset++];
-                                break;
+                                switch(soft_switch) {
+                                    case IWM_MOTOR_ON:
+                                    case IWM_MOTOR_OFF:
+                                        diskii_motor(m, slot, soft_switch);
+                                        break;
 
-                            case SP_STATUS:
-                                return m->sp_device[slot].sp_status;
-                                break;
-                        }
-                        break;
+                                    case IWM_SEL_DRIVE_1:
+                                    case IWM_SEL_DRIVE_2:
+                                        diskii_drive_select(m, slot, soft_switch);
+                                        break;
 
-                    case SLOT_TYPE_VIDEX_API: {
-                            FRANKLIN_DISPLAY *fd80 = &m->franklin_display;
-                            fd80->bank = (address & 0x0C) >> 2;
-                            return fd80->registers[address & 0x0F];
-                        }
-                        break;
+                                    case IWM_Q6_OFF:
+                                    case IWM_Q6_ON:
+                                        return diskii_q6_access(m, slot, soft_switch & 1);
+
+                                    case IWM_Q7_OFF:
+                                    case IWM_Q7_ON:
+                                        return diskii_q7_access(m, slot, soft_switch & 1);
+                                }
+                            }
+                            break;
+
+                        case SLOT_TYPE_SMARTPORT:
+                            switch(address & 0x0f) {
+                                case SP_DATA:
+                                    if(m->sp_device[slot].sp_read_offset == sizeof(m->sp_device[slot].sp_buffer)) {
+                                        m->sp_device[slot].sp_read_offset = 0;
+                                    }
+                                    return m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_read_offset++];
+                                    break;
+
+                                case SP_STATUS:
+                                    return m->sp_device[slot].sp_status;
+                                    break;
+                            }
+                            break;
+
+                        case SLOT_TYPE_VIDEX_API: {
+                                FRANKLIN_DISPLAY *fd80 = &m->franklin_display;
+                                fd80->bank = (address & 0x0C) >> 2;
+                                return fd80->registers[address & 0x0F];
+                            }
+                            break;
+                    }
+                    break;
                 }
-                break;
-            }
         }
     }
     return byte;
@@ -456,8 +456,8 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                 break;
             case 0xC010:
                 // SQW - replace with a ctx callback that's installed by paste
-                if(m->a2out_cb.cb_clipboard_ctx.cb_clipboard && 
-                    !m->a2out_cb.cb_clipboard_ctx.cb_clipboard(m->a2out_cb.cb_clipboard_ctx.user)) {
+                if(m->a2out_cb.cb_clipboard_ctx.cb_clipboard &&
+                        !m->a2out_cb.cb_clipboard_ctx.cb_clipboard(m->a2out_cb.cb_clipboard_ctx.user)) {
                     m->RAM_MAIN[KBD] &= 0x7F;
                 }
                 break;
