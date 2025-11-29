@@ -168,10 +168,10 @@ int runtime_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
     while(!quit) {
         uint64_t frame_start_ticks = SDL_GetPerformanceCounter();
         uint64_t desired_frame_end_ticks = frame_start_ticks + ticks_per_frame;
-        int dirty = 0;
+        int dirty_view = 0;
 
         if(rt->run) {
-            dirty = (rt->run << 1) | rt->run_step | rt->run_to_pc;
+            dirty_view = rt->run;
             // If not going at max speed, or stepping the debugger
             if(rt->turbo_active > 0.0) {
                 double cycles_per_frame = max(1, (CPU_FREQUENCY * rt->turbo_active) / TARGET_FPS - (overhead_ticks * clock_cycles_per_tick));
@@ -203,7 +203,7 @@ int runtime_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
 
         quit = ui->ops->process_events(ui, m);
         ui->ops->set_shadow_flags(ui, m->state_flags);
-        ui->ops->render(ui, m, dirty);
+        ui->ops->render(ui, m, dirty_view);
 
         uint64_t frame_end_ticks = SDL_GetPerformanceCounter();
         // Delay to get the MHz emulation right for the desired FPS - no vsync

@@ -471,6 +471,7 @@ void unk_toggle_debug(UNK *v) {
     v->debug_view ^= 1;
     if(v->debug_view) {
         v->draw_rect = &v->target_rect;
+        v->dirty_view = 1;
     } else {
         v->draw_rect = NULL;
     }
@@ -558,10 +559,12 @@ void unk_render_frame(UI *ui, APPLE2 *m, int dirty) {
                 v->clear_a2_view = 1;
             }
 
+            dirty |= v->dirty_view;
             unk_cpu_show(v, dirty);
             unk_dasm_show(v, dirty);
             unk_misc_show(v);
             unk_mem_show(v);
+            v->dirty_view = 0;
         }
     }
     unk_present(v);

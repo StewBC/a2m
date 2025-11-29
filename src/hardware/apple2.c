@@ -239,22 +239,26 @@ int apple2_init(APPLE2 *m, INI_STORE *ini_store) {
 }
 
 void apple2_machine_reset(APPLE2 *m) {
-    // A2 state_flags reset, setting text mode
+    // A2 state_flags reset (keep model), setting text mode
+    int model = m->model;
     m->state_flags = 0;
+    m->model = model;
     m->text = 1;
 
-    cpu_init(m);
-
+    // Reset LC
+    language_card_init(m);
+    
     // Clear the screen
     memset(&m->RAM_MAIN[0x0400], 0xA0, 0x400);
-
-    language_card_init(m);
 
     //e - Set up soft-switches
     if(m->model) {
         set_memory_map(m);
         apple2_softswitch_write_callback_IIe(m, CLRCXROM, 0);
     }
+
+    // Set up CPU
+    cpu_init(m);
 }
 
 void apple2_set_callbacks(APPLE2 *m, A2OUT_CB *a2rt_cb) {

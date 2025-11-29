@@ -28,7 +28,7 @@ static int xmodel_parse(const char *s) {
         return 0;
     }
     if(0 == stricmp(s, "enh")) {
-        return 0;
+        return 1;
     }
     fprintf(stderr, "Model must be plus or enh, not %s\n", s);
     exit(2);
