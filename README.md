@@ -422,7 +422,7 @@ errorloh.c | Assembler error logging mechanism
 frankdisp.c | Franklin Ace Display 80 Col card
 header.h | One header file to include all needed header files
 image.c | Disk II floppy images containers/support
-leds.h | Green and red png images used for disk activity
+unk_leds.h | Green and red png images used for disk activity
 main.c | Define the Apple ][+ machine and view (Display) and main emulation loop
 nuklear.h | GUI - see header (Modified very slightly for text background coloring)
 nuklrsdl.h | SDL draw of Nuklear GUI - comes with nuklear.h

@@ -2,7 +2,7 @@
 .vscode/
 build/
 disks/
-apple2.ini
+*.ini
 symbols/USER.SYM
 TODO.txt
 trace.txt

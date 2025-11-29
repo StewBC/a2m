@@ -1,10 +1,10 @@
 %{
-#include "header.h"
+#include "asm_lib.h"
 %}
 %ignore-case
 %define slot-name mnemonic
 %struct-type
-struct OpcodeInfo
+struct OPCODEINFO
 
 %%
 .align,     GPERF_DOT_ALIGN, 0, 0, 0
