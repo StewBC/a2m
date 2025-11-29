@@ -66,6 +66,9 @@ enum {
     APPLE2_BUTTON_0,
     APPLE2_BUTTON_1,
     APPLE2_BUTTON_2,
+};
+
+enum {
     APPLE2_AXIS_X,
     APPLE2_AXIS_Y,
 };
@@ -109,15 +112,18 @@ typedef struct CB_CLIPBOARD_CTX {
     int (*cb_clipboard)(void *user);
 } CB_CLIPBOARD_CTX;
 
-typedef uint8_t (*CB_READ_BUTTON)(void *user, int controller_id, int button_id);
-typedef uint8_t (*CB_READ_AXIS)(void *user, int controller_id, int axis_id);
-typedef uint8_t (*CB_PTRIG)(void *user);
+typedef uint8_t (*cb_read_button)(void *user, int controller_id, int button_id);
+typedef uint8_t (*cb_read_axis)(void *user, int controller_id, int axis_id, uint64_t cycle);
+typedef uint8_t (*cb_ptrig)(void *user, uint64_t cycle);
 
 typedef struct CB_INPUTDEVICE_CTX {
     void *user;
-    CB_PTRIG cb_ptrig;
-    CB_READ_BUTTON cb_read_button;
-    CB_READ_AXIS cb_read_axis;
+    cb_ptrig cb_ptrig;
+    cb_read_button cb_read_button;
+    cb_read_axis cb_read_axis;
+    // uint8_t (*cb_ptrig)(void *user, uint64_t cycle);
+    // uint8_t (*cb_read_button)(void *user, int controller_id, int button_id);
+    // uint8_t (*cb_read_axis)(void *user, int controller_id, int axis_id);
 } CB_INPUTDEVICE_CTX;
 
 // Callbacks that runtime will provide to the hardware

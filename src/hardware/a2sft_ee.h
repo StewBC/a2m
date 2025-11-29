@@ -212,7 +212,7 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                         break;
                     case BUTN0: {
                             uint8_t button = m->open_apple ? 0x80 : 0x00;
-                            CB_READ_BUTTON rb = m->a2out_cb.cb_inputdevice_ctx.cb_read_button;
+                            cb_read_button rb = m->a2out_cb.cb_inputdevice_ctx.cb_read_button;
                             if(rb) {
                                 for(int i = 0; i < 2; i++) {
                                     button |= rb(m->a2out_cb.cb_inputdevice_ctx.user, i, APPLE2_BUTTON_0);
@@ -223,7 +223,7 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                         break;
                     case BUTN1: {
                             uint8_t button = m->closed_apple ? 0x80 : 0x00;
-                            CB_READ_BUTTON rb = m->a2out_cb.cb_inputdevice_ctx.cb_read_button;
+                            cb_read_button rb = m->a2out_cb.cb_inputdevice_ctx.cb_read_button;
                             if(rb) {
                                 for(int i = 0; i < 2; i++) {
                                     button |= rb(m->a2out_cb.cb_inputdevice_ctx.user, i, APPLE2_BUTTON_1);
@@ -234,7 +234,7 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                         break;
                     case BUTN2: {
                             uint8_t button = 0;
-                            CB_READ_BUTTON rb = m->a2out_cb.cb_inputdevice_ctx.cb_read_button;
+                            cb_read_button rb = m->a2out_cb.cb_inputdevice_ctx.cb_read_button;
                             if(rb) {
                                 for(int i = 0; i < 2; i++) {
                                     button |= rb(m->a2out_cb.cb_inputdevice_ctx.user, i, APPLE2_BUTTON_2);
@@ -244,36 +244,36 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                         }
                         break;
                     case PADDL0: {
-                            CB_READ_AXIS ra = m->a2out_cb.cb_inputdevice_ctx.cb_read_axis;
+                            cb_read_axis ra = m->a2out_cb.cb_inputdevice_ctx.cb_read_axis;
                             if(ra) {
-                                byte = ra(m->a2out_cb.cb_inputdevice_ctx.user, 0, APPLE2_AXIS_X);
+                                byte = ra(m->a2out_cb.cb_inputdevice_ctx.user, 0, APPLE2_AXIS_X, m->cpu.cycles);
                             } else {
                                 byte = 0x80;
                             }
                         }
                         break;
                     case PADDL1: {
-                            CB_READ_AXIS ra = m->a2out_cb.cb_inputdevice_ctx.cb_read_axis;
+                            cb_read_axis ra = m->a2out_cb.cb_inputdevice_ctx.cb_read_axis;
                             if(ra) {
-                                byte = ra(m->a2out_cb.cb_inputdevice_ctx.user, 0, APPLE2_AXIS_Y);
+                                byte = ra(m->a2out_cb.cb_inputdevice_ctx.user, 0, APPLE2_AXIS_Y, m->cpu.cycles);
                             } else {
                                 byte = 0x80;
                             }
                         }
                         break;
                     case PADDL2: {
-                            CB_READ_AXIS ra = m->a2out_cb.cb_inputdevice_ctx.cb_read_axis;
+                            cb_read_axis ra = m->a2out_cb.cb_inputdevice_ctx.cb_read_axis;
                             if(ra) {
-                                byte = ra(m->a2out_cb.cb_inputdevice_ctx.user, 1, APPLE2_AXIS_X);
+                                byte = ra(m->a2out_cb.cb_inputdevice_ctx.user, 1, APPLE2_AXIS_X, m->cpu.cycles);
                             } else {
                                 byte = 0x80;
                             }
                         }
                         break;
                     case PADDL3: {
-                            CB_READ_AXIS ra = m->a2out_cb.cb_inputdevice_ctx.cb_read_axis;
+                            cb_read_axis ra = m->a2out_cb.cb_inputdevice_ctx.cb_read_axis;
                             if(ra) {
-                                byte = ra(m->a2out_cb.cb_inputdevice_ctx.user, 1, APPLE2_AXIS_Y);
+                                byte = ra(m->a2out_cb.cb_inputdevice_ctx.user, 1, APPLE2_AXIS_Y, m->cpu.cycles);
                             } else {
                                 byte = 0x80;
                             }
@@ -281,9 +281,9 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                 }
                 break;
             case 0xC070: {
-                    CB_PTRIG cb_ptrig = m->a2out_cb.cb_inputdevice_ctx.cb_ptrig;
+                    cb_ptrig cb_ptrig = m->a2out_cb.cb_inputdevice_ctx.cb_ptrig;
                     if(cb_ptrig) {
-                        cb_ptrig(m->a2out_cb.cb_inputdevice_ctx.user);
+                        cb_ptrig(m->a2out_cb.cb_inputdevice_ctx.user, m->cpu.cycles);
                     }
                 }
                 break;
@@ -519,9 +519,9 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
             case 0xC060:
                 break;
             case 0xC070: {
-                    CB_PTRIG cb_ptrig = m->a2out_cb.cb_inputdevice_ctx.cb_ptrig;
+                    cb_ptrig cb_ptrig = m->a2out_cb.cb_inputdevice_ctx.cb_ptrig;
                     if(cb_ptrig) {
-                        cb_ptrig(m->a2out_cb.cb_inputdevice_ctx.user);
+                        cb_ptrig(m->a2out_cb.cb_inputdevice_ctx.user, m->cpu.cycles);
                     }
                 }
                 break;

@@ -24,12 +24,15 @@ struct UI_OPS {
     void (*disk_read_led)(UI *ui);
     void (*disk_write_led)(UI *ui);
     int (*process_events)(UI *ui, APPLE2 *m);
-    void (*speaker_toggle)(UI *ui);
-    void (*speaker_on_cycles)(UI *ui, uint32_t cycles_executed);
+    void (*ptrig)(UI *ui, uint64_t cycle);
+    void (*read_axis)(UI *ui, int controller_id, int axis_id, uint64_t cycle);
+    void (*read_button)(UI *ui, int controller_id, int button_id);
     void (*render)(UI *ui, APPLE2 *m, int cursor_sync);
     void (*set_runtime)(UI *ui, RUNTIME *rt);
     void (*set_shadow_flags)(UI *ui, uint32_t flags);
     void (*shutdown)(UI *ui);
+    void (*speaker_on_cycles)(UI *ui, uint32_t cycles_executed);
+    void (*speaker_toggle)(UI *ui);
 };
 
 struct UI {

@@ -54,11 +54,8 @@ typedef struct UNK {
 
     // Game controller values
     int8_t num_controllers;
-    uint8_t button_a[2];
-    uint8_t button_b[2];
-    uint8_t button_x[2];
-    uint8_t axis_left_x[2];
-    uint8_t axis_left_y[2];
+    uint8_t button[2][3];
+    uint8_t axis_left[2][2];
     uint64_t ptrig_cycle;
 
     // State Flags

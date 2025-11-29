@@ -110,7 +110,7 @@ void runtime_bind(RUNTIME *rt, APPLE2 *m, UI *ui) {
         .cb_brk_ctx =           {(void *)rt, (cb_breakpoint)runtime_brk_callback},
         .cb_diskactivity_ctx =  {(void *)ui, (cb_diskread)ui->ops->disk_read_led, (cb_diskwrite)ui->ops->disk_write_led},
         .cb_speaker_ctx =       {(void *)ui, (cb_speaker)ui->ops->speaker_toggle},
-        .cb_inputdevice_ctx =   {NULL, NULL, NULL, NULL}, // user, ptrig, button, axis
+        .cb_inputdevice_ctx =   {(void *)ui, (cb_ptrig)ui->ops->ptrig, (cb_read_button)ui->ops->read_button, (cb_read_axis)ui->ops->read_axis}, // user, ptrig, button, axis
         .cb_clipboard_ctx =     {(void *)rt, (cb_clipboard)runtime_feed_clipboard_key},
     };
 

@@ -60,6 +60,7 @@ typedef enum CURSOR_DIGIT {
 #define VIEWMISC_NAME_HASH  0X97446A22
 
 #include "breakpoint.h"
+#include "unk_joy.h"
 #include "unk_layout.h"
 #include "unk_leds.h"
 #include "nuklrsdl.h"

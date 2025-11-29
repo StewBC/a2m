@@ -5,6 +5,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 add_library(unk STATIC
+    unk_joy.c
     unk_layout.c
     unk_leds.c
     unk_apl2.c

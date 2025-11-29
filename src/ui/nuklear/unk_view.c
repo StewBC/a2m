@@ -24,12 +24,14 @@ const UI_OPS unk_ops = {
     .disk_read_led     = unk_disk_read,
     .disk_write_led    = unk_disk_write,
     .process_events    = unk_process_events,
+    .ptrig             = unk_joy_ptrig,
+    .read_button       = unk_joy_read_button,
+    .read_axis         = unk_joy_read_axis,
     .speaker_toggle    = unk_audio_speaker_toggle,
     .speaker_on_cycles = unk_audio_speaker_on_cycles,
     .render            = unk_render_frame,
     .set_runtime       = unk_set_runtime,
-    .set_shadow_flags = unk_set_shadow_flags,
-    .shutdown          = NULL,
+    .set_shadow_flags  = unk_set_shadow_flags,
 };
 
 // These values are picked up in nuklrsdl.h
@@ -315,17 +317,17 @@ int unk_init(UNK *v, int model, INI_STORE *ini_store) {
     // Init the file_broswer dynamic array
     array_init(&v->viewmisc.file_browser.dir_contents, sizeof(FILE_INFO));
 
-    // See if there's a game controller
-    v->num_controllers = 0;
-    for(int i = 0; i < SDL_NumJoysticks() && v->num_controllers < 2; i++) {
-        if(!SDL_IsGameController(i)) {
-            continue;
-        }
-        v->game_controller[v->num_controllers] = SDL_GameControllerOpen(i);
-        if(v->game_controller[v->num_controllers]) {
-            v->num_controllers++;
-        }
-    }
+    // // See if there's a game controller
+    // v->num_controllers = 0;
+    // for(int i = 0; i < SDL_NumJoysticks() && v->num_controllers < 2; i++) {
+    //     if(!SDL_IsGameController(i)) {
+    //         continue;
+    //     }
+    //     v->game_controller[v->num_controllers] = SDL_GameControllerOpen(i);
+    //     if(v->game_controller[v->num_controllers]) {
+    //         v->num_controllers++;
+    //     }
+    // }
 
     v->lim.cpu_h_px = 90;
     v->lim.min_a2_w_px = 320;
@@ -439,11 +441,11 @@ int unk_process_events(UI *ui, APPLE2 *m) {
     // Get joystick states once per event loop
     for(int i = 0; i < v->num_controllers; i++) {
         if(v->game_controller[i]) {
-            v->axis_left_x[i] = (32768 + SDL_GameControllerGetAxis(v->game_controller[i], SDL_CONTROLLER_AXIS_LEFTX)) >> 8;
-            v->axis_left_y[i] = (32768 + SDL_GameControllerGetAxis(v->game_controller[i], SDL_CONTROLLER_AXIS_LEFTY)) >> 8;
-            v->button_a[i] = SDL_GameControllerGetButton(v->game_controller[i], SDL_CONTROLLER_BUTTON_A);
-            v->button_b[i] = SDL_GameControllerGetButton(v->game_controller[i], SDL_CONTROLLER_BUTTON_B);
-            v->button_x[i] = SDL_GameControllerGetButton(v->game_controller[i], SDL_CONTROLLER_BUTTON_X);
+            v->axis_left[i][0] = (32768 + SDL_GameControllerGetAxis(v->game_controller[i], SDL_CONTROLLER_AXIS_LEFTX)) >> 8;
+            v->axis_left[i][1] = (32768 + SDL_GameControllerGetAxis(v->game_controller[i], SDL_CONTROLLER_AXIS_LEFTY)) >> 8;
+            v->button[i][0] = SDL_GameControllerGetButton(v->game_controller[i], SDL_CONTROLLER_BUTTON_A);
+            v->button[i][1] = SDL_GameControllerGetButton(v->game_controller[i], SDL_CONTROLLER_BUTTON_B);
+            v->button[i][2] = SDL_GameControllerGetButton(v->game_controller[i], SDL_CONTROLLER_BUTTON_X);
         }
     }
 
