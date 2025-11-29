@@ -17,12 +17,16 @@
 #define color_bg_breakpoint     nk_rgb(255,0  ,  0)
 #define color_fg_breakpoint     nk_rgb(  0,255,  0)
 
+static inline struct nk_color unk_dasm_blend(struct nk_color a, struct nk_color b, float t) {
+    return nk_rgb(a.r * (1.0f - t) + b.r * t, a.g * (1.0f - t) + b.g * t, a.b * (1.0f - t) + b.b * t);
+}
+
 static inline int unk_dasm_circular_delta(uint16_t cursor, uint16_t view) {
-    uint16_t u = (uint16_t)(cursor - view);   // always wraps correctly
+    uint16_t u = (uint16_t)(cursor - view);     // always wraps correctly
     if(u <= 0x7FFF) {
-        return (int)u;    // forward short distance
+        return (int)u;                          // forward short distance
     } else {
-        return (int)u - 0x10000;    // backward short distance
+        return (int)u - 0x10000;                // backward short distance
     }
 }
 
@@ -329,7 +333,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                             }
                         }
                     }
-                } else if((mod & (KMOD_CTRL | KMOD_SHIFT)) == (KMOD_CTRL | KMOD_SHIFT)) {
+                } else if((mod & KMOD_CTRL) && (mod & KMOD_SHIFT)) {
                     dv->temp_assembler_config = dv->assembler_config;
                     v->unk_dlg_modal = 1;
                     v->dlg_assembler_config = 1;
@@ -529,30 +533,45 @@ void unk_dasm_show(UNK *v, int dirty) {
             if(nk_group_begin(ctx, "dasm-rows", NK_WINDOW_NO_SCROLLBAR)) {
                 nk_layout_row_dynamic(ctx, ROW_H, 1);
                 int cursor_y = 0; // SQW Because the PC is sometimes not on col 0 (asm didn't work out) this remains unset
+                struct nk_color ob = ctx->style.window.background;
                 uint16_t current_pc = dv->top_address;
                 for(int i = 0; i < dv->rows; i++) {
                     current_pc = pc;
                     runtime_disassemble_line(rt, &pc, dv->flags, dv->symbol_view, dv->str_buf, dv->str_buf_len);
-                    struct nk_color ob = ctx->style.window.background;
+                    struct nk_color bg = ob;
                     struct nk_color fg = ctx->style.text.color;
+                    BREAKPOINT *bp = get_breakpoint_at_address(rt, current_pc, 0);
                     if(current_pc == m->cpu.pc) {
                         if(dirty) {
                             dv->cursor_address = current_pc;
                         }
-                        ctx->style.window.background = color_bg_pc;
                         fg = color_fg_pc;
+                        bg = color_bg_pc;
+                        if(dv->cursor_address != current_pc) {
+                            fg = unk_dasm_blend(color_fg_pc, color_fg_cursor, 0.5);
+                            bg = unk_dasm_blend(color_bg_pc, color_bg_cursor, 0.5);
+                        }
+                        if(bp) {
+                            fg = unk_dasm_blend(fg, color_fg_breakpoint, 0.5);
+                            bg = unk_dasm_blend(fg, color_bg_breakpoint, 0.5);
+                        }
                     } else if(!dirty && current_pc == dv->cursor_address) {
-                        ctx->style.window.background = color_bg_cursor;
                         fg = color_fg_cursor;
-                    } else if(get_breakpoint_at_address(rt, current_pc, 0)) {
-                        ctx->style.window.background = color_bg_breakpoint;
+                        bg = color_bg_cursor;
+                        if(bp) {
+                            fg = unk_dasm_blend(fg, color_fg_breakpoint, 0.5);
+                            bg = unk_dasm_blend(fg, color_bg_breakpoint, 0.5);
+                        }
+                    } else if(bp) {
                         fg = color_fg_breakpoint;
+                        bg = color_bg_breakpoint;
                     }
                     if(dv->cursor_field == CURSOR_ADDRESS && current_pc == dv->cursor_address) {
                         // Can't draw the cursor here yet - ctx->current->layout->bounds does
                         // not yet include this row
                         cursor_y = i * ROW_H;
                     }
+                    ctx->style.window.background = bg;
                     nk_label_colored(ctx, dv->str_buf, NK_TEXT_LEFT, fg);
                     ctx->style.window.background = ob;
                 }
