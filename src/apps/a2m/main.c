@@ -326,8 +326,7 @@ int parse_args_all(const ARGSPEC *specs, OPTS *opts) {
             const char *params[MAX_CLI_PARAMS];
             int n = 0;
 
-            if(parse_arg(ctx, s->long_name, s->short_name,
-                         s->param_count, params, &n) > 0) {
+            if(parse_arg(ctx, s->long_name, s->short_name, s->param_count, params, &n) > 0) {
                 if(s->handler) {
                     s->handler(n, params, opts);
                 }
