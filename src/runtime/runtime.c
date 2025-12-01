@@ -393,9 +393,8 @@ void runtime_machine_step_over(RUNTIME *rt) {
         int length = opcode_lengths[instruction];
         rt->pc_to_run_to = m->cpu.pc + length;
         rt->run_to_pc = 1;
-    } else {
-        rt->run_step = 1;
     }
+    rt->run_step = 1;
     rt->run = 1;
 }
 
@@ -461,9 +460,11 @@ int runtime_feed_clipboard_key(RUNTIME *rt) {
     }
 }
 
+// This runs before machine step so the logic seems a bit weird
 int runtime_update(RUNTIME *rt) {
     APPLE2 *m = rt->m;
 
+    // Only look for breakpoints if not stepping
     if(!rt->run_step) {
         if(rt->run_to_pc && rt->pc_to_run_to == m->cpu.pc) {
             runtime_machine_stop(rt);
@@ -511,11 +512,18 @@ int runtime_update(RUNTIME *rt) {
                 }
             }
         }
-    } else {
+    } else if(!rt->run_to_pc) {
+        // If stepping, and not stepping over, then stop
         runtime_machine_stop(rt);
         return 1;
+    } else {
+        // Otherwise not stepping, but running, so future breakpoints 
+        // other than the one on the first step, if there was one, will break again
+        rt->run_step = 0;
     }
+
     if(!rt->run) {
+        // When no longer running record the cycles for delta purposes
         rt->prev_stop_cycles = rt->stop_cycles;
         rt->stop_cycles = m->cpu.cycles;
     }

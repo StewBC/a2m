@@ -532,6 +532,7 @@ void unk_dasm_show(UNK *v, int dirty) {
             nk_layout_row_dynamic(ctx, dv->rows * ROW_H, 1);
             if(nk_group_begin(ctx, "dasm-rows", NK_WINDOW_NO_SCROLLBAR)) {
                 nk_layout_row_dynamic(ctx, ROW_H, 1);
+                struct nk_rect r = nk_widget_bounds(ctx);
                 int cursor_y = 0; // SQW Because the PC is sometimes not on col 0 (asm didn't work out) this remains unset
                 struct nk_color ob = ctx->style.window.background;
                 uint16_t current_pc = dv->top_address;
@@ -541,6 +542,17 @@ void unk_dasm_show(UNK *v, int dirty) {
                     struct nk_color bg = ob;
                     struct nk_color fg = ctx->style.text.color;
                     BREAKPOINT *bp = get_breakpoint_at_address(rt, current_pc, 0);
+                    // See if the mouse has been clicked over this row to be drawn
+                    if (nk_widget_is_mouse_clicked(ctx, NK_BUTTON_LEFT)) {
+                        float rel_x = (ctx->input.mouse.pos.x - r.x) / v->font_width;
+                        dv->cursor_address = current_pc;
+                        if(rel_x < 4) {
+                            dv->cursor_field = CURSOR_ADDRESS;
+                            dv->cursor_digit = rel_x;
+                        } else {
+                            dv->cursor_field = CURSOR_ASCII;
+                        }
+                    }
                     if(current_pc == m->cpu.pc) {
                         if(dirty) {
                             dv->cursor_address = current_pc;

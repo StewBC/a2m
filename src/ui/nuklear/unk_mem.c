@@ -203,6 +203,18 @@ void unk_mem_cursor_right(VIEWMEM *ms, MEMVIEW *mv) {
     unk_mem_recenter_view(ms, mv);
 }
 
+void unk_mem_cursor_toggle_address_mode(VIEWMEM *ms, MEMVIEW *mv) {
+    if(mv->cursor_field == CURSOR_ADDRESS) {
+        mv->cursor_field = mv->prev_field;
+        mv->cursor_digit = mv->cursor_prev_digit;
+    } else {
+        mv->prev_field = mv->cursor_field;
+        mv->cursor_prev_digit = mv->cursor_digit;
+        mv->cursor_digit = CURSOR_DIGIT0;
+        mv->cursor_field = CURSOR_ADDRESS;
+    }
+}
+
 void unk_mem_cursor_up(VIEWMEM *ms, MEMVIEW *mv) {
     if(mv->cursor_field != CURSOR_ADDRESS) {
         mv->cursor_address = unk_mem_wrap16_add(mv->cursor_address, -ms->cols);
@@ -263,15 +275,7 @@ int unk_mem_process_event(UNK *v, SDL_Event *e, int window) {
     } else if(mod & KMOD_CTRL) {
         switch(e->key.keysym.sym) {
             case SDLK_a:                                        // CTRL G - Goto view_address
-                if(mv->cursor_field == CURSOR_ADDRESS) {
-                    mv->cursor_field = mv->prev_field;
-                    mv->cursor_digit = mv->cursor_prev_digit;
-                } else {
-                    mv->prev_field = mv->cursor_field;
-                    mv->cursor_prev_digit = mv->cursor_digit;
-                    mv->cursor_digit = CURSOR_DIGIT0;
-                    mv->cursor_field = CURSOR_ADDRESS;
-                }
+                unk_mem_cursor_toggle_address_mode(ms, mv);
                 break;
 
             case SDLK_f:                                        // CTRL F - Find
@@ -494,6 +498,7 @@ void unk_mem_show(UNK *v) {
                 view_top_row += mv->rows;
                 if(nk_group_begin(ctx, "mem-rows", NK_WINDOW_NO_SCROLLBAR)) {
                     nk_layout_row_dynamic(ctx, ROW_H, 1);
+                    struct nk_rect r = nk_widget_bounds(ctx);
                     struct nk_color last_c = ctx->style.window.background = unk_mem_range_colors[view].background_color;
                     for(int row = 0; row < mv->rows; row++) {
                         memset(ms->str_buf, 0x20, ms->str_buf_len);
@@ -505,6 +510,36 @@ void unk_mem_show(UNK *v) {
                         for(int col = 0; col < ms->cols; col++) {
                             uint8_t c = ms->u8_buf[col];
                             snprintf(&ms->str_buf[5 + ms->cols * 3 + col], ms->str_buf_len - 5 - (ms->cols * 3) - col, "%c", isprint(c) ? c : '.');
+                        }
+                        if (nk_widget_is_mouse_clicked(ctx, NK_BUTTON_LEFT)) {
+                            float rel_x = (ctx->input.mouse.pos.x - r.x) / v->font_width;
+                            ms->active_view_index = view;
+                            active_view = mv;
+                            active_top_row = view_top_row;
+                            if(rel_x < 4) {
+                                // First 4 digits is the hex address
+                                if(mv->cursor_field != CURSOR_ADDRESS) {
+                                    unk_mem_cursor_toggle_address_mode(ms, mv);
+                                }
+                                mv->cursor_address = view_address;
+                                mv->cursor_digit = rel_x;
+                            } else if(rel_x > 5 && rel_x < 5 + ms->cols * 3) {
+                                if(mv->cursor_field == CURSOR_ADDRESS) {
+                                    unk_mem_cursor_toggle_address_mode(ms, mv);
+                                }
+                                mv->cursor_field = CURSOR_HEX;
+                                // 5 is ignored.  6 .. ms->cols * 3 is hex
+                                rel_x -= 5;
+                                mv->cursor_address = view_address + rel_x / 3;
+                            } else {
+                                if(mv->cursor_field == CURSOR_ADDRESS) {
+                                    unk_mem_cursor_toggle_address_mode(ms, mv);
+                                }
+                                mv->cursor_field = CURSOR_ASCII;
+                                // 5 (address) + cols * 3 skipped to get to ascii
+                                rel_x -= 5 + ms->cols * 3;
+                                mv->cursor_address = view_address + rel_x;
+                            }
                         }
                         view_address += ms->cols;
                         nk_label_colored(ctx, ms->str_buf, NK_TEXT_LEFT, unk_mem_range_colors[view].text_color);
