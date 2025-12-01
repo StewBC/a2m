@@ -65,11 +65,11 @@ void handle_disk(int num_params, const char **params, OPTS *opts) {
     }
     int64_t l = val - params[0];
     val++; // skip the '='
-    if(l != 4) { 
+    if(l != 4) {
         // must be sNdX
         return;
     }
-    char *key = (char*)malloc(l + 1);
+    char *key = (char *)malloc(l + 1);
     if(!key) {
         return;
     }
@@ -82,7 +82,7 @@ void handle_disk(int num_params, const char **params, OPTS *opts) {
 void handle_franklin80(int num_params, const char **params, OPTS *opts) {
     UNUSED(num_params);
     int slot;
-    if ((sscanf(params[0], "%d", &slot) == 1) && slot >= 1 && slot <= 7) {
+    if((sscanf(params[0], "%d", &slot) == 1) && slot >= 1 && slot <= 7) {
         char key[] = "s3dev";
         key[1] = (char)('0' + slot);
         ini_set(&opts->ini_store, "Video", key, "Franklin Ace Display");
@@ -137,11 +137,11 @@ void handle_smart(int num_params, const char **params, OPTS *opts) {
     }
     int64_t l = val - params[0];
     val++;
-    if(l != 4) { 
+    if(l != 4) {
         // must be sNdX
         return;
     }
-    char *key = (char*)malloc(l + 1);
+    char *key = (char *)malloc(l + 1);
     if(!key) {
         return;
     }
@@ -212,30 +212,30 @@ void handle_help(int num_params, const char **params, OPTS *opts) {
 }
 
 static const ARGSPEC g_specs[] = {
-    { "--break"     , "-b", 1, handle_break      },
-    { "--defaults"  , "-f", 0, handle_defaults   },
-    { "--disk"      , "-d", 1, handle_disk       },
+    { "--break", "-b", 1, handle_break      },
+    { "--defaults", "-f", 0, handle_defaults   },
+    { "--disk", "-d", 1, handle_disk       },
     { "--franklin80", "-8", 1, handle_franklin80 },
-    { "--inifile"   , "-i", 1, handle_inifile    },
-    { "--leds"      , "-l", 1, handle_leds       },
-    { "--model"     , "-m", 1, handle_model      },
-    { "--noini"     , "-n", 0, handle_noini      },
-    { "--nosaveini" , "-!", 0, handle_nosaveini  },
-    { "--remember"  , "-r", 0, handle_remember   },
-    { "--saveini"   , "-v", 0, handle_saveini    },
-    { "--smart"     , "-s", 1, handle_smart      },
-    { "--turbo"     , "-t", 1, handle_turbo      },
-    { "--ui"        , "-u", 1, handle_ui         },
-    { "--help"      , "-h", 0, handle_help       },
-    { NULL          , NULL, 0, NULL              } // terminator
+    { "--inifile", "-i", 1, handle_inifile    },
+    { "--leds", "-l", 1, handle_leds       },
+    { "--model", "-m", 1, handle_model      },
+    { "--noini", "-n", 0, handle_noini      },
+    { "--nosaveini", "-!", 0, handle_nosaveini  },
+    { "--remember", "-r", 0, handle_remember   },
+    { "--saveini", "-v", 0, handle_saveini    },
+    { "--smart", "-s", 1, handle_smart      },
+    { "--turbo", "-t", 1, handle_turbo      },
+    { "--ui", "-u", 1, handle_ui         },
+    { "--help", "-h", 0, handle_help       },
+    { NULL, NULL, 0, NULL              }           // terminator
 };
 
 int parse_arg(ARGCTX *ctx, const char *long_name, const char *short_name, int param_count, const char **params, int *num_params) {
-    if (ctx->done || ctx->error) {
+    if(ctx->done || ctx->error) {
         return 0;
     }
 
-    if (ctx->index >= ctx->argc) {
+    if(ctx->index >= ctx->argc) {
         ctx->done = 1;
         return 0;
     }
@@ -243,8 +243,8 @@ int parse_arg(ARGCTX *ctx, const char *long_name, const char *short_name, int pa
     const char *arg = ctx->argv[ctx->index];
 
     // Not this option
-    if (_stricmp(arg, long_name) != 0 &&
-        (!short_name || _stricmp(arg, short_name) != 0)) {
+    if(_stricmp(arg, long_name) != 0 &&
+            (!short_name || _stricmp(arg, short_name) != 0)) {
         return 0;
     }
 
@@ -253,19 +253,19 @@ int parse_arg(ARGCTX *ctx, const char *long_name, const char *short_name, int pa
 
     int actual_params = 0;
 
-    if (param_count == -1) {
+    if(param_count == -1) {
         // Optional: consume 1 param if there is one and it doesn't look like another option.
-        if (remain_after > 0 && ctx->argv[ctx->index + 1][0] != '-') {
+        if(remain_after > 0 && ctx->argv[ctx->index + 1][0] != '-') {
             actual_params = 1;
         } else {
             actual_params = 0;
         }
     } else {
         // Fixed count.
-        if (remain_after < param_count) {
+        if(remain_after < param_count) {
             ctx->error = 1;   // "missing parameters"
             ctx->done  = 1;
-            if (num_params) {
+            if(num_params) {
                 *num_params = 0;
             }
             return 0;
@@ -273,18 +273,18 @@ int parse_arg(ARGCTX *ctx, const char *long_name, const char *short_name, int pa
         actual_params = param_count;
     }
 
-    if (params && actual_params > 0) {
-        for (int i = 0; i < actual_params; ++i) {
+    if(params && actual_params > 0) {
+        for(int i = 0; i < actual_params; ++i) {
             params[i] = ctx->argv[ctx->index + 1 + i];
         }
     }
 
-    if (num_params) {
+    if(num_params) {
         *num_params = actual_params;
     }
 
     ctx->index += 1 + actual_params;
-    if (ctx->index >= ctx->argc) {
+    if(ctx->index >= ctx->argc) {
         ctx->done = 1;
     }
 
@@ -293,34 +293,43 @@ int parse_arg(ARGCTX *ctx, const char *long_name, const char *short_name, int pa
 
 // Treat the current arg as positional (non-option).  Returns 1 if consumed, 0 if no more args.
 int parse_positional(ARGCTX *ctx, const char **out_arg) {
-    if (ctx->done || ctx->error) return 0;
-    if (ctx->index >= ctx->argc) { ctx->done = 1; return 0; }
+    if(ctx->done || ctx->error) {
+        return 0;
+    }
+    if(ctx->index >= ctx->argc) {
+        ctx->done = 1;
+        return 0;
+    }
 
     const char *arg = ctx->argv[ctx->index];
-    if (arg[0] == '-') {
+    if(arg[0] == '-') {
         ctx->error = 2;  // unknown option = error
         ctx->done  = 1;
         return 0;
     }
 
-    if (out_arg) *out_arg = arg;
+    if(out_arg) {
+        *out_arg = arg;
+    }
     ctx->index++;
-    if (ctx->index >= ctx->argc) ctx->done = 1;
+    if(ctx->index >= ctx->argc) {
+        ctx->done = 1;
+    }
     return 1;
 }
 
 int parse_args_all(const ARGSPEC *specs, OPTS *opts) {
     ARGCTX *ctx = &opts->ctx;
-    while (!ctx->done && !ctx->error) {
+    while(!ctx->done && !ctx->error) {
         int matched = 0;
 
-        for (const ARGSPEC *s = specs; !ctx->error && s->long_name; ++s) {
+        for(const ARGSPEC *s = specs; !ctx->error && s->long_name; ++s) {
             const char *params[MAX_CLI_PARAMS];
             int n = 0;
 
-            if (parse_arg(ctx, s->long_name, s->short_name,
-                          s->param_count, params, &n) > 0) {
-                if (s->handler) {
+            if(parse_arg(ctx, s->long_name, s->short_name,
+                         s->param_count, params, &n) > 0) {
+                if(s->handler) {
                     s->handler(n, params, opts);
                 }
                 matched = 1;
@@ -328,13 +337,13 @@ int parse_args_all(const ARGSPEC *specs, OPTS *opts) {
             }
         }
 
-        if (matched) {
+        if(matched) {
             continue;
         }
 
         // No spec matched: treat as positional or error
         const char *pos = NULL;
-        if (!parse_positional(ctx, &pos)) {
+        if(!parse_positional(ctx, &pos)) {
             break; // ctx.error or ctx.done
         }
         // handle positional here, or via a special handler in the table
@@ -345,7 +354,7 @@ int parse_args_all(const ARGSPEC *specs, OPTS *opts) {
 
 int main_ini_merge_to(INI_STORE *source, INI_STORE *target) {
     int rv = A2_OK;
-    for(int is = 0; is < source->sections.items; is++ ) {
+    for(int is = 0; is < source->sections.items; is++) {
         INI_SECTION *s = ARRAY_GET(&source->sections, INI_SECTION, is);
         for(int ik = 0; ik < s->kv.items; ik++) {
             INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, ik);
@@ -371,7 +380,7 @@ int main(int argc, char **argv) {
     RUNTIME rt;
     APPLE2 m;
     UI ui;
-    
+
     // Clear the command line options and init the store
     memset(&opts, 0, sizeof(OPTS));
     ini_init(&opts.ini_store);
@@ -389,7 +398,7 @@ int main(int argc, char **argv) {
         return A2_ERR;
     }
 
-    if (opts.help) {
+    if(opts.help) {
         return A2_OK;
     }
 

@@ -16,28 +16,28 @@ void runtime_apply_ini(RUNTIME *rt, INI_STORE *ini_store) {
     int slot_number = -1;
 
     const char *val;
-    if ((val = ini_get(ini_store, "machine", "turbo"))) {
+    if((val = ini_get(ini_store, "machine", "turbo"))) {
         const char *s = val;
         // Count commas
         rt->turbo_count = 1;
-        while (*s) {
-            if (*s++ == ',') {
+        while(*s) {
+            if(*s++ == ',') {
                 rt->turbo_count++;
             }
         }
         // Make an array to hold turbo values
         rt->turbo = malloc(rt->turbo_count * sizeof(double));
-        if (!rt->turbo) {
+        if(!rt->turbo) {
             rt->turbo_count = 0;
             return;
         }
         s = val;
-        for (int i = 0; i < rt->turbo_count; i++) {
+        for(int i = 0; i < rt->turbo_count; i++) {
             // Skip leading spaces in the field
-            while (*s == ' ' || *s == '\t') {
+            while(*s == ' ' || *s == '\t') {
                 s++;
             }
-            if (*s == ',' || *s == '\0') {
+            if(*s == ',' || *s == '\0') {
                 // Empty value: turbo = 1.0
                 rt->turbo[i] = 1.0;
             } else {
@@ -45,14 +45,14 @@ void runtime_apply_ini(RUNTIME *rt, INI_STORE *ini_store) {
                 errno = 0;
                 double v = strtod(s, &end);
 
-                if (end == s) {
+                if(end == s) {
                     // No digits before the comma is a bad conversion: max speed
                     rt->turbo[i] = -1.0;
                 } else {
                     // Got a number
                     v = fabs(v);
 
-                    if (errno == ERANGE || isinf(v)) {
+                    if(errno == ERANGE || isinf(v)) {
                         // Error or overflow, set to max speed
                         rt->turbo[i] = -1.0;
                     } else {
@@ -63,10 +63,10 @@ void runtime_apply_ini(RUNTIME *rt, INI_STORE *ini_store) {
                 }
             }
             // Move to next field: skip until comma or end
-            while (*s && *s != ',') {
+            while(*s && *s != ',') {
                 s++;
             }
-            if (*s == ',') {
+            if(*s == ',') {
                 s++; // skip comma
             }
         }

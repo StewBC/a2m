@@ -5,7 +5,7 @@
 #include "unk_lib.h"
 
 void unk_joy_ptrig(UI *ui, uint64_t cycle) {
-    UNK *v = (UNK*)ui->user;
+    UNK *v = (UNK *)ui->user;
     if(!v->num_controllers) {
         // See if there's a game controller
         for(int i = 0; i < SDL_NumJoysticks() && v->num_controllers < 2; i++) {
@@ -22,12 +22,12 @@ void unk_joy_ptrig(UI *ui, uint64_t cycle) {
 }
 
 uint8_t unk_joy_read_button(UI *ui, int controller_id, int button_id) {
-    UNK *v = (UNK*)ui->user;
+    UNK *v = (UNK *)ui->user;
     return v->button[controller_id][button_id];
 }
 
 uint8_t unk_joy_read_axis(UI *ui, int controller_id, int axis_id, uint64_t cycle) {
-    UNK *v = (UNK*)ui->user;
+    UNK *v = (UNK *)ui->user;
     if(!v->num_controllers) {
         return 0xff;
     }

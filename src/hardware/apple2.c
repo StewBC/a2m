@@ -27,10 +27,10 @@ static void apple2_slot_setup(APPLE2 *m, INI_STORE *ini_store) {
             const char *val = kv->val;
             int slot, device;
 
-            if (sscanf(key, "%*1[Ss]%d%*1[Dd]%d", &slot, &device) == 2) {
+            if(sscanf(key, "%*1[Ss]%d%*1[Dd]%d", &slot, &device) == 2) {
                 if(slot >= 1 && slot <= 7 && device >= 0 && device <= 1) {
                     slot_add_card(m, slot, SLOT_TYPE_DISKII, &m->diskii_controller[slot],
-                                m->roms.blocks[ROM_DISKII_16SECTOR].bytes, NULL);
+                                  m->roms.blocks[ROM_DISKII_16SECTOR].bytes, NULL);
                     if(val[0]) {
                         diskii_mount(m, slot, device, val);
                     }
@@ -47,10 +47,10 @@ static void apple2_slot_setup(APPLE2 *m, INI_STORE *ini_store) {
             const char *val = kv->val;
             int slot, device;
 
-            if (sscanf(key, "%*1[Ss]%d%*1[Dd]%d", &slot, &device) == 2) {
+            if(sscanf(key, "%*1[Ss]%d%*1[Dd]%d", &slot, &device) == 2) {
                 if(slot >= 1 && slot <= 7 && device >= 0 && device <= 1) {
-                slot_add_card(m, slot, SLOT_TYPE_SMARTPORT, &m->sp_device[slot],
-                                &m->roms.blocks[ROM_SMARTPORT].bytes[slot * 0x100], NULL);
+                    slot_add_card(m, slot, SLOT_TYPE_SMARTPORT, &m->sp_device[slot],
+                                  &m->roms.blocks[ROM_SMARTPORT].bytes[slot * 0x100], NULL);
                 }
                 if(val[0]) {
                     sp_mount(m, slot, device, val);
@@ -73,8 +73,8 @@ static void apple2_slot_setup(APPLE2 *m, INI_STORE *ini_store) {
             const char *val = kv->val;
             int slot, n;
 
-            if(!m->model && sscanf(key,"%*1[Ss]%d%n", &slot, &n) == 1 && n == 2 && 
-                stricmp(&key[2], "dev") == 0) {
+            if(!m->model && sscanf(key, "%*1[Ss]%d%n", &slot, &n) == 1 && n == 2 &&
+                    stricmp(&key[2], "dev") == 0) {
                 if(slot >= 1 && slot < 8) {
                     if(A2_OK == franklin_display_init(&m->franklin_display)) {
                         slot_add_card(m, slot, SLOT_TYPE_VIDEX_API, &m->franklin_display,
@@ -230,7 +230,7 @@ void apple2_machine_reset(APPLE2 *m) {
 
     // Reset LC
     language_card_init(m);
-    
+
     // Clear the screen
     memset(&m->RAM_MAIN[0x0400], 0xA0, 0x400);
 
