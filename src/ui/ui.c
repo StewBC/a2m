@@ -19,19 +19,9 @@ const UI_OPS null_ops = {
 void ui_apply_ini(UI *ui, INI_STORE *ini_store) {
     int slot_number = -1;
 
-    INI_SECTION *s = ini_find_section(ini_store, "UI");
-    if(s) {
-        for(int i = 0; i < s->kv.items; i++) {
-            INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
-            const char *key = kv->key;
-            const char *val = kv->val;
-
-            if(0 == stricmp(key, "instance")) {
-                if(0 == stricmp(val, "text")) {
-                    ui->class = UI_CLASS_TEXT;
-                }
-            }
-        }
+    const char *val = ini_get(ini_store, "ui", "instance");
+    if(val && stricmp(val, "text") == 0) {
+        ui->class = UI_CLASS_TEXT;
     }
 }
 

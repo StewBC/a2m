@@ -481,7 +481,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
         case SDLK_F12:
             if(mod & KMOD_SHIFT) {
                 if(m->franklin80installed) {
-                    m->franklin80active ^= 1;
+                    runtime_machine_toggle_franklin80_active(rt);
                 }
             } else {
                 if(m->dhires && m->col80set && m->hires) {

@@ -49,7 +49,7 @@ typedef struct LAYOUT {
     struct nk_rect mem;
     struct nk_rect misc;
 
-    //  Hit rects (screen space) for your input/hover logic
+    //  Hit rects (screen space) for input/hover logic
     struct nk_rect hit_split_A;         //  vertical gutter between Apple2 | Right
     struct nk_rect hit_split_B;         //  horizontal gutter between Top | Bottom
     struct nk_rect hit_split_C;         //  vertical gutter between Mem | Misc

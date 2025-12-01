@@ -5,12 +5,12 @@
 #pragma once
 
 #define KBD             0xC000 // Port where the Apple II reads what keys are down
-#define CLR80STORE      0xC000 // Write only, RAMRD/WRT decides $0400–$0BFF, $2000–$3FFF
+#define CLR80STORE      0xC000 // Write only, RAMRD/WRT decides $0400-$0BFF, $2000-$3FFF
 #define SET80STORE      0xC001 // ($C054/$C055) selects main vs aux independently of RAMRD/WRT for display mem
-#define CLRRAMRD        0xC002 // CPU reads  from main $0200–$BFFF and LC $D000–$FFFF, see SET80STORE
-#define SETRAMRD        0xC003 // CPU reads  from aux  $0200–$BFFF and LC $D000–$FFFF, see SET80STORE
-#define CLRRAMWRT       0xC004 // CPU writes from main $0200–$BFFF and LC $D000–$FFFF, see SET80STORE
-#define SETRAMWRT       0xC005 // CPU writes from aux  $0200–$BFFF and LC $D000–$FFFF, see SET80STORE
+#define CLRRAMRD        0xC002 // CPU reads  from main $0200-$BFFF and LC $D000-$FFFF, see SET80STORE
+#define SETRAMRD        0xC003 // CPU reads  from aux  $0200-$BFFF and LC $D000-$FFFF, see SET80STORE
+#define CLRRAMWRT       0xC004 // CPU writes from main $0200-$BFFF and LC $D000-$FFFF, see SET80STORE
+#define SETRAMWRT       0xC005 // CPU writes from aux  $0200-$BFFF and LC $D000-$FFFF, see SET80STORE
 #define CLRCXROM        0xC006 // C100-C7FF slot card roms
 #define SETCXROM        0xC007 // C100-CFFF //e rom (overrides c3rom and cfff)
 #define CLRALTZP        0xC008 // ZP/stack are in main bank

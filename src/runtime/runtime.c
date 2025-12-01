@@ -15,61 +15,64 @@ int runtime_update(RUNTIME *rt);
 void runtime_apply_ini(RUNTIME *rt, INI_STORE *ini_store) {
     int slot_number = -1;
 
-    INI_SECTION *s = ini_find_section(ini_store, "machine");
-    if(s) {
-        for(int i = 0; i < s->kv.items; i++) {
-            INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
-            const char *key = kv->key;
-            const char *val = kv->val;
+    const char *val;
+    if ((val = ini_get(ini_store, "machine", "turbo"))) {
+        const char *s = val;
+        // Count commas
+        rt->turbo_count = 1;
+        while (*s) {
+            if (*s++ == ',') {
+                rt->turbo_count++;
+            }
+        }
+        // Make an array to hold turbo values
+        rt->turbo = malloc(rt->turbo_count * sizeof(double));
+        if (!rt->turbo) {
+            rt->turbo_count = 0;
+            return;
+        }
+        s = val;
+        for (int i = 0; i < rt->turbo_count; i++) {
+            // Skip leading spaces in the field
+            while (*s == ' ' || *s == '\t') {
+                s++;
+            }
+            if (*s == ',' || *s == '\0') {
+                // Empty value: turbo = 1.0
+                rt->turbo[i] = 1.0;
+            } else {
+                char *end;
+                errno = 0;
+                double v = strtod(s, &end);
 
-            if(0 == stricmp(key, "turbo")) {
-                // Count the commas to know how many turbo states there are
-                const char *s = val;
-                rt->turbo_count = 1;
-                while(*s) {
-                    if(*s++ == ',') {
-                        rt->turbo_count++;
-                    }
-                }
-                // Allocare the turbo's array
-                rt->turbo = (double *)malloc(rt->turbo_count * sizeof(double));
-                if(rt->turbo) {
-                    // Convert the numbers to +float and any unknowns (non-float)
-                    // to -1 (max speed)
-                    s = val;
-                    for(int i = 0; i < rt->turbo_count; i++) {
-                        int l = sscanf(s, "%lf", &rt->turbo[i]);
-                        if(l == -1) {
-                            // no value - make it a turbo of 1.0
-                            rt->turbo[i] = 1.0;
-                        } else if(l == 0) {
-                            // bad conversion - max
-                            rt->turbo[i] = -1.0;
-                        } else {
-                            // normal conversion - make it the positive to be sure
-                            rt->turbo[i] = fabs(rt->turbo[i]);
-                            // treat overflow as "max speed"
-                            if(isinf(rt->turbo[i])) {
-                                rt->turbo[i] = -1.0;
-                            }
-                        }
-                        // scan to the comma
-                        while(*s && *s != ',') {
-                            s++;
-                        }
-                        // Skip the comma
-                        if(*s) {
-                            s++;
-                        }
-                    }
+                if (end == s) {
+                    // No digits before the comma is a bad conversion: max speed
+                    rt->turbo[i] = -1.0;
                 } else {
-                    rt->turbo_count = 0;
+                    // Got a number
+                    v = fabs(v);
+
+                    if (errno == ERANGE || isinf(v)) {
+                        // Error or overflow, set to max speed
+                        rt->turbo[i] = -1.0;
+                    } else {
+                        rt->turbo[i] = v;
+                    }
+
+                    s = end;
                 }
+            }
+            // Move to next field: skip until comma or end
+            while (*s && *s != ',') {
+                s++;
+            }
+            if (*s == ',') {
+                s++; // skip comma
             }
         }
     }
 
-    s = ini_find_section(ini_store, "debug");
+    INI_SECTION *s = ini_find_section(ini_store, "debug");
     if(s) {
         for(int i = 0; i < s->kv.items; i++) {
             INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
@@ -403,6 +406,11 @@ void runtime_machine_stop(RUNTIME *rt) {
     rt->run_to_pc = 0;
     rt->pc_to_run_to = 0;
     rt->jsr_counter = 0;
+}
+
+void runtime_machine_toggle_franklin80_active(RUNTIME *rt) {
+    APPLE2 *m = rt->m;
+    m->franklin80active ^= 1;
 }
 
 // Make a copy of the clipboard text

@@ -22,7 +22,7 @@ void unk_misc_show(UNK *v) {
     if(nk_begin(ctx, "Miscellaneous", v->layout.misc, NK_WINDOW_SCROLL_AUTO_HIDE | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
         // Show the slot if it has a card in it
         if(nk_tree_push(ctx, NK_TREE_TAB, "Slots", NK_MAXIMIZED)) {
-            for(int i = 2; i < 8; i++) {
+            for(int i = 1; i < 8; i++) {
                 if(m->slot_cards[i].slot_type != SLOT_TYPE_EMPTY) {
                     nk_layout_row_dynamic(ctx, 13, 1);
                 }

@@ -46,10 +46,6 @@ NK_API void                 nk_sdl_handle_grab(void);
 #include <string.h>
 #include <stdlib.h>
 
-// SQW defined in viewport.c
-// Wherever sdl_x_scale or sdl_y_scale is in this file are changes I made
-extern float sdl_x_scale, sdl_y_scale;
-
 struct nk_sdl_device {
     struct nk_buffer cmds;
     struct nk_draw_null_texture tex_null;
@@ -140,12 +136,6 @@ nk_sdl_render(enum nk_anti_aliasing AA)
 
         /* iterate over and execute each draw command */
         offset = (const nk_draw_index*)nk_buffer_memory_const(&ebuf);
-
-        // SQW - Get and set scale for UI
-        float x_scale, y_scale;
-        SDL_RenderGetScale(sdl.renderer, &x_scale, &y_scale);
-        SDL_RenderSetScale(sdl.renderer, sdl_x_scale, sdl_x_scale);
-
         clipping_enabled = SDL_RenderIsClipEnabled(sdl.renderer);
         SDL_RenderGetClipRect(sdl.renderer, &saved_clip);
 #ifdef NK_SDL_CLAMP_CLIP_RECT
@@ -206,8 +196,6 @@ nk_sdl_render(enum nk_anti_aliasing AA)
         nk_buffer_free(&vbuf);
         nk_buffer_free(&ebuf);
 
-        // SQW - Reset scale for apple2 rendering surface
-        SDL_RenderSetScale(sdl.renderer, x_scale, y_scale);
     }
 }
 
@@ -354,7 +342,7 @@ nk_sdl_handle_event(SDL_Event *evt)
         case SDL_MOUSEBUTTONDOWN:
             {
                 int down = evt->type == SDL_MOUSEBUTTONDOWN;
-                const int x = evt->button.x / sdl_x_scale, y = evt->button.y / sdl_y_scale;
+                const int x = evt->button.x, y = evt->button.y;
                 switch(evt->button.button)
                 {
                     case SDL_BUTTON_LEFT:
@@ -370,9 +358,9 @@ nk_sdl_handle_event(SDL_Event *evt)
         case SDL_MOUSEMOTION:
             if (ctx->input.mouse.grabbed) {
                 int x = (int)ctx->input.mouse.prev.x, y = (int)ctx->input.mouse.prev.y;
-                nk_input_motion(ctx, x + evt->motion.xrel / sdl_x_scale, y + evt->motion.yrel  / sdl_y_scale);
+                nk_input_motion(ctx, x + evt->motion.xrel, y + evt->motion.yrel);
             }
-            else nk_input_motion(ctx, evt->motion.x / sdl_x_scale, evt->motion.y / sdl_y_scale);
+            else nk_input_motion(ctx, evt->motion.x, evt->motion.y);
             return 1;
 
         case SDL_TEXTINPUT:

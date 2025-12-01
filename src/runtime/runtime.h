@@ -84,18 +84,6 @@ typedef struct RUNTIME {
     DYNARRAY *symbols;
 } RUNTIME;
 
-// Command line options
-typedef struct {
-    char *inifile;
-    uint32_t createini: 1;
-    uint32_t model: 1;
-    uint32_t ui: 1;
-    uint32_t merge: 1;
-    uint32_t noini: 1;
-    uint32_t saveini: 1;
-    uint32_t pad: 25;
-} Opts;
-
 void runtime_bind(RUNTIME *rt, APPLE2 *m, UI *ui);
 int runtime_init(RUNTIME *rt, INI_STORE *ini_store);
 int runtime_run(RUNTIME *rt, APPLE2 *m, UI *ui);
@@ -121,4 +109,5 @@ void runtime_machine_step_out(RUNTIME *rt);
 void runtime_machine_step_over(RUNTIME *rt);
 void runtime_machine_stop(RUNTIME *rt);
 void runtime_paste_clipboard(RUNTIME *rt, char *clipboard_text);
+void runtime_machine_toggle_franklin80_active(RUNTIME *rt);
 int runtime_feed_clipboard_key(RUNTIME *rt);

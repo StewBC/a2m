@@ -28,6 +28,9 @@ uint8_t unk_joy_read_button(UI *ui, int controller_id, int button_id) {
 
 uint8_t unk_joy_read_axis(UI *ui, int controller_id, int axis_id, uint64_t cycle) {
     UNK *v = (UNK*)ui->user;
+    if(!v->num_controllers) {
+        return 0xff;
+    }
     uint64_t cycle_delta = cycle - v->ptrig_cycle;
     uint8_t val = clamp_u8(cycle_delta * 255 / paddl_normalized, 0, 255);
     return val > v->axis_left[controller_id][axis_id] ? 0x00 : 0x80;

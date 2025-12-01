@@ -349,7 +349,7 @@ char *util_ini_next_token(char **start) {
     return *start;
 }
 
-int util_ini_load_file(char *filename, INI_PAIR_CALLBACK callback, void *user_data) {
+int util_ini_load_file(const char *filename, INI_PAIR_CALLBACK callback, void *user_data) {
     UTIL_FILE ini_file;
     memset(&ini_file, 0, sizeof(UTIL_FILE));
     ini_file.load_padding = 1;
@@ -391,7 +391,7 @@ int util_ini_load_file(char *filename, INI_PAIR_CALLBACK callback, void *user_da
     return A2_OK;
 }
 
-int util_ini_save_file(char *filename, INI_STORE *ini_store) {
+int util_ini_save_file(const char *filename, INI_STORE *ini_store) {
     if(!ini_store || !ini_store->sections.items) {
         return A2_OK;
     }

@@ -73,7 +73,6 @@ typedef struct UNK {
     uint32_t dlg_memory_go: 1;
     uint32_t dlg_symbol_lookup_dbg: 1;
     uint32_t dlg_symbol_lookup_mem: 1;
-    uint32_t franklin80active: 1;
     uint32_t model: 1;
     uint32_t monitor_type: 2;
     uint32_t original_del: 1;
@@ -93,9 +92,6 @@ extern const UI_OPS unk_ops;
 #define color_help_sub_heading  nk_rgb(  0,128,255)
 #define color_help_notice       nk_rgb(255,255,  0)
 #define color_help_key_heading  nk_rgb(  0,255,128)
-
-// These values are picked up in nuklrsdl.h
-extern float sdl_x_scale, sdl_y_scale;
 
 // a helper to make a Nuklear function a bit nicer
 int nk_option_label_disabled(struct nk_context *ctx, const char *label, int state, int disabled);

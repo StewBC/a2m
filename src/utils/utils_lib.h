@@ -12,6 +12,7 @@
 #include <direct.h>                                         // For _getcwd and _chdir
 #define stricmp _stricmp
 #define strnicmp _strnicmp
+#define sscanf sscanf_s
 #ifndef PATH_MAX
 #define PATH_MAX 4096                                       // Match Linux defenition
 #define PATH_SEPARATOR '\\'

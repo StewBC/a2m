@@ -4,14 +4,9 @@
 
 #include "unk_lib.h"
 
-// These are defined in unk_view and used in nuklrsdl.h, hence globals
-extern float sdl_x_scale, sdl_y_scale;
-
 void unk_show_help(UNK *v) {
     struct nk_context *ctx = v->ctx;
     SDL_Rect r = v->sdl_os_rect;
-    r.w /= sdl_x_scale;
-    r.h /= sdl_y_scale;
     if(nk_begin(ctx, "Help", nk_rect(r.x, r.y, r.w, r.h), NK_WINDOW_NO_SCROLLBAR)) {
         nk_layout_row_dynamic(ctx, 30, 1);
         nk_label_colored(ctx, "Apple ][+ emulator by Stefan Wessels, 2025.", NK_TEXT_CENTERED,

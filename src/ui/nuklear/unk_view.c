@@ -34,9 +34,6 @@ const UI_OPS unk_ops = {
     .set_shadow_flags  = unk_set_shadow_flags,
 };
 
-// These values are picked up in nuklrsdl.h
-float sdl_x_scale, sdl_y_scale;
-
 static inline SDL_Rect nk_to_sdl_rect(struct nk_rect r) {
     SDL_Rect s;
     s.x = (int)lroundf(r.x);
@@ -188,39 +185,20 @@ static SDL_Texture *load_png_texture_from_ram(SDL_Renderer *r, uint8_t *image, i
 }
 
 void unk_config_ui(UNK *v, INI_STORE *ini_store) {
-    // Display scale and LEDs
-    INI_SECTION *s = ini_find_section(ini_store, "display");
-    if(s) {
-        for(int i = 0; i < s->kv.items; i++) {
-            INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
-            const char *key = kv->key;
-            const char *val = kv->val;
-            if(0 == stricmp(key, "scale")) {
-                float scale = 1.0f;
-                sscanf(val, "%f", &scale);
-                if(scale > 0.0f) {
-                    v->display_scale = scale;
-                }
-            } else if(0 == stricmp(key, "disk_leds")) {
-                int state = 0;
-                sscanf(val, "%d", &state);
-                if(state == 1) {
-                    v->show_leds = 1;
-                }
-            }
+    // Display LEDs
+    const char *val = ini_get(ini_store, "state", "disk_leds");
+    if(val) {
+        int state = 0;
+        sscanf(val, "%d", &state);
+        if(stricmp(val, "on") == 0 || state == 1) {
+            v->show_leds = 1;
         }
     }
 }
 
 int unk_init(UNK *v, int model, INI_STORE *ini_store) {
-    v->display_scale = 1.0f;
     unk_config_ui(v, ini_store);
-
-    // Scale the window, and set the SDL render scale accordingly
-    v->target_rect.w *= v->display_scale;
-    v->target_rect.h *= v->display_scale;
-    v->sdl_os_rect = v->target_rect;        // And remember the setting
-    sdl_x_scale = sdl_y_scale = v->display_scale;
+    v->sdl_os_rect = v->target_rect;        // Remember the size
 
     // Initialize SDL with video and audio
     if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) < 0) {
@@ -481,6 +459,7 @@ void unk_toggle_debug(UNK *v) {
 
 void unk_present(UNK *v) {
     RUNTIME *rt = v->rt;
+    APPLE2 *m = v->m;
     // Commit changes to the texture And update renderer with the texture
     if(v->clear_a2_view) {
         // Clear the background that prev may have contained the texture to gray
@@ -490,7 +469,7 @@ void unk_present(UNK *v) {
         v->clear_a2_view = 0;
     }
 
-    if(v->franklin80active || v->shadow_flags.b.col80set && (v->shadow_flags.b.dhires || v->shadow_flags.b.text)) {
+    if(m->franklin80active || v->shadow_flags.b.col80set && (v->shadow_flags.b.dhires || v->shadow_flags.b.text)) {
         SDL_UpdateTexture(v->texture_wide, NULL, v->surface_wide->pixels, v->surface_wide->pitch);
         SDL_RenderCopy(v->renderer, v->texture_wide, NULL, v->draw_rect);
     } else {

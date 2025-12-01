@@ -87,6 +87,7 @@ int diskii_mount(APPLE2 *m, const int slot, const int device, const char *file_n
     slot_add_card(m, slot, SLOT_TYPE_DISKII, &m->diskii_controller[slot],
                   m->roms.blocks[ROM_DISKII_13SECTOR + image->disk_encoding].bytes, NULL);
 
+    m->diskii_controller[slot].diskii_drive[device].quarter_track_pos = rand() % DISKII_QUATERTRACKS;
     return A2_OK;
 }
 

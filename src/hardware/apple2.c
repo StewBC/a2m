@@ -8,30 +8,16 @@
 #include "a2sft_ee.h"
 
 static void apple2_cofig_from_ini(APPLE2 *m, INI_STORE *ini_store) {
-    INI_SECTION *s = ini_find_section(ini_store, "machine");
-    if(s) {
-        for(int i = 0; i < s->kv.items; i++) {
-            INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
-            const char *key = kv->key;
-            const char *val = kv->val;
-
-            if(0 == stricmp(key, "model")) {
-                if(0 == stricmp(val, "plus")) {
-                    m->model = MODEL_APPLE_II_PLUS;
-                    m->cpu.class = CPU_6502;
-                    m->ram_size = 64 * 1024;
-                }
-            }
-        }
+    const char *val = ini_get(ini_store, "machine", "model");
+    if(val && 0 == stricmp(val, "plus")) {
+        m->model = MODEL_APPLE_II_PLUS;
+        m->cpu.class = CPU_6502;
+        m->ram_size = 64 * 1024;
     }
 }
 
 static void apple2_slot_setup(APPLE2 *m, INI_STORE *ini_store) {
     INI_SECTION *s;
-    int slot_number = 0;
-
-    // No slot mapped in C800 range to start
-    m->mapped_slot = 0;
 
     s = ini_find_section(ini_store, "diskii");
     if(s) {
@@ -39,19 +25,15 @@ static void apple2_slot_setup(APPLE2 *m, INI_STORE *ini_store) {
             INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
             const char *key = kv->key;
             const char *val = kv->val;
-            if(0 == stricmp(key, "slot")) {
-                sscanf(val, "%d", &slot_number);
-                if(slot_number >= 1 && slot_number < 8) {
-                    slot_add_card(m, slot_number, SLOT_TYPE_DISKII, &m->diskii_controller[slot_number],
-                                  m->roms.blocks[ROM_DISKII_16SECTOR].bytes, NULL);
-                    m->diskii_controller[slot_number].diskii_drive[0].quarter_track_pos = rand() % DISKII_QUATERTRACKS;
-                    m->diskii_controller[slot_number].diskii_drive[1].quarter_track_pos = rand() % DISKII_QUATERTRACKS;
-                }
-            } else if(slot_number >= 1 && slot_number < 8) {
-                if(0 == stricmp(key, "disk0")) {
-                    diskii_mount(m, slot_number, 0, val);
-                } else if(0 == stricmp(key, "disk1")) {
-                    diskii_mount(m, slot_number, 1, val);
+            int slot, device;
+
+            if (sscanf(key, "%*1[Ss]%d%*1[Dd]%d", &slot, &device) == 2) {
+                if(slot >= 1 && slot <= 7 && device >= 0 && device <= 1) {
+                    slot_add_card(m, slot, SLOT_TYPE_DISKII, &m->diskii_controller[slot],
+                                m->roms.blocks[ROM_DISKII_16SECTOR].bytes, NULL);
+                    if(val[0]) {
+                        diskii_mount(m, slot, device, val);
+                    }
                 }
             }
         }
@@ -63,21 +45,20 @@ static void apple2_slot_setup(APPLE2 *m, INI_STORE *ini_store) {
             INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
             const char *key = kv->key;
             const char *val = kv->val;
-            if(0 == stricmp(key, "slot")) {
-                sscanf(val, "%d", &slot_number);
-                if(slot_number >= 1 && slot_number < 8) {
-                    slot_add_card(m, slot_number, SLOT_TYPE_SMARTPORT, &m->sp_device[slot_number],
-                                  &m->roms.blocks[ROM_SMARTPORT].bytes[slot_number * 0x100], NULL);
+            int slot, device;
+
+            if (sscanf(key, "%*1[Ss]%d%*1[Dd]%d", &slot, &device) == 2) {
+                if(slot >= 1 && slot <= 7 && device >= 0 && device <= 1) {
+                slot_add_card(m, slot, SLOT_TYPE_SMARTPORT, &m->sp_device[slot],
+                                &m->roms.blocks[ROM_SMARTPORT].bytes[slot * 0x100], NULL);
                 }
-            } else if(slot_number >= 1 && slot_number < 8) {
-                if(0 == stricmp(key, "disk0")) {
-                    sp_mount(m, slot_number, 0, val);
-                } else if(0 == stricmp(key, "disk1")) {
-                    sp_mount(m, slot_number, 1, val);
-                } else if(0 == stricmp(key, "boot")) {
-                    if(0 != strcmp(val, "0") && m->sp_device[slot_number].sp_files[0].is_file_open) {
-                        // The rom doesn't get a chance to run but fortunately ProDOS does just fine
-                        m->cpu.pc = 0xc000 + slot_number * 0x100;
+                if(val[0]) {
+                    sp_mount(m, slot, device, val);
+                }
+            } else if(stricmp(key, "bs") == 0) {
+                if(sscanf(val, "%d", &slot) == 1 && slot >= 1 && slot <= 7) {
+                    if(m->sp_device[slot].sp_files[0].is_file_open) {
+                        m->cpu.pc = 0xc000 + slot * 0x100;
                     }
                 }
             }
@@ -90,13 +71,13 @@ static void apple2_slot_setup(APPLE2 *m, INI_STORE *ini_store) {
             INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
             const char *key = kv->key;
             const char *val = kv->val;
-            if(0 == stricmp(key, "slot")) {
-                sscanf(val, "%d", &slot_number);
-            }
-            if(0 == stricmp(key, "device") && !m->model) { // Prevent the enhanced from adding this card
-                if(slot_number >= 1 && slot_number < 8) {
+            int slot, n;
+
+            if(!m->model && sscanf(key,"%*1[Ss]%d%n", &slot, &n) == 1 && n == 2 && 
+                stricmp(&key[2], "dev") == 0) {
+                if(slot >= 1 && slot < 8) {
                     if(A2_OK == franklin_display_init(&m->franklin_display)) {
-                        slot_add_card(m, slot_number, SLOT_TYPE_VIDEX_API, &m->franklin_display,
+                        slot_add_card(m, slot, SLOT_TYPE_VIDEX_API, &m->franklin_display,
                                       &m->roms.blocks[ROM_FRANKLIN_ACE_DISPLAY].bytes[0x600], franklin_display_map_cx_rom);
                         memset(m->RAM_WATCH + 0xCC00, 1, 0x200);
                         m->franklin80installed = 1;
@@ -241,8 +222,10 @@ int apple2_init(APPLE2 *m, INI_STORE *ini_store) {
 void apple2_machine_reset(APPLE2 *m) {
     // A2 state_flags reset (keep model), setting text mode
     int model = m->model;
+    int f80 = m->franklin80installed;
     m->state_flags = 0;
     m->model = model;
+    m->franklin80installed = f80;
     m->text = 1;
 
     // Reset LC

@@ -114,7 +114,7 @@ typedef struct CB_CLIPBOARD_CTX {
 
 typedef uint8_t (*cb_read_button)(void *user, int controller_id, int button_id);
 typedef uint8_t (*cb_read_axis)(void *user, int controller_id, int axis_id, uint64_t cycle);
-typedef uint8_t (*cb_ptrig)(void *user, uint64_t cycle);
+typedef void (*cb_ptrig)(void *user, uint64_t cycle);
 
 typedef struct CB_INPUTDEVICE_CTX {
     void *user;

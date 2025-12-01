@@ -665,7 +665,7 @@ void unk_apl2_screen_dhgr(UNK *v, int start, int end) {
     uint32_t *pixels = (uint32_t *) surface->pixels;
     uint16_t page = v->shadow_flags.b.page2set ? 0x4000 : 0x2000;
     int surface_width = surface->w;
-    SDL_PixelFormat *format = v->surface->format; // (unused here but keeping your locals)
+    SDL_PixelFormat *format = v->surface->format;
     int y;
 
     for(y = start; y < end; y++) {
@@ -774,7 +774,7 @@ void unk_apl2_screen_dhgr_rgb(UNK *v, int start, int end) {
     uint32_t *pixels = (uint32_t *) surface->pixels;
     uint16_t page = v->shadow_flags.b.page2set ? 0x4000 : 0x2000;
     int surface_width = surface->w;
-    SDL_PixelFormat *format = v->surface->format; // (unused here but keeping your locals)
+    SDL_PixelFormat *format = v->surface->format;
     int y;
 
     for(y = start; y < end; y++) {
