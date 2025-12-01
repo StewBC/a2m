@@ -243,8 +243,7 @@ int parse_arg(ARGCTX *ctx, const char *long_name, const char *short_name, int pa
     const char *arg = ctx->argv[ctx->index];
 
     // Not this option
-    if(_stricmp(arg, long_name) != 0 &&
-            (!short_name || _stricmp(arg, short_name) != 0)) {
+    if(stricmp(arg, long_name) != 0 && (!short_name || stricmp(arg, short_name) != 0)) {
         return 0;
     }
 
