@@ -9,7 +9,7 @@ typedef enum {
     MODE_READ   = 1,
     MODE_WRITE  = 2,
     MODE_ACCESS = 3
-} brkmode_t;
+} BRKMODE;
 
 typedef enum {
     ACTION_UNUSED,
@@ -19,13 +19,13 @@ typedef enum {
     ACTION_TRON,
     ACTION_TRON_APPEND,
     ACTION_TROFF
-} brkaction_t;
+} BRKACTION;
 
 typedef struct {
     uint32_t    start;     // required
     uint32_t    end;       // = start if no range
-    brkmode_t   mode;      // default = MODE_PC
-    brkaction_t action;    // default = ACTION_UNUSED
+    BRKMODE     mode;      // default = MODE_PC
+    BRKACTION   action;    // default = ACTION_UNUSED
     int         count;     // optional; 0 if unset
     int         reset;     // optional; 0 if unset
 } parsed_t;

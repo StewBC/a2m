@@ -505,6 +505,37 @@ int utils_is_newline(char c) {
     return (c == '\n' || c == '\r');
 }
 
+char *util_extract_file_name(const char *string, int str_len, int *index) {
+    if(*index >= str_len) {
+        return NULL;
+    }
+    char *s = string[*index] == '"' ? &string[*index+1] : &string[*index];
+    char *e = s;
+    while(*e && *e != '"') {
+        *e++;
+    }
+    if(e - string > str_len) {
+        return NULL;
+    }
+
+    int len = e - s;
+    char *fn = (char *)malloc(len + 1);
+    if(!fn) {
+        return NULL;
+    }
+    // strncpy(fn, s, len);
+    memcpy(fn, s, len);
+    fn[len] = '\0';
+    if(*e == '"') {
+        e++;
+        while(*e == ' ' || *e == ',' && *e != '"') {
+            e++;
+        };
+    }
+    *index = e - string;
+    return fn;
+}
+
 // https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function#FNV-1a_hash
 uint32_t utils_fnv_1a_hash(const char *key, size_t len) {
     uint32_t hash = 2166136261u;                            // FNV offset basis

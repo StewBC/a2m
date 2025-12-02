@@ -70,6 +70,7 @@ int array_remove(DYNARRAY *array, void *element) {
         uint8_t *start = (uint8_t *) element + array->element_size;
         memmove(element, start, end - start);
         array->items--;
+        return A2_OK;
     }
     return A2_ERR;
 }

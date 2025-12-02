@@ -5,9 +5,10 @@
 #include "common.h"
 #include "hardware_lib.h"
 
-uint8_t image_get_byte(APPLE2 *m, diskii_drive_t *d) {
+uint8_t image_get_byte(APPLE2 *m, DISKII_DRIVE *d) {
     // static int pos = 0;
-    diskii_image_t *image = &d->image;
+    // active image is set at this point
+    DISKII_IMAGE *image = d->active_image;
     uint8_t byte = rand() & 0x7f;
 
     switch(image->kind) {
@@ -16,7 +17,7 @@ uint8_t image_get_byte(APPLE2 *m, diskii_drive_t *d) {
             break;
 
         case IMG_NIB: {
-                image_nib_t *nib = (image_nib_t *)image->image_specifics;
+                IMAGE_NIB *nib = (IMAGE_NIB *)image->image_specifics;
                 // How many cpu cycles since last read
                 uint64_t delta   = m->cpu.cycles - d->q6_last_read_cycles;
                 // Advance by as many bytes as would pass in 32 cpu cycles
@@ -37,7 +38,7 @@ uint8_t image_get_byte(APPLE2 *m, diskii_drive_t *d) {
     return byte;
 }
 
-void image_head_position(diskii_image_t *image, uint32_t quater_track) {
+void image_head_position(DISKII_IMAGE *image, uint32_t quater_track) {
     if(!image->image_specifics) {
         return;
     }
@@ -47,7 +48,7 @@ void image_head_position(diskii_image_t *image, uint32_t quater_track) {
             break;
 
         case IMG_NIB: {
-                image_nib_t *nib = (image_nib_t *)image->image_specifics;
+                IMAGE_NIB *nib = (IMAGE_NIB *)image->image_specifics;
                 nib->track_index_pos = (quater_track / 4);
                 if(nib->track_index_pos > nib->num_tracks) {
                     nib->track_index_pos = nib->num_tracks - 1;
@@ -62,12 +63,12 @@ void image_head_position(diskii_image_t *image, uint32_t quater_track) {
     }
 }
 
-int image_load_dsk(APPLE2 *m, diskii_image_t *image, const char *ext) {
+int image_load_dsk(APPLE2 *m, DISKII_IMAGE *image, const char *ext) {
 
     return A2_ERR;
 }
 
-int image_load_nib(APPLE2 *m, diskii_image_t *image) {
+int image_load_nib(APPLE2 *m, DISKII_IMAGE *image) {
     uint32_t track_size = 6384;
     image->kind = IMG_NIB;
 
@@ -78,13 +79,13 @@ int image_load_nib(APPLE2 *m, diskii_image_t *image) {
         return A2_ERR;
     }
 
-    image->image_specifics = malloc(sizeof(image_nib_t));
+    image->image_specifics = malloc(sizeof(IMAGE_NIB));
     if(!image->image_specifics) {
         return A2_ERR;
     }
-    memset(image->image_specifics, 0, sizeof(image_nib_t));
+    memset(image->image_specifics, 0, sizeof(IMAGE_NIB));
     int rom_count[2] = {0, 0};
-    image_nib_t *nib = (image_nib_t *)image->image_specifics;
+    IMAGE_NIB *nib = (IMAGE_NIB *)image->image_specifics;
     nib->writable = 1;
     nib->track_size = track_size;
     nib->num_tracks = image->file.file_size / track_size;
@@ -111,11 +112,11 @@ int image_load_nib(APPLE2 *m, diskii_image_t *image) {
     return A2_OK;
 }
 
-int image_load_woz(APPLE2 *m, diskii_image_t *image) {
+int image_load_woz(APPLE2 *m, DISKII_IMAGE *image) {
     return A2_ERR;
 }
 
-void image_shutdown(diskii_image_t *image) {
+void image_shutdown(DISKII_IMAGE *image) {
     util_file_discard(&image->file);
     if(image->image_specifics) {
         // No specific image type currently has internal allocations so just

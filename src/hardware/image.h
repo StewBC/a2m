@@ -5,7 +5,7 @@
 #pragma once
 
 // Forward
-typedef struct _diskii_drive diskii_drive_t;
+typedef struct DISKII_DRIVE DISKII_DRIVE;
 
 // #define DISKII_HALFTRACKS   70
 #define DISKII_QUATERTRACKS 140            // 35 tracks, 70 half tracks 140 quater tracks
@@ -16,40 +16,40 @@ typedef enum {
     DSK_SECTOR_ORDER_DOS33,            // physical 16-sector interleave
     DSK_SECTOR_ORDER_PRODOS,           // logical 0..15
     DSK_SECTOR_ORDER_OTHER
-} disk_sector_order_t;
+} DISKII_SECTOR_ORDER;
 
 typedef enum {
     DSK_ENCODING_13SECTOR,             // DOS 3.2
     DSK_ENCODING_16SECTOR              // DOS 3.3 / ProDOS
-} disk_encoding_t;
+} DISKII_ENCODING;
 
 // Emulator support for differenty image types
 typedef enum {
     IMG_DSK,
     IMG_WOZ,
     IMG_NIB
-} diskii_kind_t;
+} DISKII_KIND;
 
 // NIB file specific data
-typedef struct _image_nib {
+typedef struct IMAGE_NIB {
     uint32_t writable;        // 0 = no
     uint32_t track_size;      // 6656 or 6384 bytes
     uint32_t num_tracks;      // Typically 35
     uint32_t track_index_pos; // byte offset into file for current track start
     uint32_t track_read_pos;  // "head" offset from track start to byte
-} image_nib_t;
+} IMAGE_NIB;
 
 // The file that's loaded
-typedef struct _diskii_image {
+typedef struct DISKII_IMAGE {
     UTIL_FILE file;
-    diskii_kind_t kind;
-    disk_encoding_t disk_encoding;
-    void *image_specifics;    // kind's data (image_dsk_t, image_nib_t, image_woz_t)
-} diskii_image_t;
+    DISKII_KIND kind;
+    DISKII_ENCODING disk_encoding;
+    void *image_specifics;    // kind's data (image_dsk_t, IMAGE_NIB, image_woz_t)
+} DISKII_IMAGE;
 
-uint8_t image_get_byte(APPLE2 *m, diskii_drive_t *d);
-void image_head_position(diskii_image_t *image, uint32_t quater_track);
-int image_load_dsk(APPLE2 *m, diskii_image_t *image, const char *ext);
-int image_load_nib(APPLE2 *m, diskii_image_t *image);
-int image_load_woz(APPLE2 *m, diskii_image_t *image);
-void image_shutdown(diskii_image_t *image);
+uint8_t image_get_byte(APPLE2 *m, DISKII_DRIVE *d);
+void image_head_position(DISKII_IMAGE *image, uint32_t quater_track);
+int image_load_dsk(APPLE2 *m, DISKII_IMAGE *image, const char *ext);
+int image_load_nib(APPLE2 *m, DISKII_IMAGE *image);
+int image_load_woz(APPLE2 *m, DISKII_IMAGE *image);
+void image_shutdown(DISKII_IMAGE *image);

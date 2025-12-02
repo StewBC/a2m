@@ -69,6 +69,7 @@ void unk_misc_show(UNK *v) {
                     nk_labelf(ctx, NK_TEXT_LEFT, "Slot %d: Disk II", i);
                     for(int j = 0; j < 2; j++) {
                         nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 5);
+                        float w = 1.0f - 0.08f;
                         nk_layout_row_push(ctx, 0.08f);
                         if(!j) {
                             char label[4];
@@ -80,10 +81,12 @@ void unk_misc_show(UNK *v) {
                         } else {
                             nk_labelf(ctx, NK_TEXT_CENTERED, "%d.%d", i, j);
                         }
+                        w -= 0.08f;
                         nk_layout_row_push(ctx, 0.08f);
                         if(nk_button_label(ctx, "Eject")) {
-                            image_shutdown(&d[i].diskii_drive[j].image);
+                            diskii_eject(m, i, j, 1);
                         }
+                        w -= 0.1f;
                         nk_layout_row_push(ctx, 0.1f);
                         if(nk_button_label(ctx, "Insert")) {
                             if(!v->unk_dlg_modal) {
@@ -95,9 +98,24 @@ void unk_misc_show(UNK *v) {
                                 v->dlg_filebrowser = 1;
                             }
                         }
-                        nk_layout_row_push(ctx, 0.74f);
-                        if(d[i].diskii_drive[j].image.file.is_file_loaded) {
-                            nk_label(ctx, d[i].diskii_drive[j].image.file.file_display_name, NK_TEXT_LEFT);
+                        if(d[i].diskii_drive[j].images.items > 1) {
+                            char low[3], high[3], title[13];
+                            int index;
+                            size_t items;
+                            index = d[i].diskii_drive[j].image_index + 1;
+                            items = d[i].diskii_drive[j].images.items;
+                            snprintf(low, 3, "%02d", index);
+                            snprintf(high, 3, "%02zd", items);
+                            sprintf(title, "Swap (%s/%s)", low, high);
+                            w -= 0.18f;
+                            nk_layout_row_push(ctx, 0.18f);
+                            if(nk_button_label(ctx, title)) {
+                                diskii_mount_image(m, i, j, index >= items ? 0 : index);
+                            }
+                        }
+                        nk_layout_row_push(ctx, w);
+                        if(d[i].diskii_drive[j].active_image && d[i].diskii_drive[j].active_image->file.is_file_loaded) {
+                            nk_label(ctx, d[i].diskii_drive[j].active_image->file.file_display_name, NK_TEXT_LEFT);
                         }
                         nk_layout_row_end(ctx);
                     }
@@ -342,12 +360,7 @@ void unk_misc_show(UNK *v) {
                     }
                 } else {
                     // SLOT_TYPE_DISKII
-                    // Eject the file that's active, if there is one, and mount the new one
-                    util_file_discard(&m->diskii_controller[fb->slot].diskii_drive[fb->device].image.file);
-                    if(A2_ERR == diskii_mount(m, fb->slot, fb->device, fb->dir_selected.name)) {
-                        // If it fails, just discard the file
-                        util_file_discard(&m->diskii_controller[fb->slot].diskii_drive[fb->device].image.file);
-                    }
+                    diskii_mount(m, fb->slot, fb->device, fb->dir_selected.name);
                 }
             }
         }

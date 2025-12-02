@@ -25,7 +25,7 @@ static inline double clamp(double v, double lo, double hi) {
     return v < lo ? lo : v > hi ? hi : v;
 }
 
-static inline double rpm_now(uint64_t now, diskii_drive_t *d) {
+static inline double rpm_now(uint64_t now, DISKII_DRIVE *d) {
     double dt = now - d->motor_event_cycles;
     double rate = d->motor_on ? DISKII_SPINUP_RATE : -DISKII_SPINDOWN_RATE;
     double rpm  = d->motor_rpm + rate * dt;
@@ -38,12 +38,16 @@ static inline void diskii_timer_update(uint64_t now, uint64_t *anchor, uint64_t 
     *timer = *timer > delta ? *timer - delta : 0;
 }
 
+void diskii_controller_init(DISKII_CONTROLLER *controller) {
+    ARRAY_INIT(&controller->diskii_drive->images, DISKII_IMAGE);
+}
+
 void diskii_drive_select(APPLE2 *m, const int slot, int soft_switch) {
     m->diskii_controller[slot].active = soft_switch & 1;
 }
 
 void diskii_motor(APPLE2 *m, const int slot, int soft_switch) {
-    diskii_drive_t *d = &m->diskii_controller[slot].diskii_drive[m->diskii_controller[slot].active];
+    DISKII_DRIVE *d = &m->diskii_controller[slot].diskii_drive[m->diskii_controller[slot].active];
     uint64_t now = m->cpu.cycles;
     double current_rpm = rpm_now(now, d);
     d->motor_rpm = current_rpm;
@@ -51,13 +55,40 @@ void diskii_motor(APPLE2 *m, const int slot, int soft_switch) {
     d->motor_on = soft_switch & 1;
 }
 
-int diskii_mount(APPLE2 *m, const int slot, const int device, const char *file_name) {
-    DISKII_CONTROLLER *diic = &m->diskii_controller[slot];
+int diskii_eject(APPLE2 *m, const int slot, const int device, int mount_next) {
+    DISKII_CONTROLLER *dc = &m->diskii_controller[slot];
     if(m->slot_cards[slot].slot_type != SLOT_TYPE_DISKII) {
         return A2_ERR;
     }
 
-    diskii_image_t *image = &diic->diskii_drive[device].image;
+    DISKII_DRIVE *dd = &dc->diskii_drive[device];
+    if(!dd->active_image) {
+        return A2_OK;
+    }
+
+    image_shutdown(dd->active_image);
+    array_remove(&dd->images, dd->active_image);
+    dd->active_image = NULL;
+    int index = dd->image_index;
+    size_t items = dd->images.items;
+    if(mount_next && items > 0) {
+        diskii_mount_image(m, slot, device, index >= items ? 0 : index);
+    } else {
+        dd->image_index = -1;
+    }
+    return A2_OK;
+}
+
+int diskii_mount(APPLE2 *m, const int slot, const int device, const char *file_name) {
+    DISKII_CONTROLLER *dc = &m->diskii_controller[slot];
+    if(m->slot_cards[slot].slot_type != SLOT_TYPE_DISKII) {
+        return A2_ERR;
+    }
+    DISKII_DRIVE *dd = &dc->diskii_drive[device];
+    DISKII_IMAGE new_disk_image;
+    memset(&new_disk_image, 0, sizeof(DISKII_IMAGE));
+    DISKII_IMAGE *image = &new_disk_image;
+    // DISKII_IMAGE *image = &dd->image;
     UTIL_FILE *file = &image->file;
     if(A2_OK != util_file_load(file, file_name, "rb+")) {
         return A2_ERR;
@@ -80,31 +111,53 @@ int diskii_mount(APPLE2 *m, const int slot, const int device, const char *file_n
             return A2_ERR;
         }
     }
-    if(load != A2_OK) {
+    if(load != A2_OK || A2_ERR == ARRAY_ADD(&dd->images, new_disk_image)) {
+        util_file_discard(&new_disk_image.file);
         return load;
     }
+    dd->image_index = dd->images.items - 1;
+    return diskii_mount_image(m, slot, device, dd->image_index);
+}
+
+uint8_t diskii_mount_image(APPLE2 *m, const int slot, const int device, const int index) {
+    DISKII_CONTROLLER *dc = &m->diskii_controller[slot];
+    if(m->slot_cards[slot].slot_type != SLOT_TYPE_DISKII) {
+        return A2_ERR;
+    }
+    DISKII_DRIVE *dd = &dc->diskii_drive[device];
+    if(!dd->images.items || index > dd->images.items) {
+        dd->image_index = -1;
+        return A2_OK;
+    }
+    dd->active_image = ARRAY_GET(&dd->images, DISKII_IMAGE, index);
     // Map the appropriate ROM
     slot_add_card(m, slot, SLOT_TYPE_DISKII, &m->diskii_controller[slot],
-                  m->roms.blocks[ROM_DISKII_13SECTOR + image->disk_encoding].bytes, NULL);
-
-    m->diskii_controller[slot].diskii_drive[device].quarter_track_pos = rand() % DISKII_QUATERTRACKS;
+                  m->roms.blocks[ROM_DISKII_13SECTOR + dd->active_image->disk_encoding].bytes, NULL);
+    dd->quarter_track_pos = rand() % DISKII_QUATERTRACKS;
+    dd->image_index = index;
     return A2_OK;
 }
 
 uint8_t diskii_q6_access(APPLE2 *m, int slot, uint8_t on_off) {
-    diskii_drive_t *d = &m->diskii_controller[slot].diskii_drive[m->diskii_controller[slot].active];
+    DISKII_DRIVE *d = &m->diskii_controller[slot].diskii_drive[m->diskii_controller[slot].active];
     if(m->a2out_cb.cb_diskactivity_ctx.cb_diskread) {
         m->a2out_cb.cb_diskactivity_ctx.cb_diskread(m->a2out_cb.cb_diskactivity_ctx.user);
     }
+
+    if(!d->active_image || !d->active_image->image_specifics) {
+        return 0x7f;
+    }
+
     diskii_timer_update(m->cpu.cycles, &d->head_event_cycles, &d->head_settle_cycles);
-    if(m->cpu.cycles - d->q6_last_read_cycles < 32 || rpm_now(m->cpu.cycles, d) < DISKII_READABLE_RPM || !d->image.image_specifics || d->head_settle_cycles) {
+    // if(m->cpu.cycles - d->q6_last_read_cycles < 32 || rpm_now(m->cpu.cycles, d) < DISKII_READABLE_RPM || !d->image.image_specifics || d->head_settle_cycles) {
+    if(m->cpu.cycles - d->q6_last_read_cycles < 32 || rpm_now(m->cpu.cycles, d) < DISKII_READABLE_RPM || d->head_settle_cycles) {
         return 0x7f;
     }
     return image_get_byte(m, d);
 }
 
 uint8_t diskii_q7_access(APPLE2 *m, int slot, uint8_t on_off) {
-    diskii_drive_t *d = &m->diskii_controller[slot].diskii_drive[m->diskii_controller[slot].active];
+    DISKII_DRIVE *d = &m->diskii_controller[slot].diskii_drive[m->diskii_controller[slot].active];
     return 0x7f;
 }
 
@@ -122,14 +175,20 @@ void diskii_reset(APPLE2 *m) {
 void diskii_shutdown(APPLE2 *m) {
     for(int slot = 2; slot <= 7; slot++) {
         if(m->slot_cards[slot].slot_type == SLOT_TYPE_DISKII) {
-            image_shutdown(&m->diskii_controller[slot].diskii_drive[0].image);
-            image_shutdown(&m->diskii_controller[slot].diskii_drive[1].image);
+            for(int i = 0; i < m->diskii_controller[slot].diskii_drive[0].images.items; i++) {
+                image_shutdown(ARRAY_GET(&m->diskii_controller[slot].diskii_drive[0].images, DISKII_IMAGE, i));
+            }
+            m->diskii_controller[slot].diskii_drive[1].active_image = NULL;
+            for(int i = 0; i < m->diskii_controller[slot].diskii_drive[1].images.items; i++) {
+                image_shutdown(ARRAY_GET(&m->diskii_controller[slot].diskii_drive[1].images, DISKII_IMAGE, i));
+            }
+            m->diskii_controller[slot].diskii_drive[1].active_image = NULL;
         }
     }
 }
 
 void diskii_step_head(APPLE2 *m, int slot, int soft_switch) {
-    diskii_drive_t *d = &m->diskii_controller[slot].diskii_drive[m->diskii_controller[slot].active];
+    DISKII_DRIVE *d = &m->diskii_controller[slot].diskii_drive[m->diskii_controller[slot].active];
 
     diskii_timer_update(m->cpu.cycles, &d->head_event_cycles, &d->head_settle_cycles);
 
@@ -174,7 +233,9 @@ void diskii_step_head(APPLE2 *m, int slot, int soft_switch) {
         d->quarter_track_pos = DISKII_QUATERTRACKS - 1;
     }
 
-    image_head_position(&d->image, d->quarter_track_pos);
+    if(d->active_image) {
+        image_head_position(d->active_image, d->quarter_track_pos);
+    }
 
     d->phase_mask = curr;
     if(curr) {

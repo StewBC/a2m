@@ -32,7 +32,14 @@ static void apple2_slot_setup(APPLE2 *m, INI_STORE *ini_store) {
                     slot_add_card(m, slot, SLOT_TYPE_DISKII, &m->diskii_controller[slot],
                                   m->roms.blocks[ROM_DISKII_16SECTOR].bytes, NULL);
                     if(val[0]) {
-                        diskii_mount(m, slot, device, val);
+                        char *fn;
+                        int index = 0;
+                        int str_len = strlen(val);
+                        while((fn = util_extract_file_name(val, str_len, &index))) {
+                            diskii_mount(m, slot, device, fn);
+                            free(fn);
+                        }
+                        diskii_mount_image(m, slot, device, 0);
                     }
                 }
             }
@@ -53,7 +60,10 @@ static void apple2_slot_setup(APPLE2 *m, INI_STORE *ini_store) {
                                   &m->roms.blocks[ROM_SMARTPORT].bytes[slot * 0x100], NULL);
                 }
                 if(val[0]) {
-                    sp_mount(m, slot, device, val);
+                    int index = 0;
+                    int str_len = strlen(val);
+                    char *fn = util_extract_file_name(val, str_len, &index);
+                    sp_mount(m, slot, device, fn);
                 }
             } else if(stricmp(key, "bs") == 0) {
                 if(sscanf(val, "%d", &slot) == 1 && slot >= 1 && slot <= 7) {
@@ -209,6 +219,10 @@ int apple2_init(APPLE2 *m, INI_STORE *ini_store) {
 
     // Init the CPU to cold-start by jumping to ROM address at 0xfffc
     cpu_init(m);
+
+    for(int slot = 1; slot < 8; slot++) {
+        diskii_controller_init(&m->diskii_controller[slot]);
+    }
 
     // Configure the slots (based on ini_store)
     apple2_slot_setup(m, ini_store);
