@@ -36,7 +36,7 @@ void unk_misc_show(UNK *v) {
                             char label[4];
                             sprintf(label, "%d.%d", i, j);
                             if(nk_button_label(ctx, label)) {
-                                runtime_machine_reset(rt);
+                                rt_machine_reset(rt);
                                 m->cpu.pc = 0xc000 + i * 0x100;
                             }
                         } else {
@@ -75,7 +75,7 @@ void unk_misc_show(UNK *v) {
                             char label[4];
                             sprintf(label, "%d.%d", i, j);
                             if(nk_button_label(ctx, label)) {
-                                runtime_machine_reset(rt);
+                                rt_machine_reset(rt);
                                 m->cpu.pc = 0xc000 + i * 0x100;
                             }
                         } else {
@@ -164,7 +164,7 @@ void unk_misc_show(UNK *v) {
                         if(read_from_memory_debug(m, stack_addr - 2) == 0x20) {
                             nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 2);
                             uint16_t dest_addr = read_from_memory_debug(m, stack_addr - 1) + read_from_memory_debug(m, stack_addr) * 256;
-                            char *symbol = symbols_find_symbols(rt, dest_addr);
+                            char *symbol = rt_sym_find_symbols(rt, dest_addr);
                             sprintf(callstack_display, "%04X", stack_addr - 2);
                             nk_layout_row_push(ctx, 0.1f);
                             if(nk_select_label(ctx, callstack_display, NK_TEXT_ALIGN_LEFT, 0)) {
@@ -247,7 +247,7 @@ void unk_misc_show(UNK *v) {
                         if(nk_button_label(ctx, bp->disabled ? "Enable" : "Disable")) {
                             bp->disabled ^= 1;
                             if(!bp->use_pc) {
-                                breakpoint_reapply_address_masks(rt);
+                                rt_bp_apply_masks(rt);
                             }
                         }
                         if(!bp->use_pc) {
@@ -266,7 +266,7 @@ void unk_misc_show(UNK *v) {
                             // Delete the breakpoint
                             array_remove(&rt->breakpoints, bp);
                             // And reset the mask on memory to watch for any remaining address breakpoint
-                            breakpoint_reapply_address_masks(rt);
+                            rt_bp_apply_masks(rt);
                         }
                         nk_layout_row_end(ctx);
                     }
@@ -326,7 +326,7 @@ void unk_misc_show(UNK *v) {
             if(1 == ret) {
                 // Apply changes
                 *bpe->bp_original = bpe->bp_under_edit;
-                breakpoint_reapply_address_masks(rt);
+                rt_bp_apply_masks(rt);
             }
             // Nov 28, 2025 - Leaving here but I think this is resolved...
             // This is necessary to keep the Misc window active. Why 193?

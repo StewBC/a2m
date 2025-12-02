@@ -48,7 +48,6 @@ typedef enum KEY_MOD {
 } KEY_MOD;
 
 typedef struct RUNTIME {
-    // SQW - do I need these Partners here?
     APPLE2 *m;
 
     // Turbo (1MHz+ settings)
@@ -84,30 +83,30 @@ typedef struct RUNTIME {
     DYNARRAY *symbols;
 } RUNTIME;
 
-void runtime_bind(RUNTIME *rt, APPLE2 *m, UI *ui);
-int runtime_init(RUNTIME *rt, INI_STORE *ini_store);
-int runtime_run(RUNTIME *rt, APPLE2 *m, UI *ui);
-void runtime_shutdown(RUNTIME *rt);
+void rt_bind(RUNTIME *rt, APPLE2 *m, UI *ui);
+int rt_init(RUNTIME *rt, INI_STORE *ini_store);
+int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui);
+void rt_shutdown(RUNTIME *rt);
 
-// UI accesses runtime through these calls
-void runtime_machine_reset(RUNTIME *rt);
-void runtime_brk_callback(RUNTIME *rt, uint16_t address, uint8_t mask);
-int runtime_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, char symbol_view, char *str_buf, int str_buf_len);
+// UI accesses rt through these calls
+void rt_machine_reset(RUNTIME *rt);
+void rt_brk_callback(RUNTIME *rt, uint16_t address, uint8_t mask);
+int rt_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, char symbol_view, char *str_buf, int str_buf_len);
 
 // Debugger control
-void runtime_machine_pause(RUNTIME *rt);
-void runtime_machine_run(RUNTIME *rt);
-void runtime_machine_run_to_pc(RUNTIME *rt, uint16_t pc);
-void runtime_machine_set_pc(RUNTIME *rt, uint16_t pc);
-void runtime_machine_set_sp(RUNTIME *rt, uint16_t sp);
-void runtime_machine_set_A(RUNTIME *rt, uint8_t A);
-void runtime_machine_set_X(RUNTIME *rt, uint8_t X);
-void runtime_machine_set_Y(RUNTIME *rt, uint8_t Y);
-void runtime_machine_set_flags(RUNTIME *rt, uint8_t flags);
-void runtime_machine_step(RUNTIME *rt);
-void runtime_machine_step_out(RUNTIME *rt);
-void runtime_machine_step_over(RUNTIME *rt);
-void runtime_machine_stop(RUNTIME *rt);
-void runtime_paste_clipboard(RUNTIME *rt, char *clipboard_text);
-void runtime_machine_toggle_franklin80_active(RUNTIME *rt);
-int runtime_feed_clipboard_key(RUNTIME *rt);
+void rt_machine_pause(RUNTIME *rt);
+void rt_machine_run(RUNTIME *rt);
+void rt_machine_run_to_pc(RUNTIME *rt, uint16_t pc);
+void rt_machine_set_pc(RUNTIME *rt, uint16_t pc);
+void rt_machine_set_sp(RUNTIME *rt, uint16_t sp);
+void rt_machine_set_A(RUNTIME *rt, uint8_t A);
+void rt_machine_set_X(RUNTIME *rt, uint8_t X);
+void rt_machine_set_Y(RUNTIME *rt, uint8_t Y);
+void rt_machine_set_flags(RUNTIME *rt, uint8_t flags);
+void rt_machine_step(RUNTIME *rt);
+void rt_machine_step_out(RUNTIME *rt);
+void rt_machine_step_over(RUNTIME *rt);
+void rt_machine_stop(RUNTIME *rt);
+void rt_paste_clipboard(RUNTIME *rt, char *clipboard_text);
+void rt_machine_toggle_franklin80_active(RUNTIME *rt);
+int rt_feed_clipboard_key(RUNTIME *rt);

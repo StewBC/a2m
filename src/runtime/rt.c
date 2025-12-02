@@ -2,7 +2,7 @@
 // Stefan Wessels, 2025
 // This is free and unencumbered software released into the public domain.
 
-#include "runtime_lib.h"
+#include "rt_lib.h"
 
 #define TARGET_FPS              60
 #define OPCODE_JSR              0x20
@@ -10,9 +10,9 @@
 #define SYMBOL_COL_LEN          17
 #define adjust(a,b,c)           do { a += c; b -= c; } while (0)
 
-int runtime_update(RUNTIME *rt);
+int rt_update(RUNTIME *rt);
 
-void runtime_apply_ini(RUNTIME *rt, INI_STORE *ini_store) {
+void rt_apply_ini(RUNTIME *rt, INI_STORE *ini_store) {
     int slot_number = -1;
 
     const char *val;
@@ -79,9 +79,10 @@ void runtime_apply_ini(RUNTIME *rt, INI_STORE *ini_store) {
             const char *key = kv->key;
             const char *val = kv->val;
             if(0 == stricmp(key, "break")) {
-                parsed_t parsed_line;
+                PARSEDBP parsed_line;
+                memset(&parsed_line, 0, sizeof(PARSEDBP));
                 if(A2_OK == parse_breakpoint_line(val, &parsed_line)) {
-                    BREAKPOINT *bp = get_breakpoint_at_address(rt, (uint16_t)parsed_line.start, 0);
+                    BREAKPOINT *bp = rt_bp_get_at_address(rt, (uint16_t)parsed_line.start, 0);
                     if(!bp) {
                         BREAKPOINT bp;
                         memset(&bp, 0, sizeof(bp));
@@ -97,24 +98,31 @@ void runtime_apply_ini(RUNTIME *rt, INI_STORE *ini_store) {
                         bp.counter_reset = parsed_line.reset;
                         bp.use_counter = bp.counter_stop_value || bp.counter_reset ? 1 : 0;
                         bp.action = parsed_line.action;
+                        bp.type_text = parsed_line.type_text;
+                        bp.slot = parsed_line.slot;
+                        bp.device = parsed_line.device;
                         ARRAY_ADD(&rt->breakpoints, bp);
+                    } else {
+                        free(parsed_line.type_text);
                     }
+                } else {
+                    free(parsed_line.type_text);
                 }
             }
         }
     }
 }
 
-void runtime_bind(RUNTIME *rt, APPLE2 *m, UI *ui) {
+void rt_bind(RUNTIME *rt, APPLE2 *m, UI *ui) {
     // Bind to the Apple 2 - This needs to be here because some
     // bindings are UI specific so what UI needs to be resolved first
     A2OUT_CB a2rt_cb = {
-        .cb_breakpoint_ctx =    {(void *)rt, breakpoint_callback},
-        .cb_brk_ctx =           {(void *)rt, (cb_breakpoint)runtime_brk_callback},
+        .cb_breakpoint_ctx =    {(void *)rt, rt_bp_callback},
+        .cb_brk_ctx =           {(void *)rt, (cb_breakpoint)rt_brk_callback},
         .cb_diskactivity_ctx =  {(void *)ui, (cb_diskread)ui->ops->disk_read_led, (cb_diskwrite)ui->ops->disk_write_led},
         .cb_speaker_ctx =       {(void *)ui, (cb_speaker)ui->ops->speaker_toggle},
         .cb_inputdevice_ctx =   {(void *)ui, (cb_ptrig)ui->ops->ptrig, (cb_read_button)ui->ops->read_button, (cb_read_axis)ui->ops->read_axis}, // user, ptrig, button, axis
-        .cb_clipboard_ctx =     {(void *)rt, (cb_clipboard)runtime_feed_clipboard_key},
+        .cb_clipboard_ctx =     {(void *)rt, (cb_clipboard)rt_feed_clipboard_key},
     };
 
     // Set up the access helpers
@@ -123,10 +131,10 @@ void runtime_bind(RUNTIME *rt, APPLE2 *m, UI *ui) {
 
     // The hardware is configured, so start binding
     apple2_set_callbacks(m, &a2rt_cb);
-    breakpoint_reapply_address_masks(rt);
+    rt_bp_apply_masks(rt);
 };
 
-int runtime_init(RUNTIME *rt, INI_STORE *ini_store) {
+int rt_init(RUNTIME *rt, INI_STORE *ini_store) {
 
     // Clear everything
     memset(rt, 0, sizeof(RUNTIME));
@@ -135,10 +143,10 @@ int runtime_init(RUNTIME *rt, INI_STORE *ini_store) {
     ARRAY_INIT(&rt->breakpoints, BREAKPOINT);
 
     // Init the symbol table
-    symbols_init(rt, ini_store);
+    rt_sym_init(rt, ini_store);
 
     // See if turbo settings or breakpoints came in at startup
-    runtime_apply_ini(rt, ini_store);
+    rt_apply_ini(rt, ini_store);
 
     // Create Turbo states if ini didn't
     if(!rt->turbo_count) {
@@ -160,7 +168,7 @@ int runtime_init(RUNTIME *rt, INI_STORE *ini_store) {
     return A2_OK;
 }
 
-int runtime_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
+int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
     int ret_val = A2_OK;
     int quit = 0;
     const uint64_t pfreq = SDL_GetPerformanceFrequency();
@@ -181,7 +189,7 @@ int runtime_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
                 uint64_t cycles = 0;
                 while(cycles < cycles_per_frame) {
                     // See if a breakpoint was hit (will clear rt->run)
-                    if(!runtime_update(rt)) {
+                    if(!rt_update(rt)) {
                         break;
                     }
                     size_t opcode_cycles = machine_run_opcode(m);
@@ -192,7 +200,7 @@ int runtime_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
                 uint64_t emulation_cycles = frame_start_ticks + ticks_per_frame - overhead_ticks;
                 while(SDL_GetPerformanceCounter() < emulation_cycles) {
                     // See if a breakpoint was hit (will clear rt->run)
-                    if(!runtime_update(rt)) {
+                    if(!rt_update(rt)) {
                         break;
                     }
                     size_t opcode_cycles = machine_run_opcode(m);
@@ -237,14 +245,14 @@ int runtime_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
     return ret_val;
 }
 
-void runtime_shutdown(RUNTIME *rt) {
+void rt_shutdown(RUNTIME *rt) {
     rt->turbo_count = 0;
     free(rt->turbo);
     rt->turbo = NULL;
 }
 
 
-void runtime_machine_reset(RUNTIME *rt) {
+void rt_machine_reset(RUNTIME *rt) {
     APPLE2 *m = rt->m;
     rt->run = 1;
     rt->run_to_pc = 0;
@@ -252,12 +260,12 @@ void runtime_machine_reset(RUNTIME *rt) {
     diskii_reset(m);
 }
 
-void runtime_brk_callback(RUNTIME *rt, uint16_t address, uint8_t mask) {
+void rt_brk_callback(RUNTIME *rt, uint16_t address, uint8_t mask) {
     rt->run = 0;
 }
 
 
-int runtime_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, char symbol_view, char *str_buf, int str_buf_len) {
+int rt_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, char symbol_view, char *str_buf, int str_buf_len) {
     APPLE2 *m = rt->m;
     char address_symbol[11];
     uint16_t pc = *address;
@@ -268,7 +276,7 @@ int runtime_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, char 
     *address += length;
     int prt_len;
     uint16_t operands;
-    char *symbol = symbol_view == SYMBOL_VIEW_NONE ? 0 : symbols_find_symbols(rt, pc);
+    char *symbol = symbol_view == SYMBOL_VIEW_NONE ? 0 : rt_sym_find_symbols(rt, pc);
     if(!symbol) {
         symbol = "                                ";
     }
@@ -292,7 +300,7 @@ int runtime_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, char 
                     if(symbol_view || instruction == 0xa0 || instruction == 0xc0 || instruction == 0xe0) {
                         symbol = 0;
                     } else {
-                        symbol = symbols_find_symbols(rt, pc + 2 + (int8_t) operands);
+                        symbol = rt_sym_find_symbols(rt, pc + 2 + (int8_t) operands);
                         // If no symbol but symbol view is on - resolve to an address and pretend that's the symbol
                         if(!symbol) {
                             snprintf(address_symbol, 11, "$%02X [%04X]", (uint8_t) operands, (uint16_t)(pc + 2 + (int8_t) operands));
@@ -304,7 +312,7 @@ int runtime_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, char 
                     symbol = 0;
                     break;
                 default:                                            // just look for the byte address
-                    symbol = symbol_view ? 0 : symbols_find_symbols(rt, operands);
+                    symbol = symbol_view ? 0 : rt_sym_find_symbols(rt, operands);
                     break;
             }
             if(!symbol) {
@@ -320,7 +328,7 @@ int runtime_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, char 
                 operands = ((ah << 8) | al);
                 prt_len = snprintf(text, remain, "%02X %02X %02X  %s", instruction, al, ah, opcode_text[instruction]);
                 adjust(text, remain, prt_len);
-                symbol = symbol_view & SYMBOL_VIEW_MARGIN ? 0 : symbols_find_symbols(rt, operands);
+                symbol = symbol_view & SYMBOL_VIEW_MARGIN ? 0 : rt_sym_find_symbols(rt, operands);
                 if(!symbol) {
                     snprintf(text, remain, opcode_hex_params[instruction], operands);
                 } else {
@@ -333,60 +341,60 @@ int runtime_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, char 
 }
 
 // Debugger control
-void runtime_machine_pause(RUNTIME *rt) {
+void rt_machine_pause(RUNTIME *rt) {
     rt->run = 0;
 }
 
-void runtime_machine_run(RUNTIME *rt) {
+void rt_machine_run(RUNTIME *rt) {
     rt->run = 1;
     // rt->run_to_pc = 0;
 }
 
-void runtime_machine_run_to_pc(RUNTIME *rt, uint16_t pc) {
+void rt_machine_run_to_pc(RUNTIME *rt, uint16_t pc) {
     rt->run = 1;
     rt->run_to_pc = 1;
     rt->pc_to_run_to = pc;
 }
 
-void runtime_machine_set_pc(RUNTIME *rt, uint16_t pc) {
+void rt_machine_set_pc(RUNTIME *rt, uint16_t pc) {
     rt->m->cpu.pc = pc;
 }
 
-void runtime_machine_set_sp(RUNTIME *rt, uint16_t sp) {
+void rt_machine_set_sp(RUNTIME *rt, uint16_t sp) {
     rt->m->cpu.sp = sp;
 }
 
-void runtime_machine_set_A(RUNTIME *rt, uint8_t A) {
+void rt_machine_set_A(RUNTIME *rt, uint8_t A) {
     rt->m->cpu.A = A;
 }
 
-void runtime_machine_set_X(RUNTIME *rt, uint8_t X) {
+void rt_machine_set_X(RUNTIME *rt, uint8_t X) {
     rt->m->cpu.X = X;
 }
 
-void runtime_machine_set_Y(RUNTIME *rt, uint8_t Y) {
+void rt_machine_set_Y(RUNTIME *rt, uint8_t Y) {
     rt->m->cpu.Y = Y;
 }
 
-void runtime_machine_set_flags(RUNTIME *rt, uint8_t flags) {
+void rt_machine_set_flags(RUNTIME *rt, uint8_t flags) {
     rt->m->cpu.flags = flags;
 }
 
-void runtime_machine_step(RUNTIME *rt) {
+void rt_machine_step(RUNTIME *rt) {
     rt->run = 1;
     rt->run_step = 1;
     // rt->run_to_pc = 0;
     // rt->run_step_out = 0;
 }
 
-void runtime_machine_step_out(RUNTIME *rt) {
+void rt_machine_step_out(RUNTIME *rt) {
     APPLE2 *m = rt->m;
     rt->run = 1;
     rt->jsr_counter = 0;
     rt->run_step_out = 1;
 }
 
-void runtime_machine_step_over(RUNTIME *rt) {
+void rt_machine_step_over(RUNTIME *rt) {
     APPLE2 *m = rt->m;
     uint8_t instruction = read_from_memory_debug(m, m->cpu.pc);
     if(instruction == OPCODE_JSR) {
@@ -398,7 +406,7 @@ void runtime_machine_step_over(RUNTIME *rt) {
     rt->run = 1;
 }
 
-void runtime_machine_stop(RUNTIME *rt) {
+void rt_machine_stop(RUNTIME *rt) {
     rt->run = 0;
     rt->run_step = 0;
     rt->run_step_out = 0;
@@ -407,20 +415,21 @@ void runtime_machine_stop(RUNTIME *rt) {
     rt->jsr_counter = 0;
 }
 
-void runtime_machine_toggle_franklin80_active(RUNTIME *rt) {
+void rt_machine_toggle_franklin80_active(RUNTIME *rt) {
     APPLE2 *m = rt->m;
     m->franklin80active ^= 1;
 }
 
 // Make a copy of the clipboard text
-void runtime_paste_clipboard(RUNTIME *rt, char *clipboard_text) {
+void rt_paste_clipboard(RUNTIME *rt, char *clipboard_text) {
+    free(rt->clipboard_text);
     rt->clipboard_text = strdup(clipboard_text);
     rt->clipboard_index = 0;
-    runtime_feed_clipboard_key(rt);
+    rt_feed_clipboard_key(rt);
 }
 
 // Put the next clipboard character into the KBD
-int runtime_feed_clipboard_key(RUNTIME *rt) {
+int rt_feed_clipboard_key(RUNTIME *rt) {
     if(!rt->clipboard_text) {
         return 0;
     }
@@ -461,13 +470,13 @@ int runtime_feed_clipboard_key(RUNTIME *rt) {
 }
 
 // This runs before machine step so the logic seems a bit weird
-int runtime_update(RUNTIME *rt) {
+int rt_update(RUNTIME *rt) {
     APPLE2 *m = rt->m;
 
     // Only look for breakpoints if not stepping
     if(!rt->run_step) {
         if(rt->run_to_pc && rt->pc_to_run_to == m->cpu.pc) {
-            runtime_machine_stop(rt);
+            rt_machine_stop(rt);
         } else if(rt->run_step_out) {
             uint8_t instruction = read_from_memory_debug(m, m->cpu.pc);
             switch(instruction) {
@@ -476,45 +485,56 @@ int runtime_update(RUNTIME *rt) {
                     break;
                 case OPCODE_RTS:
                     if(--rt->jsr_counter < 0) {
-                        runtime_machine_stop(rt);           // Stop
+                        rt_machine_stop(rt);           // Stop
                         return 1;                           // But step the RTS
                     }
                     break;
             }
         }
-        BREAKPOINT *bp = get_breakpoint_at_address(rt, m->cpu.pc, 1);
+        BREAKPOINT *bp = rt_bp_get_at_address(rt, m->cpu.pc, 1);
         if(bp) {
             if(!bp->action) {
-                runtime_machine_stop(rt);
+                rt_machine_stop(rt);
             } else {
                 switch(bp->action) {
                     // SQW - optimize access
                     case ACTION_FAST:
                         rt->turbo_active = -1.0;
-                        break;
+                    break;
+                    case ACTION_RESTORE:
+                        rt->turbo_active = rt->turbo[rt->turbo_index];
+                    break;
                     case ACTION_SLOW:
                         rt->turbo_active =  1.0;
-                        break;
-                    case ACTION_TRON:
+                    break;
+                    case ACTION_SWAP: {
+                        int index = m->diskii_controller[bp->slot].diskii_drive[bp->device].image_index + 1;
+                        int items = m->diskii_controller[bp->slot].diskii_drive[bp->device].images.items;
+                        diskii_mount_image(m, bp->slot, bp->device, index >= items ? 0 : index);
+                    }
+                    break;
+                    case ACTION_TROFF:
+                        // trace_off(&m->trace_file);
+                        // m->trace =  0;
+                    break;
                     case ACTION_TRON_APPEND:
+                    case ACTION_TRON:
                         // SQW maybe turn back on
                         // if(A2_OK == trace_on(&m->trace_file, "trace.txt", bp->action == ACTION_TRON ? "w" : "a")) {
                         //     m->trace =  1;
                         // }
-                        break;
-                    case ACTION_TROFF:
-                        // trace_off(&m->trace_file);
-                        // m->trace =  0;
-                        break;
-                    case ACTION_RESTORE:
-                        rt->turbo_active = rt->turbo[rt->turbo_index];
-                        break;
+                    break;
+                    case ACTION_TYPE:
+                        if(bp->type_text) {
+                            rt_paste_clipboard(rt, bp->type_text);
+                        }
+                    break;
                 }
             }
         }
     } else if(!rt->run_to_pc) {
         // If stepping, and not stepping over, then stop
-        runtime_machine_stop(rt);
+        rt_machine_stop(rt);
         return 1;
     } else {
         // Otherwise not stepping, but running, so future breakpoints 

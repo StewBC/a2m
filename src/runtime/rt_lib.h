@@ -13,6 +13,6 @@
 #include "hardware_lib.h"
 
 #include "breakpoint.h"
-#include "breakpnt.h"
-#include "symbols.h"
-#include "runtime.h"
+#include "rt_bp.h"
+#include "rt_sym.h"
+#include "rt.h"

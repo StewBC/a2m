@@ -2,12 +2,12 @@
 // Stefan Wessels, 2025
 // This is free and unencumbered software released into the public domain.
 
-#include "runtime_lib.h"
+#include "rt_lib.h"
 
 // Running is 0 when drawing the disassembly, but <> 0 when testing for a break running the emulation
 // SQW - This needs updating to show where read/write breakpoints are, and for finding those
 // through ini creation
-BREAKPOINT *get_breakpoint_at_address(RUNTIME *rt, uint16_t pc, int running) {
+BREAKPOINT *rt_bp_get_at_address(RUNTIME *rt, uint16_t pc, int running) {
     int items = rt->breakpoints.items;
     for(int i = 0; i < items; i++) {
         // Find a breakpoint at address
@@ -33,7 +33,7 @@ BREAKPOINT *get_breakpoint_at_address(RUNTIME *rt, uint16_t pc, int running) {
     return 0;
 }
 
-void breakpoint_callback(void *user, uint16_t address, uint8_t mask) {
+void rt_bp_callback(void *user, uint16_t address, uint8_t mask) {
     RUNTIME *rt = (RUNTIME *)user;
     APPLE2 *m = rt->m;
     int items = rt->breakpoints.items;
@@ -72,7 +72,7 @@ void breakpoint_callback(void *user, uint16_t address, uint8_t mask) {
     }
 }
 
-void breakpoint_reapply_address_masks(RUNTIME *rt) {
+void rt_bp_apply_masks(RUNTIME *rt) {
     APPLE2 *m = rt->m;
     int items = rt->breakpoints.items;
     // Clear all the callback masks for access breakpoints

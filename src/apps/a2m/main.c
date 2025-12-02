@@ -2,7 +2,7 @@
 // Stefan Wessels, 2025
 // This is free and unencumbered software released into the public domain.
 
-#include "runtime_lib.h"
+#include "rt_lib.h"
 
 #define MAX_CLI_PARAMS  1
 
@@ -422,21 +422,21 @@ int main(int argc, char **argv) {
 
     do {
         // Config selves
-        runtime_init(&rt, &ini_store);
+        rt_init(&rt, &ini_store);
         apple2_init(&m, &ini_store);
         ui_init(&ui, m.model, &ini_store);
 
-        // Set bindings (callbacks) for appe2 <-> runtime <-> ui
-        runtime_bind(&rt, &m, &ui);
+        // Set bindings (callbacks) for appe2 <-> rt <-> ui
+        rt_bind(&rt, &m, &ui);
 
         // Enter the main loop, till the user quits or makes a reconfig that
         // requires everything to be re-configured
-        runtime_run(&rt, &m, &ui);
+        rt_run(&rt, &m, &ui);
 
         // Shut everything down
         ui_shutdown(&ui);
         apple2_shutdown(&m);
-        runtime_shutdown(&rt);
+        rt_shutdown(&rt);
 
         // If a re-config is called for, go back and do it all over
     } while(ui.reconfig);

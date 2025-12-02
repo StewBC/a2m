@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "runtime_lib.h"
+#include "rt_lib.h"
 
 #include "ui.h"
 

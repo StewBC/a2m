@@ -18,7 +18,7 @@ void asm_err(ASSEMBLER *as, const char *format, ...) {
             return;
         }
 
-        uint32_t current_file_name_hash = utils_fnv_1a_hash(as->current_file, strlen(as->current_file));
+        uint32_t current_file_name_hash = util_fnv_1a_hash(as->current_file, strlen(as->current_file));
         if(entries < MAX_LOG_LINES) {
             va_list args;
             va_start(args, format);

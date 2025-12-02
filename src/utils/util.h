@@ -37,7 +37,7 @@ void util_file_close(UTIL_FILE *f);
 void util_file_discard(UTIL_FILE *f);
 int util_file_load(UTIL_FILE *f, const char *file_name, const char *file_mode);
 int util_file_open(UTIL_FILE *f, const char *file_name, const char *file_mode);
-int file_stat_regular_utf8(const char *path, uint64_t *size_out, uint64_t *mtime_out);
+int util_file_stat_regular_utf8(const char *path, uint64_t *size_out, uint64_t *mtime_out);
 
 char *util_ini_find_character(char **start, char character);
 char *util_ini_get_line(char **start, char *end);
@@ -50,8 +50,8 @@ char *util_strrtok(char *str, const char *delim);
 int util_qsort_cmp(const void *p1, const void *p2);
 void *util_memset32(void *ptr, uint32_t value, size_t count);
 char *util_strndup(const char *string, size_t length);
-char utils_character_in_characters(const char character, const char *characters);
-int utils_is_newline(char c);
+char util_character_in_characters(const char character, const char *characters);
+int util_is_newline(char c);
 char *util_extract_file_name(const char *string, int str_len, int *index);
 
-uint32_t utils_fnv_1a_hash(const char *key, size_t len);
+uint32_t util_fnv_1a_hash(const char *key, size_t len);

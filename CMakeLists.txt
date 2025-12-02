@@ -42,16 +42,22 @@ target_link_libraries(a2m PUBLIC
     $<$<PLATFORM_ID:Linux>:m>
 )
 
-# Use this to compile only unk_dasm.c with -Wno-format-security on Linux
 if(UNIX AND NOT APPLE)
-    # Create an interface target for the specific compile option
-    add_library(warn_suppress_format_security INTERFACE)
-    target_compile_options(warn_suppress_format_security INTERFACE "-Wno-format-security")
+    option(ENABLE_ASAN "Build with AddressSanitizer/LeakSanitizer" OFF)
 
-    # Link this interface target to the file unk_dasm.c only
-    set_source_files_properties(src/unk_dasm.c PROPERTIES
-        COMPILE_OPTIONS $<TARGET_PROPERTY:warn_suppress_format_security,INTERFACE_COMPILE_OPTIONS>
-    )
+    if(ENABLE_ASAN)
+        message(STATUS "Building with AddressSanitizer + LeakSanitizer")
+
+        add_compile_options(
+            -fsanitize=address
+            -fno-omit-frame-pointer
+            -g
+        )
+
+        add_link_options(
+            -fsanitize=address
+        )
+    endif()
 endif()
 
 if(APPLE)

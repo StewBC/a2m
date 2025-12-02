@@ -8,7 +8,7 @@
 // Main tokenization routines
 void get_token(ASSEMBLER *as) {
     // Expression separators
-    const char c = utils_character_in_characters(*as->input, ",;\n\r");
+    const char c = util_character_in_characters(*as->input, ",;\n\r");
     if(!(*as->input) || c) {
         // End of file, or a line/token terminating character encountered
         as->current_token.type = TOKEN_END;
@@ -16,14 +16,14 @@ void get_token(ASSEMBLER *as) {
         if(c == ',') {
             as->input++;
         } else if(c == ';') {
-            while(*as->input && !utils_is_newline(*as->input)) {
+            while(*as->input && !util_is_newline(*as->input)) {
                 as->input++;
             }
         }
-        while(utils_is_newline(*as->input)) {
+        while(util_is_newline(*as->input)) {
             as->next_line_count++;
             // MS line endings are 2 characters
-            if(utils_is_newline(*(as->input + 1)) && *as->input != *(as->input + 1)) {
+            if(util_is_newline(*(as->input + 1)) && *as->input != *(as->input + 1)) {
                 as->input++;
             }
             as->input++;
@@ -39,12 +39,12 @@ void get_token(ASSEMBLER *as) {
         as->next_line_count = 0;
     }
     // Skip whitespace
-    while(isspace(*as->input) && !utils_is_newline(*as->input)) {
+    while(isspace(*as->input) && !util_is_newline(*as->input)) {
         as->input++;
     }
 
     // Detect end of expression characters
-    if(*as->input == '\0' || utils_character_in_characters(*as->input, ",;\n\r")) {
+    if(*as->input == '\0' || util_character_in_characters(*as->input, ",;\n\r")) {
         get_token(as);
         return;
     }
@@ -56,7 +56,7 @@ void get_token(ASSEMBLER *as) {
     }
     while(*as->input) {
         const char c = *as->input;
-        if(isalnum(c) || c == '_' || (instring && !utils_character_in_characters(c, "\"\n\r"))) {
+        if(isalnum(c) || c == '_' || (instring && !util_character_in_characters(c, "\"\n\r"))) {
             as->input++;
         } else {
             if(instring) {
@@ -96,7 +96,7 @@ void get_token(ASSEMBLER *as) {
 void next_token(ASSEMBLER *as) {
     get_token(as);
 
-    if(as->token_start >= as->input || utils_character_in_characters(*as->token_start, ",;\n\r")) {
+    if(as->token_start >= as->input || util_character_in_characters(*as->token_start, ",;\n\r")) {
         as->current_token.type = TOKEN_END;
     } else if(*as->token_start == '$') {                    // Hex number
         get_token(as);
@@ -188,7 +188,7 @@ void next_token(ASSEMBLER *as) {
         as->current_token.type = TOKEN_VAR;                 // Variable Name
         as->current_token.name = as->token_start;
         as->current_token.name_length = as->input - as->token_start;
-        as->current_token.name_hash = utils_fnv_1a_hash(as->current_token.name, as->current_token.name_length);
+        as->current_token.name_hash = util_fnv_1a_hash(as->current_token.name, as->current_token.name_length);
     } else if(*as->token_start == '\'') {
         get_token(as);
         as->current_token.type = TOKEN_NUM;

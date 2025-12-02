@@ -553,7 +553,7 @@ void unk_render_frame(UI *ui, APPLE2 *m, int dirty) {
 
 void unk_set_runtime(UI *ui, RUNTIME *rt) {
     UNK *v = (UNK *)ui->user;
-    // Set the runtime that the view sits on top of
+    // Set the rt that the view sits on top of
     v->rt = rt;
 }
 

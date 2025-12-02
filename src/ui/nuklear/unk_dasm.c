@@ -234,7 +234,7 @@ void unk_dasm_resize_view(UNK *v) {
     dv->cols = cols;
     int rows = (parent.h - (ADDRESS_LABEL_H + dv->header_height)) / ROW_H;
     dv->rows = rows;
-    // 52 is more or less what runtime_disassemble_line uses to place a line
+    // 52 is more or less what rt_disassemble_line uses to place a line
     int cvt_size = cols > 60 ? cols : 60;
     if(dv->str_buf_len < cvt_size) {
         char *new_cvt_buf = (char *)realloc(dv->str_buf, cvt_size + 1);
@@ -258,7 +258,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
         if(e->key.keysym.sym == SDLK_F1) {
             v->show_help = 0;
             if(v->shadow_run) {
-                runtime_machine_run(rt);
+                rt_machine_run(rt);
             }
         }
         return;
@@ -307,29 +307,29 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                             as.pass = 2;
                             asm_err(&as, "Could not open file for assembly.");
                         }
-                        symbols_remove_symbols(rt, "assembler");
+                        rt_sym_remove_symbols(rt, "assembler");
                         size_t bucket_index;
                         for(bucket_index = 0; bucket_index < 256; bucket_index++) {
                             size_t symbol_index;
                             DYNARRAY *bucket = &as.symbol_table[bucket_index];
                             for(symbol_index = 0; symbol_index < bucket->items; symbol_index++) {
                                 SYMBOL_LABEL *sl = ARRAY_GET(bucket, SYMBOL_LABEL, symbol_index);
-                                symbols_add_symbol(rt, "assembler", sl->symbol_name, sl->symbol_length, sl->symbol_value, 1);
+                                rt_sym_add_symbol(rt, "assembler", sl->symbol_name, sl->symbol_length, sl->symbol_value, 1);
                             }
                         }
                         assembler_shutdown(&as);
-                        symbols_search_update(rt);
+                        rt_sym_search_update(rt);
 
                         if(dv->errorlog.log_array.items) {
                             v->unk_dlg_modal = 1;
                             v->dlg_assembler_errors = 1;
                         } else {
                             if(ac->reset_stack) {
-                                runtime_machine_set_sp(rt, 0x1ff);
+                                rt_machine_set_sp(rt, 0x1ff);
                             }
                             if(ac->auto_run_after_assemble) {
-                                runtime_machine_set_pc(rt, ac->start_address);
-                                runtime_machine_run(rt);
+                                rt_machine_set_pc(rt, ac->start_address);
+                                rt_machine_run(rt);
                             }
                         }
                     }
@@ -350,7 +350,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
 
         case SDLK_p:
             if(mod & KMOD_CTRL) {
-                runtime_machine_set_pc(rt, v->viewdasm.cursor_address);
+                rt_machine_set_pc(rt, v->viewdasm.cursor_address);
             }
             break;
 
@@ -415,7 +415,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
         case SDLK_F1:
             v->show_help = 1;
             v->shadow_run = rt->run;
-            runtime_machine_pause(rt);
+            rt_machine_pause(rt);
             break;
 
         case SDLK_F2:
@@ -430,20 +430,20 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
             break;
 
         case SDLK_F5:
-            runtime_machine_run(rt);                                     // Toggle run mode
+            rt_machine_run(rt);                                     // Toggle run mode
             break;
 
         case SDLK_F6:
             if(m->cpu.pc != dv->cursor_address) {
                 // This can only happen if emulator is not in run
-                runtime_machine_run_to_pc(rt, dv->cursor_address);
-                // runtime_machine_run(rt);                                 // Put the emulator back in run mode
+                rt_machine_run_to_pc(rt, dv->cursor_address);
+                // rt_machine_run(rt);                                 // Put the emulator back in run mode
             }
             break;
 
         case SDLK_F9:
             if(!rt->run) {
-                BREAKPOINT *b = get_breakpoint_at_address(rt, dv->cursor_address, 0);
+                BREAKPOINT *b = rt_bp_get_at_address(rt, dv->cursor_address, 0);
                 if(!b) {
                     // Toggle breakpoint
                     BREAKPOINT bp;
@@ -463,7 +463,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                 // if step over is active, F10 will do nothing.  This is so
                 // F10 can be held down to step-run the program
                 if(!rt->run_to_pc) {
-                    runtime_machine_step_over(rt);
+                    rt_machine_step_over(rt);
                 }
             }
             break;
@@ -472,16 +472,16 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
             // F11, with or without shift, will stop, even if run to rts is active
             // F11 with shift, otherwise will step out and without shift will just step
             if(!rt->run && mod & KMOD_SHIFT) {
-                runtime_machine_step_out(rt);
+                rt_machine_step_out(rt);
             } else {
-                runtime_machine_step(rt);                                    // Step one opcode
+                rt_machine_step(rt);                                    // Step one opcode
             }
             break;
 
         case SDLK_F12:
             if(mod & KMOD_SHIFT) {
                 if(m->franklin80installed) {
-                    runtime_machine_toggle_franklin80_active(rt);
+                    rt_machine_toggle_franklin80_active(rt);
                 }
             } else {
                 if(m->dhires && m->col80set && m->hires) {
@@ -538,10 +538,10 @@ void unk_dasm_show(UNK *v, int dirty) {
                 uint16_t current_pc = dv->top_address;
                 for(int i = 0; i < dv->rows; i++) {
                     current_pc = pc;
-                    runtime_disassemble_line(rt, &pc, dv->flags, dv->symbol_view, dv->str_buf, dv->str_buf_len);
+                    rt_disassemble_line(rt, &pc, dv->flags, dv->symbol_view, dv->str_buf, dv->str_buf_len);
                     struct nk_color bg = ob;
                     struct nk_color fg = ctx->style.text.color;
-                    BREAKPOINT *bp = get_breakpoint_at_address(rt, current_pc, 0);
+                    BREAKPOINT *bp = rt_bp_get_at_address(rt, current_pc, 0);
                     // See if the mouse has been clicked over this row to be drawn
                     if (nk_widget_is_mouse_clicked(ctx, NK_BUTTON_LEFT)) {
                         float rel_x = (ctx->input.mouse.pos.x - r.x) / v->font_width;

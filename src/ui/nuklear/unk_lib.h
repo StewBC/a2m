@@ -8,7 +8,7 @@
 #include "utils_lib.h"
 #include "asm_lib.h"
 #include "hardware_lib.h"
-#include "runtime_lib.h"
+#include "rt_lib.h"
 
 // SDL related
 #include <SDL2/SDL.h>

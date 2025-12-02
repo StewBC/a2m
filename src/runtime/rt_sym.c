@@ -2,9 +2,9 @@
 // Stefan Wessels, 2025
 // This is free and unencumbered software released into the public domain.
 
-#include "runtime_lib.h"
+#include "rt_lib.h"
 
-int symbols_add_symbol(RUNTIME *rt, const char *symbol_source, const char *symbol_name, size_t symbol_name_length, uint16_t address, int overwrite) {
+int rt_sym_add_symbol(RUNTIME *rt, const char *symbol_source, const char *symbol_name, size_t symbol_name_length, uint16_t address, int overwrite) {
     // Find where to insert the symbol
     enum {ACTION_NONE, ACTION_ADD, ACTION_UPDATE};
     DYNARRAY *bucket = &rt->symbols[address & 0xff];
@@ -46,7 +46,7 @@ int symbols_add_symbol(RUNTIME *rt, const char *symbol_source, const char *symbo
     return A2_OK;
 }
 
-int symbols_add_symbols(RUNTIME *rt, const char *symbol_source, char *input, size_t data_length, int overwrite) {
+int rt_sym_add_symbols(RUNTIME *rt, const char *symbol_source, char *input, size_t data_length, int overwrite) {
     int state = 0;
     char *end = input + data_length;
     while(input < end) {
@@ -63,23 +63,23 @@ int symbols_add_symbols(RUNTIME *rt, const char *symbol_source, char *input, siz
             }
             int symbol_length = symbol_end - symbol_name;
             input = symbol_end;
-            if(A2_OK != symbols_add_symbol(rt, symbol_source, symbol_name, symbol_length, address, overwrite)) {
+            if(A2_OK != rt_sym_add_symbol(rt, symbol_source, symbol_name, symbol_length, address, overwrite)) {
                 return A2_ERR;
             }
         }
         // Find the end of the line
-        while(input < end && *input && !utils_is_newline(*input)) {
+        while(input < end && *input && !util_is_newline(*input)) {
             input++;
         }
         // Skip past the end of the line
-        while(input < end && *input && utils_is_newline(*input)) {
+        while(input < end && *input && util_is_newline(*input)) {
             input++;
         }
     }
     return A2_OK;
 }
 
-int symbols_init(RUNTIME *rt, INI_STORE *ini_store) {
+int rt_sym_init(RUNTIME *rt, INI_STORE *ini_store) {
     // Make the 256 symbols "buckets"
     rt->symbols = (DYNARRAY *) malloc(sizeof(DYNARRAY) * 256);
     if(!rt->symbols) {
@@ -100,15 +100,15 @@ int symbols_init(RUNTIME *rt, INI_STORE *ini_store) {
 
     // Load the symbol files if they are found
     if(A2_OK == util_file_load(&symbol_file, "symbols/A2_BASIC.SYM", "r")) {
-        symbols_add_symbols(rt, "A2_BASIC", symbol_file.file_data, symbol_file.file_size, 0);
+        rt_sym_add_symbols(rt, "A2_BASIC", symbol_file.file_data, symbol_file.file_size, 0);
     }
     if(A2_OK == util_file_load(&symbol_file, "symbols/APPLE2E.SYM", "r")) {
-        symbols_add_symbols(rt, "APPLE2E", symbol_file.file_data, symbol_file.file_size, 0);
+        rt_sym_add_symbols(rt, "APPLE2E", symbol_file.file_data, symbol_file.file_size, 0);
     }
     if(A2_OK == util_file_load(&symbol_file, "symbols/USER.SYM", "r")) {
-        symbols_add_symbols(rt, "USER", symbol_file.file_data, symbol_file.file_size, 1);
+        rt_sym_add_symbols(rt, "USER", symbol_file.file_data, symbol_file.file_size, 1);
     }
-    if(A2_OK != symbols_search_update(rt)) {
+    if(A2_OK != rt_sym_search_update(rt)) {
         return A2_ERR;
     }
 
@@ -125,7 +125,7 @@ int symbols_sort(const void *lhs, const void *rhs) {
     return result;
 }
 
-void symbols_remove_symbols(RUNTIME *rt, const char *symbol_source) {
+void rt_sym_remove_symbols(RUNTIME *rt, const char *symbol_source) {
     size_t bucket_index;
     for(bucket_index = 0; bucket_index < 256; bucket_index++) {
         size_t symbol_index = 0;
@@ -142,7 +142,7 @@ void symbols_remove_symbols(RUNTIME *rt, const char *symbol_source) {
     }
 }
 
-int symbols_search_update(RUNTIME *rt) {
+int rt_sym_search_update(RUNTIME *rt) {
     size_t index;
     int count = 0;
     DYNARRAY *search = &rt->symbols_search;
@@ -174,7 +174,7 @@ int symbols_search_update(RUNTIME *rt) {
     return A2_OK;
 }
 
-char *symbols_find_symbols(RUNTIME *rt, uint32_t address) {
+char *rt_sym_find_symbols(RUNTIME *rt, uint32_t address) {
     DYNARRAY *s = &rt->symbols[address & 0xff];
     int items = s->items;
     for(int i = 0; i < items; i++) {

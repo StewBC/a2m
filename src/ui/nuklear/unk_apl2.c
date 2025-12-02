@@ -294,7 +294,7 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
                     case SDLK_SCROLLLOCK:                       // CTRL+PAUSE generates SDLK_SCROLLLOCK on my PC
                     case SDLK_PAUSE:
                         // Reset the machine
-                        runtime_machine_reset(rt);
+                        rt_machine_reset(rt);
                         v->prev_cycles = 0;                     // So MHz doesn't jump massively
                         // diskii_reset(m);
                         break;
@@ -344,7 +344,7 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
                     if(mod & KMOD_SHIFT) {
                         if(SDL_HasClipboardText()) {
                             char *clipboard_text = SDL_GetClipboardText();
-                            runtime_paste_clipboard(rt, clipboard_text);
+                            rt_paste_clipboard(rt, clipboard_text);
                             SDL_free(clipboard_text);
                         }
                     }

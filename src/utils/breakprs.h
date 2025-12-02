@@ -14,11 +14,13 @@ typedef enum {
 typedef enum {
     ACTION_UNUSED,
     ACTION_FAST,
-    ACTION_SLOW,
     ACTION_RESTORE,
-    ACTION_TRON,
+    ACTION_SLOW,
+    ACTION_SWAP,
+    ACTION_TROFF,
     ACTION_TRON_APPEND,
-    ACTION_TROFF
+    ACTION_TRON,
+    ACTION_TYPE,
 } BRKACTION;
 
 typedef struct {
@@ -28,7 +30,10 @@ typedef struct {
     BRKACTION   action;    // default = ACTION_UNUSED
     int         count;     // optional; 0 if unset
     int         reset;     // optional; 0 if unset
-} parsed_t;
+    int         slot;
+    int         device;
+    char        *type_text;
+} PARSEDBP;
 
-int parse_line(const char *val, parsed_t *out);
-int parse_breakpoint_line(const char *val, parsed_t *out);
+int parse_line(const char *val, PARSEDBP *out);
+int parse_breakpoint_line(const char *val, PARSEDBP *out);

@@ -5,9 +5,9 @@
 cmake_minimum_required(VERSION 3.16)
 
 add_library(runtime STATIC
-    breakpnt.c
-    runtime.c
-    symbols.c
+    rt_bp.c
+    rt.c
+    rt_sym.c
 )
 
 target_include_directories(runtime PUBLIC
@@ -17,7 +17,7 @@ target_include_directories(runtime PUBLIC
 
 target_compile_features(runtime PUBLIC c_std_99)
 
-target_precompile_headers(runtime PUBLIC "runtime_lib.h")
+target_precompile_headers(runtime PUBLIC "rt_lib.h")
 
 target_link_libraries(runtime PUBLIC
     hardware

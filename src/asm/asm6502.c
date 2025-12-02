@@ -455,7 +455,7 @@ int anonymous_symbol_lookup(ASSEMBLER *as, uint16_t *address, int direction) {
 }
 
 void symbol_clear(ASSEMBLER *as, const char *symbol_name, uint32_t symbol_name_length) {
-    uint32_t name_hash = utils_fnv_1a_hash(symbol_name, symbol_name_length);
+    uint32_t name_hash = util_fnv_1a_hash(symbol_name, symbol_name_length);
     uint8_t bucket = name_hash & 0xff;
     DYNARRAY *bucket_array = &as->symbol_table[bucket];
     SYMBOL_LABEL *sl = symbol_lookup(as, name_hash, symbol_name, symbol_name_length);
@@ -481,7 +481,7 @@ int symbol_sort(const void *lhs, const void *rhs) {
 }
 
 SYMBOL_LABEL *symbol_store(ASSEMBLER *as, const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TYPE symbol_type, uint64_t value) {
-    uint32_t name_hash = utils_fnv_1a_hash(symbol_name, symbol_name_length);
+    uint32_t name_hash = util_fnv_1a_hash(symbol_name, symbol_name_length);
     SYMBOL_LABEL *sl = symbol_lookup(as, name_hash, symbol_name, symbol_name_length);
     if(sl) {
         if(sl->symbol_type == SYMBOL_UNKNOWN) {
@@ -636,7 +636,7 @@ int is_indexed_indirect(ASSEMBLER *as, char *reg) {
     int brackets = 1;
     // Only called when it's known there are (as)'s on the line
     // Scan forward counting brackets and looking for a ,
-    while(*c && *c != ',' && *c != ';' && !utils_is_newline(*c)) {
+    while(*c && *c != ',' && *c != ';' && !util_is_newline(*c)) {
         if(*c == '(') {
             brackets++;
         } else if(*c == ')') {
@@ -955,7 +955,7 @@ void process_dot_macro(ASSEMBLER *as) {
         }
     }
     // After parameters it must be the end of the line
-    if(!(utils_is_newline(as->current_token.op) || as->current_token.op == ';')) {
+    if(!(util_is_newline(as->current_token.op) || as->current_token.op == ';')) {
         macro_okay = 0;
         asm_err(as, "Macro defenition error");
     }
@@ -1364,7 +1364,7 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
                 as->current_token.type = TOKEN_VAR;         // Variable Name
                 as->current_token.name = as->token_start;
                 as->current_token.name_length = as->input - as->token_start;
-                as->current_token.name_hash = utils_fnv_1a_hash(as->current_token.name, as->current_token.name_length);
+                as->current_token.name_hash = util_fnv_1a_hash(as->current_token.name, as->current_token.name_length);
                 parse_expression(as);
             } else {
                 asm_err(as, "Unknown token");

@@ -12,7 +12,7 @@ const UI_OPS utxt_ops = {
     .speaker_on_cycles = NULL,
     .render            = NULL,
     .set_runtime       = NULL,
-    .set_shadow_flags = NULL,
+    .set_shadow_flags  = NULL,
     .shutdown          = NULL,
 };
 

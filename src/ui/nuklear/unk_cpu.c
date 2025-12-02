@@ -28,7 +28,7 @@ void unk_cpu_show(UNK *v, int dirty) {
             vcpu->registers[0][vcpu->register_lengths[0]] = 0;
             ctx->current->edit.active = 0;
             sscanf(vcpu->registers[0], "%x", &value);
-            runtime_machine_set_pc(rt, value);
+            rt_machine_set_pc(rt, value);
             // m->cpu.pc = value;
         }
         nk_layout_row_push(ctx, 0.05f);
@@ -40,7 +40,7 @@ void unk_cpu_show(UNK *v, int dirty) {
             vcpu->registers[1][vcpu->register_lengths[1]] = 0;
             ctx->current->edit.active = 0;
             sscanf(vcpu->registers[1], "%x", &value);
-            runtime_machine_set_sp(rt, value);
+            rt_machine_set_sp(rt, value);
             // m->cpu.sp = value;
         }
         nk_layout_row_push(ctx, 0.05f);
@@ -52,7 +52,7 @@ void unk_cpu_show(UNK *v, int dirty) {
             vcpu->registers[2][vcpu->register_lengths[2]] = 0;
             ctx->current->edit.active = 0;
             sscanf(vcpu->registers[2], "%x", &value);
-            runtime_machine_set_A(rt, value);
+            rt_machine_set_A(rt, value);
             // m->cpu.A = value;
         }
         nk_layout_row_push(ctx, 0.05f);
@@ -64,7 +64,7 @@ void unk_cpu_show(UNK *v, int dirty) {
             vcpu->registers[3][vcpu->register_lengths[3]] = 0;
             ctx->current->edit.active = 0;
             sscanf(vcpu->registers[3], "%x", &value);
-            runtime_machine_set_X(rt, value);
+            rt_machine_set_X(rt, value);
             // m->cpu.X = value;
         }
         nk_layout_row_push(ctx, 0.05f);
@@ -76,7 +76,7 @@ void unk_cpu_show(UNK *v, int dirty) {
             vcpu->registers[4][vcpu->register_lengths[4]] = 0;
             ctx->current->edit.active = 0;
             sscanf(vcpu->registers[4], "%x", &value);
-            runtime_machine_set_Y(rt, value);
+            rt_machine_set_Y(rt, value);
             // m->cpu.Y = value;
         }
         nk_layout_row_end(ctx);
@@ -95,7 +95,7 @@ void unk_cpu_show(UNK *v, int dirty) {
                 uint8_t flags = m->cpu.flags;
                 flags &= ~(1 << (7 - i));
                 flags |= (value << (7 - i));
-                runtime_machine_set_flags(rt, flags);
+                rt_machine_set_flags(rt, flags);
             }
         }
     }

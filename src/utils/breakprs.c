@@ -5,19 +5,94 @@
 #include "common.h"
 #include "utils_lib.h"
 
-static char *ltrim(char *s) {
+static char *parse_ltrim(char *s) {
     while(isspace(*s)) {
         s++;
     }
     return s;
 }
 
-static void rtrim(char *s) {
+static void parse_rtrim(char *s) {
     char *e = s + strlen(s);
     while(e > s && isspace(e[-1])) {
         --e;
     }
     *e = '\0';
+}
+
+char *parse_decode_c_string(const char *in, size_t *out_len)
+{
+    size_t len = strlen(in);
+    char *out = malloc(len + 1);  // worst-case would be same size
+    if (!out) {
+        if (out_len) {
+            *out_len = 0;
+        }
+        return NULL;
+    }
+
+    size_t index = 0;
+
+    for (size_t i = 0; i < len; ) {
+        unsigned char c = in[i++];
+
+        if (c == '\\' && i < len) {
+            unsigned char e = in[i++];
+
+            switch (e) {
+            case 'n': 
+                out[index++] = '\n'; 
+                break;
+            case 'r': 
+                out[index++] = '\r'; 
+                break;
+            case 't': 
+                out[index++] = '\t'; 
+                break;
+            case '0': 
+                out[index++] = '\0'; 
+                break;
+            case '\\': 
+                out[index++] = '\\'; 
+                break;
+            case '"': 
+                out[index++] = '"'; 
+                break;
+            case '\'': 
+                out[index++] = '\''; 
+                break;
+
+            case 'x': {
+                // \xHH (1 or 2 hex digits)
+                char hex[3] = {0, 0, 0};
+                if (i < len && isxdigit((unsigned char)in[i])) {
+                    hex[0] = in[i++];
+                    if (i < len && isxdigit((unsigned char)in[i])) {
+                        hex[1] = in[i++];
+                    }
+                    out[index++] = (char)strtol(hex, NULL, 16);
+                } else {
+                    // Invalid \x — treat as a literal x
+                    out[index++] = 'x';
+                }
+                break;
+            }
+
+            default:
+                // Unknown escape — treat as literal character
+                out[index++] = e;
+                break;
+            }
+        } else {
+            out[index++] = (char)c;
+        }
+    }
+
+    out[index] = '\0';
+    if (out_len) {
+        *out_len = index;
+    }
+    return out;
 }
 
 static int parse_u32_auto(const char *s, char **end, uint32_t *out) {
@@ -37,8 +112,8 @@ static int parse_u32_auto(const char *s, char **end, uint32_t *out) {
 
 // Parse the first field: "<addr>" or "<addr>-<addr>" with optional spaces around '-'
 static int parse_addr_field(char *field, uint32_t *start, uint32_t *end) {
-    char *p = ltrim(field);
-    rtrim(p);
+    char *p = parse_ltrim(field);
+    parse_rtrim(p);
 
     // scan first number
     char *end1 = NULL;
@@ -78,8 +153,8 @@ static int parse_addr_field(char *field, uint32_t *start, uint32_t *end) {
 }
 
 // Main parse function
-int parse_breakpoint_line(const char *val, parsed_t *out) {
-    memset(out, 0, sizeof(parsed_t));
+int parse_breakpoint_line(const char *val, PARSEDBP *out) {
+    memset(out, 0, sizeof(PARSEDBP));
     int set_count = 0;
     int set_reset = 0;
 
@@ -112,8 +187,8 @@ int parse_breakpoint_line(const char *val, parsed_t *out) {
         }
 
         // trim value
-        char *param = ltrim(rest);
-        rtrim(param);
+        char *param = parse_ltrim(rest);
+        parse_rtrim(param);
 
         if(*param != '\0') {
             // Try keywords first
@@ -129,12 +204,25 @@ int parse_breakpoint_line(const char *val, parsed_t *out) {
                 out->action = ACTION_RESTORE;
             } else if(0 == stricmp(param, "slow")) {
                 out->action = ACTION_SLOW;
+            } else if(0 == strnicmp(param, "swap", 4)) {
+                int slot, device;
+                if(sscanf(param+4, "%*1[ \t=]%*1[Ss]%d%*1[Dd]%d", &slot, &device) == 2 &&
+                    slot >= 1 && slot <= 7 && device >= 0 && device <= 1) {
+                    out->action = ACTION_SWAP;
+                    out->slot = slot;
+                    out->device = device;
+                }
             } else if(0 == stricmp(param, "tron")) {
                 out->action = ACTION_TRON;
             } else if(0 == stricmp(param, "trona")) {
                 out->action = ACTION_TRON_APPEND;
             } else if(0 == stricmp(param, "troff")) {
                 out->action = ACTION_TROFF;
+            } else if(0 == strnicmp(param, "type", 4)) {
+                if (strchr(" \t=", param[4]) != NULL) {
+                    out->action = ACTION_TYPE;
+                    out->type_text = parse_decode_c_string(&param[5], NULL);
+                }
             } else if(0 == stricmp(param, "write")) {
                 out->mode = MODE_WRITE;
             } else {

@@ -261,7 +261,7 @@ int util_file_open(UTIL_FILE *f, const char *file_name, const char *file_mode) {
 
     // Get size (and validate regular file) via stat
     uint64_t fsz = 0, mt = 0;
-    if(file_stat_regular_utf8(file_name, &fsz, &mt) != 0) {
+    if(util_file_stat_regular_utf8(file_name, &fsz, &mt) != 0) {
         if(file_mode[0] != 'w') {
             util_file_discard(f);
             return A2_ERR;
@@ -295,7 +295,7 @@ int util_file_open(UTIL_FILE *f, const char *file_name, const char *file_mode) {
     return A2_OK;
 }
 
-int file_stat_regular_utf8(const char *path, uint64_t *size_out, uint64_t *mtime_out) {
+int util_file_stat_regular_utf8(const char *path, uint64_t *size_out, uint64_t *mtime_out) {
     struct stat st;
     int rc = fs_stat_utf8(path, &st);
     if(rc != 0) {
@@ -494,14 +494,14 @@ char *util_strndup(const char *string, size_t length) {
     return string_copy;
 }
 
-char utils_character_in_characters(const char character, const char *characters) {
+char util_character_in_characters(const char character, const char *characters) {
     while(*characters && character != *characters) {
         characters++;
     }
     return *characters;
 }
 
-int utils_is_newline(char c) {
+int util_is_newline(char c) {
     return (c == '\n' || c == '\r');
 }
 
@@ -509,15 +509,21 @@ char *util_extract_file_name(const char *string, int str_len, int *index) {
     if(*index >= str_len) {
         return NULL;
     }
-    char *s = string[*index] == '"' ? &string[*index+1] : &string[*index];
-    char *e = s;
-    while(*e && *e != '"') {
+    const char *s = &string[*index];
+    char find;
+    if(*s == '"') {
+        find = '"';
+        s++;
+    } else {
+        find = ',';
+    }
+    const char *e = s;
+    while(*e && *e != find) {
         *e++;
     }
     if(e - string > str_len) {
         return NULL;
     }
-
     int len = e - s;
     char *fn = (char *)malloc(len + 1);
     if(!fn) {
@@ -526,7 +532,7 @@ char *util_extract_file_name(const char *string, int str_len, int *index) {
     // strncpy(fn, s, len);
     memcpy(fn, s, len);
     fn[len] = '\0';
-    if(*e == '"') {
+    if(*e == find) {
         e++;
         while(*e == ' ' || *e == ',' && *e != '"') {
             e++;
@@ -537,7 +543,7 @@ char *util_extract_file_name(const char *string, int str_len, int *index) {
 }
 
 // https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function#FNV-1a_hash
-uint32_t utils_fnv_1a_hash(const char *key, size_t len) {
+uint32_t util_fnv_1a_hash(const char *key, size_t len) {
     uint32_t hash = 2166136261u;                            // FNV offset basis
     for(size_t i = 0; i < len; i++) {
         hash ^= (uint8_t) tolower(key[i]);
