@@ -1329,34 +1329,35 @@ void parse_opcode(ASSEMBLER *as) {
                 write_opcode(as);
                 processed = 1;
                 break;
-            case '(':
-                char reg;
-                int indirect = is_indirect(as, &reg);
-                if(indirect) {
-                    // Already inside bracket
-                    if(reg == 'x') {
-                        // , in ,x ends expression so evaluate to ignore active open (
-                        as->opcode_info.value = evaluate_expression(as);
-                    } else {
-                        // start with the "active" ( and end in ) so parse
-                        as->opcode_info.value = parse_expression(as);
-                    }
-                    as->opcode_info.addressing_mode = indirect;
-                    write_opcode(as);
-                    if(indirect != ADDRESS_MODE_INDIRECT) {
-                        // Indirect x or y need extra steps
-                        next_token(as);
-                        // Make sure it was ,x or ,y
-                        if(tolower(*as->token_start) != reg) {
-                            asm_err(as, "Expected ,%c", reg);
+            case '(': {
+                    char reg;
+                    int indirect = is_indirect(as, &reg);
+                    if(indirect) {
+                        // Already inside bracket
+                        if(reg == 'x') {
+                            // , in ,x ends expression so evaluate to ignore active open (
+                            as->opcode_info.value = evaluate_expression(as);
+                        } else {
+                            // start with the "active" ( and end in ) so parse
+                            as->opcode_info.value = parse_expression(as);
                         }
-                        next_token(as);
-                        // If it was ,x go past the closing )
-                        if(as->current_token.op == ')') {
+                        as->opcode_info.addressing_mode = indirect;
+                        write_opcode(as);
+                        if(indirect != ADDRESS_MODE_INDIRECT) {
+                            // Indirect x or y need extra steps
                             next_token(as);
+                            // Make sure it was ,x or ,y
+                            if(tolower(*as->token_start) != reg) {
+                                asm_err(as, "Expected ,%c", reg);
+                            }
+                            next_token(as);
+                            // If it was ,x go past the closing )
+                            if(as->current_token.op == ')') {
+                                next_token(as);
+                            }
                         }
+                        processed = 1;
                     }
-                    processed = 1;
                 }
                 break;
         }

@@ -142,6 +142,6 @@ void pages_map_memory_block(PAGES *pages, MEMORY_BLOCK *block);
 void cpu_init(APPLE2 *m);
 
 // Step the apple2 a single opcode
-size_t (*machine_run_opcode)(APPLE2 *m);
+extern size_t (*machine_run_opcode)(APPLE2 *m);
 size_t machine_run_opcode_6502(APPLE2 *m);
 size_t machine_run_opcode_65c02(APPLE2 *m);

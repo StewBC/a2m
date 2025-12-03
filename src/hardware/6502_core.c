@@ -5,6 +5,8 @@
 #include "common.h"
 #include "hardware_lib.h"
 
+size_t (*machine_run_opcode)(APPLE2 *m);
+
 // Configure a MEMORY
 uint8_t memory_init(MEMORY *memory, uint16_t num_blocks) {
     int block;
