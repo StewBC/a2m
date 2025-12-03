@@ -64,6 +64,20 @@ void pages_map_memory_block(PAGES *pages, MEMORY_BLOCK *block) {
 
 // Init the 6502
 void cpu_init(APPLE2 *m) {
+    if(!m->model) { // 6502
+        machine_run_opcode = machine_run_opcode_6502;
+        opcode_text = opcode_text_6502;
+        opcode_hex_params = opcode_hex_params_6502;
+        opcode_symbol_params = opcode_symbol_params_6502;
+        opcode_lengths = opcode_lengths_6502;
+    } else { // 65c02
+        machine_run_opcode = machine_run_opcode_65c02;
+        opcode_text = opcode_text_65c02;
+        opcode_hex_params = opcode_hex_params_65c02;
+        opcode_symbol_params = opcode_symbol_params_65c02;
+        opcode_lengths = opcode_lengths_65c02;
+    }
+    
     m->cpu.pc = read_from_memory_debug(m, 0xfffc) +  256 * read_from_memory_debug(m, 0xfffd);
     m->cpu.sp = 0x100;
 }
