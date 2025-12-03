@@ -422,9 +422,15 @@ int main(int argc, char **argv) {
 
     do {
         // Config selves
-        rt_init(&rt, &ini_store);
-        apple2_init(&m, &ini_store);
-        ui_init(&ui, m.model, &ini_store);
+        if(A2_OK != rt_init(&rt, &ini_store)) {
+            goto rt_err;
+        }
+        if(A2_OK != apple2_init(&m, &ini_store)) {
+            goto a2_err;
+        }
+        if(A2_OK != ui_init(&ui, m.model, &ini_store)) {
+            goto ui_err;
+        }
 
         // Set bindings (callbacks) for appe2 <-> rt <-> ui
         rt_bind(&rt, &m, &ui);
@@ -434,8 +440,11 @@ int main(int argc, char **argv) {
         rt_run(&rt, &m, &ui);
 
         // Shut everything down
+ui_err:        
         ui_shutdown(&ui);
+a2_err:
         apple2_shutdown(&m);
+rt_err:
         rt_shutdown(&rt);
 
         // If a re-config is called for, go back and do it all over

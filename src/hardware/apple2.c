@@ -64,6 +64,7 @@ static void apple2_slot_setup(APPLE2 *m, INI_STORE *ini_store) {
                     int str_len = strlen(val);
                     char *fn = util_extract_file_name(val, str_len, &index);
                     sp_mount(m, slot, device, fn);
+                    free(fn);
                 }
             } else if(stricmp(key, "bs") == 0) {
                 if(sscanf(val, "%d", &slot) == 1 && slot >= 1 && slot <= 7) {
@@ -266,6 +267,28 @@ void apple2_set_callbacks(APPLE2 *m, A2OUT_CB *a2rt_cb) {
 void apple2_shutdown(APPLE2 *m) {
     // speaker_shutdown(&m->speaker);
     diskii_shutdown(m);
+    sp_shutdown(m);
+    if(m->franklin80installed) {
+        franklin_display_shutdown(&m->franklin_display);
+    }
+    // pages
+    free(m->read_pages.pages);
+    m->read_pages.pages = NULL;
+    m->read_pages.num_pages = 0;
+    free(m->write_pages.pages);
+    m->write_pages.pages = NULL;
+    m->write_pages.num_pages = 0;
+    free(m->watch_pages.pages);
+    m->watch_pages.pages = NULL;
+    m->watch_pages.num_pages = 0;
+    // memory
+    free(m->ram.blocks);
+    m->ram.blocks = 0;
+    m->ram.num_blocks = 0;
+    free(m->roms.blocks);
+    m->roms.blocks = 0;
+    m->roms.num_blocks = 0;
+    // RAM
     free(m->RAM_MAIN);
     m->RAM_MAIN = NULL;
     free(m->RAM_WATCH);

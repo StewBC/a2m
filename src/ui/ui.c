@@ -25,7 +25,7 @@ void ui_apply_ini(UI *ui, INI_STORE *ini_store) {
     }
 }
 
-void ui_init(UI *ui, int model, INI_STORE *ini_store) {
+int ui_init(UI *ui, int model, INI_STORE *ini_store) {
     // Clear the ops and ptr to the actual UI
     memset(ui, 0, sizeof(UI));
     // decide which UI needs to be instanced
@@ -34,6 +34,9 @@ void ui_init(UI *ui, int model, INI_STORE *ini_store) {
     if(ui->class == UI_CLASS_GUI) {
         // Instance UNK
         UNK *v = (UNK *)malloc(sizeof(UNK));
+        if(!v) {
+            return A2_ERR;
+        }
         // Clear all
         memset(v, 0, sizeof(UNK));
 
@@ -46,18 +49,21 @@ void ui_init(UI *ui, int model, INI_STORE *ini_store) {
         v->target_rect.h = 840;
 
         // UNK gets to init
-        unk_init(v, model, ini_store);
+        return unk_init(v, model, ini_store);
     } else {
         // Instance UTXT
         UTXT *v = (UTXT *)malloc(sizeof(UTXT));
+        if(!v) {
+            return A2_ERR;
+        }
         // Clear all
-        memset(ui->user, 0, sizeof(UTXT));
+        memset(v, 0, sizeof(UTXT));
         // Link through UI
         ui->user = v;
         ui->ops = &utxt_ops;
 
         // TXT gets to init
-        utxt_init(v, ini_store);
+        return utxt_init(v, ini_store);
     }
 }
 

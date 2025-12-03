@@ -13,35 +13,6 @@ find_package(SDL2 CONFIG REQUIRED)
 find_package(SDL2_image CONFIG REQUIRED)
 find_package(SDL2_mixer CONFIG REQUIRED)
 
-# LIBRARIES
-add_subdirectory(src/utils)
-add_subdirectory(src/asm)
-add_subdirectory(src/hardware)
-add_subdirectory(src/runtime)
-add_subdirectory(src/ui)
-
-#-----------------------------------------------------------------------------
-# EMULATOR
-
-# Add the executable
-add_executable(a2m
-    src/apps/a2m/main.c
-)
-
-# Link SDL2, SDL2main, and SDL2_mixer libraries
-target_link_libraries(a2m PUBLIC
-    # utils
-    # asm
-    # hardware
-    # runtime
-    ui
-    # SDL2::SDL2
-    # SDL2::SDL2main
-    # $<IF:$<TARGET_EXISTS:SDL2_mixer::SDL2_mixer>,SDL2_mixer::SDL2_mixer,SDL2_mixer::SDL2_mixer-static>
-    # $<IF:$<TARGET_EXISTS:SDL2_image::SDL2_image>,SDL2_image::SDL2_image,SDL2_image::SDL2_image-static>
-    $<$<PLATFORM_ID:Linux>:m>
-)
-
 if(UNIX AND NOT APPLE)
     option(ENABLE_ASAN "Build with AddressSanitizer/LeakSanitizer" OFF)
 
@@ -60,6 +31,27 @@ if(UNIX AND NOT APPLE)
     endif()
 endif()
 
+# LIBRARIES
+add_subdirectory(src/utils)
+add_subdirectory(src/asm)
+add_subdirectory(src/hardware)
+add_subdirectory(src/runtime)
+add_subdirectory(src/ui)
+
+#-----------------------------------------------------------------------------
+# EMULATOR
+
+# Add the executable
+add_executable(a2m
+    src/apps/a2m/main.c
+)
+
+# utils, asm, hardware & runtime all pulled in via ui, as is SDL2, SDL2main, SDL2_mixer & SDL2_image
+target_link_libraries(a2m PUBLIC
+    ui
+    $<$<PLATFORM_ID:Linux>:m>
+)
+
 if(APPLE)
     set(CMAKE_MACOSX_RPATH ON)
     set(CMAKE_INSTALL_RPATH "@executable_path/../Frameworks;/Library/Frameworks")
@@ -73,10 +65,6 @@ endif()
 if(WIN32)
     # Add this to so printf works
     target_link_options(a2m PRIVATE /SUBSYSTEM:CONSOLE)
-
-    # target_compile_definitions(a2m
-    #     PRIVATE $<$<PLATFORM_ID:Windows>:-D_CRT_SECURE_NO_WARNINGS>
-    # )
 
     # Make this a Windows
     set_target_properties(a2m PROPERTIES WIN32_EXECUTABLE ON)

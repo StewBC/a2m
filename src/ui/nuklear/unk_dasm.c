@@ -710,6 +710,7 @@ void unk_dasm_show(UNK *v, int dirty) {
         FILE_BROWSER *fb = &dv->temp_assembler_config.file_browser;
         int ret = unk_dlg_file_browser(ctx, fb);
         if(ret >= 0) {
+            array_free(&dv->temp_assembler_config.file_browser.dir_contents);
             dv->temp_assembler_config.dlg_asm_filebrowser = 0;
             if(1 == ret) {
                 // A file was selected, so get a FQN

@@ -46,7 +46,7 @@ static inline uint16_t unk_mem_wrap16_add(uint16_t a, int b) {
     return (uint16_t)(a + b);
 }
 
-static inline void unk_mem_recenter_view(VIEWMEM *ms, MEMVIEW *mv) {
+static inline void unk_mem_recenter_view(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     int delta = unk_mem_circular_delta(mv->cursor_address, mv->view_address);
 
     int row = delta >= 0 ? delta / ms->cols : -1 + ((delta + 1) / ms->cols);
@@ -59,7 +59,7 @@ static inline void unk_mem_recenter_view(VIEWMEM *ms, MEMVIEW *mv) {
     }
 }
 
-void unk_mem_find_string(UNK *v, VIEWMEM *ms, MEMVIEW *mv) {
+void unk_mem_find_string(UNK *v, VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     APPLE2 *m = v->m;
     uint8_t flags = mv->flags;
     uint16_t index = 0;
@@ -75,7 +75,7 @@ void unk_mem_find_string(UNK *v, VIEWMEM *ms, MEMVIEW *mv) {
     }
 }
 
-void unk_mem_find_string_reverse(UNK *v, VIEWMEM *ms, MEMVIEW *mv) {
+void unk_mem_find_string_reverse(UNK *v, VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     APPLE2 *m = v->m;
     uint8_t flags = mv->flags;
     uint16_t index = ms->find_string_len - 1;
@@ -93,14 +93,14 @@ void unk_mem_find_string_reverse(UNK *v, VIEWMEM *ms, MEMVIEW *mv) {
     }
 }
 
-void unk_mem_cursor_down(VIEWMEM *ms, MEMVIEW *mv) {
+void unk_mem_cursor_down(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     if(mv->cursor_field != CURSOR_ADDRESS) {
         mv->cursor_address = unk_mem_wrap16_add(mv->cursor_address, ms->cols);
         unk_mem_recenter_view(ms, mv);
     }
 }
 
-void unk_mem_cursor_end(VIEWMEM *ms, MEMVIEW *mv, int mod) {
+void unk_mem_cursor_end(VIEWMEM *ms, VIEWMEM_VIEW *mv, int mod) {
     if(mv->cursor_field == CURSOR_ADDRESS) {
         mv->cursor_digit = CURSOR_DIGIT3;
         return;
@@ -122,7 +122,7 @@ void unk_mem_cursor_end(VIEWMEM *ms, MEMVIEW *mv, int mod) {
     mv->cursor_digit = CURSOR_DIGIT0;
 }
 
-void unk_mem_cursor_home(VIEWMEM *ms, MEMVIEW *mv, int mod) {
+void unk_mem_cursor_home(VIEWMEM *ms, VIEWMEM_VIEW *mv, int mod) {
     if(mv->cursor_field != CURSOR_ADDRESS) {
         if(!mod) {
             // move to column 0 of current row
@@ -138,7 +138,7 @@ void unk_mem_cursor_home(VIEWMEM *ms, MEMVIEW *mv, int mod) {
     mv->cursor_digit = CURSOR_DIGIT0;
 }
 
-void unk_mem_cursor_left(VIEWMEM *ms, MEMVIEW *mv) {
+void unk_mem_cursor_left(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     switch(mv->cursor_field) {
         case CURSOR_HEX:
             if(mv->cursor_digit == CURSOR_DIGIT0) {
@@ -163,19 +163,19 @@ void unk_mem_cursor_left(VIEWMEM *ms, MEMVIEW *mv) {
     unk_mem_recenter_view(ms, mv);
 }
 
-void unk_mem_cursor_page_up(VIEWMEM *ms, MEMVIEW *mv) {
+void unk_mem_cursor_page_up(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     if(mv->cursor_field != CURSOR_ADDRESS) {
         mv->view_address = unk_mem_wrap16_add(mv->view_address, -(ms->cols * mv->rows));
     }
 }
 
-void unk_mem_cursor_page_down(VIEWMEM *ms, MEMVIEW *mv) {
+void unk_mem_cursor_page_down(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     if(mv->cursor_field != CURSOR_ADDRESS) {
         mv->view_address = unk_mem_wrap16_add(mv->view_address, (ms->cols * mv->rows));
     }
 }
 
-void unk_mem_cursor_right(VIEWMEM *ms, MEMVIEW *mv) {
+void unk_mem_cursor_right(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     switch(mv->cursor_field) {
         case CURSOR_HEX:
             if(mv->cursor_digit == CURSOR_DIGIT1) {
@@ -203,7 +203,7 @@ void unk_mem_cursor_right(VIEWMEM *ms, MEMVIEW *mv) {
     unk_mem_recenter_view(ms, mv);
 }
 
-void unk_mem_cursor_toggle_address_mode(VIEWMEM *ms, MEMVIEW *mv) {
+void unk_mem_cursor_toggle_address_mode(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     if(mv->cursor_field == CURSOR_ADDRESS) {
         mv->cursor_field = mv->prev_field;
         mv->cursor_digit = mv->cursor_prev_digit;
@@ -215,7 +215,7 @@ void unk_mem_cursor_toggle_address_mode(VIEWMEM *ms, MEMVIEW *mv) {
     }
 }
 
-void unk_mem_cursor_up(VIEWMEM *ms, MEMVIEW *mv) {
+void unk_mem_cursor_up(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     if(mv->cursor_field != CURSOR_ADDRESS) {
         mv->cursor_address = unk_mem_wrap16_add(mv->cursor_address, -ms->cols);
         unk_mem_recenter_view(ms, mv);
@@ -223,17 +223,13 @@ void unk_mem_cursor_up(VIEWMEM *ms, MEMVIEW *mv) {
 }
 
 int unk_mem_init(VIEWMEM *ms) {
-    MEMVIEW memview;
-    memset(&memview, 0, sizeof(MEMVIEW));
+    VIEWMEM_VIEW memview;
+    memset(&memview, 0, sizeof(VIEWMEM_VIEW));
     memview.flags = MEM_MAPPED_6502;
 
-    ms->memviews = (DYNARRAY *) malloc(sizeof(DYNARRAY));
-    if(!ms->memviews) {
-        return A2_ERR;
-    }
     // Init the array
-    ARRAY_INIT(ms->memviews, MEMVIEW);
-    ARRAY_ADD(ms->memviews, memview);
+    ARRAY_INIT(&ms->memviews, VIEWMEM_VIEW);
+    ARRAY_ADD(&ms->memviews, memview);
     ms->find_string = (char *)malloc(MAX_FIND_STRING_LENGTH + 1);
     if(ms->find_string) {
         ms->find_string_cap = MAX_FIND_STRING_LENGTH;
@@ -245,7 +241,7 @@ int unk_mem_process_event(UNK *v, SDL_Event *e, int window) {
     APPLE2 *m = v->m;
     SDL_Keymod mod = SDL_GetModState();
     VIEWMEM *ms = &v->viewmem;
-    MEMVIEW *mv = ARRAY_GET(ms->memviews, MEMVIEW, ms->active_view_index);
+    VIEWMEM_VIEW *mv = ARRAY_GET(&ms->memviews, VIEWMEM_VIEW, ms->active_view_index);
 
     if(mv->cursor_field == CURSOR_ASCII) {
         if(e->type == SDL_TEXTINPUT) {
@@ -265,11 +261,11 @@ int unk_mem_process_event(UNK *v, SDL_Event *e, int window) {
     if(mod & KMOD_ALT) {
         switch(e->key.keysym.sym) {
             case SDLK_DOWN:
-                ms->active_view_index = (ms->active_view_index + 1) % ms->memviews->items;
+                ms->active_view_index = (ms->active_view_index + 1) % ms->memviews.items;
                 break;
 
             case SDLK_UP:
-                ms->active_view_index = (ms->active_view_index - 1) % ms->memviews->items;
+                ms->active_view_index = (ms->active_view_index - 1) % ms->memviews.items;
                 break;
         }
     } else if(mod & KMOD_CTRL) {
@@ -290,9 +286,9 @@ int unk_mem_process_event(UNK *v, SDL_Event *e, int window) {
                 break;
 
             case SDLK_j:                                        // CTRL J - Join (down) CTRL SHIFT J - Join Up
-                if(ms->memviews->items > 1) {
-                    array_remove(ms->memviews, mv);
-                    if(ms->active_view_index >= ms->memviews->items) {
+                if(ms->memviews.items > 1) {
+                    array_remove(&ms->memviews, mv);
+                    if(ms->active_view_index >= ms->memviews.items) {
                         ms->active_view_index--;
                     }
                     unk_mem_resize_view(v);
@@ -318,12 +314,12 @@ int unk_mem_process_event(UNK *v, SDL_Event *e, int window) {
                 break;
 
             case SDLK_v:                                        // CTRL v - New Range (Split)
-                if(ms->memviews->items < 16) {
-                    MEMVIEW nmv;
+                if(ms->memviews.items < 16) {
+                    VIEWMEM_VIEW nmv;
                     memset(&nmv, 0, sizeof(nmv));
                     nmv.view_address = nmv.cursor_address = mv->cursor_address;
                     nmv.flags = mv->flags;
-                    ARRAY_ADD(ms->memviews, nmv);
+                    ARRAY_ADD(&ms->memviews, nmv);
                     unk_mem_resize_view(v);
                 }
                 break;
@@ -435,11 +431,11 @@ void unk_mem_resize_view(UNK *v) {
     int visible_cols = view_width / v->font_width;
 
     int view_total_rows = (parent.h - (ADDRESS_LABEL_H + ms->header_height)) / ROW_H;
-    int view_rows = view_total_rows / ms->memviews->items;
-    int view_height_overflow = view_total_rows - (view_rows * ms->memviews->items);
+    int view_rows = view_total_rows / ms->memviews.items;
+    int view_height_overflow = view_total_rows - (view_rows * ms->memviews.items);
 
-    for(int view = 0; view < ms->memviews->items; view++) {
-        MEMVIEW *mv = ARRAY_GET(ms->memviews, MEMVIEW, view);
+    for(int view = 0; view < ms->memviews.items; view++) {
+        VIEWMEM_VIEW *mv = ARRAY_GET(&ms->memviews, VIEWMEM_VIEW, view);
         mv->rows = view_rows + (view_height_overflow ? (--view_height_overflow, 1) : 0);
     }
 
@@ -470,7 +466,7 @@ void unk_mem_show(UNK *v) {
     struct nk_vec2 gpd = ctx->style.window.group_padding;
     float border = ctx->style.window.border;
     if(nk_begin(ctx, "Memory", v->layout.mem, NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
-        MEMVIEW *active_view;
+        VIEWMEM_VIEW *active_view;
 
         float w_offset = ctx->current->layout->bounds.x;
         ctx->current->layout->bounds.w += w_offset;
@@ -480,7 +476,7 @@ void unk_mem_show(UNK *v) {
         ctx->style.window.group_padding = nk_vec2(0, 0);
         ctx->style.window.border        = 0.0f;
 
-        int num_views = v->viewmem.memviews->items;
+        int num_views = v->viewmem.memviews.items;
         struct nk_color active_background = ctx->style.window.background;
 
         nk_layout_row_begin(ctx, NK_STATIC, v->layout.mem.h, 2);
@@ -488,7 +484,7 @@ void unk_mem_show(UNK *v) {
         int active_top_row, view_top_row = 0;
         if(nk_group_begin(ctx, "mem-views", NK_WINDOW_NO_SCROLLBAR)) {
             for(int view = 0; view < num_views; view++) {
-                MEMVIEW *mv = ARRAY_GET(ms->memviews, MEMVIEW, view);
+                VIEWMEM_VIEW *mv = ARRAY_GET(&ms->memviews, VIEWMEM_VIEW, view);
                 if(ms->active_view_index == view) {
                     active_view = mv;
                     active_top_row = view_top_row;
@@ -550,7 +546,7 @@ void unk_mem_show(UNK *v) {
 
             // Cursor
             if(ctx->active->name == VIEWMEM_NAME_HASH && !rt->run) {
-                MEMVIEW *mv = active_view;
+                VIEWMEM_VIEW *mv = active_view;
                 int delta = unk_mem_circular_delta(mv->cursor_address, mv->view_address);
                 if(delta >= 0 && delta < (mv->rows * ms->cols)) {
                     int row = delta / ms->cols;
@@ -630,7 +626,7 @@ void unk_mem_show(UNK *v) {
         }
 
         // Lower down uses this
-        MEMVIEW *mv = ARRAY_GET(ms->memviews, MEMVIEW, ms->active_view_index);
+        VIEWMEM_VIEW *mv = ARRAY_GET(&ms->memviews, VIEWMEM_VIEW, ms->active_view_index);
 
         // Scrollbar
         nk_layout_row_push(ctx, SCROLLBAR_W);
@@ -696,4 +692,16 @@ void unk_mem_show(UNK *v) {
         }
     }
     nk_end(ctx);
+}
+
+void unk_mem_shutdown(VIEWMEM *ms) {
+    free(ms->u8_buf);
+    ms->u8_buf = NULL;
+    free(ms->str_buf);
+    ms->str_buf = NULL;
+    ms->str_buf_len = 0;
+    free(ms->find_string);
+    ms->find_string = NULL;
+    ms->find_string_len = 0;
+    array_free(&ms->memviews);
 }

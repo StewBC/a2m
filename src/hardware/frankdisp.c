@@ -39,3 +39,8 @@ void franklin_display_set(APPLE2 *m, uint16_t address, uint8_t value) {
     }
     fd80->registers[fd80->reg_num] = value;
 }
+
+void franklin_display_shutdown(FRANKLIN_DISPLAY *fd80) {
+    free(fd80->display_ram);
+    fd80->display_ram = NULL;
+}

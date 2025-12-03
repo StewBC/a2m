@@ -4,5 +4,5 @@
 
 #pragma once
 
-void ui_init(UI *ui, int model, INI_STORE *ini_store);
+int ui_init(UI *ui, int model, INI_STORE *ini_store);
 void ui_shutdown(UI *ui);

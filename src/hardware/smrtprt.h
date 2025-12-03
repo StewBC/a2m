@@ -22,3 +22,4 @@ int sp_mount(APPLE2 *m, const int slot, const int device, const char *file_name)
 void sp_status(APPLE2 *m, const int slot);
 void sp_read(APPLE2 *m, const int slot);
 void sp_write(APPLE2 *m, const int slot);
+void sp_shutdown(APPLE2 *m);

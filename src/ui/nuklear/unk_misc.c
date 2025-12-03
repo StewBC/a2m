@@ -345,6 +345,7 @@ void unk_misc_show(UNK *v) {
     if(v->dlg_filebrowser) {
         int ret = unk_dlg_file_browser(ctx, &v->viewmisc.file_browser);
         if(ret >= 0) {
+            array_free(&dv->temp_assembler_config.file_browser.dir_contents);
             v->dlg_filebrowser = 0;
             v->unk_dlg_modal = 0;
             if(1 == ret) {

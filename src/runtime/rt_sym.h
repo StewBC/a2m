@@ -12,7 +12,8 @@ typedef struct SYMBOL {
 
 int rt_sym_add_symbol(RUNTIME *rt, const char *symbol_source, const char *symbol_name, size_t symbol_name_length, uint16_t address, int overwrite);
 int rt_sym_add_symbols(RUNTIME *rt, const char *symbol_source, char *input, size_t data_length, int overwrite);
+char *rt_sym_find_symbols(RUNTIME *rt, uint32_t address);
 int rt_sym_init(RUNTIME *rt, INI_STORE *ini_store);
 void rt_sym_remove_symbols(RUNTIME *rt, const char *symbol_source);
 int rt_sym_search_update(RUNTIME *rt);
-char *rt_sym_find_symbols(RUNTIME *rt, uint32_t address);
+void rt_sym_shutdown(RUNTIME *rt);

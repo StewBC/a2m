@@ -203,36 +203,36 @@ int unk_init(UNK *v, int model, INI_STORE *ini_store) {
     // Initialize SDL with video and audio
     if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) < 0) {
         printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
-        goto error;
+        return A2_ERR;
     }
     if((IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG) == 0) {
         printf("SDL image could not initialize! SDL_Error: %s\n", IMG_GetError());
-        goto error;
+        return A2_ERR;
     }
     // Create window
     v->window = SDL_CreateWindow("Apple ][+ Emulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, v->target_rect.w, v->target_rect.h, SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN);
     if(v->window == NULL) {
         printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
-        goto error;
+        return A2_ERR;
     }
     // Create renderer
     v->renderer = SDL_CreateRenderer(v->window, -1, SDL_RENDERER_ACCELERATED);
     if(v->renderer == NULL) {
         printf("Renderer could not be created! SDL_Error: %s\n", SDL_GetError());
-        goto error;
+        return A2_ERR;
     }
     // Create RGB surface
     v->surface = SDL_CreateRGBSurfaceWithFormat(0, 40 * 7, 24 * 8, 32, SDL_PIXELFORMAT_ARGB8888);
     if(v->surface == NULL) {
         printf("Surface could not be created! SDL_Error: %s\n", SDL_GetError());
-        goto error;
+        return A2_ERR;
     }
     SDL_FillRect(v->surface, NULL, SDL_MapRGB(v->surface->format, 0, 0, 0));
 
     v->surface_wide = SDL_CreateRGBSurfaceWithFormat(0, 80 * (model ? 7 : 8), 24 * 8, 32, SDL_PIXELFORMAT_ARGB8888);
     if(v->surface_wide == NULL) {
         printf("Surface640 could not be created! SDL_Error: %s\n", SDL_GetError());
-        goto error;
+        return A2_ERR;
     }
     SDL_FillRect(v->surface_wide, NULL, SDL_MapRGB(v->surface_wide->format, 0, 0, 0));
 
@@ -240,39 +240,30 @@ int unk_init(UNK *v, int model, INI_STORE *ini_store) {
     v->texture = SDL_CreateTextureFromSurface(v->renderer, v->surface);
     if(v->texture == NULL) {
         printf("Texture could not be created! SDL_Error: %s\n", SDL_GetError());
-        goto error;
+        return A2_ERR;
     }
     // Create texture for pixel rendering
     v->texture_wide = SDL_CreateTextureFromSurface(v->renderer, v->surface_wide);
     if(v->texture_wide == NULL) {
         printf("Texture could not be created! SDL_Error: %s\n", SDL_GetError());
-        goto error;
-    }
-    // Create the green led for showing disk read activity
-    SDL_RWops *rw = SDL_RWFromConstMem(led_green, (int)led_green_len);
-    if(!rw) {
-        goto error;
-    }
-    SDL_Surface *surf = IMG_Load_RW(rw, 1);
-    if(!surf) {
-        goto error;
+        return A2_ERR;
     }
     v->greenLED = load_png_texture_from_ram(v->renderer, led_green, led_green_len);
     v->redLED = load_png_texture_from_ram(v->renderer, led_red, led_red_len);
     if(!v->greenLED || !v->redLED) {
-        goto error;
+        return A2_ERR;
     }
 
     if(A2_OK != unk_dasm_init(&v->viewdasm)) {
-        goto error;
+        return A2_ERR;
     }
 
     if(A2_OK != unk_mem_init(&v->viewmem)) {
-        goto error;
+        return A2_ERR;
     }
 
     if(A2_OK != unk_audio_speaker_init(&v->viewspeaker, CPU_FREQUENCY, 48000, 2, 40.0f, 256)) {
-        goto error;
+        return A2_ERR;
     }
 
     // Init nuklear
@@ -281,7 +272,7 @@ int unk_init(UNK *v, int model, INI_STORE *ini_store) {
 
     v->ctx = nk_sdl_init(v->window, v->renderer);
     if(!v->ctx) {
-        goto error;
+        return A2_ERR;
     }
     nk_sdl_font_stash_begin(&atlas);
     v->font = nk_font_atlas_add_default(atlas, 13, &config);
@@ -294,18 +285,6 @@ int unk_init(UNK *v, int model, INI_STORE *ini_store) {
 
     // Init the file_broswer dynamic array
     array_init(&v->viewmisc.file_browser.dir_contents, sizeof(FILE_INFO));
-
-    // // See if there's a game controller
-    // v->num_controllers = 0;
-    // for(int i = 0; i < SDL_NumJoysticks() && v->num_controllers < 2; i++) {
-    //     if(!SDL_IsGameController(i)) {
-    //         continue;
-    //     }
-    //     v->game_controller[v->num_controllers] = SDL_GameControllerOpen(i);
-    //     if(v->game_controller[v->num_controllers]) {
-    //         v->num_controllers++;
-    //     }
-    // }
 
     v->lim.cpu_h_px = 90;
     v->lim.min_a2_w_px = 320;
@@ -327,10 +306,6 @@ int unk_init(UNK *v, int model, INI_STORE *ini_store) {
     SDL_StartTextInput();
 
     return A2_OK;
-
-error:
-    SDL_Quit();
-    return A2_ERR;
 }
 
 int unk_process_events(UI *ui, APPLE2 *m) {
@@ -433,17 +408,31 @@ int unk_process_events(UI *ui, APPLE2 *m) {
 }
 
 void unk_shutdown(UNK *v) {
-    // Shut nuklear down
-    nk_sdl_shutdown();
+    if(v->ctx) {
+        // Shut nuklear down, crashes if it wasn't properly created and you call
+        nk_sdl_shutdown();
+    }
 
     // Then the views
     unk_dasm_shutdown(&v->viewdasm);
+    unk_mem_shutdown(&v->viewmem);
     unk_audio_speaker_shutdown(&v->viewspeaker);
 
+    // Shut down the dialog
+    array_free(&v->viewmisc.file_browser.dir_contents);
+
+
     // Then shut SDL down
+    SDL_FreeSurface(v->surface);
+    SDL_FreeSurface(v->surface_wide);
     SDL_DestroyTexture(v->texture);
+    SDL_DestroyTexture(v->texture_wide);
+    SDL_DestroyTexture(v->greenLED);
+    SDL_DestroyTexture(v->redLED);
     SDL_DestroyWindow(v->window);
+    SDL_DestroyRenderer(v->renderer);
     SDL_CloseAudio();
+    IMG_Quit();
     SDL_Quit();
 }
 

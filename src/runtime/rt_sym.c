@@ -115,6 +115,18 @@ int rt_sym_init(RUNTIME *rt, INI_STORE *ini_store) {
     return A2_OK;
 }
 
+void rt_sym_shutdown(RUNTIME *rt) {
+    for(int i = 0; i < 256; i++) {
+        for(int si = 0; si < rt->symbols[i].items; si++) {
+            SYMBOL *s = ARRAY_GET(&rt->symbols[i], SYMBOL, si);
+            free(s->symbol_name);
+        }
+        array_free(&rt->symbols[i]);
+    }
+    free(rt->symbols);
+    array_free(&rt->symbols_search);
+}
+
 int symbols_sort(const void *lhs, const void *rhs) {
     SYMBOL *symb_lhs = *(SYMBOL **)lhs;
     SYMBOL *symb_rhs = *(SYMBOL **)rhs;

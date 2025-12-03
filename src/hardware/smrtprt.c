@@ -98,3 +98,12 @@ void sp_write(APPLE2 *m, const int slot) {
     }
     spd->sp_buffer[0] = SP_SUCCESS;
 }
+
+void sp_shutdown(APPLE2 *m) {
+    for(int slot = 2; slot <= 7; slot++) {
+        if(m->slot_cards[slot].slot_type == SLOT_TYPE_SMARTPORT) {
+            util_file_discard(&m->sp_device[slot].sp_files[0]);
+            util_file_discard(&m->sp_device[slot].sp_files[1]);
+        }
+    }
+}

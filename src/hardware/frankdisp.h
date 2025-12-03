@@ -36,3 +36,4 @@ typedef struct FRANKLIN_DISPLAY {
 int franklin_display_init(FRANKLIN_DISPLAY *fd80);
 void franklin_display_map_cx_rom(APPLE2 *m, uint16_t address);
 void franklin_display_set(APPLE2 *m, uint16_t address, uint8_t value);
+void franklin_display_shutdown(FRANKLIN_DISPLAY *fd80);

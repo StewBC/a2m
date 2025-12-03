@@ -39,7 +39,8 @@ static inline void diskii_timer_update(uint64_t now, uint64_t *anchor, uint64_t 
 }
 
 void diskii_controller_init(DISKII_CONTROLLER *controller) {
-    ARRAY_INIT(&controller->diskii_drive->images, DISKII_IMAGE);
+    ARRAY_INIT(&controller->diskii_drive[0].images, DISKII_IMAGE);
+    ARRAY_INIT(&controller->diskii_drive[1].images, DISKII_IMAGE);
 }
 
 void diskii_drive_select(APPLE2 *m, const int slot, int soft_switch) {
@@ -175,14 +176,18 @@ void diskii_reset(APPLE2 *m) {
 void diskii_shutdown(APPLE2 *m) {
     for(int slot = 2; slot <= 7; slot++) {
         if(m->slot_cards[slot].slot_type == SLOT_TYPE_DISKII) {
-            for(int i = 0; i < m->diskii_controller[slot].diskii_drive[0].images.items; i++) {
-                image_shutdown(ARRAY_GET(&m->diskii_controller[slot].diskii_drive[0].images, DISKII_IMAGE, i));
+            DISKII_DRIVE *d0 = &m->diskii_controller[slot].diskii_drive[0];
+            for(int i = 0; i < d0->images.items; i++) {
+                image_shutdown(ARRAY_GET(&d0->images, DISKII_IMAGE, i));
             }
             m->diskii_controller[slot].diskii_drive[1].active_image = NULL;
-            for(int i = 0; i < m->diskii_controller[slot].diskii_drive[1].images.items; i++) {
-                image_shutdown(ARRAY_GET(&m->diskii_controller[slot].diskii_drive[1].images, DISKII_IMAGE, i));
+            DISKII_DRIVE *d1 = &m->diskii_controller[slot].diskii_drive[1];
+            for(int i = 0; i < d1->images.items; i++) {
+                image_shutdown(ARRAY_GET(&d1->images, DISKII_IMAGE, i));
             }
             m->diskii_controller[slot].diskii_drive[1].active_image = NULL;
+            array_free(&d0->images);
+            array_free(&d1->images);
         }
     }
 }

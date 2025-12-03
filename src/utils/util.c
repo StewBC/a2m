@@ -519,7 +519,7 @@ char *util_extract_file_name(const char *string, int str_len, int *index) {
     }
     const char *e = s;
     while(*e && *e != find) {
-        *e++;
+        e++;
     }
     if(e - string > str_len) {
         return NULL;

@@ -249,6 +249,7 @@ void rt_shutdown(RUNTIME *rt) {
     rt->turbo_count = 0;
     free(rt->turbo);
     rt->turbo = NULL;
+    rt_sym_shutdown(rt);
 }
 
 
@@ -528,6 +529,8 @@ int rt_update(RUNTIME *rt) {
                         if(bp->type_text) {
                             rt_paste_clipboard(rt, bp->type_text);
                         }
+                    break;
+                    default:
                     break;
                 }
             }
