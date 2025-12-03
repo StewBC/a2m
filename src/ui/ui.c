@@ -30,6 +30,8 @@ int ui_init(UI *ui, int model, INI_STORE *ini_store) {
     memset(ui, 0, sizeof(UI));
     // decide which UI needs to be instanced
     ui_apply_ini(ui, ini_store);
+    // Any user driven UI reconfiguration will have happened
+    ui->reconfig = 0;
     // Instance the UI and have it configure itself
     if(ui->class == UI_CLASS_GUI) {
         // Instance UNK

@@ -298,11 +298,13 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                 if((mod & KMOD_CTRL) && !(mod & KMOD_SHIFT)) {
                     if(dv->assembler_config.file_browser.dir_selected.name_length) {
                         ASSEMBLER_CONFIG *ac = &dv->assembler_config;
-                        ASSEMBLER as;
-                        as.selected = MEM_MAIN;
-
                         errlog_clean(&dv->errorlog);
+
+                        // Creat the assembler and init clears it to all 0's
+                        ASSEMBLER as;
                         assembler_init(&as, &dv->errorlog, v->m, (output_byte)write_to_memory_selected);
+                        // so set any state after init
+                        as.selected = ac->flags;
                         if(A2_OK != assembler_assemble(&as, ac->file_browser.dir_selected.name, 0)) {
                             as.pass = 2;
                             asm_err(&as, "Could not open file for assembly.");
@@ -677,7 +679,8 @@ void unk_dasm_show(UNK *v, int dirty) {
         ctx->style.window.border        = border;
 
         if(v->dlg_assembler_config) {
-            if((ret = unk_dlg_assembler_config(ctx, nk_rect(0, 0, 360, 115), &dv->temp_assembler_config))) {
+            dv->temp_assembler_config.model = m->model;
+            if((ret = unk_dlg_assembler_config(ctx, nk_rect(0, 0, 360, 140), &dv->temp_assembler_config))) {
                 dv->temp_assembler_config.dlg_asm_filebrowser = 0;
                 if(ret == 1) {
                     dv->assembler_config = dv->temp_assembler_config;

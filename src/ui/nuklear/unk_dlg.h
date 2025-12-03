@@ -30,6 +30,8 @@ typedef struct ASSEMBLER_CONFIG {
     int start_address_text_len;
     uint16_t start_address;
     int dlg_asm_filebrowser;
+    RAMVIEW_FLAGS flags;
+    int model;
 } ASSEMBLER_CONFIG;
 
 extern char global_entry_buffer[256];
