@@ -420,6 +420,8 @@ int main(int argc, char **argv) {
 
     main_ini_merge_to(&opts.ini_store, &ini_store);
 
+    // This avoids reading ui.reconfig which might give a possible use of uninit var warning
+    int reconfig = 0;
     do {
         // Config selves
         if(A2_OK != rt_init(&rt, &ini_store)) {
@@ -439,6 +441,8 @@ int main(int argc, char **argv) {
         // requires everything to be re-configured
         rt_run(&rt, &m, &ui);
 
+        reconfig = ui.reconfig;
+
         // Shut everything down
 ui_err:        
         ui_shutdown(&ui);
@@ -448,7 +452,7 @@ rt_err:
         rt_shutdown(&rt);
 
         // If a re-config is called for, go back and do it all over
-    } while(ui.reconfig);
+    } while(reconfig);
 
     // If the ini file needs to be saved, save it
     if(!opts.nosaveini) {
