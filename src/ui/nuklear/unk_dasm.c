@@ -305,6 +305,8 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                         assembler_init(&as, &dv->errorlog, v->m, (output_byte)write_to_memory_selected);
                         // so set any state after init
                         as.selected = ac->flags;
+                        // The assembler valid opcodes are 0 = 65c02, so opposite to this
+                        as.valid_opcodes = MODEL_APPLE_IIEE - m->model;
                         if(A2_OK != assembler_assemble(&as, ac->file_browser.dir_selected.name, 0)) {
                             as.pass = 2;
                             asm_err(&as, "Could not open file for assembly.");

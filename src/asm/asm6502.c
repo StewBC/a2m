@@ -23,7 +23,7 @@ void symbol_clear(ASSEMBLER *as, const char *symbol_name, uint32_t symbol_name_l
 const char *find_delimiter(ASSEMBLER *as, const char *delimitors);
 int match(ASSEMBLER *as, int number, ...);
 void decode_abs_rel_zp_opcode(ASSEMBLER *as);
-int is_indexed_indirect(ASSEMBLER *as, char *reg);
+int is_indirect(ASSEMBLER *as, char *reg);
 int is_address(ASSEMBLER *as);
 int is_dot_command(ASSEMBLER *as);
 int is_label(ASSEMBLER *as);
@@ -44,82 +44,165 @@ void parse_label(ASSEMBLER *as);
 void parse_opcode(ASSEMBLER *as);
 void parse_variable(ASSEMBLER *as);
 
-const uint8_t asm_opcode[56][11] = {
-//     A  |  A  |  A  |  A  |  I  |  I  |  I  |  Z  |  Z  |  Z
-//     C  |  B  |  B  |  B  |  M  |  N  |  N  |  E  |  E  |  E
-//     C  |  S  |  S  |  S  |  M  |  D  |  D  |  R  |  R  |  R
-//     U  |  O  |  O  |  O  |  E  |  I  |  I  |  O  |  O  |  O
-//     M  |  L  |  L  |  L  |  D  |  R  |  R  |  P  |  P  |  P
-//     U  |  U  |  U  |  U  |  I  |  E  |  E  |  A  |  A  |  A
-//     L  |  T  |  T  |  T  |  A  |  C  |  C  |  G  |  G  |  G
-//     A  |  E  |  E  |  E  |  T  |  T  |  T  |  E  |  E  |  E
-//     T  |     |  ,  |  ,  |  E  |  ,  |  ,  |  /  |  ,  |  ,
-//     O  |     |  X  |  Y  |     |  X  |  Y  |  R  |  X  |  Y
-//     R  |     |     |     |     |     |     |  E  |     |  
-//     /  |     |     |     |     |     |     |  L  |     |  
-//     I  |     |     |     |     |     |     |  A  |     |  
-//     M  |     |     |     |     |     |     |  T  |     |  
-//     P  |     |     |     |     |     |     |  I  |     |  
-//     L  |     |     |     |     |     |     |  V  |     |  
-//     I  |     |     |     |     |     |     |  E  |     |  
-//     E  |     |     |     |     |     |     |     |     |  
-//     D  |     |     |     |     |     |     |     |     |  
-    { -1  , 0x6d, 0x7d, 0x79, 0x69, 0x61, 0x71, 0x65, 0x75, -1   }, /*  0: ADC */
-    { -1  , 0x2d, 0x3d, 0x39, 0x29, 0x21, 0x31, 0x25, 0x35, -1   }, /*  1: AND */
-    { 0x0a, 0x0e, 0x1e, -1  , -1  , -1  , -1  , 0x06, 0x16, -1   }, /*  2: ASL */
-    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0x90, -1  , -1   }, /*  3: BCC */
-    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0xb0, -1  , -1   }, /*  4: BCS */
-    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0xf0, -1  , -1   }, /*  5: BEQ */
-    { -1  , 0x2c, -1  , -1  , -1  , -1  , -1  , 0x24, -1  , -1   }, /*  6: BIT */
-    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0x30, -1  , -1   }, /*  7: BMI */
-    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0xd0, -1  , -1   }, /*  8: BNE */
-    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0x10, -1  , -1   }, /*  9: BPL */
-    { 0x00, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 10: BRK */
-    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0x50, -1  , -1   }, /* 11: BVC */
-    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0x70, -1  , -1   }, /* 12: BVS */
-    { 0x18, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 13: CLC */
-    { 0xd8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 14: CLD */
-    { 0x58, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 15: CLI */
-    { 0xb8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 16: CLV */
-    { -1  , 0xcd, 0xdd, 0xd9, 0xc9, 0xc1, 0xd1, 0xc5, 0xd5, -1   }, /* 17: CMP */
-    { -1  , 0xec, -1  , -1  , 0xe0, -1  , -1  , 0xe4, -1  , -1   }, /* 18: CPX */
-    { -1  , 0xcc, -1  , -1  , 0xc0, -1  , -1  , 0xc4, -1  , -1   }, /* 19: CPY */
-    { -1  , 0xce, 0xde, -1  , -1  , -1  , -1  , 0xc6, 0xd6, -1   }, /* 20: DEC */
-    { 0xca, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 21: DEX */
-    { 0x88, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 22: DEY */
-    { -1  , 0x4d, 0x5d, 0x59, 0x49, 0x41, 0x51, 0x45, 0x55, -1   }, /* 23: EOR */
-    { -1  , 0xee, 0xfe, -1  , -1  , -1  , -1  , 0xe6, 0xf6, -1   }, /* 24: INC */
-    { 0xe8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 25: INX */
-    { 0xc8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 26: INY */
-    { -1  , 0x4c, -1  , -1  , 0x6C, -1  , -1  , -1  , -1  , -1   }, /* 27: JMP */
-    { -1  , 0x20, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 28: JSR */
-    { -1  , 0xad, 0xbd, 0xb9, 0xa9, 0xa1, 0xb1, 0xa5, 0xb5, -1   }, /* 29: LDA */
-    { -1  , 0xae, -1  , 0xbe, 0xa2, -1  , -1  , 0xa6, -1  , 0xb6 }, /* 30: LDX */
-    { -1  , 0xac, 0xbc, -1  , 0xa0, -1  , -1  , 0xa4, 0xb4, -1   }, /* 31: LDY */
-    { 0x4a, 0x4e, 0x5e, -1  , -1  , -1  , -1  , 0x46, 0x56, -1   }, /* 32: LSR */
-    { 0xea, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 33: NOP */
-    { -1  , 0x0d, 0x1d, 0x19, 0x09, 0x01, 0x11, 0x05, 0x15, -1   }, /* 34: ORA */
-    { 0x48, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 35: PHA */
-    { 0x08, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 36: PHP */
-    { 0x68, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 37: PLA */
-    { 0x28, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 38: PLP */
-    { 0x2a, 0x2e, 0x3e, -1  , -1  , -1  , -1  , 0x26, 0x36, -1   }, /* 39: ROL */
-    { 0x6a, 0x6e, 0x7e, -1  , -1  , -1  , -1  , 0x66, 0x76, -1   }, /* 40: ROR */
-    { 0x40, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 41: RTI */
-    { 0x60, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 42: RTS */
-    { -1  , 0xed, 0xfd, 0xf9, 0xe9, 0xe1, 0xf1, 0xe5, 0xf5, -1   }, /* 43: SBC */
-    { 0x38, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 44: SEC */
-    { 0xf8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 45: SED */
-    { 0x78, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 46: SEI */
-    { -1  , 0x8d, 0x9d, 0x99, -1  , 0x81, 0x91, 0x85, 0x95, -1   }, /* 47: STA */
-    { -1  , 0x8e, -1  , -1  , -1  , -1  , -1  , 0x86, -1  , 0x96 }, /* 48: STX */
-    { -1  , 0x8c, -1  , -1  , -1  , -1  , -1  , 0x84, 0x94, -1   }, /* 49: STY */
-    { 0xaa, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 50: TAX */
-    { 0xa8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 51: TAY */
-    { 0xba, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 52: TSX */
-    { 0x8a, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 53: TXA */
-    { 0x9a, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 54: TXS */
-    { 0x98, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 55: TYA */
+//     A  |  A  |  A  |  A  |  I  |  I  |  I  |  I  |  Z  |  Z  |  Z
+//     C  |  B  |  B  |  B  |  M  |  N  |  N  |  N  |  E  |  E  |  E
+//     C  |  S  |  S  |  S  |  M  |  D  |  D  |  D  |  R  |  R  |  R
+//     U  |  O  |  O  |  O  |  E  |  I  |  I  |  I  |  O  |  O  |  O
+//     M  |  L  |  L  |  L  |  D  |  R  |  R  |  R  |  P  |  P  |  P
+//     U  |  U  |  U  |  U  |  I  |  E  |  E  |  E  |  A  |  A  |  A
+//     L  |  T  |  T  |  T  |  A  |  C  |  C  |  C  |  G  |  G  |  G
+//     A  |  E  |  E  |  E  |  T  |  T  |  T  |  T  |  E  |  E  |  E
+//     T  |     |  ,  |  ,  |  E  |  ,  |  ,  |     |  /  |  ,  |  ,
+//     O  |     |  X  |  Y  |     |  X  |  Y  |     |  R  |  X  |  Y
+//     R  |     |     |     |     |     |     |     |  E  |     |  
+//     /  |     |     |     |     |     |     |     |  L  |     |  
+//     I  |     |     |     |     |     |     |     |  A  |     |  
+//     M  |     |     |     |     |     |     |     |  T  |     |  
+//     P  |     |     |     |     |     |     |     |  I  |     |  
+//     L  |     |     |     |     |     |     |     |  V  |     |  
+//     I  |     |     |     |     |     |     |     |  E  |     |  
+//     E  |     |     |     |     |     |     |     |     |     |  
+//     D  |     |     |     |     |     |     |     |     |     |  
+const uint8_t asm_opcode[GPERF_OPCODE_TYA+1][ADDRESS_MODE_ZEROPAGE_Y+1] = {
+    { -1  , 0x6d, 0x7d, 0x79, 0x69, 0x61, 0x71, 0x72, 0x65, 0x75, -1   }, /*  0: ADC */
+    { -1  , 0x2d, 0x3d, 0x39, 0x29, 0x21, 0x31, 0x32, 0x25, 0x35, -1   }, /*  1: AND */
+    { 0x0a, 0x0e, 0x1e, -1  , -1  , -1  , -1  , -1  , 0x06, 0x16, -1   }, /*  2: ASL */
+    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0x90, -1  , -1   }, /*  3: BCC */
+    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0xb0, -1  , -1   }, /*  4: BCS */
+    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0xf0, -1  , -1   }, /*  5: BEQ */
+    { -1  , 0x2c, 0x3c, -1  , 0x89, -1  , -1  , -1  , 0x24, 0x34, -1   }, /*  6: BIT */
+    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0x30, -1  , -1   }, /*  7: BMI */
+    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0xd0, -1  , -1   }, /*  8: BNE */
+    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0x10, -1  , -1   }, /*  9: BPL */
+    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0x80, -1  , -1   }, /* 10: BRA */
+    { 0x00, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 11: BRK */
+    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0x50, -1  , -1   }, /* 12: BVC */
+    { -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , 0x70, -1  , -1   }, /* 13: BVS */
+    { 0x18, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 14: CLC */
+    { 0xd8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 15: CLD */
+    { 0x58, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 16: CLI */
+    { 0xb8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 17: CLV */
+    { -1  , 0xcd, 0xdd, 0xd9, 0xc9, 0xc1, 0xd1, 0xd2, 0xc5, 0xd5, -1   }, /* 18: CMP */
+    { -1  , 0xec, -1  , -1  , 0xe0, -1  , -1  , -1  , 0xe4, -1  , -1   }, /* 19: CPX */
+    { -1  , 0xcc, -1  , -1  , 0xc0, -1  , -1  , -1  , 0xc4, -1  , -1   }, /* 20: CPY */
+    { 0x3a, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 21: DEA */
+    { -1  , 0xce, 0xde, -1  , -1  , -1  , -1  , -1  , 0xc6, 0xd6, -1   }, /* 22: DEC */
+    { 0xca, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 23: DEX */
+    { 0x88, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 24: DEY */
+    { -1  , 0x4d, 0x5d, 0x59, 0x49, 0x41, 0x51, 0x52, 0x45, 0x55, -1   }, /* 25: EOR */
+    { 0x1a, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 26: INA */
+    { -1  , 0xee, 0xfe, -1  , -1  , -1  , -1  , -1  , 0xe6, 0xf6, -1   }, /* 27: INC */
+    { 0xe8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 28: INX */
+    { 0xc8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 29: INY */
+    { -1  , 0x4c, -1  , -1  , -1  , 0x7c, -1  , 0x6c, -1  , -1  , -1   }, /* 30: JMP */
+    { -1  , 0x20, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 31: JSR */
+    { -1  , 0xad, 0xbd, 0xb9, 0xa9, 0xa1, 0xb1, 0xb2, 0xa5, 0xb5, -1   }, /* 32: LDA */
+    { -1  , 0xae, -1  , 0xbe, 0xa2, -1  , -1  , -1  , 0xa6, -1  , 0xb6 }, /* 33: LDX */
+    { -1  , 0xac, 0xbc, -1  , 0xa0, -1  , -1  , -1  , 0xa4, 0xb4, -1   }, /* 34: LDY */
+    { 0x4a, 0x4e, 0x5e, -1  , -1  , -1  , -1  , -1  , 0x46, 0x56, -1   }, /* 35: LSR */
+    { 0xea, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 36: NOP */
+    { -1  , 0x0d, 0x1d, 0x19, 0x09, 0x01, 0x11, 0x12, 0x05, 0x15, -1   }, /* 37: ORA */
+    { 0x48, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 38: PHA */
+    { 0x08, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 39: PHP */
+    { 0xda, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 40: PHX */
+    { 0x5a, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 41: PHY */
+    { 0x68, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 42: PLA */
+    { 0x28, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 43: PLP */
+    { 0xfa, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 44: PLX */
+    { 0x7a, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 45: PLY */
+    { 0x2a, 0x2e, 0x3e, -1  , -1  , -1  , -1  , -1  , 0x26, 0x36, -1   }, /* 46: ROL */
+    { 0x6a, 0x6e, 0x7e, -1  , -1  , -1  , -1  , -1  , 0x66, 0x76, -1   }, /* 47: ROR */
+    { 0x40, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 48: RTI */
+    { 0x60, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 49: RTS */
+    { -1  , 0xed, 0xfd, 0xf9, 0xe9, 0xe1, 0xf1, 0xf2, 0xe5, 0xf5, -1   }, /* 50: SBC */
+    { 0x38, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 51: SEC */
+    { 0xf8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 52: SED */
+    { 0x78, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 53: SEI */
+    { -1  , 0x8d, 0x9d, 0x99, -1  , 0x81, 0x91, 0x92, 0x85, 0x95, -1   }, /* 54: STA */
+    { -1  , 0x8e, -1  , -1  , -1  , -1  , -1  , -1  , 0x86, -1  , 0x96 }, /* 55: STX */
+    { -1  , 0x8c, -1  , -1  , -1  , -1  , -1  , -1  , 0x84, 0x94, -1   }, /* 56: STY */
+    { -1  , 0x9c, 0x9e, -1  , -1  , -1  , -1  , -1  , 0x64, 0x74, -1   }, /* 57: STZ */
+    { 0xaa, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 58: TAX */
+    { 0xa8, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 59: TAY */
+    { -1  , 0x1c, -1  , -1  , -1  , -1  , -1  , -1  , 0x14, -1  , -1   }, /* 60: TRB */
+    { -1  , 0x0c, -1  , -1  , -1  , -1  , -1  , -1  , 0x04, -1  , -1   }, /* 61: TSB */
+    { 0xba, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 62: TSX */
+    { 0x8a, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 63: TXA */
+    { 0x9a, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 64: TXS */
+    { 0x98, -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1  , -1   }, /* 65: TYA */
+};
+
+// In this table the values are:
+// -1 - Not a valid opcode
+//  0 - A valid 65c02 opcode only
+//  1 - A valid 6502 opcode
+const uint8_t asm_opcode_type[GPERF_OPCODE_TYA+1][ADDRESS_MODE_ZEROPAGE_Y+1] = {
+    {-1   , 1   , 1   , 1   , 1   , 1   , 1   ,  0  , 1   , 1   ,-1}    , /*  0: ADC */
+    {-1   , 1   , 1   , 1   , 1   , 1   , 1   ,  0  , 1   , 1   ,-1}    , /*  1: AND */
+    { 1   , 1   , 1   ,-1   ,-1   ,-1   ,-1   , -1  , 1   , 1   ,-1}    , /*  2: ASL */
+    {-1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  , 1   ,-1   ,-1}    , /*  3: BCC */
+    {-1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  , 1   ,-1   ,-1}    , /*  4: BCS */
+    {-1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  , 1   ,-1   ,-1}    , /*  5: BEQ */
+    {-1   , 1   , 0   ,-1   , 0   ,-1   ,-1   , -1  , 1   , 0   ,-1}    , /*  6: BIT */
+    {-1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  , 1   ,-1   ,-1}    , /*  7: BMI */
+    {-1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  , 1   ,-1   ,-1}    , /*  8: BNE */
+    {-1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  , 1   ,-1   ,-1}    , /*  9: BPL */
+    {-1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  , 0   ,-1   ,-1}    , /* 10: BRA */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 10: BRK */
+    {-1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  , 1   ,-1   ,-1}    , /* 11: BVC */
+    {-1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  , 1   ,-1   ,-1}    , /* 12: BVS */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 13: CLC */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 14: CLD */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 15: CLI */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 16: CLV */
+    {-1   , 1   , 1   , 1   , 1   , 1   , 1   ,  0  , 1   , 1   ,-1}    , /* 17: CMP */
+    {-1   , 1   ,-1   ,-1   , 1   ,-1   ,-1   , -1  , 1   ,-1   ,-1}    , /* 18: CPX */
+    {-1   , 1   ,-1   ,-1   , 1   ,-1   ,-1   , -1  , 1   ,-1   ,-1}    , /* 19: CPY */
+    { 0   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 20: DEA */
+    {-1   , 1   , 1   ,-1   ,-1   ,-1   ,-1   , -1  , 1   , 1   ,-1}    , /* 20: DEC */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 21: DEX */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 22: DEY */
+    {-1   , 1   , 1   , 1   , 1   , 1   , 1   ,  0  , 1   , 1   ,-1}    , /* 23: EOR */
+    { 0   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 24: INA */
+    {-1   , 1   , 1   ,-1   ,-1   ,-1   ,-1   , -1  , 1   , 1   ,-1}    , /* 24: INC */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 25: INX */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 26: INY */
+    {-1   , 1   ,-1   ,-1   ,-1   , 0   , 1   ,  1  ,-1   ,-1   ,-1}    , /* 27: JMP */
+    {-1   , 1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 28: JSR */
+    {-1   , 1   , 1   , 1   , 1   , 1   , 1   ,  0  , 1   , 1   ,-1}    , /* 29: LDA */
+    {-1   , 1   ,-1   , 1   , 1   ,-1   ,-1   , -1  , 1   ,-1   , 1}    , /* 30: LDX */
+    {-1   , 1   , 1   ,-1   , 1   ,-1   ,-1   , -1  , 1   , 1   ,-1}    , /* 31: LDY */
+    { 1   , 1   , 1   ,-1   ,-1   ,-1   ,-1   , -1  , 1   , 1   ,-1}    , /* 32: LSR */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 33: NOP */
+    {-1   , 1   , 1   , 1   , 1   , 1   , 1   ,  0  , 1   , 1   ,-1}    , /* 34: ORA */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 35: PHA */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 36: PHP */
+    { 0   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 36: PHX */
+    { 0   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 36: PHY */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 37: PLA */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 38: PLP */
+    { 0   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 38: PLX */
+    { 0   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 38: PLY */
+    { 1   , 1   , 1   ,-1   ,-1   ,-1   ,-1   , -1  , 1   , 1   ,-1}    , /* 39: ROL */
+    { 1   , 1   , 1   ,-1   ,-1   ,-1   ,-1   , -1  , 1   , 1   ,-1}    , /* 40: ROR */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 41: RTI */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 42: RTS */
+    {-1   , 1   , 1   , 1   , 1   , 1   , 1   ,  0  , 1   , 1   ,-1}    , /* 43: SBC */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 44: SEC */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 45: SED */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 46: SEI */
+    {-1   , 1   , 1   , 1   ,-1   , 1   , 1   ,  0  , 1   , 1   ,-1}    , /* 47: STA */
+    {-1   , 1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  , 1   ,-1   , 1}    , /* 48: STX */
+    {-1   , 1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  , 1   , 1   ,-1}    , /* 49: STY */
+    {-1   , 0   , 0   ,-1   ,-1   ,-1   ,-1   , -1  , 0   , 0   ,-1}    , /* 49: STZ */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 50: TAX */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 51: TAY */
+    {-1   , 0   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  , 0   ,-1   ,-1}    , /* 52: TRB */
+    {-1   , 0   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  , 0   ,-1   ,-1}    , /* 52: TSB */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 52: TSX */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 53: TXA */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 54: TXS */
+    { 1   ,-1   ,-1   ,-1   ,-1   ,-1   ,-1   , -1  ,-1   ,-1   ,-1}    , /* 55: TYA */
 };
 
 const char *address_mode_txt[] = {
@@ -292,6 +375,10 @@ void write_opcode(ASSEMBLER *as) {
     if(opcode == -1) {
         asm_err(as, "Invalid opcode %.3s with mode %s", as->opcode_info.mnemonic, address_mode_txt[as->opcode_info.addressing_mode]);
     }
+    if(as->valid_opcodes && !asm_opcode_type[as->opcode_info.opcode_id][as->opcode_info.addressing_mode]) {
+        asm_err(as, "Opcode %.3s with mode %s only valid in 65c02", as->opcode_info.mnemonic, address_mode_txt[as->opcode_info.addressing_mode]);
+    }
+
     // First the opcode
     emit(as, opcode);
     // Then the operand (0, ie implied, will do nothing more)
@@ -631,7 +718,7 @@ void decode_abs_rel_zp_opcode(ASSEMBLER *as) {
     write_opcode(as);
 }
 
-int is_indexed_indirect(ASSEMBLER *as, char *reg) {
+int is_indirect(ASSEMBLER *as, char *reg) {
     const char *c = as->token_start;
     int brackets = 1;
     // Only called when it's known there are (as)'s on the line
@@ -655,6 +742,8 @@ int is_indexed_indirect(ASSEMBLER *as, char *reg) {
             *reg = 'y';
             return ADDRESS_MODE_INDIRECT_Y;
         }
+    } else if(!brackets) {
+        return ADDRESS_MODE_INDIRECT;
     }
     return 0;
 }
@@ -1135,6 +1224,12 @@ uint16_t parse_anonymous_address(ASSEMBLER *as) {
 
 void parse_dot_command(ASSEMBLER *as) {
     switch(as->opcode_info.opcode_id) {
+        case GPERF_DOT_6502:
+            as->valid_opcodes = 1;
+            break;
+        case GPERF_DOT_65c02:
+            as->valid_opcodes = 0;
+            break;
         case GPERF_DOT_ALIGN: {
                 uint64_t value = evaluate_expression(as);
                 as->current_address = (as->current_address + (value - 1)) & ~(value - 1);
@@ -1197,6 +1292,8 @@ void parse_dot_command(ASSEMBLER *as) {
         case GPERF_DOT_WORD:
             write_values(as, 16, BYTE_ORDER_LO);
             break;
+        default:
+            asm_err(as, "opcode with id:%d not understood", as->opcode_info.opcode_id);
     }
 }
 
@@ -1218,6 +1315,9 @@ void parse_opcode(ASSEMBLER *as) {
     next_token(as);
     if(is_valid_instruction_only(as)) {
         // Implied
+        if(as->valid_opcodes && !asm_opcode_type[as->opcode_info.opcode_id][as->opcode_info.addressing_mode]) {
+            asm_err(as, "Opcode %.3s with mode %s only valid in 65c02", as->opcode_info.mnemonic, address_mode_txt[as->opcode_info.addressing_mode]);
+        }
         emit(as, asm_opcode[as->opcode_info.opcode_id][ADDRESS_MODE_ACCUMULATOR]);
     } else {
         int processed = 0;
@@ -1230,26 +1330,21 @@ void parse_opcode(ASSEMBLER *as) {
                 processed = 1;
                 break;
             case '(':
-                if(as->opcode_info.opcode_id == GPERF_OPCODE_JMP) {
-                    // jmp (INDIRECT) is a special case
-                    as->opcode_info.value = parse_expression(as);
-                    as->opcode_info.addressing_mode = ADDRESS_MODE_IMMEDIATE;
+                char reg;
+                int indirect = is_indirect(as, &reg);
+                if(indirect) {
+                    // Already inside bracket
+                    if(reg == 'x') {
+                        // , in ,x ends expression so evaluate to ignore active open (
+                        as->opcode_info.value = evaluate_expression(as);
+                    } else {
+                        // start with the "active" ( and end in ) so parse
+                        as->opcode_info.value = parse_expression(as);
+                    }
+                    as->opcode_info.addressing_mode = indirect;
                     write_opcode(as);
-                    processed = 1;
-                } else {
-                    char reg;
-                    int indexed_indirect = is_indexed_indirect(as, &reg);
-                    if(indexed_indirect) {
-                        // Already inside bracket
-                        if(reg == 'x') {
-                            // , in ,x ends expression so evaluate to ignore active open (
-                            as->opcode_info.value = evaluate_expression(as);
-                        } else {
-                            // start with the "active" ( and end in ) so parse
-                            as->opcode_info.value = parse_expression(as);
-                        }
-                        as->opcode_info.addressing_mode = indexed_indirect;
-                        write_opcode(as);
+                    if(indirect != ADDRESS_MODE_INDIRECT) {
+                        // Indirect x or y need extra steps
                         next_token(as);
                         // Make sure it was ,x or ,y
                         if(tolower(*as->token_start) != reg) {
@@ -1260,8 +1355,8 @@ void parse_opcode(ASSEMBLER *as) {
                         if(as->current_token.op == ')') {
                             next_token(as);
                         }
-                        processed = 1;
                     }
+                    processed = 1;
                 }
                 break;
         }

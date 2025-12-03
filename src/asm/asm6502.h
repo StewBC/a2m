@@ -6,6 +6,8 @@
 
 // Also see ../gperf/asm6502.gperf
 enum {
+    GPERF_DOT_6502,
+    GPERF_DOT_65c02,
     GPERF_DOT_ALIGN,
     GPERF_DOT_BYTE,
     GPERF_DOT_DROW,
@@ -39,6 +41,7 @@ enum {
     GPERF_OPCODE_BMI,
     GPERF_OPCODE_BNE,
     GPERF_OPCODE_BPL,
+    GPERF_OPCODE_BRA,
     GPERF_OPCODE_BRK,
     GPERF_OPCODE_BVC,
     GPERF_OPCODE_BVS,
@@ -49,10 +52,12 @@ enum {
     GPERF_OPCODE_CMP,
     GPERF_OPCODE_CPX,
     GPERF_OPCODE_CPY,
+    GPERF_OPCODE_DEA,
     GPERF_OPCODE_DEC,
     GPERF_OPCODE_DEX,
     GPERF_OPCODE_DEY,
     GPERF_OPCODE_EOR,
+    GPERF_OPCODE_INA,
     GPERF_OPCODE_INC,
     GPERF_OPCODE_INX,
     GPERF_OPCODE_INY,
@@ -66,8 +71,12 @@ enum {
     GPERF_OPCODE_ORA,
     GPERF_OPCODE_PHA,
     GPERF_OPCODE_PHP,
+    GPERF_OPCODE_PHX,
+    GPERF_OPCODE_PHY,
     GPERF_OPCODE_PLA,
     GPERF_OPCODE_PLP,
+    GPERF_OPCODE_PLX,
+    GPERF_OPCODE_PLY,
     GPERF_OPCODE_ROL,
     GPERF_OPCODE_ROR,
     GPERF_OPCODE_RTI,
@@ -79,8 +88,11 @@ enum {
     GPERF_OPCODE_STA,
     GPERF_OPCODE_STX,
     GPERF_OPCODE_STY,
+    GPERF_OPCODE_STZ,
     GPERF_OPCODE_TAX,
     GPERF_OPCODE_TAY,
+    GPERF_OPCODE_TRB,
+    GPERF_OPCODE_TSB,
     GPERF_OPCODE_TSX,
     GPERF_OPCODE_TXA,
     GPERF_OPCODE_TXS,
@@ -129,6 +141,7 @@ enum {
     ADDRESS_MODE_IMMEDIATE,
     ADDRESS_MODE_INDIRECT_X,
     ADDRESS_MODE_INDIRECT_Y,
+    ADDRESS_MODE_INDIRECT,
     ADDRESS_MODE_ZEROPAGE,
     ADDRESS_MODE_ZEROPAGE_X,
     ADDRESS_MODE_ZEROPAGE_Y,
@@ -198,33 +211,34 @@ typedef struct CB_ASSEMBLER_CTX {
 } CB_ASSEMBLER_CTX;
 
 typedef struct ASSEMBLER {
-    const char *strcode;                                    // Active .strcode expression
+    CB_ASSEMBLER_CTX cb_assembler_ctx;                      // Emit uses this FNP to output the actual byte
+    DYNARRAY anon_symbols;                                  // Array of anonymous symbols
+    DYNARRAY input_stack;                                   // Array of token "reset" points (saved token_start, input, etc)
+    DYNARRAY loop_stack;                                    // Array of for loops
+    DYNARRAY macros;                                        // Array of all macros
+    INCLUDE_FILES include_files;                            // The arrays for files and stack for .include
+    OPCODEINFO opcode_info;                                 // State of what is to be emitted in terms of 6502 opcodes
+    RAMVIEW_FLAGS selected;                                 // default is MEM_MAPPED_6502
+    TOKEN current_token;                                    // What is being parsed
+    int error_log_level;                                    // logging level (0 - filter duplicates; 1 - all to limit)
+    int expression_size;                                    // Forward defs can't change size (16 bit can't become 8 later)
+    int pass;                                               // 1 or 2 for 2 pass assembler
+    int valid_opcodes;                                      // 0 = 65c02 (default), 1 = 6502
+    int verbose;                                            // cmd-line; 0 supress duplicates, 1 show all (up to 100)
+    size_t current_line;                                    // for error reporting, line being processed
+    size_t next_line_count;                                 // count of lines past last token
+    uint16_t current_address;                               // Address where next byte will be emitted
+    uint16_t if_active;                                     // Count of if's (or else's) active
+    uint16_t last_address;                                  // Last address where the assembler put a byte
+    uint16_t start_address;                                 // First address where the assembler output a byte
     const char *current_file;                               // Points at a UTIL_FILE path_name
     const char *input;                                      // Points at the assembly language buffer (start through end)
     const char *line_start;                                 // Just past \n of line input is on
     const char *next_line_start;                            // So errors get reported on line of last token
+    const char *strcode;                                    // Active .strcode expression
     const char *token_start;                                // Points at the start of a token (and input the end)
-    DYNARRAY anon_symbols;                                  // Array of anonymous symbols
-    DYNARRAY loop_stack;                                    // Array of for loops
-    DYNARRAY macros;                                        // Array of all macros
-    DYNARRAY input_stack;                                   // Array of token "reset" points (saved token_start, input, etc)
     DYNARRAY *symbol_table;                                 // Array of arrays of symbols
-    INCLUDE_FILES include_files;                            // The arrays for files and stack for .include
-    int expression_size;                                    // Forward defs can't change size (16 bit can't become 8 later)
-    int pass;                                               // 1 or 2 for 2 pass assembler
-    OPCODEINFO opcode_info;                                 // State of what is to be emitted in terms of 6502 opcodes
-    size_t current_line;                                    // for error reporting, line being processed
-    size_t next_line_count;                                 // count of lines past last token
-    TOKEN current_token;                                    // What is being parsed
-    uint16_t current_address;                               // Address where next byte will be emitted
-    uint16_t start_address;                                 // First address where the assembler output a byte
-    uint16_t last_address;                                  // Last address where the assembler put a byte
-    uint16_t if_active;                                     // Count of if's (or else's) active
-    int verbose;                                            // cmd-line; 0 supress duplicates, 1 show all (up to 100)
-    RAMVIEW_FLAGS selected;                                 // default is MEM_MAPPED_6502
     ERRORLOG *errorlog;                                     // ptr to log that tracks errors
-    int error_log_level;                                    // logging level (0 - filter duplicates; 1 - all to limit)
-    CB_ASSEMBLER_CTX cb_assembler_ctx;                      // Emit uses this FNP to output the actual byte
 } ASSEMBLER;
 
 // extern ASSEMBLER *as;

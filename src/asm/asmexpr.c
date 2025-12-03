@@ -81,10 +81,9 @@ void get_token(ASSEMBLER *as) {
         // if it's a dot word, get the word
         if(*as->input == '.') {
             as->input++;
-            // . (dot) words are just alpha characters
-            // This makes it so .lt<number> works otherwise it has to be
-            // .lt <number> (because the dot command will also consume the numbers)
-            while(isalpha(*as->input)) {
+            // I can here detect a number an use a separate loop so .lt<num> and .6502 will work
+            // but for now it has to be .lt <num>
+            while(isalnum(*as->input)) {
                 as->input++;
             }
         } else {
