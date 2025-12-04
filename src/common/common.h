@@ -30,13 +30,17 @@
 
 #define UNUSED(x)   (void)(x)
 
+#define tst_flags(status, flag_mask)        ((status) & (flag_mask))
+#define set_flags(status, flag_mask)        ((status) |= (flag_mask))
+#define clr_flags(status, flag_mask)        ((status) &= ~(flag_mask))
+
 // The flags that tell memory functions where to read/write
 // These are not used by hardware, but exist so external friends can ask hardware for
 // values from banks other than RAM_MAIN
 typedef enum RAMVIEW_FLAGS {
-    MEM_MAPPED_6502     = (1 << 0),
-    MEM_MAIN            = (1 << 1),
-    MEM_AUX             = (1 << 2),
-    MEM_LC_BANK2        = (1 << 3),
+    MEM_MAPPED_6502     = 0,
+    MEM_MAIN            = (1 << 0),
+    MEM_AUX             = (1 << 1),
+    MEM_LC_BANK2        = (1 << 2),
 } RAMVIEW_FLAGS;
 

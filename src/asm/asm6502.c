@@ -1388,7 +1388,6 @@ int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, void *user, output_byte ob
     as->errorlog = errorlog;
     as->cb_assembler_ctx.user = user;
     as->cb_assembler_ctx.output_byte = ob;
-    as->selected = MEM_MAPPED_6502; // SQW - this should just be 0 and MEM_MAPPED_6502 should == 0
 
     ARRAY_INIT(&as->anon_symbols, uint16_t);
     ARRAY_INIT(&as->loop_stack, FOR_LOOP);

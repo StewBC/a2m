@@ -207,7 +207,6 @@ void unk_dasm_cursor_up(UNK *v, VIEWDASM *dv) {
 }
 
 int unk_dasm_init(VIEWDASM *dv) {
-    dv->flags = MEM_MAPPED_6502;
     dv->cursor_field = CURSOR_ASCII;
 
     errlog_init(&dv->errorlog);
@@ -612,39 +611,36 @@ void unk_dasm_show(UNK *v, int dirty) {
             nk_layout_row_push(ctx, 0.35);
             nk_spacer(ctx);
             nk_layout_row_push(ctx, 0.15);
-            if(nk_option_label(ctx, "6502", tst_mem_flag(dv->flags, MEM_MAPPED_6502)) && !tst_mem_flag(dv->flags, MEM_MAPPED_6502)) {
-                clr_mem_flag(dv->flags, MEM_MAIN);
-                clr_mem_flag(dv->flags, MEM_AUX);
-                clr_mem_flag(dv->flags, MEM_LC_BANK2);
-                set_mem_flag(dv->flags, MEM_MAPPED_6502);
+            if(nk_option_label(ctx, "6502", !tst_flags(dv->flags, MEM_MAIN | MEM_AUX)) && tst_flags(dv->flags, MEM_MAIN | MEM_AUX)) {
+                clr_flags(dv->flags, MEM_MAIN);
+                clr_flags(dv->flags, MEM_AUX);
+                clr_flags(dv->flags, MEM_LC_BANK2);
             }
-            if(nk_option_label(ctx, "64K", tst_mem_flag(dv->flags, MEM_MAIN)) && !tst_mem_flag(dv->flags, MEM_MAIN)) {
-                clr_mem_flag(dv->flags, MEM_MAPPED_6502);
-                clr_mem_flag(dv->flags, MEM_AUX);
-                set_mem_flag(dv->flags, MEM_MAIN);
+            if(nk_option_label(ctx, "64K", tst_flags(dv->flags, MEM_MAIN)) && !tst_flags(dv->flags, MEM_MAIN)) {
+                clr_flags(dv->flags, MEM_AUX);
+                set_flags(dv->flags, MEM_MAIN);
                 if(m->lc_bank2_enable) {
-                    set_mem_flag(dv->flags, MEM_LC_BANK2);
+                    set_flags(dv->flags, MEM_LC_BANK2);
                 } else {
-                    clr_mem_flag(dv->flags, MEM_LC_BANK2);
+                    clr_flags(dv->flags, MEM_LC_BANK2);
                 }
             }
-            if(nk_option_label_disabled(ctx, "128K", tst_mem_flag(dv->flags, MEM_AUX), !m->model) && !tst_mem_flag(dv->flags, MEM_AUX)) {
-                clr_mem_flag(dv->flags, MEM_MAPPED_6502);
-                clr_mem_flag(dv->flags, MEM_MAIN);
-                set_mem_flag(dv->flags, MEM_AUX);
+            if(nk_option_label_disabled(ctx, "128K", tst_flags(dv->flags, MEM_AUX), !m->model) && !tst_flags(dv->flags, MEM_AUX)) {
+                clr_flags(dv->flags, MEM_MAIN);
+                set_flags(dv->flags, MEM_AUX);
                 if(m->lc_bank2_enable) {
-                    set_mem_flag(dv->flags, MEM_LC_BANK2);
+                    set_flags(dv->flags, MEM_LC_BANK2);
                 } else {
-                    clr_mem_flag(dv->flags, MEM_LC_BANK2);
+                    clr_flags(dv->flags, MEM_LC_BANK2);
                 }
             }
-            int before = tst_mem_flag(dv->flags, MEM_LC_BANK2);
-            int after = nk_option_label_disabled(ctx, "LC Bank2", before, tst_mem_flag(dv->flags, MEM_MAPPED_6502));
+            int before = tst_flags(dv->flags, MEM_LC_BANK2);
+            int after = nk_option_label_disabled(ctx, "LC Bank2", before, !tst_flags(dv->flags, MEM_MAIN | MEM_AUX));
             if(after != before) {
                 if(after) {
-                    set_mem_flag(dv->flags, MEM_LC_BANK2);
+                    set_flags(dv->flags, MEM_LC_BANK2);
                 } else {
-                    clr_mem_flag(dv->flags, MEM_LC_BANK2);
+                    clr_flags(dv->flags, MEM_LC_BANK2);
                 }
             }
             nk_group_end(ctx);

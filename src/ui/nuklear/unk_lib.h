@@ -50,10 +50,6 @@ typedef enum CURSOR_DIGIT {
     CURSOR_DIGIT3,
 } CURSOR_DIGIT;
 
-#define set_mem_flag(status, flag_mask)       ((status) |= (flag_mask))
-#define tst_mem_flag(status, flag_mask)       ((status) & (flag_mask))
-#define clr_mem_flag(status, flag_mask)       ((status) &= ~(flag_mask))
-
 #define VIEWCPU_NAME_HASH   0XE5EA0BC3
 #define VIEWDASM_NAME_HASH  0X81101438
 #define VIEWMEM_NAME_HASH   0XB9A77E29

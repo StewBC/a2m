@@ -35,7 +35,7 @@ static inline uint8_t read_from_memory_debug(APPLE2 *m, uint16_t address) {
 }
 
 static inline uint8_t read_from_memory_selected(APPLE2 *m, uint16_t address, int selected) {
-    switch(selected & (MEM_MAPPED_6502 | MEM_MAIN | MEM_AUX)) {
+    switch(tst_flags(selected, (MEM_MAIN | MEM_AUX))) {
         case MEM_MAPPED_6502:
             return m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
         case MEM_MAIN:
@@ -100,10 +100,7 @@ static inline void write_to_memory(APPLE2 *m, uint16_t address, uint8_t value) {
 }
 
 static inline void write_to_memory_selected(APPLE2 *m, RAMVIEW_FLAGS selected, uint16_t address, uint8_t value) {
-    if(!selected) {
-        selected = MEM_MAPPED_6502;
-    }
-    switch(selected & (MEM_MAPPED_6502 | MEM_MAIN | MEM_AUX)) {
+    switch(tst_flags(selected, (MEM_MAIN | MEM_AUX))) {
         case MEM_MAPPED_6502:
             m->write_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE] = value;
             break;
