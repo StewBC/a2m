@@ -7,6 +7,42 @@
 // Display variables
 static const char *access_mode[3] = { "R", "W", "RW" };
 
+// Calculate the rect where the scrollbar lives
+static struct nk_rect nk_window_vscroll_rect(struct nk_context *ctx)
+{
+    struct nk_rect bounds = nk_window_get_bounds(ctx);
+    struct nk_vec2 content_min = nk_window_get_content_region_min(ctx);
+    struct nk_vec2 content_max = nk_window_get_content_region_max(ctx);
+
+    struct nk_rect r;
+    r.x = content_max.x;
+    r.y = content_min.y;                    // top of content (below header)
+    r.w = (bounds.x + bounds.w) - r.x;      // everything to the right
+    r.h = (bounds.y + bounds.h) - r.y;      // down to bottom of window
+    return r;
+}
+
+// Figure out of the scrollbar is being dragged
+static void update_nk_scroll_drag(struct nk_context *ctx, VIEWMISC *misc) {
+    const struct nk_input *in = &ctx->input;
+    const struct nk_mouse_button *mb = &in->mouse.buttons[NK_BUTTON_LEFT];
+
+    struct nk_rect vscroll = nk_window_vscroll_rect(ctx);
+
+    if (!misc->dragging) {
+        // initial click inside the scrollbar rect
+        if (mb->clicked &&
+            NK_INBOX(mb->clicked_pos.x, mb->clicked_pos.y, vscroll.x, vscroll.y, vscroll.w, vscroll.y)) {
+            misc->dragging = 1;
+        }
+    } else {
+        if (!mb->down) {
+            // release when button released
+            misc->dragging = 0;
+        }
+    }
+}
+
 void unk_misc_show(UNK *v) {
     APPLE2 *m = v->m;
     RUNTIME *rt = v->rt;
@@ -339,7 +375,10 @@ void unk_misc_show(UNK *v) {
             // ctx->current->layout->flags = 193;
         }
     }
+    // Set a flag if the scrollbar is being dragged (scrollbar_active in unk_view)
+    update_nk_scroll_drag(ctx, &v->viewmisc);
     nk_end(ctx);
+
     // Floating windows outside the main misc window
     ctx->style.window.background = ob;
     if(v->dlg_filebrowser) {

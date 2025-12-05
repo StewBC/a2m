@@ -5,6 +5,7 @@
 #pragma once
 
 typedef struct VIEWMISC {
+    int dragging;
     FILE_BROWSER file_browser;
     BREAKPOINT_EDIT breakpoint_edit;
 } VIEWMISC;
