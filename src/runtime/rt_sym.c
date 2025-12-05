@@ -91,6 +91,8 @@ int rt_sym_init(RUNTIME *rt, INI_STORE *ini_store) {
         ARRAY_INIT(s, SYMBOL);
     }
 
+    ARRAY_INIT(&rt->symbol_source_names, char*);
+
     // Init the search array
     ARRAY_INIT(&rt->symbols_search, SYMBOL *);
 
@@ -98,16 +100,34 @@ int rt_sym_init(RUNTIME *rt, INI_STORE *ini_store) {
     UTIL_FILE symbol_file;
     memset(&symbol_file, 0, sizeof(symbol_file));
 
-    // Load the symbol files if they are found
-    if(A2_OK == util_file_load(&symbol_file, "symbols/A2_BASIC.SYM", "r")) {
-        rt_sym_add_symbols(rt, "A2_BASIC", symbol_file.file_data, symbol_file.file_size, 0);
+    const char *val = ini_get(ini_store, "Config", "symbols");
+    if(val) {
+        char *fn;
+        int index = 0;
+        int str_len = strlen(val);
+        while((fn = util_extract_file_name(val, str_len, &index))) {
+            if(A2_OK == util_file_load(&symbol_file, fn, "r")) {
+                int len;
+                const char *name = util_strrtok(fn, "\\/");
+                name = name ? (name + 1) : fn;
+                const char *ext = util_strrtok(name, ".");
+                if(ext) {
+                    len = ext - name;
+                } else {
+                    len = strlen(name);
+                }
+                char *sym_src = (char*)malloc(len + 1);
+                if(sym_src) {
+                    memcpy(sym_src, name, len);
+                    sym_src[len] = 0;
+                    ARRAY_ADD(&rt->symbol_source_names, sym_src);
+                }
+                rt_sym_add_symbols(rt, sym_src, symbol_file.file_data, symbol_file.file_size, 0);
+                free(fn);
+            }
+        }
     }
-    if(A2_OK == util_file_load(&symbol_file, "symbols/APPLE2E.SYM", "r")) {
-        rt_sym_add_symbols(rt, "APPLE2E", symbol_file.file_data, symbol_file.file_size, 0);
-    }
-    if(A2_OK == util_file_load(&symbol_file, "symbols/USER.SYM", "r")) {
-        rt_sym_add_symbols(rt, "USER", symbol_file.file_data, symbol_file.file_size, 1);
-    }
+
     if(A2_OK != rt_sym_search_update(rt)) {
         return A2_ERR;
     }
@@ -124,6 +144,10 @@ void rt_sym_shutdown(RUNTIME *rt) {
         array_free(&rt->symbols[i]);
     }
     free(rt->symbols);
+    for(int i = 0; i < rt->symbol_source_names.items; i++) {
+        free(*ARRAY_GET(&rt->symbol_source_names, char*, i));
+    }
+    array_free(&rt->symbol_source_names);
     array_free(&rt->symbols_search);
 }
 

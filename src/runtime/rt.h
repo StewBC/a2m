@@ -84,6 +84,7 @@ typedef struct RUNTIME {
 
     // FLOWMANAGER flowmanager;
     DYNARRAY *symbols;
+    DYNARRAY symbol_source_names;
 } RUNTIME;
 
 #define adjust(a,b,c)           do { a += c; b -= c; } while (0)

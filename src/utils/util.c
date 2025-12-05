@@ -255,7 +255,7 @@ int util_file_open(UTIL_FILE *f, const char *file_name, const char *file_mode) {
     // Keep original UTF-8 path & mode around
     f->file_path = strdup(file_name);
     f->file_mode = strdup(file_mode);
-    f->file_display_name = util_strrtok(f->file_path, "\\/");
+    f->file_display_name = (char*)util_strrtok(f->file_path, "\\/");
     f->file_display_name = f->file_display_name ? (f->file_display_name + 1) : f->file_path;
     f->is_used = 1;
 
@@ -462,8 +462,8 @@ const char *util_strinstr(const char *haystack, const char *needle, int needle_l
     return *haystack ? haystack : NULL;
 }
 
-char *util_strrtok(char *str, const char *delim) {
-    char *s = str + strlen(str);
+const char *util_strrtok(const char *str, const char *delim) {
+    const char *s = str + strlen(str);
     while(s > str) {
         const char c = *--s;
         const char *d = delim;

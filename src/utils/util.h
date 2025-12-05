@@ -46,7 +46,7 @@ int util_ini_load_file(const char *filename, INI_PAIR_CALLBACK callback, void *u
 int util_ini_save_file(const char *filename, INI_STORE *ini_store);
 
 const char *util_strinstr(const char *haystack, const char *needle, int needle_length);
-char *util_strrtok(char *str, const char *delim);
+const char *util_strrtok(const char *str, const char *delim);
 int util_qsort_cmp(const void *p1, const void *p2);
 void *util_memset32(void *ptr, uint32_t value, size_t count);
 char *util_strndup(const char *string, size_t length);

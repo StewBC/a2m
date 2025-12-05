@@ -186,7 +186,7 @@ static SDL_Texture *load_png_texture_from_ram(SDL_Renderer *r, uint8_t *image, i
 
 void unk_config_ui(UNK *v, INI_STORE *ini_store) {
     // Display LEDs
-    const char *val = ini_get(ini_store, "state", "disk_leds");
+    const char *val = ini_get(ini_store, "Config", "disk_leds");
     if(val) {
         int state = 0;
         sscanf(val, "%d", &state);

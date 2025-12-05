@@ -96,7 +96,7 @@ void handle_inifile(int num_params, const char **params, OPTS *opts) {
 
 void handle_leds(int num_params, const char **params, OPTS *opts) {
     UNUSED(num_params);
-    ini_set(&opts->ini_store, "State", "disk_leds", params[0]);
+    ini_set(&opts->ini_store, "Config", "disk_leds", params[0]);
 }
 
 void handle_model(int num_params, const char **params, OPTS *opts) {
@@ -120,7 +120,7 @@ void handle_remember(int num_params, const char **params, OPTS *opts) {
     UNUSED(num_params);
     UNUSED(params);
     opts->remember = 1;
-    ini_set(&opts->ini_store, "State", "Save", "yes");
+    ini_set(&opts->ini_store, "Config", "Save", "yes");
 }
 
 void handle_saveini(int num_params, const char **params, OPTS *opts) {
@@ -165,15 +165,8 @@ void handle_help(int num_params, const char **params, OPTS *opts) {
     UNUSED(num_params);
     UNUSED(params);
     const char *prog = opts->ctx.argv[0];
-    const char *name = strrchr(prog, '\\');
-    if(!name) {
-        name = strrchr(prog, '/');
-    }
-    if(!name) {
-        name = prog;
-    } else {
-        name++;
-    }
+    const char *name = util_strrtok(prog, "\\/");
+    name = name ? (name + 1) : prog;
     opts->help = 1;
 
     printf("%s V2.00.\n", name);
@@ -415,7 +408,7 @@ int main(int argc, char **argv) {
         ini_set(&ini_store, "SmartPort", "s7d0", "");
         ini_set(&ini_store, "SmartPort", "s7d1", "");
         ini_set(&ini_store, "Video", "s3dev", "Franklin Ace Display ; only for model = plus");
-        ini_set(&ini_store, "State", "disk_leds", "on");
+        ini_set(&ini_store, "Config", "disk_leds", "on");
     }
 
     main_ini_merge_to(&opts.ini_store, &ini_store);
@@ -456,7 +449,7 @@ rt_err:
 
     // If the ini file needs to be saved, save it
     if(!opts.nosaveini) {
-        if(opts.saveini || ini_get(&ini_store, "State", "Save")) {
+        if(opts.saveini || ini_get(&ini_store, "Config", "Save")) {
             util_ini_save_file(opts.ini_file_name, &ini_store);
         }
     }
