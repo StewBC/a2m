@@ -10,7 +10,6 @@ add_library(utils STATIC
     dynarray.c
     errorlog.c
     inifiles.c
-    trace.c
     util.c
 )
 

@@ -112,6 +112,12 @@ typedef struct CB_CLIPBOARD_CTX {
     int (*cb_clipboard)(void *user);
 } CB_CLIPBOARD_CTX;
 
+typedef int (*cb_trace)(void *user);
+typedef struct CB_TRACE_CTX {
+    void *user;
+    int (*cb_trace)(void *user);
+} CB_TRACE_CTX;
+
 typedef uint8_t (*cb_read_button)(void *user, int controller_id, int button_id);
 typedef uint8_t (*cb_read_axis)(void *user, int controller_id, int axis_id, uint64_t cycle);
 typedef void (*cb_ptrig)(void *user, uint64_t cycle);
@@ -121,9 +127,6 @@ typedef struct CB_INPUTDEVICE_CTX {
     cb_ptrig cb_ptrig;
     cb_read_button cb_read_button;
     cb_read_axis cb_read_axis;
-    // uint8_t (*cb_ptrig)(void *user, uint64_t cycle);
-    // uint8_t (*cb_read_button)(void *user, int controller_id, int button_id);
-    // uint8_t (*cb_read_axis)(void *user, int controller_id, int axis_id);
 } CB_INPUTDEVICE_CTX;
 
 // Callbacks that runtime will provide to the hardware
@@ -134,6 +137,7 @@ typedef struct A2OUT_CB {
     CB_INPUTDEVICE_CTX      cb_inputdevice_ctx;             // Callbacks for input (joysticks)
     CB_SPEAKER_CTX          cb_speaker_ctx;                 // Callback for speaker toggles
     CB_CLIPBOARD_CTX        cb_clipboard_ctx;               // Callback for pasting from clipboard
+    CB_TRACE_CTX            cb_trace_ctx;                   // Callback for writing a trace
 } A2OUT_CB;
 
 // The emulated apple2 (computer)
@@ -169,7 +173,7 @@ typedef struct APPLE2 {
     };
 
     // Trace
-    UTIL_FILE trace_file;                                   // file that CPU traces get logged to
+    UTIL_FILE trace_log;                                   // file that CPU traces get logged to
 } APPLE2;
 
 // Seems it's about 3.0 ms to get to paddel to 255, expressed as cycles

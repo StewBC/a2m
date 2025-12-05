@@ -7,9 +7,9 @@
 #include "6502_inln.h"
 
 size_t machine_run_opcode_6502(APPLE2 *m) {
-    // if(m->trace) {
-    //     trace_log(&m->trace_file, m);
-    // }
+    if(m->a2out_cb.cb_trace_ctx.cb_trace) {
+        m->a2out_cb.cb_trace_ctx.cb_trace(m->a2out_cb.cb_trace_ctx.user);
+    }
     uint8_t opcode = read_from_memory(m, m->cpu.pc);
     size_t start_cycle = m->cpu.cycles;
     CYCLE(m);

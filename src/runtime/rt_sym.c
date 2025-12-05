@@ -188,16 +188,20 @@ int rt_sym_search_update(RUNTIME *rt) {
 
 char *rt_sym_find_symbols(RUNTIME *rt, uint32_t address) {
     DYNARRAY *s = &rt->symbols[address & 0xff];
-    int items = s->items;
-    for(int i = 0; i < items; i++) {
-        SYMBOL *sym = ARRAY_GET(s, SYMBOL, i);
-        if(sym->pc < address) {
-            continue;
-        } else if(sym->pc == address) {
-            return sym->symbol_name;
+    int lo = 0;
+    int hi = s->items - 1;
+
+    while (lo <= hi) {
+        int mid = (lo + hi) >> 1;
+        SYMBOL *sym = ARRAY_GET(s, SYMBOL, mid);
+        if (sym->pc < address) {
+            lo = mid + 1;
+        } else if (sym->pc > address) {
+            hi = mid - 1;
         } else {
-            break;
+            return sym->symbol_name;
         }
     }
-    return 0;
+
+    return NULL;
 }

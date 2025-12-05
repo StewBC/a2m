@@ -214,8 +214,6 @@ int parse_breakpoint_line(const char *val, PARSEDBP *out) {
                 }
             } else if(0 == stricmp(param, "tron")) {
                 out->action = ACTION_TRON;
-            } else if(0 == stricmp(param, "trona")) {
-                out->action = ACTION_TRON_APPEND;
             } else if(0 == stricmp(param, "troff")) {
                 out->action = ACTION_TROFF;
             } else if(0 == strnicmp(param, "type", 4)) {

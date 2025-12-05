@@ -7,8 +7,6 @@
 #define TARGET_FPS              60
 #define OPCODE_JSR              0x20
 #define OPCODE_RTS              0x60
-#define SYMBOL_COL_LEN          17
-#define adjust(a,b,c)           do { a += c; b -= c; } while (0)
 
 int rt_update(RUNTIME *rt);
 
@@ -102,6 +100,13 @@ void rt_apply_ini(RUNTIME *rt, INI_STORE *ini_store) {
                         bp.slot = parsed_line.slot;
                         bp.device = parsed_line.device;
                         ARRAY_ADD(&rt->breakpoints, bp);
+                        // SQW temp solution
+                        if(parsed_line.action == ACTION_TRON) {
+                            if(!rt->trace_log.file.is_file_open) {
+                                // Assume average 2 cycle opcodes and 1 seconds of capture
+                                rt_trace_init(rt, "./trace.txt", 1 * (int)CPU_FREQUENCY / 2);
+                            }
+                        }
                     } else {
                         free(parsed_line.type_text);
                     }
@@ -123,6 +128,7 @@ void rt_bind(RUNTIME *rt, APPLE2 *m, UI *ui) {
         .cb_speaker_ctx =       {(void *)ui, (cb_speaker)ui->ops->speaker_toggle},
         .cb_inputdevice_ctx =   {(void *)ui, (cb_ptrig)ui->ops->ptrig, (cb_read_button)ui->ops->read_button, (cb_read_axis)ui->ops->read_axis}, // user, ptrig, button, axis
         .cb_clipboard_ctx =     {(void *)rt, (cb_clipboard)rt_feed_clipboard_key},
+        .cb_trace_ctx =         {(void *)rt, (cb_trace)rt_trace},
     };
 
     // Set up the access helpers
@@ -249,6 +255,8 @@ void rt_shutdown(RUNTIME *rt) {
     rt->turbo_count = 0;
     free(rt->turbo);
     rt->turbo = NULL;
+    // trace before symbols as trace uses the symbols
+    rt_trace_shutdown(rt); 
     rt_sym_shutdown(rt);
 }
 
@@ -515,15 +523,10 @@ int rt_update(RUNTIME *rt) {
                     }
                     break;
                     case ACTION_TROFF:
-                        // trace_off(&m->trace_file);
-                        // m->trace =  0;
+                        rt_trace_off(rt);
                     break;
-                    case ACTION_TRON_APPEND:
                     case ACTION_TRON:
-                        // SQW maybe turn back on
-                        // if(A2_OK == trace_on(&m->trace_file, "trace.txt", bp->action == ACTION_TRON ? "w" : "a")) {
-                        //     m->trace =  1;
-                        // }
+                        rt_trace_on(rt);
                     break;
                     case ACTION_TYPE:
                         if(bp->type_text) {

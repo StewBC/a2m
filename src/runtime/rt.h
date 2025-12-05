@@ -75,6 +75,9 @@ typedef struct RUNTIME {
     DYNARRAY breakpoints;
     DYNARRAY symbols_search;
 
+    // Trace
+    TRACE_LOG trace_log;
+
     // Clipboard
     int clipboard_index;
     char *clipboard_text;
@@ -82,6 +85,8 @@ typedef struct RUNTIME {
     // FLOWMANAGER flowmanager;
     DYNARRAY *symbols;
 } RUNTIME;
+
+#define adjust(a,b,c)           do { a += c; b -= c; } while (0)
 
 void rt_bind(RUNTIME *rt, APPLE2 *m, UI *ui);
 int rt_init(RUNTIME *rt, INI_STORE *ini_store);

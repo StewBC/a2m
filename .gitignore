@@ -3,6 +3,5 @@
 build/
 disks/
 *.ini
+*.txt
 symbols/USER.SYM
-TODO.txt
-trace.txt

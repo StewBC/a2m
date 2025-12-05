@@ -46,4 +46,3 @@
 #include "errorlog.h"
 #include "inifiles.h"
 #include "util.h"
-#include "trace.h"

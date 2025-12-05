@@ -8,6 +8,7 @@ add_library(runtime STATIC
     rt_bp.c
     rt.c
     rt_sym.c
+    rt_trace.c
 )
 
 target_include_directories(runtime PUBLIC
