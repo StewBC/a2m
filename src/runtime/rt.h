@@ -65,26 +65,24 @@ typedef struct RUNTIME {
     size_t stop_cycles;
 
     // Flags
-    uint16_t run: 1;                                    // 1 - not running, 0 - run
+    uint16_t run: 1;                                        // 1 - not running, 0 - run
     uint16_t run_step: 1;
-    uint16_t run_to_pc: 1;                              // 1 - stepping / conditionally running
-    uint16_t run_step_out: 1;                             // 1 - step out
+    uint16_t run_to_pc: 1;                                  // 1 - stepping / conditionally running
+    uint16_t run_step_out: 1;                               // 1 - step out
     uint16_t pad: 13;
-
-    // debugger and symbold
-    DYNARRAY breakpoints;
-    DYNARRAY symbols_search;
-
-    // Trace
-    TRACE_LOG trace_log;
 
     // Clipboard
     int clipboard_index;
     char *clipboard_text;
 
-    // FLOWMANAGER flowmanager;
-    DYNARRAY *symbols;
+    // Trace
+    TRACE_LOG trace_log;
+
+    // debugger and symbold
+    DYNARRAY breakpoints;
+    DYNARRAY symbols_search;
     DYNARRAY symbol_source_names;
+    DYNARRAY *symbols;                                      // PTR to [256] buckets of symbols
 } RUNTIME;
 
 #define adjust(a,b,c)           do { a += c; b -= c; } while (0)
