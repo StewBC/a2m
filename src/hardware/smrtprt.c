@@ -24,8 +24,8 @@ int sp_mount(APPLE2 *m, const int slot, const int device, const char *file_name)
     }
 
     if(strncmp((char *) &m->sp_device[slot].sp_buffer[1], "2IMG", 4) == 0) {
-        spd->file_header_size[device] = 0x40;
-        f->file_size -= 0x40;
+        spd->file_header_size[device] = m->sp_device[slot].sp_buffer[9] + m->sp_device[slot].sp_buffer[10] * 256;
+        f->file_size -= spd->file_header_size[device];
     } else {
         spd->file_header_size[device] = 0x00;
     }
