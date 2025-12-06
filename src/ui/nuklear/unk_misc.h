@@ -10,4 +10,5 @@ typedef struct VIEWMISC {
     BREAKPOINT_EDIT breakpoint_edit;
 } VIEWMISC;
 
+int unk_misc_init(VIEWMISC *viewmisc);
 void unk_misc_show(UNK *v);

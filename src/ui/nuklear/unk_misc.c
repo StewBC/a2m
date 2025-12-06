@@ -410,7 +410,7 @@ void unk_misc_show(UNK *v) {
                 // Apply changes
                 free(bpe->bp_original->type_text);
                 *bpe->bp_original = bpe->bp_under_edit;
-                bpe->bp_original->type_text = bpe->string_type ? parse_decode_c_string(bpe->string_type, NULL) : NULL;
+                bpe->bp_original->type_text = bpe->string_type_len ? parse_decode_c_string(bpe->string_type, NULL) : NULL;
                 rt_bp_apply_masks(rt);
             }
             // Nov 28, 2025 - Leaving here but I think this is resolved...
