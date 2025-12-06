@@ -6,6 +6,8 @@
 
 char global_entry_buffer[256] = {0};
 int global_entry_length = 0;
+const char *str_actions[] = { "BREAK", "FAST", "RESTORE", "SLOW", "SWAP", "TROFF", "TRON", "TYPE" };
+const int num_actions = sizeof(str_actions) / sizeof(str_actions[0]);
 
 int unk_dlg_assembler_config(struct nk_context *ctx, struct nk_rect r, ASSEMBLER_CONFIG *ac) {
     int ret = 0;
@@ -132,8 +134,15 @@ int unk_dlg_assembler_errors(UNK *v, struct nk_context *ctx, struct nk_rect r) {
 
 int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT_EDIT *bpe) {
     int ret = -1;
-    if(nk_popup_begin(ctx, NK_POPUP_STATIC, "Edit Breakpoint", 0, r)) {
-        nk_layout_row_dynamic(ctx, 66, 1);
+
+    // This is a window, not a pop-up because combo boxes uses popups and you can't have popups in popups
+    // use same thickness as popups
+    nk_style_push_float(ctx, &ctx->style.window.border, ctx->style.window.popup_border);
+    // use same red as popups
+    nk_style_push_color(ctx, &ctx->style.window.border_color, ctx->style.window.popup_border_color);
+
+    if(nk_begin_titled(ctx, "EditBreakpoint", "Edit Breakpoint", r, NK_WINDOW_BORDER | NK_WINDOW_NO_SCROLLBAR)) {
+        nk_layout_row_dynamic(ctx, 92, 1);
         if(nk_group_begin(ctx, "address", 0)) {
             nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 5);
             nk_layout_row_push(ctx, 0.12f);
@@ -142,7 +151,7 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
             if(NK_EDIT_COMMITED &
                     nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_address[0],
                                    &bpe->string_address_len[0], 5, nk_filter_hex)) {
-                ctx->active->popup.win->edit.active = 0;
+                ctx->current->edit.active = 0;
             }
             nk_layout_row_push(ctx, 0.05f);
             nk_label(ctx, "on", NK_TEXT_CENTERED);
@@ -164,7 +173,7 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
             if(NK_EDIT_COMMITED &
                     nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_address[1],
                                    &bpe->string_address_len[1], 5, nk_filter_hex)) {
-                ctx->active->popup.win->edit.active = 0;
+                ctx->current->edit.active = 0;
             }
             if(!bpe->bp_under_edit.use_pc && !bpe->bp_under_edit.use_range) {
                 nk_widget_disable_end(ctx);
@@ -194,10 +203,78 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
             if(bpe->bp_under_edit.use_pc) {
                 nk_widget_disable_end(ctx);
             }
+
+            // Next row - actions
+            nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 5);
+            if(!bpe->bp_under_edit.use_pc) {
+                nk_widget_disable_begin(ctx);
+            }
+            nk_layout_row_push(ctx, 0.12f);
+            nk_text(ctx, "Action", 6, NK_TEXT_ALIGN_MIDDLE);
+            nk_layout_row_push(ctx, 0.25f);
+            // Get the space where the combo box should reside
+            bpe->combo_rect = nk_widget_bounds(ctx);
+            nk_spacer(ctx);
+            switch(bpe->bp_under_edit.action) {
+                case ACTION_UNUSED:
+                case ACTION_FAST:
+                case ACTION_RESTORE:
+                case ACTION_SLOW:
+                case ACTION_TROFF:
+                case ACTION_TRON:
+                    break;
+                case ACTION_SWAP:
+                    nk_layout_row_push(ctx, 0.15f);
+                    nk_text(ctx, "Slot", 4, NK_TEXT_ALIGN_MIDDLE);
+                    nk_layout_row_push(ctx, 0.05f);
+                    if(NK_EDIT_COMMITED &
+                            nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER,
+                                           bpe->string_device[0], &bpe->string_device_len[0], 2, nk_filter_decimal)) {
+                        if(!bpe->string_device_len[0]) {
+                            bpe->string_device_len[0] = 1;
+                        }
+                        ctx->current->edit.active = 0;
+                    }
+                    nk_layout_row_push(ctx, 0.15f);
+                    nk_text(ctx, "Drive", 5, NK_TEXT_ALIGN_MIDDLE);
+                    nk_layout_row_push(ctx, 0.05f);
+                    if(NK_EDIT_COMMITED &
+                            nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER,
+                                           bpe->string_device[1], &bpe->string_device_len[1], 2, nk_filter_decimal)) {
+                        if(!bpe->string_device_len[1]) {
+                            bpe->string_device_len[1] = 1;
+                        }
+                        ctx->current->edit.active = 0;
+                    }
+                    break;
+                case ACTION_TYPE:
+                    nk_layout_row_push(ctx, 0.60f);
+                    if(NK_EDIT_COMMITED &
+                            nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER,
+                                           bpe->string_type, &bpe->string_type_len, 128, nk_filter_ascii)) {
+                        bpe->string_type[bpe->string_type_len] = '\0';
+                        ctx->current->edit.active = 0;
+                    }
+                    break;
+            }
+
+            if(!bpe->bp_under_edit.use_pc) {
+                nk_widget_disable_end(ctx);
+            }
+
+            nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 5);
+            if(!nk_check_label(ctx, "Read", bpe->bp_under_edit.break_on_read)) {
+                if(!bpe->bp_under_edit.break_on_write) {
+                    bpe->bp_under_edit.break_on_write = 1;
+                }
+                bpe->bp_under_edit.break_on_read = 0;
+            } else {
+                bpe->bp_under_edit.break_on_read = 1;
+            }
             nk_group_end(ctx);
         }
 
-        nk_layout_row_dynamic(ctx, 44, 1);
+        nk_layout_row_dynamic(ctx, 40, 1);
         if(nk_group_begin(ctx, "counter", 0)) {
             nk_layout_row_dynamic(ctx, 20, 5);
             bpe->bp_under_edit.use_counter = nk_check_label(ctx, "Use Counter", bpe->bp_under_edit.use_counter ? 1 : 0) ? 1 : 0;
@@ -208,13 +285,13 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
             if(NK_EDIT_COMMITED &
                     nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_counter[0],
                                    &bpe->string_counter_len[0], 8, nk_filter_decimal)) {
-                ctx->active->popup.win->edit.active = 0;
+                ctx->current->edit.active = 0;
             }
             nk_label(ctx, "Reset Counter", NK_TEXT_LEFT);
             if(NK_EDIT_COMMITED &
                     nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_counter[1],
                                    &bpe->string_counter_len[1], 8, nk_filter_decimal)) {
-                ctx->active->popup.win->edit.active = 0;
+                ctx->current->edit.active = 0;
             }
             if(!bpe->bp_under_edit.use_counter) {
                 nk_widget_disable_end(ctx);
@@ -257,25 +334,68 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
             if(bpe->bp_under_edit.use_counter) {
                 // Counter stop
                 bpe->string_counter[0][bpe->string_counter_len[0]] = '\0';
-                if((bpe->bp_under_edit.counter_stop_value = atoi(bpe->string_counter[0])) <= 0) {
+                if((bpe->bp_under_edit.counter_stop_value = strtol(bpe->string_counter[0], NULL, 10)) <= 0) {
                     bpe->bp_under_edit.counter_stop_value = 1;
                     bpe->string_counter_len[0] = sprintf(bpe->string_counter[0], "%d", bpe->bp_under_edit.counter_stop_value);
                     ctx->current->edit.active = 1;
                 }
                 // Counter reset
                 bpe->string_counter[1][bpe->string_counter_len[1]] = '\0';
-                if((bpe->bp_under_edit.counter_reset = atoi(bpe->string_counter[1])) <= 0) {
+                if((bpe->bp_under_edit.counter_reset = strtol(bpe->string_counter[1], NULL, 10)) <= 0) {
                     bpe->bp_under_edit.counter_reset = 1;
                     bpe->string_counter_len[1] = sprintf(bpe->string_counter[1], "%d", bpe->bp_under_edit.counter_reset);
                     ctx->current->edit.active = 1;
                 }
+            }
+            if(bpe->bp_under_edit.use_pc) {
+                if(ACTION_SWAP == bpe->bp_under_edit.action) {
+                    bpe->string_device_len[0] = bpe->string_device_len[1] = 1;
+                    bpe->string_device[0][1] = '\0';
+                    bpe->string_device[1][1] = '\0';
+                    bpe->bp_under_edit.slot = strtol(bpe->string_device[0], NULL, 10);
+                    bpe->bp_under_edit.device = strtol(bpe->string_device[1], NULL, 10);
+                } else if(ACTION_TYPE == bpe->bp_under_edit.action) {
+                    bpe->string_type[bpe->string_type_len] = '\0';
+                }
+            } else {
+                bpe->bp_under_edit.action = ACTION_UNUSED;
             }
             if(!ctx->current->edit.active) {
                 ret = 1;
             }
         }
     }
-    nk_popup_end(ctx);
+
+    // Set the draw-space to where the combo box wants to be drawn
+    // And draw the combo-box last, so the drop down draws over everything "below" it as well.
+    nk_layout_space_begin(ctx, NK_STATIC, bpe->combo_rect.h, 1);
+    struct nk_rect local = nk_layout_space_rect_to_local(ctx, bpe->combo_rect);
+    nk_layout_space_push(ctx, local);
+    // Enable/disable based on BP type
+    if(!bpe->bp_under_edit.use_pc) {
+        nk_widget_disable_begin(ctx);
+    }
+    // The combo box itself (tuned to just fit inside the window)
+    if(nk_combo_begin_label(ctx, str_actions[bpe->bp_under_edit.action], nk_vec2(bpe->combo_rect.w, -2 + 4 * 25))) {
+        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_bool selected = bpe->bp_under_edit.action;
+        for(int i = 0; i < num_actions; ++i) {
+            if(nk_selectable_label(ctx, str_actions[i], NK_TEXT_LEFT, &selected)) {
+                bpe->bp_under_edit.action = i;
+                nk_popup_close(ctx);
+                break;
+            }
+        }
+        nk_combo_end(ctx);
+    }
+    if(!bpe->bp_under_edit.use_pc) {
+        nk_widget_disable_end(ctx);
+    }
+    nk_layout_space_end(ctx);
+    nk_end(ctx);
+    // Restore previous style and thickness for windows, after nk_end(ctx) otherwise it doesn't apply
+    nk_style_pop_color(ctx);
+    nk_style_pop_float(ctx);
     return ret;
 }
 

@@ -262,6 +262,10 @@ int unk_init(UNK *v, int model, INI_STORE *ini_store) {
         return A2_ERR;
     }
 
+    if(A2_OK != unk_misc_init(&v->viewmisc)) {
+        return A2_ERR;
+    }
+
     if(A2_OK != unk_audio_speaker_init(&v->viewspeaker, CPU_FREQUENCY, 48000, 2, 40.0f, 256)) {
         return A2_ERR;
     }

@@ -36,3 +36,5 @@ typedef struct {
 
 int parse_line(const char *val, PARSEDBP *out);
 int parse_breakpoint_line(const char *val, PARSEDBP *out);
+char *parse_decode_c_string(const char *in, size_t *out_len);
+int parse_encode_c_string(const char *in, char *out, int out_len);

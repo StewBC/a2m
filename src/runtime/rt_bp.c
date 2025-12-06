@@ -83,7 +83,7 @@ void rt_bp_apply_masks(RUNTIME *rt) {
     for(size_t i = 0; i < items; i++) {
         BREAKPOINT *bp = ARRAY_GET(&rt->breakpoints, BREAKPOINT, i);
         if(!bp->disabled && !bp->use_pc) {
-            for(uint16_t address = bp->address; address != (bp->address_range_end + 1); address++) {
+            for(int address = bp->address; address <= bp->address_range_end; address++) {
                 m->RAM_WATCH[address] |= bp->access;
             }
         }

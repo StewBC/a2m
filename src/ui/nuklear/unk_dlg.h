@@ -16,10 +16,15 @@ typedef struct FILE_BROWSER {
 typedef struct BREAKPOINT_EDIT {
     BREAKPOINT *bp_original;
     BREAKPOINT bp_under_edit;
+    struct nk_rect combo_rect;
     char string_address[2][5];
     int string_address_len[2];
     char string_counter[2][9];
     int string_counter_len[2];
+    char string_device[2][2];
+    int string_device_len[2];
+    char string_type[128];
+    int string_type_len;
 } BREAKPOINT_EDIT;
 
 typedef struct ASSEMBLER_CONFIG {

@@ -8,8 +8,7 @@
 static const char *access_mode[3] = { "R", "W", "RW" };
 
 // Calculate the rect where the scrollbar lives
-static struct nk_rect nk_window_vscroll_rect(struct nk_context *ctx)
-{
+static struct nk_rect nk_window_vscroll_rect(struct nk_context *ctx) {
     struct nk_rect bounds = nk_window_get_bounds(ctx);
     struct nk_vec2 content_min = nk_window_get_content_region_min(ctx);
     struct nk_vec2 content_max = nk_window_get_content_region_max(ctx);
@@ -29,18 +28,28 @@ static void update_nk_scroll_drag(struct nk_context *ctx, VIEWMISC *misc) {
 
     struct nk_rect vscroll = nk_window_vscroll_rect(ctx);
 
-    if (!misc->dragging) {
+    if(!misc->dragging) {
         // initial click inside the scrollbar rect
-        if (mb->clicked &&
-            NK_INBOX(mb->clicked_pos.x, mb->clicked_pos.y, vscroll.x, vscroll.y, vscroll.w, vscroll.y)) {
+        if(mb->clicked &&
+                NK_INBOX(mb->clicked_pos.x, mb->clicked_pos.y, vscroll.x, vscroll.y, vscroll.w, vscroll.y)) {
             misc->dragging = 1;
         }
     } else {
-        if (!mb->down) {
+        if(!mb->down) {
             // release when button released
             misc->dragging = 0;
         }
     }
+}
+
+int unk_misc_init(VIEWMISC *viewmisc) {
+    BREAKPOINT_EDIT *bpe = &viewmisc->breakpoint_edit;
+    bpe->bp_under_edit.slot = 6;
+    bpe->bp_under_edit.device = 0;
+    bpe->string_device[0][0] = '6';
+    bpe->string_device[1][0] = '0';
+    bpe->string_device_len[0] = bpe->string_device_len[1] = 1;
+    return A2_OK;
 }
 
 void unk_misc_show(UNK *v) {
@@ -55,7 +64,12 @@ void unk_misc_show(UNK *v) {
     struct nk_color ob = ctx->style.window.background;
     int x = 512;
     int w = v->layout.misc.w;
-    if(nk_begin(ctx, "Miscellaneous", v->layout.misc, NK_WINDOW_SCROLL_AUTO_HIDE | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
+    int flags = NK_WINDOW_SCROLL_AUTO_HIDE | NK_WINDOW_TITLE | NK_WINDOW_BORDER;
+    // If the breakpoint "dialog" is open, disable the misc window
+    if(v->dlg_breakpoint) {
+        flags |= NK_WINDOW_NO_INPUT;
+    }
+    if(nk_begin(ctx, "Miscellaneous", v->layout.misc, flags)) {
         // Show the slot if it has a card in it
         if(nk_tree_push(ctx, NK_TREE_TAB, "Slots", NK_MAXIMIZED)) {
             for(int i = 1; i < 8; i++) {
@@ -242,6 +256,33 @@ void unk_misc_show(UNK *v) {
                             if(bp->use_counter) {
                                 nk_labelf(ctx, NK_TEXT_CENTERED, "%04X (%d/%d)", bp->address,
                                           bp->counter_count, bp->counter_stop_value);
+                            } else if(bp->action) {
+                                switch(bp->action) {
+                                    case ACTION_FAST:
+                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Fast", bp->address);
+                                        break;
+                                    case ACTION_RESTORE:
+                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Restore", bp->address);
+                                        break;
+                                    case ACTION_SLOW:
+                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Slow", bp->address);
+                                        break;
+                                    case ACTION_SWAP:
+                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Swap s%dd%d", bp->address, bp->slot, bp->device);
+                                        break;
+                                    case ACTION_TROFF:
+                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Troff", bp->address);
+                                        break;
+                                    case ACTION_TRON:
+                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Tron", bp->address);
+                                        break;
+                                    case ACTION_TYPE:
+                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Type", bp->address);
+                                        break;
+                                    default:
+                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Action", bp->address);
+                                        break;
+                                }
                             } else {
                                 nk_labelf(ctx, NK_TEXT_CENTERED, "%04X", bp->address);
                             }
@@ -269,6 +310,7 @@ void unk_misc_show(UNK *v) {
                         if(nk_button_label(ctx, "Edit")) {
                             bpe->bp_original = bp;
                             bpe->bp_under_edit = *bp;
+                            bpe->string_type_len = parse_encode_c_string(bp->type_text, bpe->string_type, 128);
                             bpe->string_address_len[0] = sprintf(bpe->string_address[0], "%04X", bp->address);
                             bpe->string_address_len[1] = sprintf(bpe->string_address[1], "%04X", bp->address_range_end);
                             bpe->string_counter_len[0] = sprintf(bpe->string_counter[0], "%d", bp->counter_stop_value);
@@ -352,16 +394,23 @@ void unk_misc_show(UNK *v) {
             nk_tree_pop(ctx);
         }
     }
+    // Set a flag if the scrollbar is being dragged (scrollbar_active in unk_view)
+    update_nk_scroll_drag(ctx, &v->viewmisc);
+    nk_end(ctx);
+
     // Pop-up windows after the main windows
     if(v->dlg_breakpoint) {
-        struct nk_rect r = nk_rect(10, 40, 568, 160);
+        struct nk_rect mvr = v->layout.misc;
+        struct nk_rect r = nk_rect(mvr.x + 10, mvr.y + 10, 568, 180);
         int ret = unk_dlg_breakpoint_edit(ctx, r, &v->viewmisc.breakpoint_edit);
         if(ret >= 0) {
             v->dlg_breakpoint = 0;
             v->unk_dlg_modal = 0;
             if(1 == ret) {
                 // Apply changes
+                free(bpe->bp_original->type_text);
                 *bpe->bp_original = bpe->bp_under_edit;
+                bpe->bp_original->type_text = bpe->string_type ? parse_decode_c_string(bpe->string_type, NULL) : NULL;
                 rt_bp_apply_masks(rt);
             }
             // Nov 28, 2025 - Leaving here but I think this is resolved...
@@ -375,9 +424,6 @@ void unk_misc_show(UNK *v) {
             // ctx->current->layout->flags = 193;
         }
     }
-    // Set a flag if the scrollbar is being dragged (scrollbar_active in unk_view)
-    update_nk_scroll_drag(ctx, &v->viewmisc);
-    nk_end(ctx);
 
     // Floating windows outside the main misc window
     ctx->style.window.background = ob;

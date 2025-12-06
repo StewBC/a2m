@@ -20,12 +20,11 @@ static void parse_rtrim(char *s) {
     *e = '\0';
 }
 
-char *parse_decode_c_string(const char *in, size_t *out_len)
-{
+char *parse_decode_c_string(const char *in, size_t *out_len) {
     size_t len = strlen(in);
     char *out = malloc(len + 1);  // worst-case would be same size
-    if (!out) {
-        if (out_len) {
+    if(!out) {
+        if(out_len) {
             *out_len = 0;
         }
         return NULL;
@@ -33,55 +32,55 @@ char *parse_decode_c_string(const char *in, size_t *out_len)
 
     size_t index = 0;
 
-    for (size_t i = 0; i < len; ) {
+    for(size_t i = 0; i < len;) {
         unsigned char c = in[i++];
 
-        if (c == '\\' && i < len) {
+        if(c == '\\' && i < len) {
             unsigned char e = in[i++];
 
-            switch (e) {
-            case 'n': 
-                out[index++] = '\n'; 
-                break;
-            case 'r': 
-                out[index++] = '\r'; 
-                break;
-            case 't': 
-                out[index++] = '\t'; 
-                break;
-            case '0': 
-                out[index++] = '\0'; 
-                break;
-            case '\\': 
-                out[index++] = '\\'; 
-                break;
-            case '"': 
-                out[index++] = '"'; 
-                break;
-            case '\'': 
-                out[index++] = '\''; 
-                break;
+            switch(e) {
+                case 'n':
+                    out[index++] = '\n';
+                    break;
+                case 'r':
+                    out[index++] = '\r';
+                    break;
+                case 't':
+                    out[index++] = '\t';
+                    break;
+                case '0':
+                    out[index++] = '\0';
+                    break;
+                case '\\':
+                    out[index++] = '\\';
+                    break;
+                case '"':
+                    out[index++] = '"';
+                    break;
+                case '\'':
+                    out[index++] = '\'';
+                    break;
 
-            case 'x': {
-                // \xHH (1 or 2 hex digits)
-                char hex[3] = {0, 0, 0};
-                if (i < len && isxdigit((unsigned char)in[i])) {
-                    hex[0] = in[i++];
-                    if (i < len && isxdigit((unsigned char)in[i])) {
-                        hex[1] = in[i++];
+                case 'x': {
+                        // \xHH (1 or 2 hex digits)
+                        char hex[3] = {0, 0, 0};
+                        if(i < len && isxdigit((unsigned char)in[i])) {
+                            hex[0] = in[i++];
+                            if(i < len && isxdigit((unsigned char)in[i])) {
+                                hex[1] = in[i++];
+                            }
+                            out[index++] = (char)strtol(hex, NULL, 16);
+                        } else {
+                            // Invalid \x — treat as a literal x
+                            out[index++] = 'x';
+                        }
+                        break;
                     }
-                    out[index++] = (char)strtol(hex, NULL, 16);
-                } else {
-                    // Invalid \x — treat as a literal x
-                    out[index++] = 'x';
-                }
-                break;
-            }
 
-            default:
-                // Unknown escape — treat as literal character
-                out[index++] = e;
-                break;
+                default:
+                    // Unknown escape — treat as literal character
+                    out[index++] = e;
+                    break;
             }
         } else {
             out[index++] = (char)c;
@@ -89,10 +88,59 @@ char *parse_decode_c_string(const char *in, size_t *out_len)
     }
 
     out[index] = '\0';
-    if (out_len) {
+    if(out_len) {
         *out_len = index;
     }
     return out;
+}
+
+int parse_encode_c_string(const char *in, char *out, int out_len) {
+    size_t i = 0;
+    size_t index = 0;
+    uint8_t c;
+
+    if(!in) {
+        return 0;
+    }
+
+    while((c = in[i++])) {
+        if(isprint(c)) {
+            out[index++] = c;
+        } else {
+            switch(c) {
+                case '\n':
+                    if(out_len - index >= 3) {
+                        out[index++] = '\\';
+                        out[index++] = 'n';
+                    }
+                    break;
+                case '\r':
+                    if(out_len - index >= 3) {
+                        out[index++] = '\\';
+                        out[index++] = 'r';
+                    }
+                    break;
+                case '\t':
+                    if(out_len - index >= 3) {
+                        out[index++] = '\\';
+                        out[index++] = 't';
+                    }
+                    break;
+                default:
+                    if(out_len - index >= 5) {
+                        char h = (c & 0xf0) >> 4;
+                        out[index++] = '\\';
+                        out[index++] = 'x';
+                        out[index++] = h < 9 ? '0' + h : 'A' + h - 10;
+                        h = (c & 0x0f);
+                        out[index++] = h < 9 ? '0' + h : 'A' + h - 10;
+                    }
+                    break;
+            }
+        }
+    }
+    out[index] = c;
+    return index;
 }
 
 static int parse_u32_auto(const char *s, char **end, uint32_t *out) {
@@ -206,8 +254,8 @@ int parse_breakpoint_line(const char *val, PARSEDBP *out) {
                 out->action = ACTION_SLOW;
             } else if(0 == strnicmp(param, "swap", 4)) {
                 int slot, device;
-                if(sscanf(param+4, "%*1[ \t=]%*1[Ss]%d%*1[Dd]%d", &slot, &device) == 2 &&
-                    slot >= 1 && slot <= 7 && device >= 0 && device <= 1) {
+                if(sscanf(param + 4, "%*1[ \t=]%*1[Ss]%d%*1[Dd]%d", &slot, &device) == 2 &&
+                        slot >= 1 && slot <= 7 && device >= 0 && device <= 1) {
                     out->action = ACTION_SWAP;
                     out->slot = slot;
                     out->device = device;
@@ -217,7 +265,7 @@ int parse_breakpoint_line(const char *val, PARSEDBP *out) {
             } else if(0 == stricmp(param, "troff")) {
                 out->action = ACTION_TROFF;
             } else if(0 == strnicmp(param, "type", 4)) {
-                if (strchr(" \t=", param[4]) != NULL) {
+                if(strchr(" \t=", param[4]) != NULL) {
                     out->action = ACTION_TYPE;
                     out->type_text = parse_decode_c_string(&param[5], NULL);
                 }
