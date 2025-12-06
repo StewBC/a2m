@@ -173,7 +173,7 @@ void rt_trace_off(RUNTIME *rt) {
 void rt_trace_init(RUNTIME *rt, const char *filename, size_t transactions) {
     TRACE_LOG *trace_log = &rt->trace_log;
     memset(trace_log, 0, sizeof(TRACE_LOG));
-    trace_log->trace_buffer = (TRACE_DATA*)malloc(sizeof(TRACE_DATA) * transactions);
+    trace_log->trace_buffer = (TRACE_DATA *)malloc(sizeof(TRACE_DATA) * transactions);
     if(!trace_log->trace_buffer) {
         rt_trace_shutdown(rt);
     }

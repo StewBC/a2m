@@ -437,7 +437,7 @@ int main(int argc, char **argv) {
         reconfig = ui.reconfig;
 
         // Shut everything down
-ui_err:        
+ui_err:
         ui_shutdown(&ui);
 a2_err:
         apple2_shutdown(&m);

@@ -79,7 +79,7 @@ void cpu_init(APPLE2 *m) {
         opcode_symbol_params = opcode_symbol_params_65c02;
         opcode_lengths = opcode_lengths_65c02;
     }
-    
+
     m->cpu.pc = read_from_memory_debug(m, 0xfffc) +  256 * read_from_memory_debug(m, 0xfffd);
     m->cpu.sp = 0x100;
 }

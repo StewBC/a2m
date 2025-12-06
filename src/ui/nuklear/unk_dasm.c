@@ -546,7 +546,7 @@ void unk_dasm_show(UNK *v, int dirty) {
                     struct nk_color fg = ctx->style.text.color;
                     BREAKPOINT *bp = rt_bp_get_at_address(rt, current_pc, 0);
                     // See if the mouse has been clicked over this row to be drawn
-                    if (nk_widget_is_mouse_clicked(ctx, NK_BUTTON_LEFT)) {
+                    if(nk_widget_is_mouse_clicked(ctx, NK_BUTTON_LEFT)) {
                         float rel_x = (ctx->input.mouse.pos.x - r.x) / v->font_width;
                         dv->cursor_address = current_pc;
                         if(rel_x < 4) {

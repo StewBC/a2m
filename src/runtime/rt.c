@@ -256,7 +256,7 @@ void rt_shutdown(RUNTIME *rt) {
     free(rt->turbo);
     rt->turbo = NULL;
     // trace before symbols as trace uses the symbols
-    rt_trace_shutdown(rt); 
+    rt_trace_shutdown(rt);
     rt_sym_shutdown(rt);
 }
 
@@ -509,32 +509,32 @@ int rt_update(RUNTIME *rt) {
                     // SQW - optimize access
                     case ACTION_FAST:
                         rt->turbo_active = -1.0;
-                    break;
+                        break;
                     case ACTION_RESTORE:
                         rt->turbo_active = rt->turbo[rt->turbo_index];
-                    break;
+                        break;
                     case ACTION_SLOW:
                         rt->turbo_active =  1.0;
-                    break;
+                        break;
                     case ACTION_SWAP: {
-                        int index = m->diskii_controller[bp->slot].diskii_drive[bp->device].image_index + 1;
-                        int items = m->diskii_controller[bp->slot].diskii_drive[bp->device].images.items;
-                        diskii_mount_image(m, bp->slot, bp->device, index >= items ? 0 : index);
-                    }
-                    break;
+                            int index = m->diskii_controller[bp->slot].diskii_drive[bp->device].image_index + 1;
+                            int items = m->diskii_controller[bp->slot].diskii_drive[bp->device].images.items;
+                            diskii_mount_image(m, bp->slot, bp->device, index >= items ? 0 : index);
+                        }
+                        break;
                     case ACTION_TROFF:
                         rt_trace_off(rt);
-                    break;
+                        break;
                     case ACTION_TRON:
                         rt_trace_on(rt);
-                    break;
+                        break;
                     case ACTION_TYPE:
                         if(bp->type_text) {
                             rt_paste_clipboard(rt, bp->type_text);
                         }
-                    break;
+                        break;
                     default:
-                    break;
+                        break;
                 }
             }
         }
@@ -543,7 +543,7 @@ int rt_update(RUNTIME *rt) {
         rt_machine_stop(rt);
         return 1;
     } else {
-        // Otherwise not stepping, but running, so future breakpoints 
+        // Otherwise not stepping, but running, so future breakpoints
         // other than the one on the first step, if there was one, will break again
         rt->run_step = 0;
     }

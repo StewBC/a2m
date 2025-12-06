@@ -506,7 +506,7 @@ void unk_mem_show(UNK *v) {
                             uint8_t c = ms->u8_buf[col];
                             snprintf(&ms->str_buf[5 + ms->cols * 3 + col], ms->str_buf_len - 5 - (ms->cols * 3) - col, "%c", isprint(c) ? c : '.');
                         }
-                        if (nk_widget_is_mouse_clicked(ctx, NK_BUTTON_LEFT)) {
+                        if(nk_widget_is_mouse_clicked(ctx, NK_BUTTON_LEFT)) {
                             float rel_x = (ctx->input.mouse.pos.x - r.x) / v->font_width;
                             ms->active_view_index = view;
                             active_view = mv;

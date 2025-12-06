@@ -24,7 +24,7 @@ typedef struct TRACE_LOG {
     uint32_t trace_wrapped: 1;
     uint32_t pad: 30;
     UTIL_FILE file;
-    TRACE_DATA *trace_buffer;    
+    TRACE_DATA *trace_buffer;
 } TRACE_LOG;
 
 void rt_trace(RUNTIME *rt);

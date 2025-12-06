@@ -143,7 +143,7 @@ int ini_set(INI_STORE *st, const char *section, const char *key, const char *val
                 }
                 return A2_ERR;
             }
-        
+
             INI_KV new_kv;
             new_kv.key = strdup(key);
             new_kv.val = strdup(value ? value : "");

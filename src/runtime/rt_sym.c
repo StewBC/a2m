@@ -91,7 +91,7 @@ int rt_sym_init(RUNTIME *rt, INI_STORE *ini_store) {
         ARRAY_INIT(s, SYMBOL);
     }
 
-    ARRAY_INIT(&rt->symbol_source_names, char*);
+    ARRAY_INIT(&rt->symbol_source_names, char *);
 
     // Init the search array
     ARRAY_INIT(&rt->symbols_search, SYMBOL *);
@@ -116,7 +116,7 @@ int rt_sym_init(RUNTIME *rt, INI_STORE *ini_store) {
                 } else {
                     len = strlen(name);
                 }
-                char *sym_src = (char*)malloc(len + 1);
+                char *sym_src = (char *)malloc(len + 1);
                 if(sym_src) {
                     memcpy(sym_src, name, len);
                     sym_src[len] = 0;
@@ -145,7 +145,7 @@ void rt_sym_shutdown(RUNTIME *rt) {
     }
     free(rt->symbols);
     for(int i = 0; i < rt->symbol_source_names.items; i++) {
-        free(*ARRAY_GET(&rt->symbol_source_names, char*, i));
+        free(*ARRAY_GET(&rt->symbol_source_names, char *, i));
     }
     array_free(&rt->symbol_source_names);
     array_free(&rt->symbols_search);
@@ -215,12 +215,12 @@ char *rt_sym_find_symbols(RUNTIME *rt, uint32_t address) {
     int lo = 0;
     int hi = s->items - 1;
 
-    while (lo <= hi) {
+    while(lo <= hi) {
         int mid = (lo + hi) >> 1;
         SYMBOL *sym = ARRAY_GET(s, SYMBOL, mid);
-        if (sym->pc < address) {
+        if(sym->pc < address) {
             lo = mid + 1;
-        } else if (sym->pc > address) {
+        } else if(sym->pc > address) {
             hi = mid - 1;
         } else {
             return sym->symbol_name;

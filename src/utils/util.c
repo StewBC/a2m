@@ -255,7 +255,7 @@ int util_file_open(UTIL_FILE *f, const char *file_name, const char *file_mode) {
     // Keep original UTF-8 path & mode around
     f->file_path = strdup(file_name);
     f->file_mode = strdup(file_mode);
-    f->file_display_name = (char*)util_strrtok(f->file_path, "\\/");
+    f->file_display_name = (char *)util_strrtok(f->file_path, "\\/");
     f->file_display_name = f->file_display_name ? (f->file_display_name + 1) : f->file_path;
     f->is_used = 1;
 
