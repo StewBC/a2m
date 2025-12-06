@@ -5,32 +5,33 @@
 #include "common.h"
 #include "hardware_lib.h"
 
-uint8_t language_card(APPLE2 *m, uint16_t address, uint16_t value) {
-    m->lc_bank2_enable = (address & 0b1000) ? 0 : 1;
-    if((address & 0b11) && (address & 0b11) != 3) {
-        m->lc_read_ram_enable = 0;
-    } else {
-        m->lc_read_ram_enable = 1;
-    }
+void language_card(APPLE2 *m, uint16_t address, int write_access) {
+    int odd_access = address & 1;
 
-    if(!(address & 1) || value < 0x100) {
-        // even access or write resets pre-write
+    // Bank select (A3)
+    m->lc_bank2_enable = (address & 0b1000) ? 0 : 1;
+
+    // HRAMRD (A1/A0)
+    int bits2 = address & 0b11;
+    m->lc_read_ram_enable = (bits2 == 0 || bits2 == 3);
+
+    if (!odd_access) {
+        // Even access (read or write)
         m->lc_pre_write = 0;
-        if(value >= 0x100) {
-            m->lc_write_enable = 0;
-        }
+        m->lc_write_enable = 0;
+    } else if (write_access) {
+        // Odd write
+        m->lc_pre_write = 0;
     } else {
-        // odd access
-        if(m->lc_pre_write) {
+        // Odd read
+        if (m->lc_pre_write) {
             m->lc_write_enable = 1;
         }
-        // odd sets pre_write
         m->lc_pre_write = 1;
     }
-
     language_card_map_memory(m);
-    return m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
 }
+
 
 void language_card_init(APPLE2 *m) {
     m->lc_bank2_enable = 1;

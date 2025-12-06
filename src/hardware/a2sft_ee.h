@@ -176,19 +176,27 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                         break;
                     case CLRPAGE2:
                         m->page2set = 0;
-                        set_memory_map(m);
+                        if(m->store80set) {
+                            set_memory_map(m);
+                        }
                         break;
                     case SETPAGE2:
                         m->page2set = 1;
-                        set_memory_map(m);
+                        if(m->store80set) {
+                            set_memory_map(m);
+                        }
                         break;
                     case CLRHIRES:
                         m->hires = 0;
-                        set_memory_map(m);
+                        if(m->store80set) {
+                            set_memory_map(m);
+                        }
                         break;
                     case SETHIRES:
                         m->hires = 1;
-                        set_memory_map(m);
+                        if(m->store80set) {                            
+                            set_memory_map(m);
+                        }
                         break;
                     case CLRAN0:
                     case SETAN0:
@@ -288,7 +296,7 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
                 }
                 break;
             case 0xC080:
-                language_card(m, address, 0x100);
+                language_card(m, address, 0);
                 break;
             case 0xC090:
             case 0xC0A0:
@@ -487,19 +495,27 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                         break;
                     case CLRPAGE2:
                         m->page2set = 0;
-                        set_memory_map(m);
+                        if(m->store80set) {
+                            set_memory_map(m);
+                        }
                         break;
                     case SETPAGE2:
                         m->page2set = 1;
-                        set_memory_map(m);
+                        if(m->store80set) {
+                            set_memory_map(m);
+                        }
                         break;
                     case CLRHIRES:
                         m->hires = 0;
-                        set_memory_map(m);
+                        if(m->store80set) {
+                            set_memory_map(m);
+                        }
                         break;
                     case SETHIRES:
                         m->hires = 1;
-                        set_memory_map(m);
+                        if(m->store80set) {
+                            set_memory_map(m);
+                        }
                         break;
                     case CLRAN0: // SQW - hires or dhires if text off
                     case SETAN0: // SQW
@@ -526,7 +542,7 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                 }
                 break;
             case 0xC080:
-                language_card(m, address, value);
+                language_card(m, address, 1);
                 break;
             case 0xC090:
             case 0xC0A0:
