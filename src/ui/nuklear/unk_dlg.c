@@ -233,6 +233,10 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
                         if(!bpe->string_device_len[0]) {
                             bpe->string_device_len[0] = 1;
                         }
+                        int s = strtol(bpe->string_device[0], NULL, 10);
+                        if(s < 1 || s > 7) {
+                            bpe->string_device[0][0] = '6';
+                        }
                         ctx->current->edit.active = 0;
                     }
                     nk_layout_row_push(ctx, 0.15f);
@@ -243,6 +247,10 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
                                            bpe->string_device[1], &bpe->string_device_len[1], 2, nk_filter_decimal)) {
                         if(!bpe->string_device_len[1]) {
                             bpe->string_device_len[1] = 1;
+                        }
+                        int s = strtol(bpe->string_device[1], NULL, 10);
+                        if(s < 0 || s > 1) {
+                            bpe->string_device[1][0] = '0';
                         }
                         ctx->current->edit.active = 0;
                     }
