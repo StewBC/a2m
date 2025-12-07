@@ -8,7 +8,93 @@
 #define OPCODE_JSR              0x20
 #define OPCODE_RTS              0x60
 
-int rt_update(RUNTIME *rt);
+// This is the code that checks breakpoints and controls flow and marks cycle counts
+// It's okay to return 1, but not 0 at any point before the end (so not to skip cycle marking)
+static int rt_step_okay(RUNTIME *rt) {
+    APPLE2 *m = rt->m;
+
+    // Single-step mode doesn't check breakpoints and stops after 1 step
+    if(rt->run_step) {
+        rt_machine_stop(rt);
+        return 1; // allow this opcode
+    }
+
+    // Run-to-PC stops when at the target PC
+    if (rt->run_to_pc && m->cpu.pc == rt->run_to_pc_address) {
+        rt_machine_stop(rt);
+    } else {
+        // Run-step-out stops when it steps of the RTS that matches the JSR that got to here
+        if(rt->run_step_out) {
+            uint8_t instruction = read_from_memory_debug(m, m->cpu.pc);
+            switch(instruction) {
+                case OPCODE_JSR:
+                    rt->jsr_counter++;
+                    break;
+                case OPCODE_RTS:
+                    if(--rt->jsr_counter < 0) {
+                        rt_machine_stop(rt);           // Stop
+                        return 1;                      // But step the RTS
+                    }
+                    break;
+            }
+        }
+
+        // Prevent a breakpoint on starting to run from keeping a run from happening
+        if (rt->run_first_step) {
+            rt->run_first_step = 0;
+            return 1;   // Skip breakpoint checking
+        }
+    }
+
+    if(rt->run) {
+        // Actual breakpoint check
+        BREAKPOINT *bp = rt_bp_get_at_address(rt, m->cpu.pc, 1);
+        if(bp) {
+            switch(bp->action) {
+                case ACTION_UNUSED:
+                    rt_machine_stop(rt);
+                    break;
+                case ACTION_FAST:
+                    rt->turbo_active = -1.0;
+                    break;
+                case ACTION_RESTORE:
+                    rt->turbo_active = rt->turbo[rt->turbo_index];
+                    break;
+                case ACTION_SLOW:
+                    rt->turbo_active =  1.0;
+                    break;
+                case ACTION_SWAP: {
+                        int index = m->diskii_controller[bp->slot].diskii_drive[bp->device].image_index + 1;
+                        int items = m->diskii_controller[bp->slot].diskii_drive[bp->device].images.items;
+                        diskii_mount_image(m, bp->slot, bp->device, index >= items ? 0 : index);
+                    }
+                    break;
+                case ACTION_TROFF:
+                    rt_trace_off(rt);
+                    break;
+                case ACTION_TRON:
+                    rt_trace_on(rt);
+                    break;
+                case ACTION_TYPE:
+                    if(bp->type_text) {
+                        rt_paste_clipboard(rt, bp->type_text);
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    if(!rt->run) {
+        // When no longer running record the cycles for delta purposes
+        rt->prev_stop_cycles = rt->stop_cycles;
+        rt->stop_cycles = m->cpu.cycles;
+        return 0;
+    }
+    
+    return 1;
+}
 
 void rt_apply_ini(RUNTIME *rt, INI_STORE *ini_store) {
     int slot_number = -1;
@@ -195,7 +281,7 @@ int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
                 uint64_t cycles = 0;
                 while(cycles < cycles_per_frame) {
                     // See if a breakpoint was hit (will clear rt->run)
-                    if(!rt_update(rt)) {
+                    if(!rt_step_okay(rt)) {
                         break;
                     }
                     size_t opcode_cycles = machine_run_opcode(m);
@@ -206,7 +292,7 @@ int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
                 uint64_t emulation_cycles = frame_start_ticks + ticks_per_frame - overhead_ticks;
                 while(SDL_GetPerformanceCounter() < emulation_cycles) {
                     // See if a breakpoint was hit (will clear rt->run)
-                    if(!rt_update(rt)) {
+                    if(!rt_step_okay(rt)) {
                         break;
                     }
                     size_t opcode_cycles = machine_run_opcode(m);
@@ -356,13 +442,13 @@ void rt_machine_pause(RUNTIME *rt) {
 
 void rt_machine_run(RUNTIME *rt) {
     rt->run = 1;
-    // rt->run_to_pc = 0;
+    rt->run_first_step = 1;
 }
 
 void rt_machine_run_to_pc(RUNTIME *rt, uint16_t pc) {
     rt->run = 1;
     rt->run_to_pc = 1;
-    rt->pc_to_run_to = pc;
+    rt->run_to_pc_address = pc;
 }
 
 void rt_machine_set_pc(RUNTIME *rt, uint16_t pc) {
@@ -392,8 +478,6 @@ void rt_machine_set_flags(RUNTIME *rt, uint8_t flags) {
 void rt_machine_step(RUNTIME *rt) {
     rt->run = 1;
     rt->run_step = 1;
-    // rt->run_to_pc = 0;
-    // rt->run_step_out = 0;
 }
 
 void rt_machine_step_out(RUNTIME *rt) {
@@ -408,10 +492,11 @@ void rt_machine_step_over(RUNTIME *rt) {
     uint8_t instruction = read_from_memory_debug(m, m->cpu.pc);
     if(instruction == OPCODE_JSR) {
         int length = opcode_lengths[instruction];
-        rt->pc_to_run_to = m->cpu.pc + length;
+        rt->run_to_pc_address = m->cpu.pc + length;
         rt->run_to_pc = 1;
+    } else {
+        rt->run_step = 1;
     }
-    rt->run_step = 1;
     rt->run = 1;
 }
 
@@ -420,7 +505,7 @@ void rt_machine_stop(RUNTIME *rt) {
     rt->run_step = 0;
     rt->run_step_out = 0;
     rt->run_to_pc = 0;
-    rt->pc_to_run_to = 0;
+    rt->run_to_pc_address = 0;
     rt->jsr_counter = 0;
 }
 
@@ -478,80 +563,3 @@ int rt_feed_clipboard_key(RUNTIME *rt) {
     }
 }
 
-// This runs before machine step so the logic seems a bit weird
-int rt_update(RUNTIME *rt) {
-    APPLE2 *m = rt->m;
-
-    // Only look for breakpoints if not stepping
-    if(!rt->run_step) {
-        if(rt->run_to_pc && rt->pc_to_run_to == m->cpu.pc) {
-            rt_machine_stop(rt);
-        } else if(rt->run_step_out) {
-            uint8_t instruction = read_from_memory_debug(m, m->cpu.pc);
-            switch(instruction) {
-                case OPCODE_JSR:
-                    rt->jsr_counter++;
-                    break;
-                case OPCODE_RTS:
-                    if(--rt->jsr_counter < 0) {
-                        rt_machine_stop(rt);           // Stop
-                        return 1;                           // But step the RTS
-                    }
-                    break;
-            }
-        }
-        BREAKPOINT *bp = rt_bp_get_at_address(rt, m->cpu.pc, 1);
-        if(bp) {
-            if(!bp->action) {
-                rt_machine_stop(rt);
-            } else {
-                switch(bp->action) {
-                    // SQW - optimize access
-                    case ACTION_FAST:
-                        rt->turbo_active = -1.0;
-                        break;
-                    case ACTION_RESTORE:
-                        rt->turbo_active = rt->turbo[rt->turbo_index];
-                        break;
-                    case ACTION_SLOW:
-                        rt->turbo_active =  1.0;
-                        break;
-                    case ACTION_SWAP: {
-                            int index = m->diskii_controller[bp->slot].diskii_drive[bp->device].image_index + 1;
-                            int items = m->diskii_controller[bp->slot].diskii_drive[bp->device].images.items;
-                            diskii_mount_image(m, bp->slot, bp->device, index >= items ? 0 : index);
-                        }
-                        break;
-                    case ACTION_TROFF:
-                        rt_trace_off(rt);
-                        break;
-                    case ACTION_TRON:
-                        rt_trace_on(rt);
-                        break;
-                    case ACTION_TYPE:
-                        if(bp->type_text) {
-                            rt_paste_clipboard(rt, bp->type_text);
-                        }
-                        break;
-                    default:
-                        break;
-                }
-            }
-        }
-    } else if(!rt->run_to_pc) {
-        // If stepping, and not stepping over, then stop
-        rt_machine_stop(rt);
-        return 1;
-    } else {
-        // Otherwise not stepping, but running, so future breakpoints
-        // other than the one on the first step, if there was one, will break again
-        rt->run_step = 0;
-    }
-
-    if(!rt->run) {
-        // When no longer running record the cycles for delta purposes
-        rt->prev_stop_cycles = rt->stop_cycles;
-        rt->stop_cycles = m->cpu.cycles;
-    }
-    return rt->run;
-}

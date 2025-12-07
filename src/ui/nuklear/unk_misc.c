@@ -188,7 +188,7 @@ void unk_misc_show(UNK *v) {
                 nk_layout_row_push(ctx, 0.49f);
                 nk_option_label(ctx, "Run to PC", rt->run_to_pc);
                 nk_layout_row_push(ctx, 0.49f);
-                nk_labelf(ctx, NK_TEXT_LEFT, "%04X", rt->pc_to_run_to);
+                nk_labelf(ctx, NK_TEXT_LEFT, "%04X", rt->run_to_pc_address);
                 nk_layout_row_end(ctx);
                 nk_layout_row_dynamic(ctx, 18, 1);
                 nk_option_label(ctx, "Step Out", rt->run_step_out);

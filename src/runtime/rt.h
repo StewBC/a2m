@@ -57,7 +57,7 @@ typedef struct RUNTIME {
     double *turbo;                                          // Array of multipliers (* 1MHz) to run at
 
     // Flow
-    uint16_t pc_to_run_to;
+    uint16_t run_to_pc_address;
     int16_t jsr_counter;
 
     // Counters
@@ -68,8 +68,9 @@ typedef struct RUNTIME {
     uint16_t run: 1;                                        // 1 - not running, 0 - run
     uint16_t run_step: 1;
     uint16_t run_to_pc: 1;                                  // 1 - stepping / conditionally running
-    uint16_t run_step_out: 1;                               // 1 - step out
-    uint16_t pad: 13;
+    uint16_t run_step_out: 1;                               // 1 - step out (count jsr/rts till out)
+    uint16_t run_first_step: 1;                             // 1 - don't look for a breakpoint
+    uint16_t pad: 11;
 
     // Clipboard
     int clipboard_index;
