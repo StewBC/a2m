@@ -269,8 +269,14 @@ int unk_mem_process_event(UNK *v, SDL_Event *e, int window) {
         }
     } else if(mod & KMOD_CTRL) {
         switch(e->key.keysym.sym) {
-            case SDLK_a:                                        // CTRL G - Goto view_address
-                unk_mem_cursor_toggle_address_mode(ms, mv);
+            case SDLK_a:                                        // CTRL A - Goto view_address
+                if(mod & KMOD_SHIFT) {                          // CTRL+SHIFT+A - Move crsr addr to col 0
+                    int delta = unk_mem_circular_delta(mv->cursor_address, mv->view_address);
+                    int col = delta % ms->cols;
+                    mv->view_address += col;
+                } else {
+                    unk_mem_cursor_toggle_address_mode(ms, mv);
+                }
                 break;
 
             case SDLK_f:                                        // CTRL F - Find
@@ -364,6 +370,7 @@ int unk_mem_process_event(UNK *v, SDL_Event *e, int window) {
                 uint16_t address = mv->cursor_address - col;
                 address &= ~(0x0f << shift);
                 address |= (key << shift);
+                address += col;
                 mv->cursor_address = address;
                 mv->view_address = address - delta;
             }

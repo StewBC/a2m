@@ -403,6 +403,9 @@ int unk_process_events(UI *ui, APPLE2 *m) {
             v->button[i][0] = SDL_GameControllerGetButton(v->game_controller[i], SDL_CONTROLLER_BUTTON_A);
             v->button[i][1] = SDL_GameControllerGetButton(v->game_controller[i], SDL_CONTROLLER_BUTTON_B);
             v->button[i][2] = SDL_GameControllerGetButton(v->game_controller[i], SDL_CONTROLLER_BUTTON_X);
+            // This is because I made a crappy joutstick routine in Penetrator which hangs on 255
+            v->axis_left[i][0] = clamp_u8(v->axis_left[i][0], 0, 254);
+            v->axis_left[i][1] = clamp_u8(v->axis_left[i][1], 0, 254);
         }
     }
 
