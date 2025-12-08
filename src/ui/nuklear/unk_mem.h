@@ -34,7 +34,7 @@ typedef struct VIEWMEM {
 } VIEWMEM;
 
 int unk_mem_init(VIEWMEM *ms);
-int unk_mem_process_event(UNK *v, SDL_Event *e, int window);
+int unk_mem_process_event(UNK *v, SDL_Event *e);
 void unk_mem_resize_view(UNK *v);
 void unk_mem_show(UNK *v);
 void unk_mem_shutdown(VIEWMEM *ms);

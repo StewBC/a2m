@@ -384,7 +384,7 @@ int unk_process_events(UI *ui, APPLE2 *m) {
                             break;
 
                         case VIEWMEM_NAME_HASH:                         // Memory view
-                            unk_mem_process_event(v, &e, 0);
+                            unk_mem_process_event(v, &e);
                             break;
 
                         case VIEWMISC_NAME_HASH:                        // Miscellaneous view (no events)

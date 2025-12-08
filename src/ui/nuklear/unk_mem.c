@@ -59,7 +59,7 @@ static inline void unk_mem_recenter_view(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     }
 }
 
-void unk_mem_find_string(UNK *v, VIEWMEM *ms, VIEWMEM_VIEW *mv) {
+static void unk_mem_find_string(UNK *v, VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     APPLE2 *m = v->m;
     uint8_t flags = mv->flags;
     uint16_t index = 0;
@@ -75,7 +75,7 @@ void unk_mem_find_string(UNK *v, VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     }
 }
 
-void unk_mem_find_string_reverse(UNK *v, VIEWMEM *ms, VIEWMEM_VIEW *mv) {
+static void unk_mem_find_string_reverse(UNK *v, VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     APPLE2 *m = v->m;
     uint8_t flags = mv->flags;
     uint16_t index = ms->find_string_len - 1;
@@ -93,14 +93,14 @@ void unk_mem_find_string_reverse(UNK *v, VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     }
 }
 
-void unk_mem_cursor_down(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
+static void unk_mem_cursor_down(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     if(mv->cursor_field != CURSOR_ADDRESS) {
         mv->cursor_address = unk_mem_wrap16_add(mv->cursor_address, ms->cols);
         unk_mem_recenter_view(ms, mv);
     }
 }
 
-void unk_mem_cursor_end(VIEWMEM *ms, VIEWMEM_VIEW *mv, int mod) {
+static void unk_mem_cursor_end(VIEWMEM *ms, VIEWMEM_VIEW *mv, int mod) {
     if(mv->cursor_field == CURSOR_ADDRESS) {
         mv->cursor_digit = CURSOR_DIGIT3;
         return;
@@ -122,7 +122,7 @@ void unk_mem_cursor_end(VIEWMEM *ms, VIEWMEM_VIEW *mv, int mod) {
     mv->cursor_digit = CURSOR_DIGIT0;
 }
 
-void unk_mem_cursor_home(VIEWMEM *ms, VIEWMEM_VIEW *mv, int mod) {
+static void unk_mem_cursor_home(VIEWMEM *ms, VIEWMEM_VIEW *mv, int mod) {
     if(mv->cursor_field != CURSOR_ADDRESS) {
         if(!mod) {
             // move to column 0 of current row
@@ -138,7 +138,7 @@ void unk_mem_cursor_home(VIEWMEM *ms, VIEWMEM_VIEW *mv, int mod) {
     mv->cursor_digit = CURSOR_DIGIT0;
 }
 
-void unk_mem_cursor_left(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
+static void unk_mem_cursor_left(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     switch(mv->cursor_field) {
         case CURSOR_HEX:
             if(mv->cursor_digit == CURSOR_DIGIT0) {
@@ -163,19 +163,19 @@ void unk_mem_cursor_left(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     unk_mem_recenter_view(ms, mv);
 }
 
-void unk_mem_cursor_page_up(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
+static void unk_mem_cursor_page_up(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     if(mv->cursor_field != CURSOR_ADDRESS) {
         mv->view_address = unk_mem_wrap16_add(mv->view_address, -(ms->cols * mv->rows));
     }
 }
 
-void unk_mem_cursor_page_down(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
+static void unk_mem_cursor_page_down(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     if(mv->cursor_field != CURSOR_ADDRESS) {
         mv->view_address = unk_mem_wrap16_add(mv->view_address, (ms->cols * mv->rows));
     }
 }
 
-void unk_mem_cursor_right(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
+static void unk_mem_cursor_right(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     switch(mv->cursor_field) {
         case CURSOR_HEX:
             if(mv->cursor_digit == CURSOR_DIGIT1) {
@@ -203,7 +203,7 @@ void unk_mem_cursor_right(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     unk_mem_recenter_view(ms, mv);
 }
 
-void unk_mem_cursor_toggle_address_mode(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
+static void unk_mem_cursor_toggle_address_mode(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     if(mv->cursor_field == CURSOR_ADDRESS) {
         mv->cursor_field = mv->prev_field;
         mv->cursor_digit = mv->cursor_prev_digit;
@@ -215,11 +215,48 @@ void unk_mem_cursor_toggle_address_mode(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     }
 }
 
-void unk_mem_cursor_up(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
+static void unk_mem_cursor_up(VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     if(mv->cursor_field != CURSOR_ADDRESS) {
         mv->cursor_address = unk_mem_wrap16_add(mv->cursor_address, -ms->cols);
         unk_mem_recenter_view(ms, mv);
     }
+}
+
+static int unk_mem_hex_key(UNK *v, int key) {
+    APPLE2 *m = v->m;
+    VIEWMEM *ms = &v->viewmem;
+    VIEWMEM_VIEW *mv = ARRAY_GET(&ms->memviews, VIEWMEM_VIEW, ms->active_view_index);
+
+    if((key >= SDLK_0 && key <= SDLK_9) || (key >= SDLK_a && key <= SDLK_f)) {
+        key -= key >= SDLK_a ? SDLK_a - 10 : SDLK_0;
+        if(mv->cursor_field == CURSOR_HEX) {
+            // This is HEX mode only as ascii mode was handled at the start
+            uint8_t byte = read_from_memory_selected(m, mv->cursor_address, mv->flags);
+            if(mv->cursor_digit == CURSOR_DIGIT1) {
+                byte &= 0xf0;
+                byte |= key;
+            } else {
+                byte &= 0x0F;
+                byte |= (key << 4);
+            }
+            write_to_memory_selected(m, mv->flags, mv->cursor_address, byte);
+        } else {
+            // This is address mode
+            int delta = unk_mem_circular_delta(mv->cursor_address, mv->view_address);
+            int row = delta / ms->cols;
+            int col = delta % ms->cols;
+            uint8_t shift = (4 * (3 - mv->cursor_digit));
+            uint16_t address = mv->cursor_address - col;
+            address &= ~(0x0f << shift);
+            address |= (key << shift);
+            address += col;
+            mv->cursor_address = address;
+            mv->view_address = address - delta;
+        }
+        unk_mem_cursor_right(ms, mv);
+        return 1;
+    }
+    return 0;
 }
 
 int unk_mem_init(VIEWMEM *ms) {
@@ -236,7 +273,7 @@ int unk_mem_init(VIEWMEM *ms) {
     return A2_OK;
 }
 
-int unk_mem_process_event(UNK *v, SDL_Event *e, int window) {
+int unk_mem_process_event(UNK *v, SDL_Event *e) {
     APPLE2 *m = v->m;
     SDL_Keymod mod = SDL_GetModState();
     VIEWMEM *ms = &v->viewmem;
@@ -344,37 +381,22 @@ int unk_mem_process_event(UNK *v, SDL_Event *e, int window) {
             case SDLK_UP:
                 mv->view_address += ms->cols;
                 break;
+            }
+    } else if(mod & KMOD_SHIFT && e->key.keysym.sym == SDLK_INSERT) {
+        // Paste
+        if(SDL_HasClipboardText()) {
+            char *clipboard_text = SDL_GetClipboardText();
+            if(clipboard_text) {
+                while(*clipboard_text) {
+                    uint8_t key = tolower(*clipboard_text++);
+                    unk_mem_hex_key(v, key);
+                }
+            }
         }
     } else {
         // Regular, unmodified keys
         uint8_t key = e->key.keysym.sym;
-        if((key >= SDLK_0 && key <= SDLK_9) || (key >= SDLK_a && key <= SDLK_f)) {
-            key -= key >= SDLK_a ? SDLK_a - 10 : SDLK_0;
-            if(mv->cursor_field == CURSOR_HEX) {
-                // This is HEX mode only as ascii mode was handled at the start
-                uint8_t byte = read_from_memory_selected(m, mv->cursor_address, mv->flags);
-                if(mv->cursor_digit == CURSOR_DIGIT1) {
-                    byte &= 0xf0;
-                    byte |= key;
-                } else {
-                    byte &= 0x0F;
-                    byte |= (key << 4);
-                }
-                write_to_memory_selected(m, mv->flags, mv->cursor_address, byte);
-            } else {
-                // This is address mode
-                int delta = unk_mem_circular_delta(mv->cursor_address, mv->view_address);
-                int row = delta / ms->cols;
-                int col = delta % ms->cols;
-                uint8_t shift = (4 * (3 - mv->cursor_digit));
-                uint16_t address = mv->cursor_address - col;
-                address &= ~(0x0f << shift);
-                address |= (key << shift);
-                address += col;
-                mv->cursor_address = address;
-                mv->view_address = address - delta;
-            }
-            unk_mem_cursor_right(ms, mv);
+        if(unk_mem_hex_key(v, key)) {
             return 0;
         }
         // Unmodified special keys
