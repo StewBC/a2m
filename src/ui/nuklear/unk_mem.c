@@ -388,8 +388,14 @@ int unk_mem_process_event(UNK *v, SDL_Event *e) {
             char *clipboard_text = SDL_GetClipboardText();
             if(clipboard_text) {
                 while(*clipboard_text) {
-                    uint8_t key = tolower(*clipboard_text++);
-                    unk_mem_hex_key(v, key);
+                    uint8_t key = *clipboard_text++;
+                    if(mv->cursor_field == CURSOR_ASCII) {
+                        write_to_memory_selected(m, mv->flags, mv->cursor_address, key);
+                        unk_mem_cursor_right(ms, mv);
+                    } else {
+                        key = tolower(key);
+                        unk_mem_hex_key(v, key);
+                    }
                 }
             }
         }
