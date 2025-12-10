@@ -42,4 +42,4 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e);
 void unk_dasm_resize_view(UNK *v);
 void unk_dasm_show(UNK *v, int dirty);
 void unk_dasm_shutdown(VIEWDASM *d);
-void unk_put_address_on_line(VIEWDASM *dv, APPLE2 *m, uint16_t address, int line);
+void unk_dasm_put_address_on_line(VIEWDASM *dv, APPLE2 *m, uint16_t address, int line);

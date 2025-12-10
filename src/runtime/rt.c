@@ -498,6 +498,7 @@ void rt_machine_step_over(RUNTIME *rt) {
         rt->run_step = 1;
     }
     rt->run = 1;
+    rt->run_first_step = 1;
 }
 
 void rt_machine_stop(RUNTIME *rt) {

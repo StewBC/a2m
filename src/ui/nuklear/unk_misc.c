@@ -220,7 +220,7 @@ void unk_misc_show(UNK *v) {
                             if(nk_select_label(ctx, callstack_display, NK_TEXT_ALIGN_LEFT, 0)) {
                                 dv->cursor_address = stack_addr - 2;
                                 dv->cursor_line = dv->rows / 2;
-                                unk_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
+                                unk_dasm_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
                             }
                             if(symbol) {
                                 snprintf(callstack_display, 256, "JSR %04X %s", dest_addr, symbol);
@@ -231,7 +231,7 @@ void unk_misc_show(UNK *v) {
                             if(nk_select_label(ctx, callstack_display, NK_TEXT_ALIGN_LEFT, 0)) {
                                 dv->cursor_address = dest_addr;
                                 dv->cursor_line = dv->rows / 2;
-                                unk_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
+                                unk_dasm_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
                             }
                             address += 2;
                         } else {
@@ -337,7 +337,7 @@ void unk_misc_show(UNK *v) {
                         if(nk_button_label(ctx, "View PC")) {
                             dv->cursor_address = bp->address;
                             dv->cursor_line = dv->rows / 2;
-                            unk_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
+                            unk_dasm_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
                         }
                         if(!bp->use_pc) {
                             nk_widget_disable_end(ctx);
