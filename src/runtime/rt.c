@@ -360,14 +360,14 @@ void rt_brk_callback(RUNTIME *rt, uint16_t address, uint8_t mask) {
 }
 
 
-int rt_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, char symbol_view, char *str_buf, int str_buf_len) {
+int rt_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, int force_byte, char symbol_view, char *str_buf, int str_buf_len) {
     APPLE2 *m = rt->m;
     char address_symbol[11];
     uint16_t pc = *address;
     char *text = str_buf;
     int remain = str_buf_len;
     uint8_t instruction = read_from_memory_selected(m, pc, selected);
-    int length = opcode_lengths[instruction];
+    int length = force_byte ? 1 : opcode_lengths[instruction];
     *address += length;
     int prt_len;
     uint16_t operands;

@@ -9,6 +9,9 @@
 #define ADDRESS_LABEL_H         26
 #define ROW_H                   v->font_height
 
+#define top_line_offset         1
+#define bottom_line_offset      1
+
 // Colors for disassembly code
 #define color_bg_cursor         nk_rgb(  0,255,255)
 #define color_fg_cursor         nk_rgb(255, 70, 50)
@@ -16,6 +19,46 @@
 #define color_fg_pc             nk_rgb(128,  0,128)
 #define color_bg_breakpoint     nk_rgb(255,0  ,  0)
 #define color_fg_breakpoint     nk_rgb(  0,255,  0)
+
+static const uint8_t valid_dasm_opcodes_6502[256] = {
+//  0 , 1 , 2 , 3 , 4 , 5 , 6 , 7 , 8 , 9 , A , B , C , D , E , F
+    1 , 1 , 0 , 0 , 0 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 0 , 1 , 1 , 0, // 0
+    1 , 1 , 0 , 0 , 0 , 1 , 1 , 0 , 1 , 1 , 0 , 0 , 0 , 1 , 1 , 0, // 1
+    1 , 1 , 0 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0, // 2
+    1 , 1 , 0 , 0 , 0 , 1 , 1 , 0 , 1 , 1 , 0 , 0 , 0 , 1 , 1 , 0, // 3
+    1 , 1 , 0 , 0 , 0 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0, // 4
+    1 , 1 , 0 , 0 , 0 , 1 , 1 , 0 , 1 , 1 , 0 , 0 , 0 , 1 , 1 , 0, // 5
+    1 , 1 , 0 , 0 , 0 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0, // 6
+    1 , 1 , 0 , 0 , 0 , 1 , 1 , 0 , 1 , 1 , 0 , 0 , 0 , 1 , 1 , 0, // 7
+    0 , 1 , 0 , 0 , 1 , 1 , 1 , 0 , 1 , 0 , 1 , 0 , 1 , 1 , 1 , 0, // 8
+    1 , 1 , 0 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 0 , 1 , 0 , 0, // 9
+    1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0, // A
+    1 , 1 , 0 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0, // B
+    1 , 1 , 0 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0, // C
+    1 , 1 , 0 , 0 , 0 , 1 , 1 , 0 , 1 , 1 , 0 , 0 , 0 , 1 , 1 , 0, // D
+    1 , 1 , 0 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0, // E
+    1 , 1 , 0 , 0 , 0 , 1 , 1 , 0 , 1 , 1 , 0 , 0 , 0 , 1 , 1 , 0, // F
+} ;
+
+static const uint8_t valid_dasm_opcodes_65c02[256] = {
+//  0 , 1 , 2 , 3 , 4 , 5 , 6 , 7 , 8 , 9 , A , B , C , D , E , F
+    1 , 1 , 0 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0, // 0
+    1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0, // 1
+    1 , 1 , 0 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0, // 2
+    1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0, // 3
+    1 , 1 , 0 , 0 , 0 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0, // 4
+    1 , 1 , 1 , 0 , 0 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 0 , 1 , 1 , 0, // 5
+    1 , 1 , 0 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0, // 6
+    1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 0 , 1 , 1 , 0, // 7
+    1 , 1 , 0 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0, // 8
+    1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0, // 9
+    1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0, // A
+    1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0, // B
+    1 , 1 , 0 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0, // C
+    1 , 1 , 1 , 0 , 0 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 0 , 1 , 1 , 0, // D
+    1 , 1 , 0 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 1 , 1 , 1 , 0, // E
+    1 , 1 , 1 , 0 , 0 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 0 , 1 , 1 , 0, // F
+} ;
 
 static inline struct nk_color unk_dasm_blend(struct nk_color a, struct nk_color b, float t) {
     return nk_rgb(a.r * (1.0f - t) + b.r * t, a.g * (1.0f - t) + b.g * t, a.b * (1.0f - t) + b.b * t);
@@ -30,123 +73,161 @@ static inline int unk_dasm_circular_delta(uint16_t cursor, uint16_t view) {
     }
 }
 
-static inline uint16_t unk_dasm_wrap16_add(uint16_t a, int b) {
-    return (uint16_t)(a + b);
+static inline LINE_INFO *unk_dasm_get_line_info(VIEWDASM *dv, int line) {
+    return ARRAY_GET(&dv->line_info, LINE_INFO, line + top_line_offset);
 }
 
-static inline uint16_t unk_dasm_next_opcode(APPLE2 *m, uint16_t address) {
-    uint8_t instruction = read_from_memory_debug(m, address);
-    int length = opcode_lengths[instruction];
-    return address + length;
+static inline uint16_t unk_dasm_next_opcode_address(APPLE2 *m, uint16_t address, uint8_t *opcode) {
+    *opcode = read_from_memory_debug(m, address);
+    return address + opcode_lengths[*opcode];
 }
 
-static inline uint16_t unk_dasm_prev_opcode(APPLE2 *m, uint16_t address) {
-    // Assume 3 bytes per instruction, so step "some" lines back
-    uint16_t step_back = 4 * 3;
-    static uint64_t mx = 0;
-    uint64_t iter = 0;
-    while(step_back > 1) {
-        uint16_t search_pc = address - step_back;
-        // Walk towards the desired ADDRESS
-        while(search_pc != address) {
-            iter++;
-            uint16_t next_pc = unk_dasm_next_opcode(m, search_pc);
-            // If this matches up exactly, assume it's correct
-            if(next_pc == address) {
-                if(iter > mx) {
-                    mx = iter;
-                }
-                return search_pc;
+static inline void unk_dasm_prev_opcode(VIEWDASM *dv, APPLE2 *m, uint16_t address, int prev_line) {
+    DECODE_ENTRY de;
+
+    uint16_t seek_address = address - 1;
+    for(int i=0; i < 3; i++) {
+        uint16_t next_address = unk_dasm_next_opcode_address(m, seek_address - i, &de.opcode);
+        if(next_address == address) {
+            de.address = seek_address - i;
+            de.line = prev_line;
+            int valid = m->model ? valid_dasm_opcodes_65c02[de.opcode] : valid_dasm_opcodes_6502[de.opcode];
+            if(valid) {
+                ARRAY_ADD(&dv->valid_stack, de);
+            } else {
+                ARRAY_ADD(&dv->invalid_stack, de);
             }
-            if(unk_dasm_circular_delta(next_pc, address) > 0) {
-                break;
-            }
-            search_pc = next_pc;
         }
-        step_back--;
-    }
-    // Give up and step back one byte
-    if(iter > mx) {
-        mx = iter;
-    }
-    return address - 1;
-}
-
-void unk_dasm_top_line_address(VIEWDASM *dv, APPLE2 *m, uint16_t address, int lines_from_top, int set_bottom) {
-    while(lines_from_top--) {
-        address = unk_dasm_prev_opcode(m, address);
-    }
-    dv->top_address = address;
-    if(set_bottom) {
-        lines_from_top = 0;
-        while(++lines_from_top < dv->rows) {
-            address = unk_dasm_next_opcode(m, address);
-        }
-        dv->bottom_address = address;
     }
 }
 
-// SQW this code (very much) needs improving...
-void unk_dasm_recenter_view(UNK *v, int dirty) {
-    VIEWDASM *dv = &v->viewdasm;
-    APPLE2 *m = v->m;
-    uint16_t address;
-    if(dirty) {
-        address = dv->cursor_address = m->cpu.pc;
-        // dirty & 2 == run; dirty & 1 == step (run always set if step set)
-        // if(dirty) {
-        // I do this to lock the cursor to the middle for run, otherwise
-        // it really doesn't look good to see the cursor flying around
-        unk_dasm_top_line_address(dv, m, address, dv->rows / 2, 0);
+static inline void unk_dasm_fill_lines_down(VIEWDASM *dv, APPLE2 *m, uint16_t address, uint32_t next_line) {
+    DECODE_ENTRY de;
+    int end_line = bottom_line_offset + dv->rows - 1;
+    while(next_line++ < end_line) {
+        address = unk_dasm_next_opcode_address(m, address, &de.opcode);
+        LINE_INFO *li = unk_dasm_get_line_info(dv, next_line);
+        li->address = address;
+        li->force_byte = 0;
+    }
+}
+
+static inline void unk_dasm_cursor_on_screen(UNK *v, VIEWDASM *dv) {
+    if(dv->cursor_line >= 0 && dv->cursor_line < dv->rows) {
         return;
-        // }
-    } else {
-        address = dv->cursor_address;
     }
+    dv->cursor_line = dv->rows / 2;
+    unk_put_address_on_line(dv, v->m, dv->cursor_address, dv->cursor_line);
+}
 
-    int top_delta = unk_dasm_circular_delta(address, dv->top_address);
-    int bottom_delta = unk_dasm_circular_delta(address, dv->bottom_address);
-    // if(dirty && top_delta > 0 && bottom_delta < 0) {
-    //     return;
-    // }
+void unk_put_address_on_line(VIEWDASM *dv, APPLE2 *m, uint16_t address, int line) {
+    LINE_INFO *li = unk_dasm_get_line_info(dv, line);
+    li->address = address;
+    li->force_byte = 0;
+    int current_line = line;
+    uint16_t working_address = address;
+    while(current_line-- > -top_line_offset) {
+        DECODE_ENTRY *de = NULL;
+        unk_dasm_prev_opcode(dv, m, li->address, current_line);
 
-    // if(dirty && (top_delta < dv->rows || bottom_delta > dv->rows)) {
-    //     unk_dasm_top_line_address(dv, m, address, min(dv->rows, 2), 0);
-    //     return;
-    // }
+        // Try valid opcodes before trying invalid opcodes
+        if(dv->valid_stack.items) {
+            de = ARRAY_GET(&dv->valid_stack, DECODE_ENTRY, --dv->valid_stack.items);
+        } else if(dv->invalid_stack.items) {
+            de = ARRAY_GET(&dv->invalid_stack, DECODE_ENTRY, --dv->invalid_stack.items);
+        }
 
-    if(top_delta <= 0) {
-        do {
-            address = unk_dasm_prev_opcode(v->m, address);
-            top_delta = unk_dasm_circular_delta(address, dv->top_address);
-        } while(top_delta > 0);
-        dv->top_address = address;
-    } else {
-        do {
-            address = unk_dasm_next_opcode(v->m, address);
-            bottom_delta = unk_dasm_circular_delta(address, dv->bottom_address);
-        } while(bottom_delta < 0);
-        unk_dasm_top_line_address(dv, m, address, dv->rows - 1, 0);
+        if(de) {
+            current_line = de->line;
+            li = unk_dasm_get_line_info(dv, current_line);
+            working_address = li->address = de->address;
+            li->force_byte = 0;
+        } else {
+            // If nothing works, force a byte into the stream
+            li = unk_dasm_get_line_info(dv, current_line);
+            li->address = --working_address;
+            li->force_byte = 1;
+        }
+    }
+    dv->valid_stack.items = 0;
+    dv->invalid_stack.items = 0;
+    unk_dasm_fill_lines_down(dv, m, address, line);
+}
+
+void unk_dasm_cursor_up(UNK *v, VIEWDASM *dv) {
+    if(dv->cursor_field != CURSOR_ADDRESS) {
+        unk_dasm_cursor_on_screen(v, dv);
+        if(dv->cursor_line > 0) {
+            dv->cursor_line--;
+            dv->cursor_address = unk_dasm_get_line_info(dv, dv->cursor_line)->address;
+        } else {
+            dv->cursor_address = unk_dasm_get_line_info(dv, dv->cursor_line - 1)->address;
+            unk_put_address_on_line(dv, v->m, dv->cursor_address, dv->cursor_line);
+        }
     }
 }
 
 void unk_dasm_cursor_down(UNK *v, VIEWDASM *dv) {
     if(dv->cursor_field != CURSOR_ADDRESS) {
-        dv->cursor_address = unk_dasm_next_opcode(v->m, dv->cursor_address);
-        unk_dasm_recenter_view(v, 0);
+        unk_dasm_cursor_on_screen(v, dv);
+        if(dv->cursor_line < dv->rows - 1) {
+            dv->cursor_line++;
+            dv->cursor_address = unk_dasm_get_line_info(dv, dv->cursor_line)->address;
+        } else {
+            int size = dv->line_info.element_size;
+            memmove(dv->line_info.data, (char*)dv->line_info.data + size, (dv->line_info.size - 1) * size);
+            dv->cursor_address = unk_dasm_get_line_info(dv, dv->cursor_line)->address;
+            unk_dasm_fill_lines_down(dv, v->m, dv->cursor_address, dv->cursor_line);
+        }
     }
 }
 
-void unk_dasm_cursor_end(UNK *v, VIEWDASM *dv, int mod) {
+void unk_dasm_cursor_left(UNK *v, VIEWDASM *dv, int mod) {
     if(dv->cursor_field == CURSOR_ADDRESS) {
-        dv->cursor_digit = CURSOR_DIGIT3;
-        return;
+        if(dv->cursor_digit != CURSOR_DIGIT0) {
+            dv->cursor_digit--;
+        }
+        return; // no recenter needed
     }
-
+    unk_dasm_cursor_on_screen(v, dv);
     if(mod & KMOD_CTRL) {
-        unk_dasm_top_line_address(dv, v->m, 0xFFFF, dv->rows - 1, 1);
+        rt_machine_set_pc(v->rt, dv->cursor_address);
     }
-    dv->cursor_address = dv->bottom_address;
+}
+
+void unk_dasm_cursor_right(UNK *v, VIEWDASM *dv, int mod) {
+    if(dv->cursor_field == CURSOR_ADDRESS) {
+        if(dv->cursor_digit != CURSOR_DIGIT3) {
+            dv->cursor_digit++;
+        } else {
+            dv->cursor_field = CURSOR_ASCII;
+        }
+        return; // no view math
+    }
+    // Set the cpu to the centre of the view
+    if(v->m->cpu.pc != unk_dasm_get_line_info(dv, dv->rows / 2)->address) {
+        unk_put_address_on_line(dv, v->m, v->m->cpu.pc, dv->rows / 2);
+        // The cursor might now be off-screen
+        if(dv->cursor_address < unk_dasm_get_line_info(dv, 0)->address || 
+            dv->cursor_address > unk_dasm_get_line_info(dv, dv->rows-1)->address) {
+                // if it is, set the cursor line just somewhere off-screen
+            dv->cursor_line = dv->rows + 5;
+        } else {
+            // cursor is still on-screen, find the line - force a match
+            for(int row = 0; row < dv->rows; row++) {
+                uint16_t row_address = unk_dasm_get_line_info(dv, row)->address;
+                if(row_address >= dv->cursor_address) {
+                    dv->cursor_address = row_address;
+                    dv->cursor_line = row;
+                    break;
+                }
+            }
+        }
+    }
+    if(mod & KMOD_CTRL) {
+        dv->cursor_address = v->m->cpu.pc;
+        dv->cursor_line = dv->rows / 2;
+    }
 }
 
 void unk_dasm_cursor_home(UNK *v, VIEWDASM *dv, int mod) {
@@ -156,57 +237,42 @@ void unk_dasm_cursor_home(UNK *v, VIEWDASM *dv, int mod) {
     }
 
     if(mod & KMOD_CTRL) {
-        dv->top_address = 0x0000;
+        unk_put_address_on_line(dv, v->m, 0x0000, 0);
     }
-    dv->cursor_address = dv->top_address;
+    dv->cursor_line = 0;
+    dv->cursor_address = unk_dasm_get_line_info(dv, dv->cursor_line)->address;
 }
 
-void unk_dasm_cursor_left(UNK *v, VIEWDASM *dv) {
+void unk_dasm_cursor_end(UNK *v, VIEWDASM *dv, int mod) {
     if(dv->cursor_field == CURSOR_ADDRESS) {
-        if(dv->cursor_digit != CURSOR_DIGIT0) {
-            dv->cursor_digit--;
-        }
-        return; // no recenter needed
+        dv->cursor_digit = CURSOR_DIGIT3;
+        return;
     }
 
-    unk_dasm_recenter_view(v, 0);
+    if(mod & KMOD_CTRL) {
+        unk_put_address_on_line(dv, v->m, 0xFFFF, dv->rows - 1);
+    }
+    dv->cursor_line = dv->rows - 1;
+    dv->cursor_address = unk_dasm_get_line_info(dv, dv->cursor_line)->address;
 }
 
 void unk_dasm_cursor_page_up(UNK *v, VIEWDASM *dv) {
     if(dv->cursor_field != CURSOR_ADDRESS) {
-        uint16_t address = dv->top_address;
-        unk_dasm_top_line_address(dv, v->m, address, dv->rows - 1, 0);
+        uint16_t address = unk_dasm_get_line_info(dv, 0)->address;
+        dv->cursor_line -= dv->rows - 1;
+        unk_put_address_on_line(dv, v->m, address, dv->rows - 1);
     }
 }
 
 void unk_dasm_cursor_page_down(UNK *v, VIEWDASM *dv) {
     if(dv->cursor_field != CURSOR_ADDRESS) {
-        uint16_t address = dv->bottom_address;
-        unk_dasm_top_line_address(dv, v->m, address, 0, 0);
+        uint16_t address = unk_dasm_get_line_info(dv, dv->rows - 1)->address;
+        dv->cursor_line += dv->rows - 1;
+        unk_put_address_on_line(dv, v->m, address, 0);
     }
 }
 
-void unk_dasm_cursor_right(UNK *v, VIEWDASM *dv) {
-    if(dv->cursor_field == CURSOR_ADDRESS) {
-        if(dv->cursor_digit != CURSOR_DIGIT3) {
-            dv->cursor_digit++;
-        } else {
-            dv->cursor_field = CURSOR_ASCII;
-        }
-        return; // no view math
-    }
-
-    unk_dasm_recenter_view(v, 0);
-}
-
-void unk_dasm_cursor_up(UNK *v, VIEWDASM *dv) {
-    if(dv->cursor_field != CURSOR_ADDRESS) {
-        dv->cursor_address = unk_dasm_prev_opcode(v->m, dv->cursor_address);
-        unk_dasm_recenter_view(v, 0);
-    }
-}
-
-int unk_dasm_init(VIEWDASM *dv) {
+int unk_dasm_init(VIEWDASM *dv, int model) {
     dv->cursor_field = CURSOR_ASCII;
 
     errlog_init(&dv->errorlog);
@@ -216,6 +282,9 @@ int unk_dasm_init(VIEWDASM *dv) {
         sprintf(dv->assembler_config.start_address_text, "%04X", dv->assembler_config.start_address);
     dv->assembler_config.dlg_asm_filebrowser = 0;
     array_init(&dv->assembler_config.file_browser.dir_contents, sizeof(FILE_INFO));
+    array_init(&dv->line_info, sizeof(LINE_INFO));
+    array_init(&dv->valid_stack, sizeof(DECODE_ENTRY));
+    array_init(&dv->invalid_stack, sizeof(DECODE_ENTRY));
     return A2_OK;
 }
 
@@ -244,7 +313,7 @@ void unk_dasm_resize_view(UNK *v) {
             free(new_cvt_buf);
         }
     }
-    unk_dasm_recenter_view(v, 0);
+    array_resize(&dv->line_info, top_line_offset + bottom_line_offset + dv->rows);
 }
 
 void unk_dasm_process_event(UNK *v, SDL_Event *e) {
@@ -273,8 +342,11 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
             address &= ~(0x0f << shift);
             address |= (key << shift);
             dv->cursor_address = address;
-            unk_dasm_recenter_view(v, 0);
-            unk_dasm_cursor_right(v, dv);
+            if(dv->cursor_line < 0 || dv->cursor_line > dv->rows - 1) {
+                unk_dasm_cursor_on_screen(v, dv); // SQW - not sure this can be hit
+            }
+            unk_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
+            unk_dasm_cursor_right(v, dv, 0);
             return;
         }
     }
@@ -285,7 +357,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                 if(dv->cursor_field == CURSOR_ASCII) {
                     dv->cursor_field = CURSOR_ADDRESS;
                     dv->cursor_digit = CURSOR_DIGIT0;
-                    unk_dasm_recenter_view(v, 0);
+                    unk_dasm_cursor_on_screen(v, dv);
                 } else {
                     dv->cursor_field = CURSOR_ASCII;
                 }
@@ -322,6 +394,23 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                         }
                         assembler_shutdown(&as);
                         rt_sym_search_update(rt);
+                        // Force a rethink of the display, since the contents changed
+                        uint16_t view_address = unk_dasm_get_line_info(dv, 0)->address;
+                        unk_put_address_on_line(dv, v->m, view_address, 0);
+                        // See if the cursor is on-screen
+                        if(dv->cursor_address >= view_address && dv->cursor_address < unk_dasm_get_line_info(dv, dv->rows - 1)->address) {
+                            for(int row = 0; row < dv->rows; row++) {
+                                uint16_t row_address = unk_dasm_get_line_info(dv, row)->address;
+                                if(row_address >= dv->cursor_address) {
+                                    dv->cursor_address = row_address;
+                                    dv->cursor_line = row;
+                                    break;
+                                }
+                            }
+                        } else {
+                            // Just off screen somewhere
+                            dv->cursor_line = dv->rows + 5;
+                        }
 
                         if(dv->errorlog.log_array.items) {
                             v->unk_dlg_modal = 1;
@@ -400,11 +489,11 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
             break;
 
         case SDLK_LEFT:
-            unk_dasm_cursor_left(v, dv);
+            unk_dasm_cursor_left(v, dv, mod);
             break;
 
         case SDLK_RIGHT:
-            unk_dasm_cursor_right(v, dv);
+            unk_dasm_cursor_right(v, dv, mod);
             break;
 
         case SDLK_PAGEUP:
@@ -513,14 +602,13 @@ void unk_dasm_show(UNK *v, int dirty) {
     struct nk_vec2 gpd = ctx->style.window.group_padding;
     float border = ctx->style.window.border;
 
-    // If running need to re-sync
+    // Put the pc in the middle of the screen
     if(dirty) {
-        // but of only stepping, don't move the cursor to the middle
-        unk_dasm_recenter_view(v, dirty);
+        dv->cursor_address = m->cpu.pc;
+        dv->cursor_line = dv->rows / 2;
+        unk_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
     }
     if(nk_begin(ctx, "Disassembly", v->layout.dasm, NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
-        uint16_t pc = dv->top_address;
-
         float w_offset = ctx->current->layout->bounds.x;
         ctx->current->layout->bounds.w += w_offset;
         ctx->current->layout->bounds.x = 0;
@@ -538,15 +626,19 @@ void unk_dasm_show(UNK *v, int dirty) {
                 struct nk_rect r = nk_widget_bounds(ctx);
                 int cursor_y = 0; // SQW Because the PC is sometimes not on col 0 (asm didn't work out) this remains unset
                 struct nk_color ob = ctx->style.window.background;
-                uint16_t current_pc = dv->top_address;
                 for(int i = 0; i < dv->rows; i++) {
-                    current_pc = pc;
-                    rt_disassemble_line(rt, &pc, dv->flags, dv->symbol_view, dv->str_buf, dv->str_buf_len);
+                    LINE_INFO *li = unk_dasm_get_line_info(dv, i);
+                    uint16_t pc = li->address;
+                    uint16_t current_pc = pc;
+                    rt_disassemble_line(rt, &pc, dv->flags, li->force_byte, dv->symbol_view, dv->str_buf, dv->str_buf_len);
                     struct nk_color bg = ob;
                     struct nk_color fg = ctx->style.text.color;
+                    if(li->force_byte) {
+                        fg = unk_dasm_blend(fg, nk_rgb(0, 0, 0), 0.5f);
+                    }
                     BREAKPOINT *bp = rt_bp_get_at_address(rt, current_pc, 0);
                     // See if the mouse has been clicked over this row to be drawn
-                    if(nk_widget_is_mouse_clicked(ctx, NK_BUTTON_LEFT)) {
+                    if(!v->unk_dlg_modal && nk_widget_is_mouse_clicked(ctx, NK_BUTTON_LEFT)) {
                         float rel_x = (ctx->input.mouse.pos.x - r.x) / v->font_width;
                         dv->cursor_address = current_pc;
                         if(rel_x < 4) {
@@ -590,7 +682,6 @@ void unk_dasm_show(UNK *v, int dirty) {
                     nk_label_colored(ctx, dv->str_buf, NK_TEXT_LEFT, fg);
                     ctx->style.window.background = ob;
                 }
-                dv->bottom_address = current_pc;
                 if(dv->cursor_field == CURSOR_ADDRESS) {
                     struct nk_rect r = ctx->current->layout->bounds;
                     r.h = ROW_H;
@@ -654,21 +745,33 @@ void unk_dasm_show(UNK *v, int dirty) {
         sbar_bounds.w = SCROLLBAR_W;
         sbar_bounds.h -= (dv->header_height + ADDRESS_LABEL_H);
         sbar_bounds.y += dv->header_height;
-        int view_address = dv->top_address;
-        int address = view_address;
         if(nk_input_is_mouse_hovering_rect(&ctx->input, v->layout.dasm)) {
-            // SQW - the 3 is a "bytes per row to scroll" number
-            int wheel = (int)ctx->input.mouse.scroll_delta.y * 3;
+            int wheel = (int)ctx->input.mouse.scroll_delta.y;
             if(wheel) {
-                address = (address - wheel) % 0x10000;
-                if(address < 0) {
-                    address += 0x10000;
+                wheel *= 3; // SQW - maybe make this a config option
+                int line = 0;
+                if(wheel < 0) {
+                    // down
+                    wheel = abs(wheel);
+                    if(wheel > dv->rows - 1) {
+                        wheel = dv->rows - 1;
+                    }
+                    unk_put_address_on_line(dv, m, unk_dasm_get_line_info(dv, wheel)->address, 0);
+                } else {
+                    if(wheel > dv->rows - 1) {
+                        wheel = dv->rows - 1;
+                    }
+                    unk_put_address_on_line(dv, m, unk_dasm_get_line_info(dv, 0)->address, wheel);
                 }
             }
         }
         // The dv->rows * 2 is "2 = average bytes per row" - this can actually be calculated for better results
+        int view_address = unk_dasm_get_line_info(dv, 0)->address;
+        int address = view_address;
         nk_custom_scrollbarv(ctx, sbar_bounds, 0x10000, dv->rows * 2, &address, &dv->dragging, &dv->grab_offset);
-        dv->top_address = address;
+        if(view_address != address) {
+            unk_put_address_on_line(dv, m, address, 0);
+        }
 
         // Restore style padding
         ctx->style.window.padding       = pad;
@@ -698,8 +801,7 @@ void unk_dasm_show(UNK *v, int dirty) {
             static uint16_t pc = 0;
             if((ret = unk_dlg_symbol_lookup(ctx, nk_rect(0, 0, 360, 430), &rt->symbols_search, global_entry_buffer, &global_entry_length, &pc))) {
                 if(ret == 1) {
-                    dv->cursor_address = pc;
-                    unk_dasm_recenter_view(v, 0);
+                    unk_put_address_on_line(dv, m, pc, dv->rows / 2);
                 }
                 v->dlg_symbol_lookup_dbg = 0;
                 v->unk_dlg_modal = 0;

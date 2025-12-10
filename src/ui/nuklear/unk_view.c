@@ -254,7 +254,7 @@ int unk_init(UNK *v, int model, INI_STORE *ini_store) {
         return A2_ERR;
     }
 
-    if(A2_OK != unk_dasm_init(&v->viewdasm)) {
+    if(A2_OK != unk_dasm_init(&v->viewdasm, model)) {
         return A2_ERR;
     }
 
