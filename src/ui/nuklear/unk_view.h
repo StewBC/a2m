@@ -16,6 +16,7 @@ typedef struct UNK {
     SDL_GameController *game_controller[2];
     SDL_Rect target_rect;
     SDL_Rect sdl_os_rect;
+    SDL_Rect full_screen_rect;
     SDL_Rect *draw_rect;
     struct nk_rect nk_os_rect;
 

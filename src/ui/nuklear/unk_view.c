@@ -310,6 +310,7 @@ int unk_init(UNK *v, int model, INI_STORE *ini_store) {
 
     v->nk_os_rect = sdl_to_nk_rect(v->sdl_os_rect);
     unk_layout_init_apple2(&v->layout, v->nk_os_rect, v->target_rect.w * 0.60f, v->target_rect.h * 0.60f, /*mem ratio*/ 0.456f);
+    v->draw_rect = &v->full_screen_rect;
 
     // Set up a table to speed up rendering HGR
     unk_apl2_init_color_table(v);
@@ -363,6 +364,7 @@ int unk_process_events(UI *ui, APPLE2 *m) {
                 unk_layout_on_window_resize(l, v->nk_os_rect, &v->lim);
                 unk_layout_compute(l, v->nk_os_rect, &v->lim);
                 v->target_rect = nk_to_sdl_rect(nk_rect_fit_4x3_center(l->apple2));
+                v->full_screen_rect = nk_to_sdl_rect(nk_rect_fit_4x3_center(v->nk_os_rect));
                 unk_mem_resize_view(v);
                 unk_dasm_resize_view(v);
                 v->clear_a2_view = 1;
@@ -456,8 +458,10 @@ void unk_toggle_debug(UNK *v) {
     if(v->debug_view) {
         v->draw_rect = &v->target_rect;
         v->dirty_view = 1;
+        v->clear_a2_view = 1;
     } else {
-        v->draw_rect = NULL;
+        v->draw_rect = &v->full_screen_rect;
+        v->clear_a2_view = 1;
     }
 }
 
@@ -468,7 +472,12 @@ void unk_present(UNK *v) {
     if(v->clear_a2_view) {
         // Clear the background that prev may have contained the texture to gray
         SDL_SetRenderDrawColor(v->renderer, 0x2d, 0x2d, 0x2d, 0xFF);
-        SDL_Rect clear_rect = nk_to_sdl_rect(v->layout.apple2);
+        SDL_Rect clear_rect;
+        if(v->debug_view) {
+            clear_rect = nk_to_sdl_rect(v->layout.apple2);
+        } else {
+            clear_rect = v->sdl_os_rect;
+        }
         SDL_RenderFillRect(v->renderer, &clear_rect);
         v->clear_a2_view = 0;
     }
