@@ -670,6 +670,7 @@ void unk_mem_show(UNK *v) {
         if(nk_input_is_mouse_hovering_rect(&ctx->input, v->layout.mem)) {
             int wheel = (int)ctx->input.mouse.scroll_delta.y;
             if(wheel) {
+                wheel *= v->scroll_wheel_lines;
                 address = (address - wheel * ms->cols) % 0x10000;
                 if(address < 0) {
                     address += 0x10000;

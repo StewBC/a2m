@@ -748,7 +748,7 @@ void unk_dasm_show(UNK *v, int dirty) {
         if(nk_input_is_mouse_hovering_rect(&ctx->input, v->layout.dasm)) {
             int wheel = (int)ctx->input.mouse.scroll_delta.y;
             if(wheel) {
-                wheel *= 3; // SQW - maybe make this a config option
+                wheel *= v->scroll_wheel_lines;
                 int line = 0;
                 if(wheel < 0) {
                     // down

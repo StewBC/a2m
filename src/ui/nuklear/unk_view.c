@@ -194,9 +194,17 @@ void unk_config_ui(UNK *v, INI_STORE *ini_store) {
             v->show_leds = 1;
         }
     }
+    val = ini_get(ini_store, "Config", "scroll_wheel_sensitivity");
+    if(val) {
+        int state = 0;
+        if(1 == sscanf(val, "%d", &state)) {
+            v->scroll_wheel_lines = state;
+        }
+    }
 }
 
 int unk_init(UNK *v, int model, INI_STORE *ini_store) {
+    v->scroll_wheel_lines = 4;
     unk_config_ui(v, ini_store);
     v->sdl_os_rect = v->target_rect;        // Remember the size
 

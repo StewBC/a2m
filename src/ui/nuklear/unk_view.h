@@ -28,12 +28,12 @@ typedef struct UNK {
     double mhz_moving_average;
     double fps_moving_average;
 
-    float display_scale;
-
     struct nk_context *ctx;
     struct nk_font *font;
     int font_height;
     int font_width;
+
+    int scroll_wheel_lines;
 
     VIEWDASM viewdasm;
     VIEWMEM viewmem;
