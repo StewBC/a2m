@@ -14,6 +14,7 @@ add_library(unk STATIC
     unk_dlg.c
     unk_dasm.c
     unk_help.c
+    unk_htext.c
     unk_mem.c
     unk_misc.c
     unk_view.c
