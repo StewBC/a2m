@@ -360,6 +360,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
     if(v->show_help) {
         if(e->key.keysym.sym == SDLK_F1) {
             v->show_help = 0;
+            v->clear_a2_view = 1;
             if(v->shadow_run) {
                 rt_machine_run(rt);
             }

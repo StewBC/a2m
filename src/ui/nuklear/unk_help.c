@@ -9,7 +9,7 @@ extern const int unk_help_page_count;
 extern const char *unk_help_text;
 
 #define HELP_DEFAULT_LINE_HEIGHT 14
-#define HELP_MAX_LINE            170
+#define HELP_MAX_LINE            512
 
 static int unk_help_hex_digit(char c) {
     if(c >= '0' && c <= '9') {
@@ -35,7 +35,51 @@ static struct nk_color unk_help_parse_hex_color(const char *s) {
     return nk_rgb(r, g, b);
 }
 
-static void unk_help_render_text(struct nk_context *ctx, int requested_page, const char *help_text) {
+static void unk_help_draw_wrapped_line(struct nk_context *ctx, const char *s, int max_chars, int line_height, nk_flags align, struct nk_color color) {
+    const char *p = s;
+    char buf[HELP_MAX_LINE];
+
+    while(*p) {
+        int len = 0;
+        int last_space = -1;
+
+        // Find how many chars fit on this line
+        while(p[len] && len < max_chars) {
+            if(p[len] == ' ') {
+                last_space = len;
+            }
+            len++;
+        }
+
+        // Back up to last space to break
+        if(p[len] && last_space > 0) {
+            len = last_space;
+        }
+
+        if(len <= 0) {
+            // no spaces & word longer than max_chars, then hard-break
+            len = max_chars;
+        }
+
+        if(len >= HELP_MAX_LINE) {
+            len = HELP_MAX_LINE - 1;
+        }
+
+        memcpy(buf, p, len);
+        buf[len] = '\0';
+
+        nk_layout_row_dynamic(ctx, line_height, 1);
+        nk_label_colored(ctx, buf, align, color);
+
+        p += len;
+        // skip spaces at start of the next line
+        while(*p == ' ') {
+            p++;
+        }
+    }
+}
+
+static void unk_help_render_text(struct nk_context *ctx, int requested_page, const char *help_text, int max_chars_per_line) {
     int current_page = 0;
     int page_active = 0;
 
@@ -61,9 +105,9 @@ static void unk_help_render_text(struct nk_context *ctx, int requested_page, con
         line[line_len] = '\0';
         line_len = 0;
 
-        // Normalize CRLF: skip bare '\r' lines, handle on '\n'
+        // Normalize CRLF - skip bare '\r' lines, handle on '\n'
         if(c == '\r' && *p == '\n') {
-            continue; // we'll process on '\n'
+            continue; // process on '\n'
         }
 
         // Process this line
@@ -95,7 +139,7 @@ static void unk_help_render_text(struct nk_context *ctx, int requested_page, con
             memcpy(tag, tag_start, tag_len);
             tag[tag_len] = '\0';
 
-            // Advance s past this tag
+            // Advance past this tag
             s = gt + 1;
 
             // Interpret tag
@@ -164,64 +208,66 @@ static void unk_help_render_text(struct nk_context *ctx, int requested_page, con
             continue; // not on the selected page
         }
 
-        // Split by '\t' into columns (up to 'cols')
-        const char *col_start = s;
-        int col_index = 0;
+        if (cols == 1) {
+            // single-column - manual wrap over the whole line 
+            unk_help_draw_wrapped_line(ctx, s, max_chars_per_line, line_height, align, color);
+        } else {
+            // multi-column - split by '\t' and draw all columns in one multi-column row 
+            const char *col_start = s;
+            int col_index = 0;
 
-        nk_layout_row_dynamic(ctx, line_height, cols);
-
-        while(col_index < cols) {
-            const char *tab = strchr(col_start, '\t');
-            char col_text[HELP_MAX_LINE];
-
-            if(tab && col_index < cols - 1) {
-                size_t len = (size_t)(tab - col_start);
-                if(len >= sizeof(col_text)) {
-                    len = sizeof(col_text) - 1;
-                }
-                memcpy(col_text, col_start, len);
-                col_text[len] = '\0';
-                col_start = tab + 1;
-            } else {
-                // last column or no more tabs
-                strncpy(col_text, col_start, sizeof(col_text) - 1);
-                col_text[sizeof(col_text) - 1] = '\0';
-                col_start += strlen(col_start);
-            }
-
-            nk_label_colored(ctx, col_text, align, color);
-            col_index++;
-        }
-    }
-
-    // Handle final line if file doesn't end with newline
-    if(line_len > 0) {
-        line[line_len] = '\0';
-        const char *s = line;
-        while(*s == ' ' || *s == '\t') {
-            s++;
-        }
-        if(*s && page_active) {
             nk_layout_row_dynamic(ctx, line_height, cols);
-            nk_label_colored(ctx, s, align, color);
+
+            while (col_index < cols) {
+                const char *tab = strchr(col_start, '\t');
+                char col_text[HELP_MAX_LINE];
+
+                if (tab && col_index < cols - 1) {
+                    size_t len = (size_t)(tab - col_start);
+                    if (len >= sizeof(col_text)) len = sizeof(col_text) - 1;
+                    memcpy(col_text, col_start, len);
+                    col_text[len] = '\0';
+                    col_start = tab + 1;
+                } else {
+                    // last column or no more tabs 
+                    strncpy(col_text, col_start, sizeof(col_text) - 1);
+                    col_text[sizeof(col_text) - 1] = '\0';
+                    col_start += strlen(col_start);
+                }
+
+                nk_label_colored(ctx, col_text, NK_TEXT_LEFT, color);
+                col_index++;
+            }
         }
     }
 }
-
 
 void unk_show_help(UNK *v) {
     struct nk_context *ctx = v->ctx;
     SDL_Rect r = v->sdl_os_rect;
     char label[8];
 
+    const struct nk_user_font *font = ctx->style.font;
+    float char_w = font->width(font->userdata, font->height, "0", 1);
+    int max_chars_per_line = (int)((r.w - 2 * ctx->style.window.padding.x) / char_w);
+
+    // clamp to the buffer size
+    if(max_chars_per_line > HELP_MAX_LINE - 1) {
+        max_chars_per_line = HELP_MAX_LINE - 1;
+    }
+    if(max_chars_per_line < 10) {
+        // Should never have a window so small, but just for sanity's sake
+        max_chars_per_line = 10; 
+    }
+
     if(nk_begin(ctx, "Help", nk_rect(r.x, r.y, r.w, r.h), NK_WINDOW_NO_SCROLLBAR)) {
         nk_layout_row_dynamic(ctx, 30, 1);
-        nk_label_colored(ctx, "Apple ][+ emulator by Stefan Wessels, 2025.", NK_TEXT_CENTERED, nk_rgb(0, 255, 255));
+        nk_label_colored(ctx, "Apple ][+ and //e Enhanced emulator by Stefan Wessels, 2025.", NK_TEXT_CENTERED, nk_rgb(0, 255, 255));
         // main help area
         nk_layout_row_dynamic(ctx, r.h - 55, 1);
         if(nk_group_begin(ctx, "Help Pages", 0)) {
             // Display pages are 1-based but v->help_page is 0-based
-            unk_help_render_text(ctx, v->help_page + 1, unk_help_text);
+            unk_help_render_text(ctx, v->help_page + 1, unk_help_text, max_chars_per_line);
             nk_group_end(ctx);
         }
 
