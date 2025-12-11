@@ -6,10 +6,11 @@
 
 // The help lives in unk_help_text.c
 extern const int unk_help_page_count;
-extern const char *unk_help_text;
+extern const char *unk_help_text[];
 
 #define HELP_DEFAULT_LINE_HEIGHT 14
 #define HELP_MAX_LINE            512
+#define HELP_MAX_MAX_COLS        10
 
 static int unk_help_hex_digit(char c) {
     if(c >= '0' && c <= '9') {
@@ -91,6 +92,8 @@ static void unk_help_render_text(struct nk_context *ctx, int requested_page, con
 
     const char *p = help_text;
     char line[HELP_MAX_LINE];
+    float col_width[HELP_MAX_MAX_COLS];
+    int use_col_width = 0;
     int line_len = 0;
 
     while(*p) {
@@ -178,6 +181,38 @@ static void unk_help_render_text(struct nk_context *ctx, int requested_page, con
                 }
                 cols = n;
                 control_only = 1;
+                use_col_width = 0;
+            } else if(strncmp(tag, "width", 5) == 0) {
+                const char *num = tag + 5;
+                int cvt = 0;
+                for(int col = 0; col < cols; col++) {
+                    while (*num == ' ' || *num == '\t') {
+                        num++;
+                    }
+                    char *end;
+                    float f = strtof(num, &end);
+                    if (end == num) {
+                        break; // malformed - give up
+                    }
+                    cvt++;
+                    // parse but don't store if too many cols
+                    if(col < HELP_MAX_MAX_COLS) {
+                        col_width[col] = f;
+                    }
+                    num = end; // past the float
+                    while (*num && *num != ',') {
+                        num++;
+                    }
+                    if (!*num) {
+                        break;  // malformed (not enoug entries) - give up
+                    }
+                    num++; // skip ,
+                }
+                control_only = 1;
+                // Activate if well formed and not too many cols
+                if(cvt == cols && cvt <= HELP_MAX_MAX_COLS) {
+                    use_col_width = 1;
+                }
             } else if(strncmp(tag, "lh", 2) == 0) {
                 const char *num = tag + 2;
                 while(*num == ' ') {
@@ -216,7 +251,11 @@ static void unk_help_render_text(struct nk_context *ctx, int requested_page, con
             const char *col_start = s;
             int col_index = 0;
 
-            nk_layout_row_dynamic(ctx, line_height, cols);
+            if(use_col_width) {
+                nk_layout_row_begin(ctx, NK_DYNAMIC, line_height, cols);
+            } else {
+                nk_layout_row_dynamic(ctx, line_height, cols);
+            }
 
             while (col_index < cols) {
                 const char *tab = strchr(col_start, '\t');
@@ -228,6 +267,9 @@ static void unk_help_render_text(struct nk_context *ctx, int requested_page, con
                     memcpy(col_text, col_start, len);
                     col_text[len] = '\0';
                     col_start = tab + 1;
+                    if(use_col_width) {
+                        nk_layout_row_push(ctx, col_width[col_index]);
+                    }
                 } else {
                     // last column or no more tabs 
                     strncpy(col_text, col_start, sizeof(col_text) - 1);
@@ -238,6 +280,9 @@ static void unk_help_render_text(struct nk_context *ctx, int requested_page, con
                 nk_label_colored(ctx, col_text, NK_TEXT_LEFT, color);
                 col_index++;
             }
+            if (use_col_width) {
+                nk_layout_row_end(ctx);
+            }                
         }
     }
 }
@@ -267,7 +312,7 @@ void unk_show_help(UNK *v) {
         nk_layout_row_dynamic(ctx, r.h - 55, 1);
         if(nk_group_begin(ctx, "Help Pages", 0)) {
             // Display pages are 1-based but v->help_page is 0-based
-            unk_help_render_text(ctx, v->help_page + 1, unk_help_text, max_chars_per_line);
+            unk_help_render_text(ctx, v->help_page + 1, unk_help_text[v->help_page], max_chars_per_line);
             nk_group_end(ctx);
         }
 
