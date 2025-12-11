@@ -1,7 +1,10 @@
 from: markdown
 to: pdf
-include-before-body: titlepage.tex
 pdf-engine: xelatex
+
+include-before-body: titlepage.tex
+include-in-header: header.tex
+
 toc: false
 number-sections: true
 

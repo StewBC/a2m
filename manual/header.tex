@@ -1,0 +1,29 @@
+% Number headings down to \subparagraph (Markdown ######)
+\setcounter{secnumdepth}{5}
+
+% Use titlesec to make \paragraph and \subparagraph block headings
+\usepackage{titlesec}
+
+% #### in Markdown -> \paragraph
+\titleformat{\paragraph}[block]
+  {\normalfont\normalsize\bfseries}   % style
+  {\theparagraph}                     % label (1.4.2.1)
+  {1em}                               % spacing between number and title
+  {}
+
+\titlespacing*{\paragraph}
+  {0pt}                               % left indent
+  {3.25ex plus 1ex minus .2ex}        % space before
+  {1.5ex plus .2ex}                   % space after
+
+% ##### / ###### in Markdown -> \subparagraph
+\titleformat{\subparagraph}[block]
+  {\normalfont\normalsize\bfseries}
+  {\thesubparagraph}
+  {1em}
+  {}
+
+\titlespacing*{\subparagraph}
+  {0pt}
+  {3.25ex plus 1ex minus .2ex}
+  {1.5ex plus .2ex}

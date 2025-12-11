@@ -6,7 +6,7 @@ a2m began as a small experiment after discovering the Harte 6502 CPU tests. The 
 a2m is released under the Unlicense, meaning it is free and unencumbered software placed in the public domain.
 
 ## Overview
-a2m V2.0 emulates either an NTSC Apple ][+ or an Apple //e Enhanced. It runs on Windows, Linux, and macOS, with binaries available on the project's GitHub page (https://github.com/StewBC/a2m).  
+a2m V2.0 emulates either an NTSC Apple ][+ or an Apple //e Enhanced. It runs on Windows, Linux, and macOS, with binaries available on the project's GitHub page (https://github.com/StewBC/a2m).
 
 Some of the key features include:
 
@@ -28,9 +28,9 @@ a2m can be launched from the command line, or as a GUI application without a con
 Running a2m is as simple as executing the program with any desired command-line switches. Use the `--help` switch (or simply `-h`) to view the full command-line reference.
 
 ### INI Files
-a2m supports configuration through INI files. They are optional, but very useful for storing common setups (for example, per-game configurations).  
-Use `--inifile` (or `-i`) to choose a specific INI file at launch.  
-By default, a2m loads `a2m.ini` from the current directory.  
+a2m supports configuration through INI files. They are optional, but very useful for storing common setups (for example, per-game configurations).
+Use `--inifile` (or `-i`) to choose a specific INI file at launch.
+By default, a2m loads `a2m.ini` from the current directory.
 See **INI Files in Depth** for more information.
 
 ## User Interface
@@ -46,7 +46,7 @@ Regular keys are sent directly to the emulated Apple 2. Function keys control th
 
 On the //e model, Open-Apple and Closed-Apple map to joystick buttons A/B and to Left ALT (Open Apple) and Right ALT (Closed Apple).
 
-Pasting into the Apple 2 is done with **SHIFT+INSERT**.  
+Pasting into the Apple 2 is done with **SHIFT+INSERT**.
 **PAUSE** acts as RESET. On laptops this may require a key combination such as **Fn+B** or **Fn+P**.
 
 **F1** opens a help screen (and pauses emulation). This help applies mostly to the debugger and assembler, which are described in their own sections. All other function keys behave as debugger controls, even while in Normal Mode.
@@ -62,10 +62,10 @@ Press **F2** to enter Debug Mode. Press **F2** again to leave it.
 
 The default layout is:
 
-* **Upper left:** Apple 2 display  
-* **Upper right:** CPU view (program counter, registers, flags, etc.)  
-* **Right, below CPU:** Disassembly view (shows the executing instruction or any RAM/ROM bank)  
-* **Lower left:** Memory view (hex and text representation; any bank can be examined)  
+* **Upper left:** Apple 2 display
+* **Upper right:** CPU view (program counter, registers, flags, etc.)
+* **Right, below CPU:** Disassembly view (shows the executing instruction or any RAM/ROM bank)
+* **Lower left:** Memory view (hex and text representation; any bank can be examined)
 * **Lower right:** Miscellaneous view (slot configuration, loaded disks, soft-switches, breakpoints, and more)
 
 #### Basic Philosophy
@@ -77,11 +77,11 @@ Throughout the rest of this manual, references to "in Debug Mode" will be omitte
 
 The debugger views can be resized. There are two sliders:
 
-* a **vertical** slider between the Apple 2 display and the CPU/Disassembly views  
-* a **horizontal** slider below the Apple 2 display and above the Memory/Miscellaneous views  
+* a **vertical** slider between the Apple 2 display and the CPU/Disassembly views
+* a **horizontal** slider below the Apple 2 display and above the Memory/Miscellaneous views
 
-Left-click in these regions to drag and resize.  
-There is also a "hot spot" in the lower-right corner of the Apple 2 display; dragging here does move both sliders at once, scaling the layout proportionally.  
+Left-click in these regions to drag and resize.
+There is also a "hot spot" in the lower-right corner of the Apple 2 display; dragging here does move both sliders at once, scaling the layout proportionally.
 If the Apple 2 view is letterboxed (not 4:3), clicking this hot spot also snaps the layout back to a perfect 4:3 Apple 2 display region.
 
 #### Apple 2 View
