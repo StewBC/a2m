@@ -55,21 +55,21 @@ a2m is primarily a GUI-based Apple\ 2 emulator. It also supports a text-based mo
 In text mode, the emulator boots into BASIC and accepts input directly from the terminal. If the Apple\ 2 switches to graphics, you simply won't see it. Typed keys are sent to `$C000` and characters printed by the emulated machine appear in the terminal.  
 This manual does not describe text mode further.
 
-### Normal Mode
+## Normal Mode
 When launched normally, a2m displays the Apple\ 2's video output in the full application window. It behaves like a ][+ or //e.  
 The Apple\ 2 will attempt to boot from:
 
-* **Slot 6 Drive 0** (floppy), or  
+* **Slot 6 Drive 0** (floppy), or
 * **Slot 7 Device 0** (hard-disk image)
 
 These defaults can be overridden in an INI file.
 
-#### Keyboard Usage
+### Keyboard Usage
 Regular keys are sent directly to the emulated Apple\ 2. Function keys control the debugger, which is always running “behind the scenes” even when the Apple\ 2 display fills the window.
 
 On the //e model:
 
-* **Open-Apple** - joystick button A or Left-ALT  
+* **Open-Apple** - joystick button A or Left-ALT
 * **Closed-Apple** - joystick button B or Right-ALT  
 
 To paste text into the Apple\ 2, use **SHIFT+INSERT**.  
@@ -78,17 +78,17 @@ To paste text into the Apple\ 2, use **SHIFT+INSERT**.
 **F1** opens a help screen and pauses emulation.  
 All other function keys remain debugger controls even while in Normal Mode.
 
-#### Resizing
+### Resizing
 The window can be resized using standard OS controls.  
 The Apple\ 2 display is always drawn within the largest 4:3 region that fits inside the window's client area.
 
-### Debug Mode
+## Debug Mode
 Debug Mode is where a2m really shines. Every part of the emulated Apple\ 2 can be inspected, and many parts can be modified.
 
 Although Debug Mode is often described as a separate mode, it is always active. All function keys route to the debugger even when only the Apple\ 2 display is visible. Once the debugger views are shown, the full set of tools becomes available.
 
 \Needspace{10\baselineskip}
-##### Keyboard controls
+***Keyboard controls***
 The following keys control the debugger regardless of whether the Debug Mode View is open (via F2):
 
 | Key       | Action                    | Key | Action                 |
@@ -100,18 +100,18 @@ The following keys control the debugger regardless of whether the Debug Mode Vie
 | F11       | Break                     | F12 | Monitor Select         |
 | SHIFT+F11 | Step Out                  |     |                        |
 
-#### Opening the Debugger
-Press **F2** to open the Debug Mode View. Press **F2** again to hide it.
+### Opening the Debugger
+Press **F2** to open the Debug Mode View. Press **F2** again to hide it.  The following table represents the layout of the Debugger Views, when opened. 
 
-The default layout is:
+| Position             | View |
+|:---------------------|:----------------------------------------------------------------------------|
+|Upper left: | Apple\ 2 display |
+|Upper right: | CPU view |
+|Right, below CPU: | Disassembly view |
+|Lower left: | Memory view (hex + text; any bank can be inspected) |
+|Lower right: | Miscellaneous view (slot configuration, disks, soft-switches, breakpoints, etc.) |
 
-* **Upper left:** Apple\ 2 display  
-* **Upper right:** CPU view  
-* **Right, below CPU:** Disassembly view  
-* **Lower left:** Memory view (hex + text; any bank can be inspected)  
-* **Lower right:** Miscellaneous view (slot configuration, disks, soft-switches, breakpoints, etc.)
-
-#### Basic Philosophy
+### Basic Philosophy
 a2m uses the **Nuklear** immediate-mode GUI library. Nuklear uses a *hover-active* model: when the CPU is stopped, whichever view the mouse is over becomes active and receives input. Active views have a green header; inactive ones use grey.
 
 When the emulator is running, all keys except function keys and SHIFT+INSERT go to the Apple\ 2.
@@ -120,41 +120,41 @@ In the rest of this manual, “in Debug Mode” is omitted for brevity—assume 
 
 The debugger layout is resizable:
 
-* a **vertical slider** between the Apple\ 2 and the CPU/Disassembly views  
+* a **vertical slider** between the Apple\ 2 and the CPU/Disassembly views
 * a **horizontal slider** between the Apple\ 2 and the Memory/Misc views  
 
 Dragging these sliders resizes the layout.  
 A “hot spot” in the lower-right corner of the Apple\ 2 view moves both sliders together, scaling the layout proportionally.  
 If the Apple\ 2 view is letterboxed, clicking this hot spot snaps it back to a perfect 4:3 region.
 
-#### Apple\ 2 View
+### Apple\ 2 View
 As in Normal Mode, the Apple\ 2 display is always shown in a 4:3 region inside the largest area available.
 
-##### Keyboard controls
+#### Keyboard controls
 When the emulator is running, regular keys go to the Apple\ 2, while function keys and SHIFT+INSERT always go to the debugger.
 
 See **Disassembly View - Keyboard controls** for details on function-key behaviour.
 
-#### CPU View
+### CPU View
 The CPU view shows the program counter (PC), stack pointer (SP), registers, and flags.  
 When the emulator is stopped, these can be edited by typing new values:
 
-* PC and SP: 16-bit hex  
-* Registers: 8-bit hex  
-* Flags: 0 (off) or 1 (on)  
+* PC and SP: 16-bit hex
+* Registers: 8-bit hex
+* Flags: 0 (off) or 1 (on)
 
 Flags are:
 
-* **N** – Negative  
-* **V** – oVerflow  
-* **E** – ignorEd  
-* **B** – Break  
-* **D** – Decimal mode  
-* **I** – Interrupt  
-* **Z** – Zero  
-* **C** – Carry  
+* **N** – Negative
+* **V** – oVerflow
+* **E** – ignorEd
+* **B** – Break
+* **D** – Decimal mode
+* **I** – Interrupt
+* **Z** – Zero
+* **C** – Carry
 
-#### Disassembly View
+### Disassembly View
 The disassembly view shows the code being executed by the CPU. When running or stepping, the current instruction (at the PC) is highlighted. Other highlighted lines include:
 
 * the cursor  
@@ -167,15 +167,15 @@ Each line follows this general format:
 
 Broken down:
 
-* **C27D** — the address  
-* **WAITKEY1** — a label for that address (if present)  
-* **E6 4E** — the raw bytes  
+* **C27D** — the address
+* **WAITKEY1** — a label for that address (if present)
+* **E6 4E** — the raw bytes
 * **INC RNDL** — the disassembled instruction (with symbols resolved when available)
 
 See **Symbols Dialog** for more information.
 
 \Needspace{10\baselineskip}
-##### Keyboard controls
+#### Keyboard controls
 These keys apply **when emulation is stopped**:
 
 | Key           | Action                                                                  |
@@ -202,45 +202,45 @@ These keys apply **when emulation is stopped**:
 
 **C+ and S+ mean CONTROL+ and SHIFT+, respectively.**
 
-##### Mouse Controls
+#### Mouse Controls
 At the bottom of the view are **selector buttons** that choose which memory bank to display.  
 On the Apple\ ][+ model, the 128 K option is disabled.
 
-* **6502** — shows the CPU's current live memory map  
-* **64K** — shows the first 64 K regardless of soft-switch configuration  
-* **128K** — on the //e, shows the auxiliary bank  
-* **LC Bank** — toggles between the two language-card banks  
+* **6502** — shows the CPU's current live memory map
+* **64K** — shows the first 64 K regardless of soft-switch configuration
+* **128K** — on the //e, shows the auxiliary bank
+* **LC Bank** — toggles between the two language-card banks
 
 The **scrollbar** on the right scrolls from address `$0000` to `$FFFF`.  
 A mouse **scroll wheel** scrolls by 4 lines. Scroll sensitivity can be configured (see **INI Files in Depth - Config**).
 
-#### Memory View
-#### Miscellaneous View
+### Memory View
+### Miscellaneous View
 
-#### Dialogs
-##### File Browser Dialog
-##### Breakpoint Editor
-##### Symbols Dialog
-##### Search Dialog
+### Dialogs
+#### File Browser Dialog
+#### Breakpoint Editor
+#### Symbols Dialog
+#### Search Dialog
 
-### Using the Assembler
-#### Invoking
-##### From the Emulator
-##### Command Line Invocation
-#### Syntax
-#### Examples
-##### Simple Examples
-##### Manic Miner Source Code (Full Example)
+## Using the Assembler
+### Invoking
+#### From the Emulator
+#### Command Line Invocation
+### Syntax
+### Examples
+#### Simple Examples
+#### Manic Miner Source Code (Full Example)
 
-### INI Files in Depth
-#### Machine Section
-#### Config Section
-#### Video Section
-#### DiskII Section
-#### SmartPort Section
-#### Debug Section
+## INI Files in Depth
+### Machine Section
+### Config Section
+### Video Section
+### DiskII Section
+### SmartPort Section
+### Debug Section
 
-### Known Issues & Future Work
+## Known Issues & Future Work
 
 ## Appendix A: Keyboard Shortcuts
 ## Appendix B: Troubleshooting
