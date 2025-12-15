@@ -768,6 +768,46 @@ The SmartPort section configures a slot for use as a SmartPort block device. The
 
 As with the Disk\ II section, the values for `N` and `X` are a valid, unused slot number and device number, where device numbers are `0` or `1`. Usually the slot numbers are `5` or `7`. The Apple\ //e will try to boot from a SmartPort device `0` in slot `7`. The `bs` setting can be used to force an Apple\ 2 to boot a SmartPort device `0` in a slot other than slot `7`, or to boot an Apple\ ][+ from a SmartPort device instead of the Disk\ II device.
 
+## Debug Section
+The Debug section is not a normal INI section. Normally, a variable (or key, in INI parlance) must have a unique name. In the Debug section, the `break` variable is used repeatedly.
+
+\Needspace{2\baselineskip}
+The `break` variable takes the form:  
+`break = <address[-address]>[,<pc|read|write|access|reset|fast|slow|swap sNdX|tron|troff|type str|count[,reset]>`
+
+In this syntax, elements in `<>` are required, and elements in `[]` are optional. When `|` is used, it means "or". For example, `[,pc|read|write]` means an optional comma followed by one of `pc`, `read`, or `write`.
+
+* **address** is the breakpoint address, usually a hexadecimal number such as `0x1234`.
+* **-address** is optional and makes the breakpoint apply to a range from address to address. This takes the form `0x8000-0x80ff`, where `0x8000` is the range start and `0x80ff` is the range end.
+* **pc** means this is a breakpoint on code execution.
+* **read** means the breakpoint is activated by a read from the address or range.
+* **write** means the breakpoint is activated by a write to the address or range.
+* **access** means the breakpoint is activated by either a read from or a write to the address or range.
+* **fast** sets Turbo Mode to `max`.
+* **slow** sets Turbo Mode to 1 MHz.
+* **restore** sets Turbo Mode back to the value it had before `slow` or `fast` was used.
+* **swap** swaps the disk in the drive (Slot N Drive X) to the next disk in the queue.
+* **tron** turns trace logging on. The log is written to the file `trace.txt` in the current folder.
+* **troff** turns trace logging off.
+* **type** inserts the characters from `str` into the keyboard address.
+* **count** is a number that sets the breakpoint counter to that value.
+* **reset** is a number that sets the breakpoint reset counter to that value.
+
+For `count` and `reset`, the first non-keyword number is assumed to be `count`, and the second is `reset`.
+
+\Needspace{10\baselineskip}
+Here are a few examples:
+
+`; switch to the second floppy for Disk II in slot 6, drive 0`  
+`break = 0x55b5,swap=s6d0`  
+`; press enter`  
+`break = 0x55b8,type=\r`  
+`; set Turbo Mode to fast, that is, as fast as possible at 60 FPS (max)`  
+`break = 0x581e,fast`  
+`; after 10 read/write accesses in the range, a break will occur`  
+`; thereafter, every second access will cause a break`  
+`break = 0x5000-0x5002,access,10,2`  
+
 \Needspace{9\baselineskip}
 # Appendix C: Version History
 31 Oct 2024 - Initial release  
