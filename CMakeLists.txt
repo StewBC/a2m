@@ -64,7 +64,7 @@ endif()
 # Copy DLLs on Windows if using vcpkg
 if(WIN32)
     # Add this to so printf works
-    target_link_options(a2m PRIVATE /SUBSYSTEM:CONSOLE)
+    # target_link_options(a2m PRIVATE /SUBSYSTEM:CONSOLE)
 
     # Make this a Windows
     set_target_properties(a2m PROPERTIES WIN32_EXECUTABLE ON)

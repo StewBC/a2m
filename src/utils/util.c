@@ -10,10 +10,10 @@
 #define stat _stat64
 #ifndef S_ISREG
 #define S_ISREG(m) (((m) & _S_IFMT) == _S_IFREG)
-#endif
+#endif // S_ISREG
 #ifndef S_ISDIR
 #define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
-#endif
+#endif // _WIN32
 
 // UTF-8 <-> UTF-16 helpers
 static int utf8_to_wide(const char *u8, wchar_t **out_w) {
@@ -64,6 +64,21 @@ static int fs_stat_utf8(const char *path, struct stat *st) {
 }
 #endif
 
+int util_attach_to_console(void) {
+#ifdef _WIN32
+    if (GetConsoleWindow() != NULL)
+        return A2_OK;
+
+    if (!AttachConsole(ATTACH_PARENT_PROCESS))
+        return A2_ERR;
+
+    // freopen("CONIN$",  "r", stdin);
+    freopen("CONOUT$", "w", stdout);
+    freopen("CONOUT$", "w", stderr);
+#endif // _WIN32
+    return A2_OK;
+}
+
 // Directory operations
 int util_dir_change(const char *path) {
 #ifdef _WIN32
@@ -75,9 +90,9 @@ int util_dir_change(const char *path) {
     int ok = (_wchdir(wpath) == 0);
     free(wpath);
     return ok ? A2_OK : A2_ERR;
-#else
+#else // ndef _WIN32
     return (chdir(path) == 0) ? A2_OK : A2_ERR;
-#endif
+#endif // _WIN32
 }
 
 int util_dir_get_current(char *buffer, size_t buffer_size) {
@@ -98,9 +113,9 @@ int util_dir_get_current(char *buffer, size_t buffer_size) {
     int rc = (got > 0 && wide_to_utf8(wbuf, buffer, buffer_size) == 0) ? A2_OK : A2_ERR;
     free(wbuf);
     return rc;
-#else
+#else // ndef _WIN32
     return (getcwd(buffer, buffer_size) != NULL) ? A2_OK : A2_ERR;
-#endif
+#endif // _WIN32
 }
 
 // Enumerate current directory (".") into FILE_INFO entries
@@ -151,7 +166,7 @@ int util_dir_load_contents(DYNARRAY *array) {
     FindClose(h);
     return (err == ERROR_NO_MORE_FILES) ? A2_OK : A2_ERR;
 
-#else
+#else // ndef _WIN32
     DIR *dp = opendir(".");
     if(!dp) {
         return A2_ERR;
@@ -177,7 +192,7 @@ int util_dir_load_contents(DYNARRAY *array) {
     }
     closedir(dp);
     return A2_OK;
-#endif
+#endif // _WIN32
 }
 
 // File Operations
@@ -281,9 +296,9 @@ int util_file_open(UTIL_FILE *f, const char *file_name, const char *file_mode) {
     f->fp = _wfopen(wpath, wmode);
     free(wpath);
     free(wmode);
-#else
+#else  // ndef _WIN32
     f->fp = fopen(file_name, file_mode);
-#endif
+#endif  // _WIN32
 
     if(!f->fp) {
         util_file_discard(f);

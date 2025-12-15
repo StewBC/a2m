@@ -363,7 +363,6 @@ int main_ini_merge_to(INI_STORE *source, INI_STORE *target) {
     return rv;
 }
 
-
 int main(int argc, char **argv) {
     int ini_load_status = A2_ERR;
     OPTS opts;
@@ -372,6 +371,8 @@ int main(int argc, char **argv) {
     APPLE2 m;
     UI ui;
 
+    // Windows - see if there is a console?
+    util_attach_to_console();
     // Clear the command line options and init the store
     memset(&opts, 0, sizeof(OPTS));
     ini_init(&opts.ini_store);

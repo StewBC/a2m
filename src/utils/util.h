@@ -29,6 +29,8 @@ typedef struct UTIL_FILE {
 // Prototype callback for ini file loading
 typedef int (*INI_PAIR_CALLBACK)(void *user_data, const char *section, const char *key, const char *value);
 
+int util_attach_to_console(void);
+
 int util_dir_change(const char *path);
 int util_dir_get_current(char *buffer, size_t buffer_size);
 int util_dir_load_contents(DYNARRAY *array);
