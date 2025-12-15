@@ -27,3 +27,11 @@
   {0pt}
   {3.25ex plus 1ex minus .2ex}
   {1.5ex plus .2ex}
+
+% --- Needed for \Needspace ---
+\usepackage{needspace}
+
+% Optional helper environment (uses \Needspace internally)
+\newenvironment{keep-together}[1][6]{%
+  \Needspace{#1\baselineskip}%
+}{}
