@@ -86,6 +86,7 @@ static int rt_step_okay(RUNTIME *rt) {
         }
     }
 
+    // Not else - the breakpoints can set rt->run to false
     if(!rt->run) {
         // When no longer running record the cycles for delta purposes
         rt->prev_stop_cycles = rt->stop_cycles;
@@ -301,9 +302,6 @@ int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
             }
         }
 
-        // after a run_to_pc, the pc the debugger will want to show should be the cpu pc
-        // ui.debugger.cursor_pc = m->cpu.pc;
-
         quit = ui->ops->process_events(ui, m);
         ui->ops->set_shadow_flags(ui, m->state_flags);
         ui->ops->render(ui, m, dirty_view);
@@ -507,6 +505,7 @@ void rt_machine_stop(RUNTIME *rt) {
     rt->run_step_out = 0;
     rt->run_to_pc = 0;
     rt->run_to_pc_address = 0;
+    rt->run_first_step = 0;
     rt->jsr_counter = 0;
 }
 
