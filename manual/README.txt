@@ -2,7 +2,7 @@ Pandoc/latex PDF manual maker for Linux
 
 1. Install Pandoc and XeLaTeX (TeX Live / MikTeX).  See below.
 2. Run: ./build-manual.sh
-3. Outputs: manual.pdf
+3. Outputs: a2m User Manual.pdf
 
 Customize pandoc.yaml to adjust fonts or margins.
 
