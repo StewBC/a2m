@@ -194,7 +194,7 @@ void unk_config_ui(UNK *v, INI_STORE *ini_store) {
             v->show_leds = 1;
         }
     }
-    val = ini_get(ini_store, "Config", "scroll_wheel_sensitivity");
+    val = ini_get(ini_store, "Config", "wheel_speed");
     if(val) {
         int state = 0;
         if(1 == sscanf(val, "%d", &state)) {
