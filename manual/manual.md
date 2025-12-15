@@ -428,6 +428,36 @@ This is a simple single-file selection dialog. A single mouse click is used to a
 Press the `[OK]` button to close the dialog. If a file is highlighted when `[OK]` is pressed, that file becomes the selected file.
 
 ### Breakpoint Editor
+The breakpoint editor dialog is used to change the way a breakpoint works. In it you can configure the address or address range that a breakpoint activates on, and whether that activation is on execution, read, write, or read or write. Actions can also be assigned to breakpoints here, as well as counters, as discussed in the Breakpoints section.
+
+The dialog has `Break At [nnnn] on [] PC [] Address Access`. In this, `nnnn` is the memory address to watch for an execution break if `on PC` is checked. If `Address Access` is checked, the breakpoint will activate on a read, write, or either. This depends on the checked state of `[] Read [] Write`, which is available if `Address Access` is chosen. Also available when `Address Access` is chosen is `[] Range`. Check `Range` to enter a second address. All selected accesses between the `Break At` and `Range` addresses will now cause a stop.
+
+\Needspace{11\baselineskip}
+The `Actions`:
+
+| Action  | Meaning                                                                  |
+|:--------|:-------------------------------------------------------------------------|
+| Break   | Default action. Puts the emulator in a stopped state.                    |
+| Fast    | Switches the Turbo Mode to `max`.                                        |
+| Restore | Switches the Turbo Mode to the last mode active through the `F3` setting |
+| Slow    | Switches the Turbo Mode to 1 MHz.                                        |
+| Swap    | Enter the slot and drive, and a swap is done on that floppy.             |
+| Troff   | Turns off trace file logging.                                            |
+| Tron    | Turns on trace logging to a file called `./trace.txt`.                   |
+| Type    | Enter text to be "typed" into the Apple\ 2 when the breakpoint is hit    |
+
+Lastly, there is the `[] use Counter` setting. Select this option to enter two counter values. The first value is how many times the breakpoint must be hit before it causes its action, and the second value specifies what value to install as the counter once the breakpoint has been hit. As an example, setting `Counter` to 10 and `Reset Counter` to 2 means that the breakpoint must be hit 10 times before its action is executed, and after that it will only execute the action every second time the breakpoint is hit.
+
+Using `[Cancel]` will not apply any changes to the breakpoint, but pressing `[Apply]` will apply the changes to the breakpoint.
+
+### Symbols Dialog
+The symbol search dialog has a search box at the top and two buttons, `[OK]` and `[Cancel]`, at the bottom. In the middle is a list of names, addresses, and a symbol source name.
+
+Typing into the symbol search box performs a search on the name and the symbol source, and any matching symbols are shown in the middle section. For example, typing `PP` might show all symbols from the A`PP`LE2E source, as well as `A.TEMPP`T from the A2_BASIC source.
+
+Clicking on any line in the middle section, for example `A.TEMPPT $0052 A2_BASIC`, sets the Disassembly View cursor to address `$0052` and makes the cursor visible in the Disassembly View.
+
+Clicking `[OK]` closes the dialog.
 
 ### Symbols Dialog
 The symbol search dialog has a search box at the top and two buttons, `[OK]` and `[Cancel]`, at the bottom. In the middle is a list of names, addresses, and a symbol source name.
@@ -459,7 +489,6 @@ Where: infile is a 6502 assembly language file
        symbolfile contains a list of the addresses of all the named variables and labels
        -v turns on verbose and will dump the hex 6502 as it is assembled
 ```
-
 
 It is worth noting that assembly files can include other assembly files. This can be seen in `samples/mminer/mminer.asm`.
 
@@ -544,17 +573,17 @@ Numbers can be written in the following formats:
 
 | Prefix  | Base                                                                              |
 |:--------|:----------------------------------------------------------------------------------|
-| `$`     | Hexadecimal                                                                       |
-| `0`     | Octal                                                                             |
-| `%`     | Binary                                                                            |
-| `1`–`9` | Decimal                                                                           |
+| `$`     | Hexadecimal number. $ followed by 1 to 4 digits                                   |
+| `0`     | Octal number.  0 followed by digits in the range 0..7                             |
+| `%`     | Binary number. % followed by didgts 0 or 1 only                                   |
+| `1`–`9` | Decimal number.                                                                   |
 
 \Needspace{8\baselineskip}
 Inside strings, numbers can also be quoted. In that case, the formats are:
 
 | Prefix      | Base                                                                        |
 |:------------|:----------------------------------------------------------------------------|
-| `\x[N]+`    | Hexadecimal                                                                 |
+| `\x[N]+`    | Hexadecimal number.  The same rules apply as in the previous table          |
 | `\0[N]+`    | Octal                                                                       |
 | `\%[1\|0]+` | Binary                                                                      |
 | `\[0-9]+`   | Decimal                                                                     |
@@ -659,12 +688,13 @@ Note the lack of `#`. You cannot call the macro with `add_a_b #12, #25`, since `
 
 \Needspace{7\baselineskip}
 #### Assembler Strcode
-`.strcode` maps characters in a string to other values. It uses the variable `_` to perform the mapping. For example:
+`.strcode` maps characters in a string to other values. It uses the variable `_` to perform the mapping. For example, `.string "Apple ][ Forever"` produces the output `41 70 70 6C 65 20 5D 5B 20 46 6F 72 65 76 65 72`, whereas:
 ```
-.strcode _-1
-.string "1234"
+.strcode _ .ge 'A' && _ .le 'Z' ? _ - 'A' : _ .ge 'a' && _ .le 'z' ? _ - 'a' : _
+.string "Apple ][ Forever"
 ```
-This outputs `0000: 30 31 32 33`, which corresponds to `"0123"`. This is useful when mapping characters between display modes.
+produces the output `00 0F 0F 0B 04 20 5D 5B 20 05 0E 11 04 15 04 11`.  
+As can be seen, the ASCII alphabet characters were remapped to the 0..25 range, but the spaces and `][` characters were left alone.
 
 To disable processing, use `.strcode _`. Note that if you use `_` as a variable elsewhere, `.strcode` will overwrite it.
 
@@ -674,15 +704,74 @@ The sample folder contains code for use with the assembler. The `Manic Miner` fo
 There is also a Python script to help de-scope ca65 assembler source files. This is how the Manic Miner sources were created.
 
 # INI Files in Depth
+a2m uses INI files to configure itself at startup. The sequence is to read the INI file specified on the command line, or, if none is specified, to read `a2m.ini` in the current folder. This is unless `--noini` was specified, in which case an INI file is not read. After reading the INI file, a2m will apply any command-line switches that affect configuration to the configuration loaded from the INI file.
+
+This means the on-disk INI file can be altered by the command line. This can be prevented by specifying the `--nosaveini` command-line switch. When `--nosaveini` is specified, the INI file is not saved on exit, even if the INI file that was parsed contained a switch to save on exit, or `--saveini` was specified. `--saveini` is used to force saving to an INI file that does not contain a switch to save on exit. This is a way to force a command-line change into an on-disk INI file.
+
+All section headings appear between square brackets, for example `[Machine]`. The names are case-insensitive. All variables in a section have the form `<Name> = <value>`, where `<Name>` is the name of the variable and `<value>` is the value associated with that variable.
+
+Comments can be used in INI files, but note that if a2m saves out an INI file, the comments will be lost. Comments take the form `# Everything after the hash symbol (#) is a comment`. Comments can appear on lines that also have valid information, for example: `Variable = Value # assign Value to Variable`.
+
+\Needspace{7\baselineskip}
 ## Machine Section
+The Machine section is used to configure the Apple\ 2 machine that is being emulated. Variables are:
+
+| Variable | Value                                                                 |
+|:---------|:----------------------------------------------------------------------|
+| Model    | `plus` or `enh`. `plus` emulates a ][+, and `enh` emulates a //e Enhanced |
+| Turbo    | Comma-separated values as 1 MHz multipliers. `max` for as fast as possible |
+
+An example Turbo setting might be `Turbo = 1, 8, max ; This means 1 MHz, 8 MHz, or as fast as possible at 60 FPS`.
+
+\Needspace{9\baselineskip}
 ## Config Section
+The Config section is mostly UI configuration. Variables are:
+
+| Variable     | Value                                                                   |
+|:-------------|:------------------------------------------------------------------------|
+| disk_leds    | Value `on` or `1` shows disk activity LEDs in the lower right of the UI |
+| save         | `yes` means save the INI file on exit                                   |
+| symbols      | Comma-separated files that contain symbol information                   |
+| wheel_speed  | Number of lines to scroll when using the mouse scroll wheel             |
+
+\Needspace{7\baselineskip}
 ## Video Section
+The Video section has only one valid variable, and it is only used to configure the 80-column card on the Apple\ ][+ model. Using this will install the Franklin Ace Display card into a slot on an Apple\ ][+ machine.
+
+| Variable | Value                                                                 |
+|:---------|:----------------------------------------------------------------------|
+| sNdev    | Franklin Ace Display. The `N` in `sNdev` is a slot number, usually 3  |
+
+\Needspace{6\baselineskip}
 ## DiskII Section
+The Disk\ II section configures an Apple Disk\ II floppy drive.
+
+| Variable | Value                                       |
+|:---------|:--------------------------------------------|
+| sNdX     | Comma-separated paths to floppy disk images |
+
+The `N` and `X` in `sNdX` are slot and drive numbers. The slot is usually 6, and the drive number can be `0` or `1`.
+
+Example:  
+`s6d0 = "./disks/Leaderboard side A.nib","./disks/Leaderboard side B.nib"`
+
+In the example, both floppy disk images are configured for a Disk\ II in slot 6, drive 0. Side A will be mounted, and using the Swap button in the UI, or the Swap action in a breakpoint, the Side B floppy can be swapped into the drive for use.
+
+\Needspace{8\baselineskip}
 ## SmartPort Section
-## Debug Section
+The SmartPort section configures a slot for use as a SmartPort block device. These contain block device images, usually 32 MB images (often 33,553,920 bytes) or smaller.
 
-# Known Issues & Future Work
+| Variable | Value                                      |
+|:---------|:-------------------------------------------|
+| sNdX     | Path to a disk image                       |
+| bs       | A value of `1` will force-boot that device |
 
-# Appendix A: Keyboard Shortcuts
-# Appendix B: Troubleshooting
+As with the Disk\ II section, the values for `N` and `X` are a valid, unused slot number and device number, where device numbers are `0` or `1`. Usually the slot numbers are `5` or `7`. The Apple\ //e will try to boot from a SmartPort device `0` in slot `7`. The `bs` setting can be used to force an Apple\ 2 to boot a SmartPort device `0` in a slot other than slot `7`, or to boot an Apple\ ][+ from a SmartPort device instead of the Disk\ II device.
+
+\Needspace{9\baselineskip}
 # Appendix C: Version History
+31 Oct 2024 - Initial release  
+ 8 Dec 2024 - Version 1.0 release  
+10 Dec 2024 - Version 1.1 release  
+xx xxx xxxx - Version 2.0 release  
+    The version 2 release is a re-architecture of the entire code base, as well as a rewrite of the 6502 core, adding a 65C02 mode. The Apple\ //e is also supported, along with many new features such as a resizable window, window pane sliders, and more.
