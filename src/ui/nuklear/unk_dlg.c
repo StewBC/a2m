@@ -491,26 +491,38 @@ int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
     return ret;
 }
 
-int unk_dlg_find(struct nk_context *ctx, struct nk_rect r, char *data, int *data_length, int max_len) {
+// This code works but it's honestly not great
+// The find_mode is STATIC so it remembers between calls
+// It is 3 bit fields:
+// 1 - Sting search, 2 - Hex search, 4 - Case insensitive string search
+// A return value of all bits set (7) means cancel.  0 means no action yet and
+// 1, 2, or 5 means str, hex, stri search to start
+int unk_dlg_find(struct nk_context *ctx, struct nk_rect r, uint8_t *data, int *data_length, int max_len) {
     int ret = 0;
-    static int find_mode = 0;
+    static int find_mode = 1;
     static int error_status = 0;
     int find_mode_setting;
 
     if(nk_popup_begin(ctx, NK_POPUP_STATIC, "Find", 0, r)) {
-        nk_layout_row_dynamic(ctx, 20, 2);
-        find_mode_setting = nk_option_label(ctx, "String", find_mode == 0) ? 0 : find_mode;
-        find_mode_setting = nk_option_label(ctx, "Hex", find_mode_setting == 1) ? 1 : find_mode_setting;
+        nk_layout_row_dynamic(ctx, 20, 3);
+        find_mode_setting = nk_option_label(ctx, "String", (find_mode & 1)) ? (find_mode & ~2) | 1 : find_mode;
+        find_mode_setting = nk_option_label(ctx, "Hex", find_mode_setting & 2) ? ((find_mode & ~1) | 2) : find_mode_setting;
+        int find_case_setting = nk_option_label_disabled(ctx, "Ignore Case", find_mode_setting & 4, !(find_mode_setting & 1));
+        if(find_case_setting) {
+            find_mode_setting |= 4;
+        }
         if(find_mode_setting != find_mode) {
-            *data_length = 0;
+            if((find_mode_setting & 3) != (find_mode & 3)) {
+                *data_length = 0;
+            }
             find_mode = find_mode_setting;
         }
         nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 2);
         nk_layout_row_push(ctx, 0.20f);
-        nk_label(ctx, find_mode ? "HEX" : "String", NK_TEXT_CENTERED);
+        nk_label(ctx, (find_mode & 1) ? "String" : "HEX", NK_TEXT_CENTERED);
         nk_layout_row_push(ctx, 0.80f);
         int edit_state = nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, data, data_length, max_len,
-                                        find_mode ? nk_filter_hex : nk_filter_default);
+                                        (find_mode & 1) ? nk_filter_default : nk_filter_hex);
         nk_layout_row_end(ctx);
         if(!ctx->active->edit.active) {
             ctx->current->edit.active = 1;
@@ -518,16 +530,16 @@ int unk_dlg_find(struct nk_context *ctx, struct nk_rect r, char *data, int *data
         }
         nk_layout_row_dynamic(ctx, 28, 2);
         if(edit_state & NK_EDIT_COMMITED || nk_button_label(ctx, "OK")) {
-            if(find_mode && *data_length & 1) {
+            if((find_mode & 2) && *data_length & 1) {
                 error_status = 1;
             } else {
                 nk_popup_close(ctx);
-                ret = 1 + find_mode;
+                ret = find_mode;
             }
         }
         if(nk_button_label(ctx, "Cancel")) {
             nk_popup_close(ctx);
-            ret = 3;
+            ret = 7;
         }
         nk_layout_row_dynamic(ctx, 28, 2);
         nk_label(ctx, error_status ? "Uneven # of hex digits" : "Okay", NK_TEXT_ALIGN_LEFT);

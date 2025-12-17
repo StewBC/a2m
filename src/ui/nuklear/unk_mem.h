@@ -26,11 +26,12 @@ typedef struct VIEWMEM {
     int cols;                           // how many cols each view shows
     int dragging;					    // scrollbar
     uint16_t last_found_address;        // used for find nex/prev
+    uint16_t find_case_insensitive;     // 1 - don't care about case
     float grab_offset;				    // scrollbar
     DYNARRAY memviews;                  // the array of views
     char *str_buf;                      // the buffer that holds a complete row of text
     uint8_t *u8_buf;                    // the buffer that holds the uint8_t's from memory (in that row)
-    char *find_string;
+    uint8_t *find_string;
 } VIEWMEM;
 
 int unk_mem_init(VIEWMEM *ms);

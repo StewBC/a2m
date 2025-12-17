@@ -65,10 +65,18 @@ static void unk_mem_find_string(UNK *v, VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     uint16_t index = 0;
     for(size_t i = ms->last_found_address + 1; i < ms->last_found_address + 65537; i++) {
         uint16_t pc = i;
-        while(read_from_memory_selected(m, pc + index, flags) == ms->find_string[index]) {
+        uint8_t c = read_from_memory_selected(m, pc + index, flags);
+        if(ms->find_case_insensitive) {
+            c = tolower(c);
+        }
+        while(c == ms->find_string[index]) {
             if(++index == ms->find_string_len) {
                 mv->cursor_address = mv->view_address = ms->last_found_address = pc;
                 return;
+            }
+            c = read_from_memory_selected(m, pc + index, flags);
+            if(ms->find_case_insensitive) {
+                c = tolower(c);
             }
         }
         index = 0;
@@ -81,13 +89,21 @@ static void unk_mem_find_string_reverse(UNK *v, VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     uint16_t index = ms->find_string_len - 1;
     for(int i = ms->last_found_address - 1; i > ms->last_found_address - 65537; i--) {
         uint16_t pc = i;
-        while(read_from_memory_selected(m, pc + index, flags) == ms->find_string[index]) {
+        uint8_t c = read_from_memory_selected(m, pc + index, flags);
+        if(ms->find_case_insensitive) {
+            c = tolower(c);
+        }
+        while(c == ms->find_string[index]) {
             if(index == 0) {
                 pc += index;
                 mv->cursor_address = mv->view_address = ms->last_found_address = pc;
                 return;
             }
             --index;
+            c = read_from_memory_selected(m, pc + index, flags);
+            if(ms->find_case_insensitive) {
+                c = tolower(c);
+            }
         }
         index = ms->find_string_len - 1;
     }
@@ -266,7 +282,7 @@ int unk_mem_init(VIEWMEM *ms) {
     // Init the array
     ARRAY_INIT(&ms->memviews, VIEWMEM_VIEW);
     ARRAY_ADD(&ms->memviews, memview);
-    ms->find_string = (char *)malloc(MAX_FIND_STRING_LENGTH + 1);
+    ms->find_string = (uint8_t *)malloc(MAX_FIND_STRING_LENGTH + 1);
     if(ms->find_string) {
         ms->find_string_cap = MAX_FIND_STRING_LENGTH;
     }
@@ -689,10 +705,10 @@ void unk_mem_show(UNK *v) {
         if(v->dlg_memory_find && ms->find_string_cap) {
             int ret;
             if((ret = unk_dlg_find(ctx, nk_rect(10, 10, 400, 120), ms->find_string, &ms->find_string_len, ms->find_string_cap))) {
-                if(ret && ret != 3) {
+                if(ret && ret != 7) {
                     int value;
                     ms->find_string[ms->find_string_len] = 0;
-                    if(ret == 2) {
+                    if(ret & 2) {
                         for(int i = 0; i < ms->find_string_len; i += 2) {
                             int value;
                             if(1 == sscanf(ms->find_string + i, "%02x", &value)) {
@@ -700,6 +716,14 @@ void unk_mem_show(UNK *v) {
                             }
                         }
                         ms->find_string_len /= 2;
+                    }
+                    if(ret & 4) {
+                        ms->find_case_insensitive = 1;
+                        for(int i = 0; i < ms->find_string_len; i++) {
+                            ms->find_string[i] = tolower(ms->find_string[i]);
+                        }
+                    } else {
+                        ms->find_case_insensitive = 0;
                     }
                     ms->last_found_address = mv->cursor_address;
                     unk_mem_find_string(v, ms, mv);
