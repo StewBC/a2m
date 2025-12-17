@@ -411,7 +411,7 @@ void unk_show_help(UNK *v) {
 
     const struct nk_user_font *font = ctx->style.font;
     float char_w = font->width(font->userdata, font->height, "0", 1);
-    int max_chars_per_line = (int)((r.w - 2 * ctx->style.window.padding.x) / char_w);
+    int max_chars_per_line = (int)((r.w - 4 * ctx->style.window.padding.x) / char_w);
 
     // clamp to the buffer size
     if(max_chars_per_line > HELP_MAX_LINE - 1) {
@@ -426,7 +426,7 @@ void unk_show_help(UNK *v) {
         nk_layout_row_dynamic(ctx, 30, 1);
         nk_label_colored(ctx, "Apple ][+ and //e Enhanced emulator by Stefan Wessels, 2025.", NK_TEXT_CENTERED, nk_rgb(0, 255, 255));
         // main help area
-        nk_layout_row_dynamic(ctx, r.h - 55, 1);
+        nk_layout_row_dynamic(ctx, r.h - 5 * HELP_DEFAULT_LINE_HEIGHT, 1);
         struct nk_scroll *scr = &v->help_scroll[v->help_page];
 
         if(nk_group_scrolled_begin(ctx, scr, "Help Pages", 0)) {
@@ -438,11 +438,11 @@ void unk_show_help(UNK *v) {
         const struct nk_color active = {0xff, 0xff, 0x00, 0xff};
 
         // one label + N buttons
-        nk_layout_row_begin(ctx, NK_STATIC, 13, 1 + unk_help_page_count);
+        nk_layout_row_begin(ctx, NK_STATIC, 1.5 * HELP_DEFAULT_LINE_HEIGHT, 1 + unk_help_page_count);
 
         // label
         nk_layout_row_push(ctx, 40.0f);
-        nk_label(ctx, "Page:", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE);
+        nk_label_colored(ctx, "Page:", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, nk_rgb(255, 0, 0));
 
         // buttons
         for(int i = 0; i < unk_help_page_count; ++i) {
