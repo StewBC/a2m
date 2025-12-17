@@ -98,12 +98,12 @@ void unk_misc_show(UNK *v) {
                         }
                         nk_layout_row_push(ctx, 0.1f);
                         if(nk_button_label(ctx, "Insert")) {
-                            if(!v->unk_dlg_modal) {
+                            if(!v->dlg_modal_active) {
                                 fb->slot = i;
                                 fb->device = j;
                                 fb->device_type = SLOT_TYPE_SMARTPORT;
                                 fb->dir_contents.items = 0;
-                                v->unk_dlg_modal = 1;
+                                v->dlg_modal_active = 1;
                                 v->dlg_filebrowser = 1;
                             }
                         }
@@ -139,12 +139,12 @@ void unk_misc_show(UNK *v) {
                         w -= 0.1f;
                         nk_layout_row_push(ctx, 0.1f);
                         if(nk_button_label(ctx, "Insert")) {
-                            if(!v->unk_dlg_modal) {
+                            if(!v->dlg_modal_active) {
                                 fb->slot = i;
                                 fb->device = j;
                                 fb->device_type = SLOT_TYPE_DISKII;
                                 fb->dir_contents.items = 0;
-                                v->unk_dlg_modal = 1;
+                                v->dlg_modal_active = 1;
                                 v->dlg_filebrowser = 1;
                             }
                         }
@@ -317,7 +317,7 @@ void unk_misc_show(UNK *v) {
                             bpe->string_address_len[1] = sprintf(bpe->string_address[1], "%04X", bp->address_range_end);
                             bpe->string_counter_len[0] = sprintf(bpe->string_counter[0], "%d", bp->counter_stop_value);
                             bpe->string_counter_len[1] = sprintf(bpe->string_counter[1], "%d", bp->counter_reset);
-                            v->unk_dlg_modal = 1;
+                            v->dlg_modal_active = 1;
                             v->dlg_breakpoint = 1;
                             // This fixes an issue where selecting edit passes through to the pop-up and
                             // selects Cancel as well.
@@ -408,7 +408,8 @@ void unk_misc_show(UNK *v) {
         int ret = unk_dlg_breakpoint_edit(ctx, r, &v->viewmisc.breakpoint_edit);
         if(ret >= 0) {
             v->dlg_breakpoint = 0;
-            v->unk_dlg_modal = 0;
+            v->dlg_modal_active = 0;
+            v->dlg_modal_mouse_down = ctx->input.mouse.buttons[NK_BUTTON_LEFT].down;
             if(1 == ret) {
                 // Apply changes
                 free(bpe->bp_original->type_text);
@@ -435,7 +436,8 @@ void unk_misc_show(UNK *v) {
         if(ret >= 0) {
             array_free(&dv->temp_assembler_config.file_browser.dir_contents);
             v->dlg_filebrowser = 0;
-            v->unk_dlg_modal = 0;
+            v->dlg_modal_active = 0;
+            v->dlg_modal_mouse_down = ctx->input.mouse.buttons[NK_BUTTON_LEFT].down;
             if(1 == ret) {
                 // A file was selected, so get a FQN
                 strncat(fb->dir_selected.name, "/", PATH_MAX - 1);

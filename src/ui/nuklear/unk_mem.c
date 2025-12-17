@@ -333,9 +333,9 @@ int unk_mem_process_event(UNK *v, SDL_Event *e) {
                 break;
 
             case SDLK_f:                                        // CTRL F - Find
-                if(!v->unk_dlg_modal) {
+                if(!v->dlg_modal_active) {
                     ms->find_string_len = 0;
-                    v->unk_dlg_modal = 1;
+                    v->dlg_modal_active = 1;
                     v->dlg_memory_find = 1;
                 }
                 break;
@@ -363,7 +363,7 @@ int unk_mem_process_event(UNK *v, SDL_Event *e) {
 
             case SDLK_s:                                        // CTRL S - Search
                 global_entry_length = 0;
-                v->unk_dlg_modal = 1;
+                v->dlg_modal_active = 1;
                 v->dlg_symbol_lookup_mem = 1;
                 break;
 
@@ -557,7 +557,9 @@ void unk_mem_show(UNK *v) {
                             uint8_t c = ms->u8_buf[col];
                             snprintf(&ms->str_buf[5 + ms->cols * 3 + col], ms->str_buf_len - 5 - (ms->cols * 3) - col, "%c", isprint(c) ? c : '.');
                         }
-                        if(nk_widget_is_mouse_clicked(ctx, NK_BUTTON_LEFT)) {
+                        nk_label_colored(ctx, ms->str_buf, NK_TEXT_LEFT, unk_mem_range_colors[view].text_color);
+                        view_address += ms->cols;
+                        if(!v->dlg_modal_active && !v->dlg_modal_mouse_down && nk_widget_is_mouse_clicked(ctx, NK_BUTTON_LEFT)) {
                             float rel_x = (ctx->input.mouse.pos.x - r.x) / v->font_width;
                             ms->active_view_index = view;
                             active_view = mv;
@@ -587,8 +589,6 @@ void unk_mem_show(UNK *v) {
                                 mv->cursor_address = view_address + rel_x;
                             }
                         }
-                        view_address += ms->cols;
-                        nk_label_colored(ctx, ms->str_buf, NK_TEXT_LEFT, unk_mem_range_colors[view].text_color);
                     }
                     nk_group_end(ctx);
                 }
@@ -697,10 +697,10 @@ void unk_mem_show(UNK *v) {
         mv->view_address = (uint16_t)address;
 
         // Restore style padding
-        ctx->style.window.padding       = pad;
-        ctx->style.window.spacing       = spc;
+        ctx->style.window.padding = pad;
+        ctx->style.window.spacing = spc;
         ctx->style.window.group_padding = gpd;
-        ctx->style.window.border        = border;
+        ctx->style.window.border = border;
 
         if(v->dlg_memory_find && ms->find_string_cap) {
             int ret;
@@ -728,8 +728,9 @@ void unk_mem_show(UNK *v) {
                     ms->last_found_address = mv->cursor_address;
                     unk_mem_find_string(v, ms, mv);
                 }
-                v->unk_dlg_modal = 0;
+                v->dlg_modal_active = 0;
                 v->dlg_memory_find = 0;
+                v->dlg_modal_mouse_down = ctx->input.mouse.buttons[NK_BUTTON_LEFT].down;
             }
         }
 
@@ -743,7 +744,8 @@ void unk_mem_show(UNK *v) {
                     mv->cursor_address = pc;
                 }
                 v->dlg_symbol_lookup_mem = 0;
-                v->unk_dlg_modal = 0;
+                v->dlg_modal_active = 0;
+                v->dlg_modal_mouse_down = ctx->input.mouse.buttons[NK_BUTTON_LEFT].down;
             }
         }
     }

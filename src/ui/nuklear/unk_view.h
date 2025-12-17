@@ -75,6 +75,8 @@ typedef struct UNK {
     uint32_t dlg_filebrowser: 1;
     uint32_t dlg_memory_find: 1;
     uint32_t dlg_memory_go: 1;
+    uint32_t dlg_modal_active: 1;
+    uint32_t dlg_modal_mouse_down: 1;
     uint32_t dlg_symbol_lookup_dbg: 1;
     uint32_t dlg_symbol_lookup_mem: 1;
     uint32_t model: 1;
@@ -83,7 +85,6 @@ typedef struct UNK {
     uint32_t shadow_run: 1;
     uint32_t show_help: 1;
     uint32_t show_leds: 1;
-    uint32_t unk_dlg_modal: 1;
     uint32_t pad: 9;
 } UNK;
 

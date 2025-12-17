@@ -401,7 +401,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
             break;
 
         case SDLK_b:
-            if(!v->unk_dlg_modal) {
+            if(!v->dlg_modal_active) {
                 if((mod & KMOD_CTRL) && !(mod & KMOD_SHIFT)) {
                     if(dv->assembler_config.file_browser.dir_selected.name_length) {
                         ASSEMBLER_CONFIG *ac = &dv->assembler_config;
@@ -449,7 +449,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                         }
 
                         if(dv->errorlog.log_array.items) {
-                            v->unk_dlg_modal = 1;
+                            v->dlg_modal_active = 1;
                             v->dlg_assembler_errors = 1;
                         } else {
                             if(ac->reset_stack) {
@@ -463,15 +463,15 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                     }
                 } else if((mod & KMOD_CTRL) && (mod & KMOD_SHIFT)) {
                     dv->temp_assembler_config = dv->assembler_config;
-                    v->unk_dlg_modal = 1;
+                    v->dlg_modal_active = 1;
                     v->dlg_assembler_config = 1;
                 }
             }
             break;
 
         case SDLK_e:
-            if(mod & KMOD_CTRL && !v->unk_dlg_modal) {
-                v->unk_dlg_modal = 1;
+            if(mod & KMOD_CTRL && !v->dlg_modal_active) {
+                v->dlg_modal_active = 1;
                 v->dlg_assembler_errors = 1;
             }
             break;
@@ -485,7 +485,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
         case SDLK_s:
             if(mod & KMOD_CTRL) {
                 global_entry_length = 0;
-                v->unk_dlg_modal = 1;
+                v->dlg_modal_active = 1;
                 v->dlg_symbol_lookup_dbg = 1;
             }
             break;
@@ -647,6 +647,7 @@ void unk_dasm_show(UNK *v, int dirty) {
             unk_dasm_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
         }
     }
+    
     if(nk_begin(ctx, "Disassembly", v->layout.dasm, NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
         float w_offset = ctx->current->layout->bounds.x;
         ctx->current->layout->bounds.w += w_offset;
@@ -677,7 +678,7 @@ void unk_dasm_show(UNK *v, int dirty) {
                     }
                     BREAKPOINT *bp = rt_bp_get_at_address(rt, current_pc, 0);
                     // See if the mouse has been clicked over this row to be drawn
-                    if(!v->unk_dlg_modal && nk_widget_is_mouse_clicked(ctx, NK_BUTTON_LEFT)) {
+                    if(!v->dlg_modal_active && !v->dlg_modal_mouse_down && nk_widget_is_mouse_clicked(ctx, NK_BUTTON_LEFT)) {
                         float rel_x = (ctx->input.mouse.pos.x - r.x) / v->font_width;
                         dv->cursor_address = current_pc;
                         if(rel_x < 4) {
@@ -826,14 +827,16 @@ void unk_dasm_show(UNK *v, int dirty) {
                     dv->assembler_config = dv->temp_assembler_config;
                 }
                 v->dlg_assembler_config = 0;
-                v->unk_dlg_modal = 0;
+                v->dlg_modal_active = 0;
+                v->dlg_modal_mouse_down = ctx->input.mouse.buttons[NK_BUTTON_LEFT].down;
             }
         }
         if(v->dlg_assembler_errors) {
             if((ret = unk_dlg_assembler_errors(v, ctx, nk_rect(0, 0, 360, 430)))) {
                 errlog_clean(&dv->errorlog);
                 v->dlg_assembler_errors = 0;
-                v->unk_dlg_modal = 0;
+                v->dlg_modal_active = 0;
+                v->dlg_modal_mouse_down = ctx->input.mouse.buttons[NK_BUTTON_LEFT].down;
             }
         }
         if(v->dlg_symbol_lookup_dbg) {
@@ -843,7 +846,8 @@ void unk_dasm_show(UNK *v, int dirty) {
                     unk_dasm_put_address_on_line(dv, m, pc, dv->rows / 2);
                 }
                 v->dlg_symbol_lookup_dbg = 0;
-                v->unk_dlg_modal = 0;
+                v->dlg_modal_active = 0;
+                v->dlg_modal_mouse_down = ctx->input.mouse.buttons[NK_BUTTON_LEFT].down;
             }
         }
     }

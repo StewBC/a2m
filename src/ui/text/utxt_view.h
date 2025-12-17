@@ -38,7 +38,7 @@ typedef struct UTXT {
     uint32_t shadow_run: 1;
     uint32_t show_help: 1;
     uint32_t show_leds: 1;
-    uint32_t unk_dlg_modal: 1;
+    uint32_t dlg_modal_active: 1;
     uint32_t display_override: 1;
     uint32_t clear_a2_view: 1;
 } UTXT;

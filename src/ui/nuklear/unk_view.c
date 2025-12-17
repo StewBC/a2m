@@ -328,6 +328,10 @@ int unk_process_events(UI *ui, APPLE2 *m) {
     SDL_Event e;
     int ret = 0;
 
+    if(v->dlg_modal_mouse_down && !v->ctx->input.mouse.buttons[NK_BUTTON_LEFT].down) {
+        v->dlg_modal_mouse_down = 0;
+    }
+    
     nk_input_begin(v->ctx);
 
     while(SDL_PollEvent(&e) != 0) {
@@ -383,7 +387,7 @@ int unk_process_events(UI *ui, APPLE2 *m) {
             // Not running - goes to the active view
             if(v->debug_view && e.type == SDL_KEYDOWN || e.type == SDL_TEXTINPUT) {
                 // A view must be open to receive input, and no modal dialog open
-                if(!v->unk_dlg_modal && v->ctx->active) {
+                if(!v->dlg_modal_active && v->ctx->active) {
                     // Active view is known by the name hash
                     switch(v->ctx->active->name) {
                         case VIEWCPU_NAME_HASH:                         // CPU view (no events)
@@ -405,6 +409,8 @@ int unk_process_events(UI *ui, APPLE2 *m) {
         }
     }
 
+    nk_input_end(v->ctx);
+
     // Get joystick states once per event loop
     for(int i = 0; i < v->num_controllers; i++) {
         if(v->game_controller[i]) {
@@ -418,8 +424,6 @@ int unk_process_events(UI *ui, APPLE2 *m) {
             v->axis_left[i][1] = clamp_u8(v->axis_left[i][1], 0, 254);
         }
     }
-
-    nk_input_end(v->ctx);
 
     return ret;
 }
