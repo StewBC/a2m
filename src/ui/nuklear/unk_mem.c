@@ -397,7 +397,7 @@ int unk_mem_process_event(UNK *v, SDL_Event *e) {
             case SDLK_UP:
                 mv->view_address += ms->cols;
                 break;
-            }
+        }
     } else if(mod & KMOD_SHIFT && e->key.keysym.sym == SDLK_INSERT) {
         // Paste
         if(SDL_HasClipboardText()) {
@@ -453,6 +453,12 @@ int unk_mem_process_event(UNK *v, SDL_Event *e) {
 
             case SDLK_PAGEDOWN:
                 unk_mem_cursor_page_down(ms, mv);
+                break;
+
+            case SDLK_ESCAPE:
+                if(v->right_click_menu_open) {
+                    v->right_click_menu_open = 0;
+                }
                 break;
 
             default:
@@ -559,35 +565,43 @@ void unk_mem_show(UNK *v) {
                         }
                         nk_label_colored(ctx, ms->str_buf, NK_TEXT_LEFT, unk_mem_range_colors[view].text_color);
                         view_address += ms->cols;
-                        if(!v->dlg_modal_active && !v->dlg_modal_mouse_down && nk_widget_is_mouse_clicked(ctx, NK_BUTTON_LEFT)) {
-                            float rel_x = (ctx->input.mouse.pos.x - r.x) / v->font_width;
-                            ms->active_view_index = view;
-                            active_view = mv;
-                            active_top_row = view_top_row;
-                            if(rel_x < 4) {
-                                // First 4 digits is the hex address
-                                if(mv->cursor_field != CURSOR_ADDRESS) {
-                                    unk_mem_cursor_toggle_address_mode(ms, mv);
+                        if(!v->dlg_modal_active) {
+                            if(!v->dlg_modal_mouse_down && (nk_widget_is_mouse_clicked(ctx, NK_BUTTON_LEFT) || nk_widget_is_mouse_clicked(ctx, NK_BUTTON_RIGHT))) {
+                                float rel_x = (ctx->input.mouse.pos.x - r.x) / v->font_width;
+                                ms->active_view_index = view;
+                                active_view = mv;
+                                active_top_row = view_top_row;
+                                if(rel_x < 4) {
+                                    // First 4 digits is the hex address
+                                    if(mv->cursor_field != CURSOR_ADDRESS) {
+                                        unk_mem_cursor_toggle_address_mode(ms, mv);
+                                    }
+                                    mv->cursor_address = view_address;
+                                    mv->cursor_digit = rel_x;
+                                } else if(rel_x > 5 && rel_x < 5 + ms->cols * 3) {
+                                    if(mv->cursor_field == CURSOR_ADDRESS) {
+                                        unk_mem_cursor_toggle_address_mode(ms, mv);
+                                    }
+                                    mv->cursor_field = CURSOR_HEX;
+                                    // 5 is ignored.  6 .. ms->cols * 3 is hex
+                                    rel_x -= 5;
+                                    mv->cursor_address = view_address + rel_x / 3;
+                                } else {
+                                    if(mv->cursor_field == CURSOR_ADDRESS) {
+                                        unk_mem_cursor_toggle_address_mode(ms, mv);
+                                    }
+                                    mv->cursor_field = CURSOR_ASCII;
+                                    // 5 (address) + cols * 3 skipped to get to ascii
+                                    rel_x -= 5 + ms->cols * 3;
+                                    mv->cursor_address = view_address + rel_x;
                                 }
-                                mv->cursor_address = view_address;
-                                mv->cursor_digit = rel_x;
-                            } else if(rel_x > 5 && rel_x < 5 + ms->cols * 3) {
-                                if(mv->cursor_field == CURSOR_ADDRESS) {
-                                    unk_mem_cursor_toggle_address_mode(ms, mv);
-                                }
-                                mv->cursor_field = CURSOR_HEX;
-                                // 5 is ignored.  6 .. ms->cols * 3 is hex
-                                rel_x -= 5;
-                                mv->cursor_address = view_address + rel_x / 3;
-                            } else {
-                                if(mv->cursor_field == CURSOR_ADDRESS) {
-                                    unk_mem_cursor_toggle_address_mode(ms, mv);
-                                }
-                                mv->cursor_field = CURSOR_ASCII;
-                                // 5 (address) + cols * 3 skipped to get to ascii
-                                rel_x -= 5 + ms->cols * 3;
-                                mv->cursor_address = view_address + rel_x;
                             }
+                            if(nk_widget_is_mouse_clicked(ctx, NK_BUTTON_RIGHT)) {
+                                // SQW See if there are write values at the cursor address...
+                                // If there are, we can show a menu with <stuff>
+                                v->right_click_menu_open = 1;
+                                v->right_click_menu_pos  = ctx->input.mouse.pos;
+                            }                        
                         }
                     }
                     nk_group_end(ctx);
@@ -745,6 +759,21 @@ void unk_mem_show(UNK *v) {
                 }
                 v->dlg_symbol_lookup_mem = 0;
                 v->dlg_modal_active = 0;
+                v->dlg_modal_mouse_down = ctx->input.mouse.buttons[NK_BUTTON_LEFT].down;
+            }
+        }
+
+        if (v->right_click_menu_open) {
+            if (nk_contextual_begin(ctx, NK_WINDOW_NO_SCROLLBAR, nk_vec2(160, 180), nk_rect(v->right_click_menu_pos.x, v->right_click_menu_pos.y, 1, 1))) {
+                nk_layout_row_dynamic(ctx, 22, 1);
+                if (nk_menu_item_label(ctx, "0x2000", NK_TEXT_LEFT)) { }
+                nk_layout_row_dynamic(ctx, 2, 1);
+                nk_rule_horizontal(ctx, nk_rgb(200, 200, 200), 1);
+                nk_layout_row_dynamic(ctx, 22, 1);
+                if (nk_menu_item_label(ctx, "Paste", NK_TEXT_LEFT)) { }
+                nk_contextual_end(ctx);
+            } else {
+                v->right_click_menu_open = 0;
                 v->dlg_modal_mouse_down = ctx->input.mouse.buttons[NK_BUTTON_LEFT].down;
             }
         }

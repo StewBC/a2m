@@ -46,6 +46,9 @@ typedef struct UNK {
     int help_page;
     struct nk_scroll help_scroll[HELP_MAX_PAGES];
 
+    // Right-click menu
+    struct nk_vec2 right_click_menu_pos;
+
     // These are so the UI can pull data out with ease
     // APPLE2 *m is set/reset ever time RT calls UI so the UI can
     // be asked to display any APPLE2 machine at any time - the UI
@@ -82,10 +85,11 @@ typedef struct UNK {
     uint32_t model: 1;
     uint32_t monitor_type: 2;
     uint32_t original_del: 1;
+    uint32_t right_click_menu_open: 1;
     uint32_t shadow_run: 1;
     uint32_t show_help: 1;
     uint32_t show_leds: 1;
-    uint32_t pad: 9;
+    uint32_t pad: 8;
 } UNK;
 
 extern const UI_OPS unk_ops;
