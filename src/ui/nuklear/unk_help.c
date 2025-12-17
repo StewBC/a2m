@@ -97,6 +97,28 @@ static struct nk_color unk_help_resolve_tag_payload(const char *payload) {
     return unk_help_color_tags[0].color;
 }
 
+// <#...> is a color tag, where ... ends at '>' and is non-empty.
+static int unk_help_is_inline_color_tag(const char *p, int *tag_chars) {
+    if(!p || p[0] != '<' || p[1] != '#') {
+        return 0;
+    }
+
+    const char *gt = strchr(p, '>');
+    if(!gt) {
+        return 0;
+    }
+
+    int payload_len = (int)(gt - (p + 2));
+    if(payload_len <= 0) {
+        return 0;
+    }
+
+    if(tag_chars) {
+        *tag_chars = (int)((gt - p) + 1);    // include '>'
+    }
+    return 1;
+}
+
 static void unk_help_consume_color_tags(const char *s, int len, struct nk_color *cur_color) {
     const char *p = s;
     const char *end = s + len;
@@ -121,28 +143,6 @@ static void unk_help_consume_color_tags(const char *s, int len, struct nk_color 
             p++;
         }
     }
-}
-
-// <#...> is a color tag, where ... ends at '>' and is non-empty.
-static int unk_help_is_inline_color_tag(const char *p, int *tag_chars) {
-    if(!p || p[0] != '<' || p[1] != '#') {
-        return 0;
-    }
-
-    const char *gt = strchr(p, '>');
-    if(!gt) {
-        return 0;
-    }
-
-    int payload_len = (int)(gt - (p + 2));
-    if(payload_len <= 0) {
-        return 0;
-    }
-
-    if(tag_chars) {
-        *tag_chars = (int)((gt - p) + 1);    // include '>'
-    }
-    return 1;
 }
 
 // Draw one visual line segment [s, s+len) and UPDATE *cur_color when tags appear.
