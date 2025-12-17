@@ -521,7 +521,7 @@ int unk_dlg_find(struct nk_context *ctx, struct nk_rect r, uint8_t *data, int *d
         nk_layout_row_push(ctx, 0.20f);
         nk_label(ctx, (find_mode & 1) ? "String" : "HEX", NK_TEXT_CENTERED);
         nk_layout_row_push(ctx, 0.80f);
-        int edit_state = nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, data, data_length, max_len,
+        int edit_state = nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, (char *)data, data_length, max_len,
                                         (find_mode & 1) ? nk_filter_default : nk_filter_hex);
         nk_layout_row_end(ctx);
         if(!ctx->active->edit.active) {
