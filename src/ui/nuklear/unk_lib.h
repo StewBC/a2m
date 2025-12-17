@@ -55,6 +55,8 @@ typedef enum CURSOR_DIGIT {
 #define VIEWMEM_NAME_HASH   0XB9A77E29
 #define VIEWMISC_NAME_HASH  0X97446A22
 
+#define HELP_MAX_PAGES 8
+
 #include "breakpoint.h"
 #include "unk_joy.h"
 #include "unk_layout.h"

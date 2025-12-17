@@ -459,15 +459,6 @@ Clicking on any line in the middle section, for example `A.TEMPPT $0052 A2_BASIC
 
 Clicking `[OK]` closes the dialog.
 
-### Symbols Dialog
-The symbol search dialog has a search box at the top and two buttons, `[OK]` and `[Cancel]`, at the bottom. In the middle is a list of names, addresses, and a symbol source name.
-
-Typing into the symbol search box performs a search on the name and the symbol source, and any matching symbols are shown in the middle section. For example, typing `PP` might show all symbols from the A`PP`LE2E source, as well as `A.TEMPP`T from the A2_BASIC source.
-
-Clicking on any line in the middle section, for example `A.TEMPPT $0052 A2_BASIC`, sets the Disassembly View cursor to address `$0052` and makes the cursor visible in the Disassembly View.
-
-Clicking `[OK]` closes the dialog.
-
 ### Find Dialog
 The find dialog has selectors for string or hexadecimal searches. When searching for strings, type the ASCII characters to search for into the search box. When searching for hexadecimal values, type the hex values as two-digit hex numbers, not separated by any characters (for example `01abcd`), and press ENTER or click `[OK]`.
 

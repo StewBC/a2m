@@ -42,6 +42,10 @@ typedef struct UNK {
     VIEWMISC viewmisc;
     VIEWSPEAKER viewspeaker;
 
+    // Help related
+    int help_page;
+    struct nk_scroll help_scroll[HELP_MAX_PAGES];
+
     // These are so the UI can pull data out with ease
     // APPLE2 *m is set/reset ever time RT calls UI so the UI can
     // be asked to display any APPLE2 machine at any time - the UI
@@ -51,7 +55,6 @@ typedef struct UNK {
 
     // Shadow of machine states
     A2FLAGSPACK shadow_flags;
-    int help_page;
 
     // Game controller values
     int8_t num_controllers;
