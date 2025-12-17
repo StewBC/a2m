@@ -711,7 +711,7 @@ void unk_mem_show(UNK *v) {
                     if(ret & 2) {
                         for(int i = 0; i < ms->find_string_len; i += 2) {
                             int value;
-                            if(1 == sscanf(ms->find_string + i, "%02x", &value)) {
+                            if(1 == sscanf((char *)ms->find_string + i, "%02x", &value)) {
                                 ms->find_string[i / 2] = value;
                             }
                         }
