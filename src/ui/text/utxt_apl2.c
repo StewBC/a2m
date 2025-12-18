@@ -149,9 +149,14 @@ void utxt_apl2_screen_txt40(UTXT *v, int start, int end) {
                         character &= 0x3F;
                         inv = time_inv;
                     }
-                } else if(!m->model) {
+                } else {//if(!m->model) {
                     inv = 0xFF;
                 }
+            } else {
+                character -= 0x80;
+            }
+            if(character < 32) {
+                character += 0x40;
             }
             if(inv) {
                 attron(A_REVERSE);
@@ -189,9 +194,14 @@ void utxt_apl2_screen_txt80(UTXT *v, int start, int end) {
                         character &= 0x3F;
                         inv = time_inv;
                     }
-                } else if(!m->model) {
+                } else {//if(!m->model) {
                     inv = 0xFF;
                 }
+            } else {
+                character -= 0x80;
+            }
+            if(character < 32) {
+                character += 0x40;
             }
             if(inv) {
                 attron(A_REVERSE);
