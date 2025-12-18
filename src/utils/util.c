@@ -64,19 +64,40 @@ static int fs_stat_utf8(const char *path, struct stat *st) {
 }
 #endif
 
-int util_attach_to_console(void) {
+int util_console_open_for_text_ui(void) {
 #ifdef _WIN32
-    if (GetConsoleWindow() != NULL)
-        return A2_OK;
-
-    if (!AttachConsole(ATTACH_PARENT_PROCESS))
+    if (!AllocConsole()) {
         return A2_ERR;
+    }
 
-    // freopen("CONIN$",  "r", stdin);
-    freopen("CONOUT$", "w", stdout);
-    freopen("CONOUT$", "w", stderr);
-#endif // _WIN32
+    // Route CRT stdio to the console
+    FILE *f;
+    freopen_s(&f, "CONIN$",  "r", stdin);
+    freopen_s(&f, "CONOUT$", "w", stdout);
+    freopen_s(&f, "CONOUT$", "w", stderr);
+
+    // Also ensure Win32 std handles are valid (helps some libs)
+    HANDLE hIn  = CreateFileW(L"CONIN$",  GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+    HANDLE hOut = CreateFileW(L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+
+    if (hIn  != INVALID_HANDLE_VALUE) {
+        SetStdHandle(STD_INPUT_HANDLE,  hIn);
+    }
+    if (hOut != INVALID_HANDLE_VALUE) {
+        SetStdHandle(STD_OUTPUT_HANDLE, hOut);
+        SetStdHandle(STD_ERROR_HANDLE,  hOut);
+    }
+    #endif // _WIN32
+    Sleep(100);
     return A2_OK;
+}
+
+void util_console_close_for_text_ui(void) {
+#ifdef _WIN32
+    if (GetConsoleWindow() != NULL) {
+        FreeConsole();
+    }
+#endif // _WIN32
 }
 
 // Directory operations

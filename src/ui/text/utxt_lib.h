@@ -6,8 +6,11 @@
 
 #include "common.h"
 #include "utils_lib.h"
-#include "asm_lib.h"
 #include "hardware_lib.h"
 #include "rt_lib.h"
 
+#include <locale.h>
+#include <curses.h>
+
 #include "utxt_view.h"
+#include "utxt_apl2.h"

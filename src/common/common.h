@@ -44,3 +44,5 @@ typedef enum RAMVIEW_FLAGS {
     MEM_LC_BANK2        = (1 << 2),
 } RAMVIEW_FLAGS;
 
+// The UIs use this so a2m links in common.c, where it lives
+extern int apl2_txt_row_start[];

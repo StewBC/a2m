@@ -33,13 +33,6 @@ int hgr_row_start[] = {
     0x03D0, 0x07D0, 0x0BD0, 0x0FD0, 0x13D0, 0x17D0, 0x1BD0, 0x1FD0
 };
 
-// Start of each text/lores screen row, as an offset from the active page
-int txt_row_start[] = {
-    0x0000, 0x0080, 0x0100, 0x0180, 0x0200, 0x0280, 0x0300, 0x0380,
-    0x0028, 0x00A8, 0x0128, 0x01A8, 0x0228, 0x02A8, 0x0328, 0x03A8,
-    0x0050, 0x00D0, 0x0150, 0x01D0, 0x0250, 0x02D0, 0x0350, 0x03D0
-};
-
 // Use the Holger Picker sliding window method
 // https://groups.google.com/g/comp.sys.apple2.programmer/c/iSmIAVA95WA/m/KKsYkTgfWSEJ
 //
@@ -503,8 +496,8 @@ void unk_apl2_screen_dlores(UNK *v, int start, int end) {
 
     for(y = start; y < end; y++) {
         uint32_t *p = &pixels[y * 8 * surface_width];
-        const uint8_t *man = m->RAM_MAIN + 0x00400 + txt_row_start[y];
-        const uint8_t *aux = m->RAM_MAIN + 0x10400 + txt_row_start[y];
+        const uint8_t *man = m->RAM_MAIN + 0x00400 + apl2_txt_row_start[y];
+        const uint8_t *aux = m->RAM_MAIN + 0x10400 + apl2_txt_row_start[y];
 
         for(int col = 0; col < 80; col++) {
             int r;
@@ -543,8 +536,8 @@ void unk_apl2_screen_dlores_mono(UNK *v, int start, int end) {
 
     for(y = start; y < end; y++) {
         uint32_t *p = &pixels[y * 8 * surface_width];
-        const uint8_t *man = m->RAM_MAIN + 0x00400 + txt_row_start[y];
-        const uint8_t *aux = m->RAM_MAIN + 0x10400 + txt_row_start[y];
+        const uint8_t *man = m->RAM_MAIN + 0x00400 + apl2_txt_row_start[y];
+        const uint8_t *aux = m->RAM_MAIN + 0x10400 + apl2_txt_row_start[y];
 
         for(int col = 0; col < 80; col++) {
             int r;
@@ -591,7 +584,7 @@ void unk_apl2_screen_lores(UNK *v, int start, int end) {
     for(y = start; y < end; y++) {
         // Get the pointer to the start of the row in the SDL surface
         uint32_t *p = &pixels[y * 8 * surface->w];
-        int address = page + txt_row_start[y];
+        int address = page + apl2_txt_row_start[y];
 
         // Loop through every col (byte)
         for(int x = 0; x < 40; x++) {
@@ -626,7 +619,7 @@ void unk_apl2_screen_lores_mono(UNK *v, int start, int end) {
     for(y = start; y < end; y++) {
         // Get the pointer to the start of the row in the SDL surface
         uint32_t *p = &pixels[y * 8 * surface->w];
-        int address = page + txt_row_start[y];
+        int address = page + apl2_txt_row_start[y];
 
         // Loop through every col (byte)
         for(int x = 0; x < 40; x++) {
@@ -914,7 +907,7 @@ void unk_apl2_screen_txt40(UNK *v, int start, int end) {
     for(y = start; y < end; y++) {
         // Get the pointer to the start of the row in the SDL surface
         uint32_t *p = &pixels[y * 8 * surface->w];
-        int address = page + txt_row_start[y];
+        int address = page + apl2_txt_row_start[y];
 
         // Loop through every col (byte)
         for(int x = 0; x < 40; x++) {
@@ -963,7 +956,7 @@ void unk_apl2_screen_txt80(UNK *v, int start, int end) {
     for(y = start; y < end; y++) {
         // Get the pointer to the start of the row in the SDL surface
         uint32_t *p = &pixels[y * 8 * surface->w];
-        int address = 0x0400 + txt_row_start[y];
+        int address = 0x0400 + apl2_txt_row_start[y];
 
         // Loop through every col (byte)
         for(int x = 0; x < 80; x++) {

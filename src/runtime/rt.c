@@ -303,7 +303,9 @@ int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
         }
 
         quit = ui->ops->process_events(ui, m);
-        ui->ops->set_shadow_flags(ui, m->state_flags);
+        if(ui->ops->set_shadow_flags) {
+            ui->ops->set_shadow_flags(ui, m->state_flags);
+        }
         ui->ops->render(ui, m, dirty_view);
 
         uint64_t frame_end_ticks = SDL_GetPerformanceCounter();

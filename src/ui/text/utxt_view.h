@@ -4,46 +4,48 @@
 
 #pragma once
 
+typedef enum {
+    RT_IN_NONE = 0,
+    RT_IN_TEXT,     // printable char
+    RT_IN_KEY       // special key (arrows, etc.)
+} rt_in_type;
+
+typedef enum {
+    RTK_NONE = 0,
+    RTK_BACKSPACE,
+    RTK_RETURN,
+    RTK_ESCAPE,
+    RTK_TAB,
+    RTK_UP,
+    RTK_DOWN,
+    RTK_LEFT,
+    RTK_RIGHT,
+    RTK_INSERT,
+    RTK_HOME
+} rt_key;
+
+typedef struct {
+    rt_in_type type;
+    uint32_t   ch;      // Unicode codepoint for TEXT (or raw byte on POSIX)
+    rt_key     key;     // for KEY
+    int        ctrl;
+    int        alt;     // best-effort only
+    int        shift;   // best-effort only (mainly Windows)
+} rt_input_event;
+
 typedef struct UTXT {
-    // Window title MHz display helpers
-    uint64_t prev_cycles;
-    uint64_t prev_ticks;
-    double mhz_moving_average;
-    double fps_moving_average;
-
-    // Shadow of machine states
-    // int shadow_flags;
-    A2FLAGSPACK shadow_flags;
-    int help_page;
-
-    // Game controller values
-    int8_t num_controllers;
-    uint8_t button_a[2];
-    uint8_t button_b[2];
-    uint8_t button_x[2];
-    uint8_t axis_left_x[2];
-    uint8_t axis_left_y[2];
-    uint64_t ptrig_cycle;
-
-    // Flags that contain machine states
-    uint32_t debug_view: 1;
-    uint32_t dlg_assembler_config: 1;
-    uint32_t dlg_assembler_errors: 1;
-    uint32_t dlg_breakpoint: 1;
-    uint32_t dlg_filebrowser: 1;
-    uint32_t dlg_memory_find: 1;
-    uint32_t dlg_memory_go: 1;
-    uint32_t dlg_symbol_lookup_dbg: 1;
-    uint32_t dlg_symbol_lookup_mem: 1;
-    uint32_t shadow_run: 1;
-    uint32_t show_help: 1;
-    uint32_t show_leds: 1;
-    uint32_t dlg_modal_active: 1;
-    uint32_t display_override: 1;
-    uint32_t clear_a2_view: 1;
+    int show_help;
+    APPLE2 *m;
+    RUNTIME *rt;
 } UTXT;
 
 extern const UI_OPS utxt_ops;
 
-int utxt_init(UTXT *v, INI_STORE *ini_store);
+void utxt_config_ui(UTXT *v, INI_STORE *ini_store);
+int utxt_init(UTXT *v, int model, INI_STORE *ini_store);
+int utxt_process_events(UI *ui, APPLE2 *m);
 void utxt_shutdown(UTXT *v);
+void utxt_present(UTXT *v);
+void utxt_render_frame(UI *ui, APPLE2 *m, int dirty);
+void utxt_set_runtime(UI *ui, RUNTIME *rt);
+void utxt_null(UI *ui, uint32_t cycles);

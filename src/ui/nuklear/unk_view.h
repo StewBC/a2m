@@ -112,7 +112,6 @@ void nk_custom_scrollbarv(struct nk_context *ctx, struct nk_rect sbar, int total
 void unk_config_ui(UNK *v, INI_STORE *ini_store);
 int unk_init(UNK *v, int model, INI_STORE *ini_store);
 int unk_process_events(UI *ui, APPLE2 *m);
-void unk_show(UNK *v);
 void unk_shutdown(UNK *v);
 void unk_toggle_debug(UNK *v);
 void unk_present(UNK *v);

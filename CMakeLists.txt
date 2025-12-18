@@ -44,12 +44,13 @@ add_subdirectory(src/ui)
 # Add the executable
 add_executable(a2m
     src/apps/a2m/main.c
+    src/common/common.c
 )
 
 # utils, asm, hardware & runtime all pulled in via ui, as is SDL2, SDL2main, SDL2_mixer & SDL2_image
 target_link_libraries(a2m PUBLIC
-    ui
     $<$<PLATFORM_ID:Linux>:m>
+    ui
 )
 
 if(APPLE)
@@ -95,7 +96,6 @@ add_executable(asm6502
 )
 
 target_link_libraries(asm6502 PUBLIC
-    utils
     asm
     $<$<PLATFORM_ID:Linux>:m>
 )

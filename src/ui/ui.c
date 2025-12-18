@@ -65,7 +65,7 @@ int ui_init(UI *ui, int model, INI_STORE *ini_store) {
         ui->ops = &utxt_ops;
 
         // TXT gets to init
-        return utxt_init(v, ini_store);
+        return utxt_init(v, model, ini_store);
     }
 }
 
