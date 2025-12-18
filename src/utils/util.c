@@ -87,8 +87,8 @@ int util_console_open_for_text_ui(void) {
         SetStdHandle(STD_OUTPUT_HANDLE, hOut);
         SetStdHandle(STD_ERROR_HANDLE,  hOut);
     }
-    #endif // _WIN32
     Sleep(100);
+    #endif // _WIN32
     return A2_OK;
 }
 
