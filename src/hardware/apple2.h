@@ -160,6 +160,7 @@ typedef struct APPLE2 {
     uint8_t *RAM_MAIN;                                      // The ram_size MEMORY - addressable in max 64k chunks
     uint8_t *RAM_WATCH;                                     // IO "mask" (0 = not watched). See RAM_WATCH_MASK
     uint8_t *RAM_LC;                                        // 16 KB LC Ram (Always 2*16 for ease with //e)
+    uint64_t *RAM_LAST_WRITE;                               // 64KB of write pointers
 
     uint8_t *rom_shadow_pages[(0xC800 - 0xC000) / PAGE_SIZE]; // Slot ram page mappings when SETC?ROM active
     uint8_t mapped_slot;                                    // 0 = not mapped, 1-7 means that slot card is strobe mapped (to C800)

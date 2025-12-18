@@ -42,6 +42,7 @@ enum {
 /* The 6502 internals*/
 typedef struct CPU {
     uint16_t pc;                                            // Program counter
+    uint16_t opcode_pc;                                     // for last write, track last opcode pc
     uint16_t sp;                                            // Stack pointer
     uint8_t A, X, Y;                                        // 8 bit registers
     union {

@@ -563,14 +563,13 @@ void unk_mem_show(UNK *v) {
                             uint8_t c = ms->u8_buf[col];
                             snprintf(&ms->str_buf[5 + ms->cols * 3 + col], ms->str_buf_len - 5 - (ms->cols * 3) - col, "%c", isprint(c) ? c : '.');
                         }
-                        nk_label_colored(ctx, ms->str_buf, NK_TEXT_LEFT, unk_mem_range_colors[view].text_color);
-                        view_address += ms->cols;
                         if(!v->dlg_modal_active) {
                             if(!v->dlg_modal_mouse_down && (nk_widget_is_mouse_clicked(ctx, NK_BUTTON_LEFT) || nk_widget_is_mouse_clicked(ctx, NK_BUTTON_RIGHT))) {
                                 float rel_x = (ctx->input.mouse.pos.x - r.x) / v->font_width;
                                 ms->active_view_index = view;
                                 active_view = mv;
                                 active_top_row = view_top_row;
+                                v->right_click_address = 0x10000;
                                 if(rel_x < 4) {
                                     // First 4 digits is the hex address
                                     if(mv->cursor_field != CURSOR_ADDRESS) {
@@ -585,7 +584,7 @@ void unk_mem_show(UNK *v) {
                                     mv->cursor_field = CURSOR_HEX;
                                     // 5 is ignored.  6 .. ms->cols * 3 is hex
                                     rel_x -= 5;
-                                    mv->cursor_address = view_address + rel_x / 3;
+                                    v->right_click_address = mv->cursor_address = view_address + rel_x / 3;
                                 } else {
                                     if(mv->cursor_field == CURSOR_ADDRESS) {
                                         unk_mem_cursor_toggle_address_mode(ms, mv);
@@ -593,16 +592,16 @@ void unk_mem_show(UNK *v) {
                                     mv->cursor_field = CURSOR_ASCII;
                                     // 5 (address) + cols * 3 skipped to get to ascii
                                     rel_x -= 5 + ms->cols * 3;
-                                    mv->cursor_address = view_address + rel_x;
+                                    v->right_click_address = mv->cursor_address = view_address + rel_x;
                                 }
                             }
-                            if(nk_widget_is_mouse_clicked(ctx, NK_BUTTON_RIGHT)) {
-                                // SQW See if there are write values at the cursor address...
-                                // If there are, we can show a menu with <stuff>
+                            if(nk_widget_is_mouse_clicked(ctx, NK_BUTTON_RIGHT) && v->right_click_address < 0x10000) {
                                 v->right_click_menu_open = 1;
                                 v->right_click_menu_pos  = ctx->input.mouse.pos;
                             }                        
                         }
+                        nk_label_colored(ctx, ms->str_buf, NK_TEXT_LEFT, unk_mem_range_colors[view].text_color);
+                        view_address += ms->cols;
                     }
                     nk_group_end(ctx);
                 }
@@ -765,12 +764,20 @@ void unk_mem_show(UNK *v) {
 
         if (v->right_click_menu_open) {
             if (nk_contextual_begin(ctx, NK_WINDOW_NO_SCROLLBAR, nk_vec2(160, 180), nk_rect(v->right_click_menu_pos.x, v->right_click_menu_pos.y, 1, 1))) {
+                uint64_t last_write = m->RAM_LAST_WRITE[v->right_click_address];
+                char options_text[6];
                 nk_layout_row_dynamic(ctx, 22, 1);
-                if (nk_menu_item_label(ctx, "0x2000", NK_TEXT_LEFT)) { }
-                nk_layout_row_dynamic(ctx, 2, 1);
-                nk_rule_horizontal(ctx, nk_rgb(200, 200, 200), 1);
-                nk_layout_row_dynamic(ctx, 22, 1);
-                if (nk_menu_item_label(ctx, "Paste", NK_TEXT_LEFT)) { }
+                for(int i=0; i < 4; i++) {
+                    uint16_t address = last_write & 0xFFFF;
+                    snprintf(options_text, 6, "$%04X", address);
+                    last_write >>= 16;
+                    if (nk_menu_item_label(ctx, options_text, NK_TEXT_LEFT)) {
+                        VIEWDASM *dv = &v->viewdasm;
+                        dv->cursor_address = address;
+                        dv->cursor_line = dv->rows / 2;
+                        unk_dasm_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
+                    }
+                }
                 nk_contextual_end(ctx);
             } else {
                 v->right_click_menu_open = 0;

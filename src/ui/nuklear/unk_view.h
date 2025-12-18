@@ -48,6 +48,7 @@ typedef struct UNK {
 
     // Right-click menu
     struct nk_vec2 right_click_menu_pos;
+    uint32_t right_click_address;
 
     // These are so the UI can pull data out with ease
     // APPLE2 *m is set/reset ever time RT calls UI so the UI can

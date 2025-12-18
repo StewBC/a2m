@@ -135,10 +135,12 @@ int apple2_init(APPLE2 *m, INI_STORE *ini_store) {
     m->RAM_MAIN = (uint8_t *) malloc(m->ram_size);
     // Allocate the WATCH RAM (for breakpoints and IO callbacks)
     m->RAM_WATCH = (uint8_t *) malloc(m->ram_size);
-    if(!m->RAM_MAIN || !m->RAM_WATCH) {
+    m->RAM_LAST_WRITE = (uint64_t *) malloc(64 * 1024 * sizeof(uint64_t));
+    if(!m->RAM_MAIN || !m->RAM_WATCH || !m->RAM_LAST_WRITE) {
         return A2_ERR;
     }
 
+    memset(m->RAM_LAST_WRITE, 0, 64 * 1024 * sizeof(uint64_t));
     // Init RAM to a fixed pattern
     util_memset32(m->RAM_MAIN, 0x0000ffff, m->ram_size / 4);
     // And IO area floating bus is a lot of 160's
@@ -295,4 +297,6 @@ void apple2_shutdown(APPLE2 *m) {
     m->RAM_WATCH = NULL;
     free(m->RAM_LC);
     m->RAM_LC = NULL;
+    free(m->RAM_LAST_WRITE);
+    m->RAM_LAST_WRITE = NULL;
 }
