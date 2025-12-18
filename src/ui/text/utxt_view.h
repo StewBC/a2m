@@ -21,20 +21,23 @@ typedef enum {
     RTK_LEFT,
     RTK_RIGHT,
     RTK_INSERT,
-    RTK_HOME
+    RTK_HOME,
+    RTK_PAGE_UP,
+    RTK_PAGE_DOWN,
+    RTK_END,
+    RTK_DEL,
+    RTK_TURBO
 } rt_key;
 
 typedef struct {
     rt_in_type type;
-    uint32_t   ch;      // Unicode codepoint for TEXT (or raw byte on POSIX)
     rt_key     key;     // for KEY
-    int        ctrl;
-    int        alt;     // best-effort only
-    int        shift;   // best-effort only (mainly Windows)
+    uint32_t   ch;
 } rt_input_event;
 
 typedef struct UTXT {
     int show_help;
+    int ctrl;
     APPLE2 *m;
     RUNTIME *rt;
 } UTXT;
