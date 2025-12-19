@@ -106,13 +106,13 @@ void utxt_apl2_screen_apple2(UTXT *v) {
             utxt_apl2_screen_txt(v, 20, 24, 80);
             break;
         case 0x1C: // 1 ,1 ,1 ,0 ,0 ,11100,1C
-            utxt_apl2_screen_box(v, 0, 24, 80, "DOUBLE hires");
+            utxt_apl2_screen_box(v, 0, 24, 80, "DOUBLE HIRES");
             break;
         case 0x1D: // 1 ,1 ,1 ,0 ,1 ,11101,1D
             utxt_apl2_screen_txt(v, 0, 24, 80);
             break;
         case 0x1E: // 1 ,1 ,1 ,1 ,0 ,11110,1E
-            utxt_apl2_screen_box(v, 0, 20, 80, "DOUBLE hires");
+            utxt_apl2_screen_box(v, 0, 20, 80, "DOUBLE HIRES");
             utxt_apl2_screen_txt(v, 20, 24, 80);
             break;
         case 0x1F: // 1 ,1 ,1 ,1 ,1 ,11111,1F

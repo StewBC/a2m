@@ -52,8 +52,15 @@ See **INI Files in Depth** for full details.
 # User Interface
 a2m is primarily a GUI-based Apple\ 2 emulator. It also supports a text-based mode, enabled with `--ui text` (or `-u text`). This mode exists mostly as a demonstration of the cleaner architecture introduced after v1.0.
 
-In text mode, the emulator boots into BASIC and accepts input directly from the terminal. If the Apple\ 2 switches to graphics, you simply will not see it. Typed keys are sent to `$C000`, and characters printed by the emulated machine appear in the terminal.  
-This manual does not describe text mode further.
+The text mode emulator runs Apple\ 2 text based software in 40 or 80 columns in a terminal window.  On Windows it opens a new terminal window (I could not get curses input connected to the existing terminal if launched that way) but on a Unix-style OS it runs in the launch terminal.
+
+Should the Apple\ 2 enable a graphics mode, the text based emulator will simply draw a box and label it as LOWRES, HGR, DOUBLE LOWRES or DOUBLE HIRES.  For mixed modes you will see the box in the upper portion of the screen and the normal text in the lower portion.
+
+This mode works well when bootong ProDOS with Bitsy Bye, for example.
+
+On a Unix-style OS, CTRL-C will quit the emulator, so there are meta-keys to press for CTRL and Open- and Close-Apple.  Press F1 in the emulator to see a Key Quick Reference.  Note that the debugger is not available in the text mode emulator.  It is only for running text based Apple\ 2 applications.
+
+The text mode emulator will not be discussed any further.
 
 # Normal Mode
 When launched normally, a2m displays the Apple\ 2's video output in the full application window. It behaves like a ][+ or //e.  
