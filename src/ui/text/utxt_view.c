@@ -1,4 +1,3 @@
-// utxt_lib.c (single-file version)
 // Apple ][+ and //e Enhanced emulator with assembler
 // Stefan Wessels, 2025
 // Public domain.
@@ -302,7 +301,7 @@ int utxt_process_events(UI *ui, APPLE2 *m) {
 void utxt_show_help(UTXT *v) {
     WINDOW *rect = derwin(stdscr, 24, 40, 0, 0);
     box(rect, 0, 0);
-    
+
     int y = 1;
     move(y++, 2);
     addstr("Apple ][+ and //e Enhanced emulator");
