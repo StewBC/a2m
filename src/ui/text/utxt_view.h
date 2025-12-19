@@ -26,7 +26,8 @@ typedef enum {
     RTK_PAGE_DOWN,
     RTK_END,
     RTK_DEL,
-    RTK_TURBO
+    RTK_TURBO,
+    RTK_HELP
 } rt_key;
 
 typedef struct {

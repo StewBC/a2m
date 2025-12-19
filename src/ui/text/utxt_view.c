@@ -35,15 +35,6 @@ static int curses_input_poll(rt_input_event *out) {
         return 0;
     }
 
-    // Quit on HOME
-#ifdef KEY_HOME
-    if(ch == KEY_HOME) {
-        out->type = RT_IN_KEY;
-        out->key  = RTK_HOME;
-        return 1;
-    }
-#endif
-
     // Arrows
 #ifdef KEY_UP
     if(ch == KEY_UP)    {
@@ -74,7 +65,7 @@ static int curses_input_poll(rt_input_event *out) {
     }
 #endif
 
-    // Page up/down becomes open/closed apple, END becomes CTRL
+    // "Special" keys
 #ifdef KEY_NPAGE
     if(ch == KEY_NPAGE) {
         out->type = RT_IN_KEY;
@@ -96,7 +87,19 @@ static int curses_input_poll(rt_input_event *out) {
         return 1;
     }
 #endif
+#ifdef KEY_HOME
+    if(ch == KEY_HOME) {
+        out->type = RT_IN_KEY;
+        out->key  = RTK_HOME;
+        return 1;
+    }
+#endif
 #ifdef KEY_F0
+    if(ch == KEY_F(1)) {
+        out->type = RT_IN_KEY;
+        out->key = RTK_HELP;
+        return 1;
+    }
     if(ch == KEY_F(3)) {
         out->type = RT_IN_KEY;
         out->key = RTK_TURBO;
@@ -110,8 +113,6 @@ static int curses_input_poll(rt_input_event *out) {
         return 1;
     }
 #endif
-
-    // Insert (may be reported as KEY_IC)
 #ifdef KEY_IC
     if(ch == KEY_IC) {
         out->type = RT_IN_KEY;
@@ -226,11 +227,6 @@ int utxt_process_events(UI *ui, APPLE2 *m) {
     int ret = 0;
 
     while(curses_input_poll(&e)) {
-        if(e.type == RT_IN_KEY && e.key == RTK_HOME) {
-            ret = 1;
-            break;
-        }
-
         if(e.type == RT_IN_TEXT) {
             // Apple II KBD uses high bit set.
             if(v->ctrl) {
@@ -241,21 +237,21 @@ int utxt_process_events(UI *ui, APPLE2 *m) {
                 }
                 m->RAM_MAIN[KBD] = 0x80 | (uint8_t)(e.ch + 1);
             } else {
-                m->RAM_MAIN[KBD] = 0x80 | (uint8_t)(e.ch & 0x7F);
+                m->RAM_MAIN[KBD] = 0x80 | (uint8_t)(e.ch);
             }
         } else if(e.type == RT_IN_KEY) {
             switch(e.key) {
                 case RTK_BACKSPACE:
-                    m->RAM_MAIN[KBD] = 0x80 | 0x08;
+                    m->RAM_MAIN[KBD] = 0x88;
                     break;
                 case RTK_RETURN:
-                    m->RAM_MAIN[KBD] = 0x80 | 0x0D;
+                    m->RAM_MAIN[KBD] = 0x8D;
                     break;
                 case RTK_ESCAPE:
-                    m->RAM_MAIN[KBD] = 0x80 | 0x1B;
+                    m->RAM_MAIN[KBD] = 0x9B;
                     break;
                 case RTK_TAB:
-                    m->RAM_MAIN[KBD] = 0x80 | 0x09;
+                    m->RAM_MAIN[KBD] = 0x89;
                     break;
                 case RTK_UP:
                     m->RAM_MAIN[KBD] = 0x8B;
@@ -287,10 +283,13 @@ int utxt_process_events(UI *ui, APPLE2 *m) {
                     }
                     rt->turbo_active = rt->turbo[rt->turbo_index];
                     break;
-                case RTK_INSERT:
-                    // no clipboard integration in terminal mode
-                    break;
-
+                case RTK_HELP:
+                    v->show_help ^= 1;
+                    if(v->show_help) {
+                        rt_machine_stop(v->rt);
+                    } else {
+                        rt_machine_run(v->rt);
+                    }
                 default:
                     break;
             }
@@ -301,25 +300,47 @@ int utxt_process_events(UI *ui, APPLE2 *m) {
 }
 
 void utxt_show_help(UTXT *v) {
-    int x = 0;
-    move(x++, 0);
+    WINDOW *rect = derwin(stdscr, 24, 40, 0, 0);
+    box(rect, 0, 0);
+    
+    int y = 1;
+    move(y++, 2);
+    addstr("Apple ][+ and //e Enhanced emulator");
+    move(y++, 8);
+    addstr("by Stefan Wessels, 2025.");
+    y++;
+    move(y++, 1);
     addstr("Key Quick reference:");
-    move(x++, 0);
-    addstr("HOME = quit");
-    move(x++, 0);
-    addstr("END = CTRL");
-    move(x++, 0);
-    addstr("PAGE UP = Open Apple");
-    move(x++, 0);
-    addstr("PAGE DOWN = Closed Apple");
-    move(x++, 0);
-    addstr("DEL = Reset");
-    move(x++, 0);
-    addstr("Note that the Apple & CTRL keys are tap-active.");
-    move(x++, 0);
-    addstr("Tap once to activate and tap again to de-activate.");
-    move(x++, 0);
-    addstr("There's no debugger or turbo control keys");
+    move(y++, 1);
+#ifdef _WIN32
+    addstr("CTRL+PAUSE Quit");
+#else
+    addstr("CTRL-C.... Quit");
+#endif
+    move(y++, 1);
+    addstr("END....... Apple 2 Control");
+    move(y++, 1);
+    addstr("PAGE UP... Open Apple");
+    move(y++, 1);
+    addstr("PAGE DOWN. Closed Apple");
+    move(y++, 1);
+    addstr("DEL....... Reset");
+    move(y++, 1);
+    addstr("F1........ Help");
+    move(y++, 1);
+    addstr("F3........ Turbo");
+    y++;
+    move(y++, 1);
+    addstr("Note that the Apple & CTRL keys");
+    move(y++, 1);
+    addstr("  are tap-active. Tap once to");
+    move(y++, 1);
+    addstr("  activate and tap again to");
+    move(y++, 1);
+    addstr("  de-activate.");
+    y += 2;
+    move(y, 1);
+    addstr("There is no debugger in text mode.");
 }
 
 void utxt_render_frame(UI *ui, APPLE2 *m, int dirty) {
