@@ -98,7 +98,7 @@ static inline uint8_t apple2_softswitch_read_callback_IIplus(APPLE2 *m, uint16_t
                 break;
             case TXTSET:
                 m->text = 1;
-                break;
+                // break; - Fall through 
             case MIXCLR:
                 m->mixed = 0;
                 break;
