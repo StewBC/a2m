@@ -122,6 +122,9 @@ mRGB lores_palette_mono[16] = {
     { 0xFF, 0xFF, 0xFF },
 };
 
+// double lores interleaves the palette entries of lowres 
+// so this table maps the colors properly based on the bits and bank
+// effectivly de-interleaves the aux bits to non-aux colors
 uint8_t double_aux_map[] = {
     0x00,
     0x02,
@@ -157,17 +160,16 @@ typedef struct {
 // total entries = 128 * 2 * 2 * 2 * 2 = 2048
 static HGRLUTENTRY hgr_lut[128][2][2][2][2];
 // Look Up Table with monochrome
-typedef struct {
-    uint32_t pixel[7];
-} HGRMONOLUTENTRY;
-static HGRMONOLUTENTRY hgr_mono_lut[128];
+static HGRLUTENTRY hgr_mono_lut[128];
 // Lookup tables for lores
 static uint32_t gr_lut[16];
 static uint32_t gr_mono_lut[16];
-// A character width line of pixels for lores
+// A character width line of pixels for lores. 16 colors and
+// 7 pixels wide (all same color) but used with memcpy
 static uint32_t gr_line[16][7];
 static uint32_t gr_mono_line[16][7];
 
+// Looupup table that revesrses the bits of the imdex
 static const uint8_t rev4_lut[16] = {
     0x0, 0x8, 0x4, 0xC,
     0x2, 0xA, 0x6, 0xE,
@@ -244,6 +246,7 @@ void unk_apl2_init_color_table(UNK *v) {
     for(int byte = 0; byte < 128; ++byte) {
         uint8_t x = byte;
         for(int i = 0; i < 7; ++i) {
+            // Assign white or black only based on the bit being 1 ot 0
             hgr_mono_lut[byte].pixel[i] = (x & 1) ? color_table[7][0][0] : color_table[0][0][0];
             x >>= 1;
         }
@@ -877,7 +880,7 @@ void unk_apl2_screen_hgr_mono(UNK *v, int start, int end) {
         // Loop through every column (40 iterations for each 280-pixel row)
         uint8_t *bytes = &m->RAM_MAIN[address];
         for(int x = 0; x < 40; x++) {
-            const HGRMONOLUTENTRY *e = &hgr_mono_lut[*bytes++ & 0x7F];
+            const HGRLUTENTRY *e = &hgr_mono_lut[*bytes++ & 0x7F];
             p[0] = e->pixel[0];
             p[1] = e->pixel[1];
             p[2] = e->pixel[2];
