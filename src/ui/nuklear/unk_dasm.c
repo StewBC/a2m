@@ -612,13 +612,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                     rt_machine_toggle_franklin80_active(rt);
                 }
             } else {
-                if(m->dhires && m->col80set && m->hires) {
-                    if(++v->monitor_type > MONITOR_RGB) {
-                        v->monitor_type = MONITOR_COLOR;
-                    }
-                } else {
-                    v->monitor_type ^= 1;
-                }
+                v->monitor_type ^= 1;
             }
             break;
 

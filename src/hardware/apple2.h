@@ -22,7 +22,6 @@ enum {
 enum {
     MONITOR_COLOR,
     MONITOR_MONO,
-    MONITOR_RGB
 };
 
 // RAM

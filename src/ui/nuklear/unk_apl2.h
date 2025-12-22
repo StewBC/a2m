@@ -22,7 +22,6 @@ void unk_apl2_screen_dlores_mono(UNK *v, int start, int end);
 void unk_apl2_screen_lores(UNK *v, int start, int end);
 void unk_apl2_screen_lores_mono(UNK *v, int start, int end);
 void unk_apl2_screen_dhgr(UNK *v, int start, int end);
-void unk_apl2_screen_dhgr_rgb(UNK *v, int start, int end);
 void unk_apl2_screen_hgr(UNK *v, int start, int end);
 void unk_apl2_screen_hgr_mono(UNK *v, int start, int end);
 void unk_apl2_screen_txt40(UNK *v, int start, int end);
