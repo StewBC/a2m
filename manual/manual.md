@@ -814,7 +814,7 @@ Here are a few examples:
 `break = 0x5000-0x5002,access,10,2`  
 
 \Needspace{9\baselineskip}
-# Appendix C: Version History
+# Appendix A: Version History
 31 Oct 2024 - Initial release  
  8 Dec 2024 - Version 1.0 release  
 10 Dec 2024 - Version 1.1 release  
