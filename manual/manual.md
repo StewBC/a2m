@@ -52,13 +52,13 @@ See **INI Files in Depth** for full details.
 # User Interface
 a2m is primarily a GUI-based Apple\ 2 emulator. It also supports a text-based mode, enabled with `--ui text` (or `-u text`). This mode exists mostly as a demonstration of the cleaner architecture introduced after v1.0.
 
-The text mode emulator runs Apple\ 2 text based software in 40 or 80 columns in a terminal window.  On Windows it opens a new terminal window (I could not get curses input connected to the existing terminal if launched that way) but on a Unix-style OS it runs in the launch terminal.
+The text mode emulator runs Apple\ 2 text-based software in 40 or 80 columns in a terminal window. On Windows it opens a new terminal window (I could not get curses input connected to the existing terminal if launched that way) but on a Unix-style OS it runs in the launch terminal.
 
-Should the Apple\ 2 enable a graphics mode, the text based emulator will simply draw a box and label it as LOWRES, HGR, DOUBLE LOWRES or DOUBLE HIRES.  For mixed modes you will see the box in the upper portion of the screen and the normal text in the lower portion.
+Should the Apple\ 2 enable a graphics mode, the text-based emulator will simply draw a box and label it as LOWRES, HGR, DOUBLE LOWRES or DOUBLE HIRES. For mixed modes you will see the box in the upper portion of the screen and the normal text in the lower portion.
 
-This mode works well when bootong ProDOS with Bitsy Bye, for example.
+This mode works well when booting ProDOS with Bitsy Bye, for example.
 
-On a Unix-style OS, CTRL-C will quit the emulator, so there are meta-keys to press for CTRL and Open- and Close-Apple.  Press F1 in the emulator to see a Key Quick Reference.  Note that the debugger is not available in the text mode emulator.  It is only for running text based Apple\ 2 applications.
+On a Unix-style OS, CTRL-C will quit the emulator, so there are meta-keys to press for CTRL and Open- and Close-Apple. Press F1 in the emulator to see a Key Quick Reference. Note that the debugger is not available in the text mode emulator. It is only for running text-based Apple\ 2 applications.
 
 The text mode emulator will not be discussed any further.
 
@@ -109,7 +109,7 @@ The following keys control the debugger regardless of whether the Debug Mode Vie
 
 \Needspace{10\baselineskip}
 ## Opening the Debugger
-Press **F2** to open the Debug Mode View. Press **F2** again to hide it.  The following table represents the layout of the Debugger Views, when opened. 
+Press **F2** to open the Debug Mode View. Press **F2** again to hide it. The following table represents the layout of the Debugger Views, when opened. 
 
 | Position             | View |
 |:---------------------|:----------------------------------------------------------------------------|
@@ -165,7 +165,7 @@ Flags are:
 ## Disassembly View
 The disassembly view shows the code being executed by the CPU. When running or stepping, the current instruction (at the PC) is highlighted. Other highlighted lines include:
 
-* the cursor  
+* the cursor
 * any addresses with a **stop** breakpoint  
   (breakpoints with non-stop actions do not appear highlighted)
 
@@ -228,7 +228,7 @@ On the Apple\ ][+ model, the 128 K option is disabled.
 The **scrollbar** on the right scrolls from address `$0000` to `$FFFF`.  
 A mouse **scroll wheel** scrolls by 4 lines. Scroll sensitivity can be configured (see **INI Files in Depth - Config**).
 
-Click on any row, outside the address section, to put the cursor on that row.  Click on the address section to set the address of that row (Same as pressing CTRL+a).
+Click on any row, outside the address section, to put the cursor on that row. Click on the address section to set the address of that row (Same as pressing CTRL+a).
 
 \Needspace{11\baselineskip}
 ## Memory View
@@ -281,6 +281,8 @@ The **scrollbar** on the right scrolls from address `$0000` to `$FFFF`.
 A mouse **scroll wheel** scrolls by 4 lines. Scroll sensitivity can be configured (see **INI Files in Depth – Config**).
 
 Click on any row, outside the address section, to place the cursor on that row. Click on the address section to set the address of that row (same as pressing CTRL+a).
+
+Right-click on a value in the hex address matrix to open a pop-up window that shows the last four program-counter addresses where the selected address was modified. The top entry is the most recent change—the change that resulted in the current value at this address. If an address in the pop-up is `$0000`, it means that fewer than four changes to this address were recorded. Select any of the four addresses in the pop-up to move the cursor to the corresponding line in the disassembly view.
 
 ## Miscellaneous View
 The Miscellaneous View consists of sub-views that can be opened and closed at will. Each sub-view has a triangle to the left of its name; clicking the triangle opens or closes the sub-view. The Miscellaneous View also has a scrollbar on the right, making it possible to see all details without closing any sub-views.
@@ -406,25 +408,27 @@ For example, setting Mixed to ON will draw the Apple\ 2 screen as though Mixed i
 Note that the addresses work in pairs, and only the first address is shown in the table. The odd address turns the setting on, and the even address turns the setting off. For example, `$C000` sets `80STORE` and `$C001` clears `80STORE`.
 
 \Needspace{18\baselineskip}
-| Address | Meaning |
-|:-------:|:---------------------------------------------------------------------------------|
-| C000    | 80STORE |
-| C003    | RAMRD |
-| C005    | RAMWRT |
-| C007    | CXROM |
-| C009    | ALTZP |
-| C00B    | C3ROM |
-| C00D    | 80COL |
-| C00F    | ALTCHAR |
-| C051    | TEXT |
-| C053    | MIXED |
-| C055    | PAGE2 |
-| C057    | HIRES |
-| C05E    | DHGR |
-| C08x    | LCBANK |
-| C08x    | LCREAD |
-| C08X    | LCPREWRITE |
-| C08X    | LCWRITE |
+| Address | Meaning                                                                             |
+|:-------:|:------------------------------------------------------------------------------------|
+| C001    | 80STORE - ($C054/$C055) selects main vs aux independently of RAMRD/WRT for disp mem |
+| C003    | RAMRD   - CPU reads aux $0200-$BFFF and LC $D000-$FFFF, see 80STORE               |
+| C005    | RAMWRT  - CPU writes aux $0200-$BFFF and LC $D000-$FFFF, see 80STORE               |
+| C007    | CXROM   - C100-CFFF //e ROM (overrides C3ROM and CFFF)                              |
+| C009    | ALTZP   - ZP/stack are in aux bank                                                  |
+| C00B    | C3ROM   - Turn internal ROM off, turn Slot ROM on                                   |
+| C00D    | 80COL   - 80-column display (turn 80-col display on)                                |
+| C00F    | ALTCHAR - alternate character set                                                   |
+| C051    | TEXT    - Enable text mode                                                          |
+| C053    | MIXED   - Graphics modes have 4 lines of text at the bottom                         |
+| C055    | PAGE2   - Display from $800/$4000 instead of  $400/$2000                            |
+| C057    | HIRES   - Enable high resolution graphics mode                                      |
+| C05E    | DHGR    - Enable double resolution graphics mode                                    |
+| C08X    | LCBANK  - Bank1 vs Bank2                                                            |
+| C08X    | LCREAD  - Show RAM vs ROM at $D000-$FFFF                                            |
+| C08X    | LCPREWRITE                                                                          |
+| C08X    | LCWRITE - Write to RAM at $D000-$FFFF                                              |
+
+The descriptions of the above are very loose. See a credible source for proper explanations.
 
 ## Dialogs
 The dialog boxes are activated from various views and reused wherever needed in a2m.
@@ -495,14 +499,14 @@ It is worth noting that assembly files can include other assembly files. This ca
 The assembler supports these features:
 
 | Feature        | Description                                                                        |
-|:---------------|:-----------------------------------------------------------------------------------|
-| 6502 mnemonics | All standard opcodes and addressing modes                                          |
-| labels         | Labels start with `a-z` or `_` and can contain numbers. A label ends with `:`       |
-| variables      | Values can be assigned and used in expressions                                     |
-| .commands      | Dot commands are described below                                                   |
-| comments       | The comment character is `;`; everything after `;` on a line is ignored            |
-| address        | The address character is `*`; it can be assigned and read                          |
-| expressions    | The assembler has a full expression parser                                         |
+|:-----------------|:-----------------------------------------------------------------------------------|
+| 65x02 mnemonics  | All standard opcodes and addressing modes                                          |
+| labels           | Labels start with `a-z` or `_` and can contain numbers. A label ends with `:`       |
+| variables        | Values can be assigned and used in expressions                                     |
+| .commands        | Dot commands are described below                                                   |
+| comments         | The comment character is `;` and everything after `;` on a line is ignored            |
+| address          | The address character is `*` and it can be assigned and read                          |
+| expressions      | The assembler has a full expression parser                                         |
 
 \Needspace{27\baselineskip}
 There is a set of directives that control how a 6502 source file is assembled. These are referred to as `dot commands`, since each keyword starts with a `.`. The available `dot commands` are:
@@ -561,8 +565,8 @@ The assembler has a full expression parser. The following table lists valid toke
 | equality                          | `.ne .eq` for `!=, ==`                                      |
 | `&`                               | Bitwise AND                                                 |
 | `^`                               | Bitwise exclusive OR                                        |
-| `\|`                              | Bitwise OR                                                  |
-| `&&`, `\|\|`                      | Logical AND and OR                                          |
+| `|`                              | Bitwise OR                                                  |
+| `&&`, `||`                      | Logical AND and OR                                          |
 | `?`, `:`                          | Ternary conditional                                         |
 
 \Needspace{9\baselineskip}
@@ -572,8 +576,8 @@ Numbers can be written in the following formats:
 | Prefix  | Base                                                                              |
 |:--------|:----------------------------------------------------------------------------------|
 | `$`     | Hexadecimal number. $ followed by 1 to 4 digits                                   |
-| `0`     | Octal number.  0 followed by digits in the range 0..7                             |
-| `%`     | Binary number. % followed by didgts 0 or 1 only                                   |
+| `0`     | Octal number. 0 followed by digits in the range 0..7                              |
+| `%`     | Binary number. % followed by digits 0 or 1 only                                   |
 | `1`–`9` | Decimal number.                                                                   |
 
 \Needspace{8\baselineskip}
@@ -581,9 +585,9 @@ Inside strings, numbers can also be quoted. In that case, the formats are:
 
 | Prefix      | Base                                                                        |
 |:------------|:----------------------------------------------------------------------------|
-| `\x[N]+`    | Hexadecimal number.  The same rules apply as in the previous table          |
+| `\x[N]+`    | Hexadecimal number. The same rules apply as in the previous table          |
 | `\0[N]+`    | Octal                                                                       |
-| `\%[1\|0]+` | Binary                                                                      |
+| `\%[1|0]+`  | Binary                                                                      |
 | `\[0-9]+`   | Decimal                                                                     |
 
 \Needspace{6\baselineskip}
@@ -662,7 +666,7 @@ Macros have the form:
 .endmacro
 ```
 
-\Needspace{8\baselineskip}
+\Needspace{10\baselineskip}
 Arguments are variables. For example:
 ```
 .macro add_a_b a b
@@ -671,18 +675,21 @@ Arguments are variables. For example:
     adc b
 .endmacro
 
-    add_a_b 12, 25 ; This is a call to use the macro
+    add_a_b 12, 25          ; This is a call to use the macro
+    add_a_b "($55),y", #12  ; another call to use the macro with very different parameters
 ```
+Notice that the `($55),y` is in quotation marks. Any parameter that contains a `,` must be completely wrapped in `"` marks.
 
-\Needspace{4\baselineskip}
+\Needspace{7\baselineskip}
 This emits:
 ```
     clc
     lda 12
     adc 15
+    clc
+    lda ($55),y
+    adc #12
 ```
-
-Note the lack of `#`. You cannot call the macro with `add_a_b #12, #25`, since `#12` is not a valid variable value. The `#` must be part of the macro body. This macro system is not yet very powerful, but it helps reduce repetition.
 
 \Needspace{7\baselineskip}
 #### Assembler Strcode
@@ -811,5 +818,5 @@ Here are a few examples:
 31 Oct 2024 - Initial release  
  8 Dec 2024 - Version 1.0 release  
 10 Dec 2024 - Version 1.1 release  
-xx xxx xxxx - Version 2.0 release  
-    The version 2 release is a re-architecture of the entire code base, as well as a rewrite of the 6502 core, adding a 65C02 mode. The Apple\ //e is also supported, along with many new features such as a resizable window, window pane sliders, and more.
+23 Dec 2025 - Version 2.0 release  
+    The version 2 release is a re-architecture of the entire code base, as well as a rewrite of the 6502 core, adding a 65C02 mode. The Apple\ //e is also supported, along with many new features such as a NIB Disk II, resizable window, window pane sliders, and many more.
