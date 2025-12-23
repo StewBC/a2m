@@ -758,7 +758,7 @@ MACRO_ARG parse_macro_args(const char **pp) {
 
     // Skip the closing quote after setting the length right
     if(*p == '"') {
-        *p++;
+        p++;
     }
 
     // trim trailing space
