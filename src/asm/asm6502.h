@@ -167,6 +167,7 @@ typedef struct INPUT_STACK {
     const char *next_line_start;
     size_t next_line_count;
     size_t current_line;
+    const char *line_start;
 } INPUT_STACK;
 
 typedef struct PARSE_DATA {
@@ -189,15 +190,21 @@ typedef struct FOR_LOOP {                                   // For init, conditi
     size_t iterations;                                      // Break out of runaway loops
 } FOR_LOOP;
 
-typedef struct MACRO_VARIABLE {
+typedef struct MACRO_VARIABLE {                             // This is for the formal macro parameters
     const char *variable_name;
     int variable_name_length;
 } MACRO_VARIABLE;
 
+typedef struct MACRO_ARG {                                  // This is for the macro call arguments
+    const char *text;
+    int text_length;
+} MACRO_ARG;
+
 typedef struct MACRO {
     const char *macro_name;
     int macro_name_length;
-    INPUT_STACK macro_body_input;
+    INPUT_STACK macro_body_input;                           // Start of macro body text
+    const char *macro_body_end;
     DYNARRAY macro_parameters;
 } MACRO;
 
@@ -216,6 +223,7 @@ typedef struct ASSEMBLER {
     DYNARRAY input_stack;                                   // Array of token "reset" points (saved token_start, input, etc)
     DYNARRAY loop_stack;                                    // Array of for loops
     DYNARRAY macros;                                        // Array of all macros
+    DYNARRAY macro_buffers;                                 // Array of all buffers that macros expand into
     INCLUDE_FILES include_files;                            // The arrays for files and stack for .include
     OPCODEINFO opcode_info;                                 // State of what is to be emitted in terms of 6502 opcodes
     RAMVIEW_FLAGS selected;                                 // default is MEM_MAPPED_6502

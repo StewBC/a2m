@@ -22,6 +22,7 @@ int anonymous_symbol_lookup(ASSEMBLER *as, uint16_t *address, int direction);
 void symbol_clear(ASSEMBLER *as, const char *symbol_name, uint32_t symbol_name_length);
 const char *find_delimiter(ASSEMBLER *as, const char *delimitors);
 int match(ASSEMBLER *as, int number, ...);
+void append_bytes(char **buf, size_t *len, size_t *cap, const char *src, size_t n);
 void decode_abs_rel_zp_opcode(ASSEMBLER *as);
 int is_indirect(ASSEMBLER *as, char *reg);
 int is_address(ASSEMBLER *as);
@@ -334,6 +335,7 @@ int input_stack_push(ASSEMBLER *as) {
     is.current_line = as->current_line;
     is.next_line_count = as->next_line_count;
     is.next_line_start = as->next_line_start;
+    is.line_start = as->line_start;
     return ARRAY_ADD(&as->input_stack, is);
 }
 
@@ -347,6 +349,7 @@ void input_stack_pop(ASSEMBLER *as) {
         as->current_line = is->current_line;
         as->next_line_count = is->next_line_count;
         as->next_line_start = is->next_line_start;
+        as->line_start = is->line_start;
     }
 }
 
@@ -652,6 +655,27 @@ int match(ASSEMBLER *as, int number, ...) {
     return -1;
 }
 
+void append_bytes(char **buf, size_t *len, size_t *cap, const char *src, size_t n) {
+    if(n == 0) {
+        return;
+    }
+    if(*len + n + 1 > *cap) {
+        size_t newcap = (*cap == 0) ? 256 : *cap;
+        while(*len + n + 1 > newcap) {
+            newcap *= 2;
+        }
+        char *nb = (char *)realloc(*buf, newcap);
+        if(!nb) {
+            return;
+        }
+        *buf = nb;
+        *cap = newcap;
+    }
+    memcpy(*buf + *len, src, n);
+    *len += n;
+    (*buf)[*len] = '\0';
+}
+
 void find_ab_passing_over_c(ASSEMBLER *as, const char *a, const char *b, const char *c) {
     int nest_level = 1;
     size_t a_len = strlen(a);
@@ -679,6 +703,75 @@ void find_ab_passing_over_c(ASSEMBLER *as, const char *a, const char *b, const c
     if(as->input == as->token_start) {
         get_token(as);
     }
+}
+
+MACRO_ARG parse_macro_args(const char **pp) {
+    const char *p = *pp;
+
+    // trim leading space
+    while(*p == ' ' || *p == '\t') {
+        p++;
+    }
+
+    const char *start = p;
+    int parens = 0;
+    int in_string = 0;
+
+    // lift the token, respecting '"'s - ','s have to be quoted, ie
+    // my_macro "lda ($50),y", sta $25
+    // will work, and the inner ',' isn't mistaken as a arg seperator
+    while(*p) {
+        char c = *p;
+
+        if(!in_string) {
+            if(c == ';' || c == '\n' || c == '\r') {
+                break;
+            }
+            if(c == ',' && parens == 0) {
+                break;
+            }
+            if(c == '(') {
+                parens++;
+            } else if(c == ')' && parens > 0) {
+                parens--;
+            }
+            if(c == '"') {
+                in_string = 1;
+                if(p == start) {
+                    start++;
+                }
+            }
+        } else {
+            if(c == '"' && p[-1] != '\\') {
+                in_string = 0;
+                break;
+            }
+            if(c == '\n' || c == '\r') {
+                break;
+            }
+        }
+
+        p++;
+    }
+
+    const char *end = p;
+
+    // Skip the closing quote after setting the length right
+    if(*p == '"') {
+        *p++;
+    }
+
+    // trim trailing space
+    while(end > start && (end[-1] == ' ' || end[-1] == '\t')) {
+        end--;
+    }
+
+    MACRO_ARG a;
+    a.text = start;
+    a.text_length = (int)(end - start);
+
+    *pp = p;
+    return a;
 }
 
 //----------------------------------------------------------------------------
@@ -778,25 +871,148 @@ int is_label(ASSEMBLER *as) {
 int is_macro_parse_macro(ASSEMBLER *as) {
     size_t i;
     int name_length = (int)(as->input - as->token_start);
+
     for(i = 0; i < as->macros.items; i++) {
         MACRO *macro = ARRAY_GET(&as->macros, MACRO, i);
         if(name_length == macro->macro_name_length && 0 == strnicmp(as->token_start, macro->macro_name, name_length)) {
-            size_t p;
-            // This is a macro to execute - load the parameters into the variables
-            as->current_token.op = ',';
-            for(p = 0; p < macro->macro_parameters.items; p++) {
-                MACRO_VARIABLE *mv = ARRAY_GET(&macro->macro_parameters, MACRO_VARIABLE, p);
-                if(as->current_token.op == ',') {
-                    uint64_t value = evaluate_expression(as);
-                    symbol_store(as, mv->variable_name, mv->variable_name_length, SYMBOL_VARIABLE, value);
-                } else {
-                    symbol_clear(as, mv->variable_name, mv->variable_name_length);
+
+            const size_t argc = macro->macro_parameters.items;
+
+            // Get the raw parameters to the macro
+            MACRO_ARG *args = NULL;
+            if(argc) {
+                args = (MACRO_ARG *)calloc(argc, sizeof(MACRO_ARG));
+                if(!args) {
+                    asm_err(as, "Out of memory");
+                    return 1;
                 }
             }
-            // Then make the macro active
-            input_stack_push(as); // save current parse point
-            ARRAY_ADD(&as->input_stack, macro->macro_body_input); // add macro parse point
-            input_stack_pop(as); // make that the current parse point
+
+            const char *p = as->input; // points after macro name token
+            for(size_t ai = 0; ai < argc; ai++) {
+                // If at end-of-line or at a comment, remaining args are empty
+                while(*p == ' ' || *p == '\t') {
+                    p++;
+                }
+                if(*p == '\0' || *p == ';' || *p == '\n' || *p == '\r') {
+                    args[ai].text = NULL;
+                    args[ai].text_length = 0;
+                    continue;
+                }
+                args[ai] = parse_macro_args(&p);
+                // skip comma
+                if(*p == ',') {
+                    p++;    
+                }
+            }
+
+            // Advance input to end-of-line, past all macro parameters so parsing can continue
+            while(*p && *p != '\n' && *p != '\r') {
+                if(*p == ';') {
+                    break;
+                }
+                p++;
+            }
+            as->input = p;
+            as->token_start = p;
+            input_stack_push(as);
+
+            // Expand macro body using get_token()
+            const char *body_start = macro->macro_body_input.input;
+            const char *body_end   = macro->macro_body_end;
+
+            if(!body_start || !body_end || body_end < body_start) {
+                free(args);
+                asm_err(as, "Macro body end not set for %.*s", macro->macro_name_length, macro->macro_name);
+                return 1;
+            }
+
+            // Set up to parse macro body
+            as->input = as->token_start = body_start;
+            as->next_line_count = 0;
+
+            char *out = NULL;
+            size_t out_len = 0, out_cap = 0;
+
+            const char *cursor = body_start;
+
+            while(as->input < body_end && *as->input) {
+                get_token(as); // advances as->input, sets as->token_start
+
+                const char *ts = as->token_start;
+                const char *te = as->input;
+
+                if(ts > body_end) {
+                    ts = body_end;
+                }
+                if(te > body_end) {
+                    te = body_end;
+                }
+
+                // Copy bytes before token
+                if(cursor < ts) {
+                    append_bytes(&out, &out_len, &out_cap, cursor, (size_t)(ts - cursor));
+                }
+
+                // Copy or substitute token bytes
+                if(ts < te) {
+                    if(is_variable(as)) {
+                        int substituted = 0;
+                        for(size_t mi = 0; mi < argc; mi++) {
+                            MACRO_VARIABLE *mv = ARRAY_GET(&macro->macro_parameters, MACRO_VARIABLE, mi);
+                            if(mv->variable_name_length == (int)(te - ts) &&
+                                    0 == strnicmp(ts, mv->variable_name, (size_t)(te - ts))) {
+                                // Substitute raw argument text
+                                if(args[mi].text && args[mi].text_length > 0) {
+                                    append_bytes(&out, &out_len, &out_cap, args[mi].text, (size_t)args[mi].text_length);
+                                }
+                                substituted = 1;
+                                break;
+                            }
+                        }
+                        if(!substituted) {
+                            append_bytes(&out, &out_len, &out_cap, ts, (size_t)(te - ts));
+                        }
+                    } else {
+                        append_bytes(&out, &out_len, &out_cap, ts, (size_t)(te - ts));
+                    }
+                }
+
+                cursor = te;
+            }
+
+            // Copy any trailing bytes up to body_end
+            if(cursor < body_end) {
+                append_bytes(&out, &out_len, &out_cap, cursor, (size_t)(body_end - cursor));
+            }
+			// Add the body to the list
+			// Note that these have to stay past pass 1 so that
+			// symbols in pass 2, from here in pass 1, still exist
+			// I could reuse the buffer in pass 2 if I hash the sig
+			// or I can just live with all of these buffers, which
+			// is what I currently choose to do
+            ARRAY_ADD(&as->macro_buffers, out);
+
+
+            free(args);
+
+            if(!out) {
+                asm_err(as, "Out of memory");
+                return 1;
+            }
+
+            // Ensure buffer ends with newline
+            if(out_len == 0 || out[out_len - 1] != '\n') {
+                append_bytes(&out, &out_len, &out_cap, "\n", 1);
+            }
+
+            // Activate expanded macro buffer directly
+            as->current_file = macro->macro_body_input.current_file;
+            as->current_line = macro->macro_body_input.current_line;
+            as->line_start   = out;
+            as->next_line_start = out;
+            as->next_line_count = 0;
+            as->input = as->token_start = out;
 
             return 1;
         }
@@ -805,7 +1021,6 @@ int is_macro_parse_macro(ASSEMBLER *as) {
 }
 
 int is_opcode(ASSEMBLER *as) {
-    // SQW Maked this case the same all caps style as used everywhere else
     OPCODEINFO *oi;
     if(as->input - as->token_start != 3 || *as->token_start == '.' || !(oi = in_word_set(as->token_start, 3))) {
         return 0;
@@ -903,6 +1118,7 @@ void parse_dot_endif(ASSEMBLER *as) {
 
 void parse_dot_endmacro(ASSEMBLER *as) {
     if(!input_stack_empty(as)) {
+        // Do not free the macro buffer here, there might be a reference to a symbol name
         // Return to the parse point where the macro was called
         input_stack_pop(as);
     } else {
@@ -1054,6 +1270,7 @@ void process_dot_macro(ASSEMBLER *as) {
     input_stack_pop(as);
     // Look for .endmacro, ignoring the macro body
     find_ab_passing_over_c(as, ".endmacro", NULL, ".macro");
+    macro.macro_body_end = as->input;
     if(!(*as->input)) {
         macro_okay = 0;
         asm_err(as, ".macro %.*s L%05zu, with no .endmacro\n", macro.macro_name_length, macro.macro_name, macro.macro_body_input.current_line);
@@ -1363,6 +1580,9 @@ void parse_opcode(ASSEMBLER *as) {
         }
         if(!processed) {
             // general case
+            if(as->current_token.type == TOKEN_END) {
+                asm_err(as, "Opcode %.3s with mode %s expects an operand", as->opcode_info.mnemonic, address_mode_txt[as->opcode_info.addressing_mode]);
+            }
             as->opcode_info.value = parse_expression(as);
             if(as->opcode_info.width >= 8 && as->expression_size > 8) {
                 as->opcode_info.width = 16;                 //as->expression_size;
@@ -1392,6 +1612,7 @@ int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, void *user, output_byte ob
     ARRAY_INIT(&as->anon_symbols, uint16_t);
     ARRAY_INIT(&as->loop_stack, FOR_LOOP);
     ARRAY_INIT(&as->macros, MACRO);
+    ARRAY_INIT(&as->macro_buffers, char *);
     ARRAY_INIT(&as->input_stack, INPUT_STACK);
 
     int bucket;
@@ -1478,8 +1699,15 @@ void assembler_shutdown(ASSEMBLER *as) {
         array_free(&as->symbol_table[i]);
     }
     free(as->symbol_table);
+    // free active macro buffer (if any)
+    while(as->macro_buffers.items) {
+        char *buf = *ARRAY_GET(&as->macro_buffers, char*, as->macro_buffers.items - 1);
+        free(buf);
+        as->macro_buffers.items--;
+    }
     array_free(&as->input_stack);
     array_free(&as->macros);
+    array_free(&as->macro_buffers);
     array_free(&as->loop_stack);
     array_free(&as->anon_symbols);
 }

@@ -232,14 +232,16 @@ int64_t parse_primary(ASSEMBLER *as) {
     } else if(as->current_token.type == TOKEN_OP && as->current_token.op == 'D') {
         value = 0;
         next_token(as);
-        if(as->current_token.type == TOKEN_VAR) {
-            SYMBOL_LABEL *sl = symbol_lookup(as, as->current_token.name_hash, as->current_token.name, as->current_token.name_length);
-            if(sl) {
-                value = 1;
+        // If there is a token, something is defined
+        if(as->current_token.type != TOKEN_END) {
+            // Now consume everything to the end of the line
+            while(as->current_token.type != TOKEN_END || !util_character_in_characters(as->current_token.op, ";\n\r")) {
+                next_token(as);
             }
-            next_token(as);
+            value = 1;
         } else {
-            asm_err(as, ".defined expects a variable to follow");
+            // Nothing defined
+            value = 0;
         }
     } else if(as->current_token.type == TOKEN_NUM) {
         value = as->current_token.value;
