@@ -5,7 +5,7 @@
 ; Stefan Wessels, 2020
 ; This is free and unencumbered software released into the public domain.
 
-
+;-----------------------------------------------------------------------------
 ZEROPAGE    = $50
 LOWMEM      = $0800
 HGR         = $4000
@@ -21,32 +21,31 @@ HGR         = $4000
 .incbin "logo.hgr"
 
 ;-----------------------------------------------------------------------------
-: CODE = :-     ; Current address, also CODE = * - 1
+: CODE = :-                                      ; Current address, also CODE = * - 1
 
-main: ;  .proc
+main:
 
-    jsr mainInit
-    jsr uiWaitForIntroEnter
+    jsr mainInit                                 ; do some one-time global init
+    jsr uiWaitForIntroEnter                      ; color cycle ENTER and wait for key
 
 main_loop:
-    jsr uiTitleScreen
-    and #EVENT_EXIT_GAME
+    jsr uiTitleScreen                            ; go to the ui
+    and #EVENT_EXIT_GAME                         ; see if event to exit game is set
     bne main_quit
-    jsr gameLoop
-    jmp main_loop
+    jsr gameLoop                                 ; not main_quit, so run the gameplay (or demo)
+    jmp main_loop                                ; go back to the ui
 
 main_quit:
-    jsr MLI
+    jsr MLI                                      ; main_quit using the prodos mli
 
-    .byte   $65
-    .word   *+1
+    .byte   $65                                  ; ProDOS Quit request
+    .word   *+ 1
     .byte   4
     .byte   0
     .word   0000
     .byte   0
     .word   0000
 
-; endproc
 
 ;-----------------------------------------------------------------------------
 .include "audio.inc"
@@ -60,25 +59,21 @@ main_quit:
 .include "ui.inc"
 .include "willy.inc"
 
+
 ;-----------------------------------------------------------------------------
-mainInit: ;  .proc
+mainInit:
 
-    lda #0
-    sta backPage
-    sta leftEdge
-    sta cameraMode
-    sta uiComponent
-    sta cheatActive
-    sta cheatIndex
-    sta monochrome
+    lda #0                                       ; init some one-time globals
+    ldx #bit7Mask-ZEROPAGE
+:   sta ZEROPAGE,x
+    dex
+    bne :-
 
-    lda #AUDIO_MUSIC | AUDIO_SOUND
+    lda #AUDIO_MUSIC | AUDIO_SOUND               ; turn the music and in-game sounds on
     sta audioMask
+    lda #>HGRPage1                               ; set the current hidden (back) page to page 1
+    sta currPageH                                ; (page 2 was made visible by the loader)
 
-    lda #>HGRPage1
-    sta currPageH
-    lda #0
-    sta backPage
     bit TXTCLR
     bit MIXCLR
     bit HISCR
@@ -86,17 +81,15 @@ mainInit: ;  .proc
     jsr screenSwap
     jsr screenSwap
 
-    lda #$80
-    ldx #7
+    lda #$80                                     ; make a zero-page bit mask area for checking bits
+    ldx #7                                       ; from 1 to 128, set each bit (backwards)
 :
-    sta bitMasks, x
+    sta bitMasks, x                              ; set the bits in the area called bitMasks
     lsr
     dex
     bpl :-
 
     rts
-
-; endproc
 
 ; RODATA
 .include "roaudio.inc"

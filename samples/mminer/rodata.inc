@@ -5,9 +5,6 @@
 ; Stefan Wessels, 2020
 ; This is free and unencumbered software released into the public domain.
 
-;-----------------------------------------------------------------------------
-; .segment "RODATA"
-
 manicText:
 .byte $88, $D8, $A8, $88, $88, $00, $00
 .byte $00, $70, $88, $88, $F8, $88, $00

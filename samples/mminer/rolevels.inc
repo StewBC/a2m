@@ -6,8 +6,6 @@
 ; This is free and unencumbered software released into the public domain.
 
 ;-----------------------------------------------------------------------------
-; .segment "RODATA"
-
 level_01:
 .byte $1A, $40, $14, $60, $1E, $60, $2F, $40, $F2, $04, $FF, $00, $2F, $40, $F2, $04
 .byte $F7, $00, $13, $50, $13, $50, $2D, $41, $41, $71, $48, $71, $2F, $40, $F2, $04
@@ -228,26 +226,26 @@ levelsH:
 ;
 ; floor1, floor2, conveyor, wall, bush, rock, collapse, key - door & switch not here
 levelTiles:
-.byte $31, $00, $1C, $1F, $0D, $28, $27, $09    ; Level 1
-.byte $31, $00, $1C, $1F, $0D, $28, $27, $10    ; Level 2
-.byte $2E, $03, $1E, $15, $0D, $05, $2D, $09    ; Level 3
-.byte $31, $00, $1C, $1F, $0D, $34, $27, $09    ; Level 4
-.byte $31, $00, $07, $1F, $0D, $13, $27, $08    ; Level 5
-.byte $2F, $00, $1C, $1F, $0D, $0B, $31, $09    ; Level 6
-.byte $31, $00, $16, $1F, $0D, $17, $26, $09    ; Level 7
-.byte $31, $35, $1D, $1F, $0D, $13, $27, $14    ; Level 8
-.byte $31, $00, $07, $18, $0D, $13, $27, $09    ; Level 9
-.byte $12, $30, $1C, $1B, $0D, $0F, $20, $01    ; Level 10
-.byte $31, $33, $21, $1A, $04, $03, $27, $0A    ; Level 11
-.byte $31, $35, $1D, $1F, $0D, $13, $27, $14    ; Level 12
-.byte $29, $23, $07, $18, $0D, $13, $31, $06    ; Level 13
-.byte $2C, $2B, $07, $22, $00, $00, $31, $19    ; Level 14
-.byte $32, $2A, $21, $1A, $04, $03, $27, $11    ; Level 15
-.byte $31, $31, $1D, $1B, $0E, $13, $27, $02    ; Level 16
-.byte $31, $00, $1C, $25, $0D, $0C, $26, $09    ; Level 17
-.byte $31, $00, $1C, $24, $0D, $13, $27, $09    ; Level 18
-.byte $31, $00, $1C, $1F, $0D, $13, $27, $09    ; Level 19
-.byte $31, $00, $1C, $1F, $04, $13, $27, $09    ; Level 20
+.byte $31, $00, $1C, $1F, $0D, $28, $27, $09     ; Level 1
+.byte $31, $00, $1C, $1F, $0D, $28, $27, $10     ; Level 2
+.byte $2E, $03, $1E, $15, $0D, $05, $2D, $09     ; Level 3
+.byte $31, $00, $1C, $1F, $0D, $34, $27, $09     ; Level 4
+.byte $31, $00, $07, $1F, $0D, $13, $27, $08     ; Level 5
+.byte $2F, $00, $1C, $1F, $0D, $0B, $31, $09     ; Level 6
+.byte $31, $00, $16, $1F, $0D, $17, $26, $09     ; Level 7
+.byte $31, $35, $1D, $1F, $0D, $13, $27, $14     ; Level 8
+.byte $31, $00, $07, $18, $0D, $13, $27, $09     ; Level 9
+.byte $12, $30, $1C, $1B, $0D, $0F, $20, $01     ; Level 10
+.byte $31, $33, $21, $1A, $04, $03, $27, $0A     ; Level 11
+.byte $31, $35, $1D, $1F, $0D, $13, $27, $14     ; Level 12
+.byte $29, $23, $07, $18, $0D, $13, $31, $06     ; Level 13
+.byte $2C, $2B, $07, $22, $00, $00, $31, $19     ; Level 14
+.byte $32, $2A, $21, $1A, $04, $03, $27, $11     ; Level 15
+.byte $31, $31, $1D, $1B, $0E, $13, $27, $02     ; Level 16
+.byte $31, $00, $1C, $25, $0D, $0C, $26, $09     ; Level 17
+.byte $31, $00, $1C, $24, $0D, $13, $27, $09     ; Level 18
+.byte $31, $00, $1C, $1F, $0D, $13, $27, $09     ; Level 19
+.byte $31, $00, $1C, $1F, $04, $13, $27, $09     ; Level 20
 
 ; This table says which color index to use, to color a
 ; tile (1-8), per level.  The colors are:
@@ -257,26 +255,26 @@ levelTiles:
 ;
 ; floor1, floor2, conveyor, wall, bush, rock, collapse, key - door & switch not here
 levelMasks:
-.byte $01, $02, $03, $02, $01, $02, $04, $00    ; Level 1
-.byte $03, $02, $03, $02, $01, $02, $04, $00    ; Level 2
-.byte $04, $00, $03, $04, $01, $03, $01, $00    ; Level 3
-.byte $02, $00, $03, $04, $01, $00, $04, $00    ; Level 4
-.byte $04, $02, $02, $01, $00, $02, $01, $00    ; Level 5
-.byte $01, $00, $04, $02, $01, $00, $04, $00    ; Level 6
-.byte $03, $02, $01, $04, $01, $00, $02, $00    ; Level 7
-.byte $02, $00, $01, $00, $01, $02, $04, $00    ; Level 8
-.byte $03, $02, $01, $02, $01, $02, $04, $00    ; Level 9
-.byte $01, $00, $01, $02, $01, $01, $02, $00    ; Level 10
-.byte $04, $00, $03, $02, $02, $00, $01, $00    ; Level 11
-.byte $03, $00, $00, $02, $01, $02, $04, $00    ; Level 12
-.byte $04, $03, $01, $02, $01, $02, $04, $00    ; Level 13
-.byte $04, $03, $00, $04, $01, $02, $04, $00    ; Level 14
-.byte $04, $02, $00, $00, $02, $00, $04, $00    ; Level 15
-.byte $02, $03, $00, $03, $01, $02, $04, $00    ; Level 16
-.byte $01, $02, $01, $02, $01, $00, $04, $00    ; Level 17
-.byte $02, $02, $03, $03, $01, $02, $04, $00    ; Level 18
-.byte $01, $02, $00, $02, $01, $02, $04, $00    ; Level 19
-.byte $02, $02, $04, $01, $00, $02, $04, $00    ; Level 20
+.byte $01, $02, $03, $02, $01, $02, $04, $00     ; Level 1
+.byte $03, $02, $03, $02, $01, $02, $04, $00     ; Level 2
+.byte $04, $00, $03, $04, $01, $03, $01, $00     ; Level 3
+.byte $02, $00, $03, $04, $01, $00, $04, $00     ; Level 4
+.byte $04, $02, $02, $01, $00, $02, $01, $00     ; Level 5
+.byte $01, $00, $04, $02, $01, $00, $04, $00     ; Level 6
+.byte $03, $02, $01, $04, $01, $00, $02, $00     ; Level 7
+.byte $02, $00, $01, $00, $01, $02, $04, $00     ; Level 8
+.byte $03, $02, $01, $02, $01, $02, $04, $00     ; Level 9
+.byte $01, $00, $01, $02, $01, $01, $02, $00     ; Level 10
+.byte $04, $00, $03, $02, $02, $00, $01, $00     ; Level 11
+.byte $03, $00, $00, $02, $01, $02, $04, $00     ; Level 12
+.byte $04, $03, $01, $02, $01, $02, $04, $00     ; Level 13
+.byte $04, $03, $00, $04, $01, $02, $04, $00     ; Level 14
+.byte $04, $02, $00, $00, $02, $00, $04, $00     ; Level 15
+.byte $02, $03, $00, $03, $01, $02, $04, $00     ; Level 16
+.byte $01, $02, $01, $02, $01, $00, $04, $00     ; Level 17
+.byte $02, $02, $03, $03, $01, $02, $04, $00     ; Level 18
+.byte $01, $02, $00, $02, $01, $02, $04, $00     ; Level 19
+.byte $02, $02, $04, $01, $00, $02, $04, $00     ; Level 20
 
 ; The number of bytes to skip when calling a tileDrawP*R* routine for a collapsing platform
 collapseHeight:
@@ -305,48 +303,48 @@ willyStartDir:
 .byte 0, 0, 1, 1, 0, 1, 0
 
 doorL:
-.byte <(levelLayout + $1BE)                     ; level 0
-.byte <(levelLayout + $1DE)                     ; level 1
-.byte <(levelLayout + $17E)                     ; level 2
-.byte <(levelLayout + $03E)                     ; level 3
-.byte <(levelLayout + $1CF)                     ; level 4
-.byte <(levelLayout + $01E)                     ; level 5
-.byte <(levelLayout + $1CF)                     ; level 6
-.byte <(levelLayout + $1CF)                     ; level 7
-.byte <(levelLayout + $001)                     ; level 8
-.byte <(levelLayout + $1CC)                     ; level 9
-.byte <(levelLayout + $021)                     ; level 10
-.byte <(levelLayout + $1CF)                     ; level 11
-.byte <(levelLayout + $1C1)                     ; level 12
-.byte <(levelLayout + $010)                     ; level 13
-.byte <(levelLayout + $061)                     ; level 14
-.byte <(levelLayout + $0CC)                     ; level 15
-.byte <(levelLayout + $03E)                     ; level 16
-.byte <(levelLayout + $03E)                     ; level 17
-.byte <(levelLayout + $041)                     ; level 18
-.byte <(levelLayout + $0B3)                     ; level 19
+.byte <(levelLayout + $1BE)                      ; level 0
+.byte <(levelLayout + $1DE)                      ; level 1
+.byte <(levelLayout + $17E)                      ; level 2
+.byte <(levelLayout + $03E)                      ; level 3
+.byte <(levelLayout + $1CF)                      ; level 4
+.byte <(levelLayout + $01E)                      ; level 5
+.byte <(levelLayout + $1CF)                      ; level 6
+.byte <(levelLayout + $1CF)                      ; level 7
+.byte <(levelLayout + $001)                      ; level 8
+.byte <(levelLayout + $1CC)                      ; level 9
+.byte <(levelLayout + $021)                      ; level 10
+.byte <(levelLayout + $1CF)                      ; level 11
+.byte <(levelLayout + $1C1)                      ; level 12
+.byte <(levelLayout + $010)                      ; level 13
+.byte <(levelLayout + $061)                      ; level 14
+.byte <(levelLayout + $0CC)                      ; level 15
+.byte <(levelLayout + $03E)                      ; level 16
+.byte <(levelLayout + $03E)                      ; level 17
+.byte <(levelLayout + $041)                      ; level 18
+.byte <(levelLayout + $0B3)                      ; level 19
 
 doorH:
-.byte >(levelLayout + $1BE)                     ; level 0
-.byte >(levelLayout + $1DE)                     ; level 1
-.byte >(levelLayout + $17E)                     ; level 2
-.byte >(levelLayout + $03E)                     ; level 3
-.byte >(levelLayout + $1CF)                     ; level 4
-.byte >(levelLayout + $01E)                     ; level 5
-.byte >(levelLayout + $1CF)                     ; level 6
-.byte >(levelLayout + $1CF)                     ; level 7
-.byte >(levelLayout + $001)                     ; level 8
-.byte >(levelLayout + $1CC)                     ; level 9
-.byte >(levelLayout + $021)                     ; level 10
-.byte >(levelLayout + $1CF)                     ; level 11
-.byte >(levelLayout + $1C1)                     ; level 12
-.byte >(levelLayout + $010)                     ; level 13
-.byte >(levelLayout + $061)                     ; level 14
-.byte >(levelLayout + $0CC)                     ; level 15
-.byte >(levelLayout + $03E)                     ; level 16
-.byte >(levelLayout + $03E)                     ; level 17
-.byte >(levelLayout + $041)                     ; level 18
-.byte >(levelLayout + $0B3)                     ; level 19
+.byte >(levelLayout + $1BE)                      ; level 0
+.byte >(levelLayout + $1DE)                      ; level 1
+.byte >(levelLayout + $17E)                      ; level 2
+.byte >(levelLayout + $03E)                      ; level 3
+.byte >(levelLayout + $1CF)                      ; level 4
+.byte >(levelLayout + $01E)                      ; level 5
+.byte >(levelLayout + $1CF)                      ; level 6
+.byte >(levelLayout + $1CF)                      ; level 7
+.byte >(levelLayout + $001)                      ; level 8
+.byte >(levelLayout + $1CC)                      ; level 9
+.byte >(levelLayout + $021)                      ; level 10
+.byte >(levelLayout + $1CF)                      ; level 11
+.byte >(levelLayout + $1C1)                      ; level 12
+.byte >(levelLayout + $010)                      ; level 13
+.byte >(levelLayout + $061)                      ; level 14
+.byte >(levelLayout + $0CC)                      ; level 15
+.byte >(levelLayout + $03E)                      ; level 16
+.byte >(levelLayout + $03E)                      ; level 17
+.byte >(levelLayout + $041)                      ; level 18
+.byte >(levelLayout + $0B3)                      ; level 19
 
 door_color1:
 .byte $01, $03, $01, $02, $03, $04, $01, $02
