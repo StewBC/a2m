@@ -338,6 +338,7 @@ int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
 }
 
 void rt_shutdown(RUNTIME *rt) {
+    array_free(&rt->breakpoints);
     rt->turbo_count = 0;
     free(rt->turbo);
     rt->turbo = NULL;

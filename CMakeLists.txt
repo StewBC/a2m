@@ -14,6 +14,9 @@ find_package(SDL2_image CONFIG REQUIRED)
 find_package(SDL2_mixer CONFIG REQUIRED)
 
 if(UNIX AND NOT APPLE)
+    # Leak test by turning this option ON.  Make a clean build and run with:
+    # ASAN_OPTIONS=detect_leaks=1 ./build/a2m
+    # I did find I need to blow the build folder away to get this to be reliable.
     option(ENABLE_ASAN "Build with AddressSanitizer/LeakSanitizer" OFF)
 
     if(ENABLE_ASAN)
@@ -21,12 +24,14 @@ if(UNIX AND NOT APPLE)
 
         add_compile_options(
             -fsanitize=address
+            -fsanitize=leak
             -fno-omit-frame-pointer
             -g
         )
 
         add_link_options(
             -fsanitize=address
+            -fsanitize=leak
         )
     endif()
 endif()
@@ -49,7 +54,6 @@ add_executable(a2m
 
 # utils, asm, hardware & runtime all pulled in via ui, as is SDL2, SDL2main, SDL2_mixer & SDL2_image
 target_link_libraries(a2m PUBLIC
-    $<$<PLATFORM_ID:Linux>:m>
     ui
 )
 
@@ -97,12 +101,18 @@ add_executable(asm6502
 
 target_link_libraries(asm6502 PUBLIC
     asm
-    $<$<PLATFORM_ID:Linux>:m>
 )
 
 # MSVC gets better warnings and RelWithDebInfo gets profiling flags
 foreach(tgt IN ITEMS a2m asm6502)
+
   if(TARGET ${tgt})
+
+    if(UNIX AND NOT APPLE)
+      # Add the math library to Unix (Linux) biulds
+      target_link_libraries(${tgt} PRIVATE m)
+    endif()
+
     if(MSVC)
       # Always-on MSVC flags (all configs)
       target_compile_options(${tgt} PRIVATE

@@ -866,4 +866,7 @@ void unk_dasm_shutdown(VIEWDASM *dv) {
     free(dv->str_buf);
     dv->str_buf = 0;
     dv->str_buf_len = 0;
+    array_free(&dv->line_info);
+    array_free(&dv->valid_stack);
+    array_free(&dv->invalid_stack);
 }
