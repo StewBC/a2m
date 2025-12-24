@@ -19,15 +19,18 @@ It was actually not such a big effort after I used the python.  From memory:
 * Change `.addr` to `.word`
 * Make `.string` of data in quotes
 * Replace `.res` with some other mechanism
-* My `.macro` is far inferior.  Rework macros
+* Moved all macros to a macros file
+* Moved variables and zero-page defines around (and into new files where needed)
 * Move include files around so I still get main at $6000
+* Fix local issue (freq in game, for example, remove .local in macros)
   
 That might have more or less been it!  
   
-Press `F2` and `F11` (Debugger visible and stopped).  Put the mouse over the disassembly window and press `CTRL + SHIFT + A`.  Browse to `samples/mmminer/mminer.asm`.  Change the address to `6000`. Press `OK`.  
+Press `F2` and `F11` (Debugger visible and stopped).  Put the mouse over the disassembly window and press `CTRL + SHIFT + B`.  Browse to `samples/mmminer/mminer.asm`.  Change the address to `6000`. Press `OK`.  
   
-Press `CTRL + A`.  Pretty much immediately Manic Miner should be running.  On my system, the compile of the Manic Miner sources, all 12555 lines, took only 13 milliseconds.  That included the time to update the labels in the emulator and shut the assembler down again.  Pretty quick! `:)`  
+Press `CTRL + B`.  Pretty much immediately Manic Miner should be running.  On my system, the compile of the Manic Miner sources, all 12555 lines, took only 13 milliseconds.  That included the time to update the labels in the emulator and shut the assembler down again.  Pretty quick! `:)`  
   
-You can now stop with `F11`, open the source, modify it and press `CTRL-A` back in the debugger to instantly see the changes.  You can also un-check the box to auto-run, in which cae you could press `CTRL-G` to jump to an address (say 6000).  Then press `CTRL-P` to set the program counter to the address of the cursor.  Now pressing `F5` will run the code from that address.  
+You can now stop with `F11`, open the source, modify it and press `CTRL-B` back in the debugger to instantly see the changes.  You can also un-check the box to auto-run, in which cae you could press `CTRL-A` to jump to an address (say 6000).  Then press `CTRL-P` to set the program counter to the address of the cursor.  Now pressing `F5` will run the code from that address.  
   
 29 November 2024  
+Updated 24 November 2025
