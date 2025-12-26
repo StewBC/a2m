@@ -19,7 +19,7 @@ const UI_OPS null_ops = {
 void ui_apply_ini(UI *ui, INI_STORE *ini_store) {
     int slot_number = -1;
 
-    const char *val = ini_get(ini_store, "ui", "instance");
+    const char *val = ini_get(ini_store, "Config", "ui");
     if(val && stricmp(val, "text") == 0) {
         ui->class = UI_CLASS_TEXT;
     }

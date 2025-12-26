@@ -158,7 +158,7 @@ void handle_turbo(int num_params, const char **params, OPTS *opts) {
 
 void handle_ui(int num_params, const char **params, OPTS *opts) {
     UNUSED(num_params);
-    ini_set(&opts->ini_store, "UI", "Instance", params[0]);
+    ini_set(&opts->ini_store, "Config", "ui", params[0]);
 }
 
 void handle_help(int num_params, const char **params, OPTS *opts) {

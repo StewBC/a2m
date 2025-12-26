@@ -23,14 +23,15 @@ a2m is designed for people who enjoy developing or exploring Apple\ 2 software.
 ## Quick Key Reference
 In both Normal and Debug Mode, these keys have the listed meanings:
 
-| Key       | Action                    | Key | Action                 |
-|:----------|:--------------------------|:----|:-----------------------|
-| F1        | Show Help                 | F2  | Toggle Debug Mode View |
-| F5        | Run                       | F6  | Run to cursor          |
-| F7        |                           | F8  |                        |
-| F9        | Toggle Breakpoint         | F10 | Step                   |
-| F11       | Break                     | F12 | Monitor Select         |
-| SHIFT+F11 | Step Out                  |     |                        |
+| Key       | Action                    | Key       | Action                           |
+|:----------|:--------------------------|:----------|:---------------------------------|
+| F1        | Show Help                 | F2        | Toggle Debug Mode View           |
+| F3        | Toggle Turbo Mode         | F4        |                                  |
+| F5        | Run                       | F6        | Run to cursor                    |
+| F7        |                           | F8        |                                  |
+| F9        | Toggle Breakpoint         | F10       | Step                             |
+| F11       | Break                     | F12       | Monitor Select                   |
+| SHIFT+F11 | Step Out                  | SHIFT+F12 | `][+` Franklin Ace Diplay toggle |
 
 Debug Mode (`F2`) also reveals the Miscellaneous view, and it is here where disks can be inserted, making the Apple\ 2 really useful.
 
@@ -737,6 +738,7 @@ The Config section is mostly UI configuration. Variables are:
 | disk_leds    | Value `on` or `1` shows disk activity LEDs in the lower right of the UI |
 | save         | `yes` means save the INI file on exit                                   |
 | symbols      | Comma-separated files that contain symbol information                   |
+| ui           | `text` for text based UI.  Anything else means GUI based UI             |
 | wheel_speed  | Number of lines to scroll when using the mouse scroll wheel             |
 
 \Needspace{7\baselineskip}
