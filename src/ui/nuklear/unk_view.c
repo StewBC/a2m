@@ -223,6 +223,8 @@ int unk_init(UNK *v, int model, INI_STORE *ini_store) {
         printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
         return A2_ERR;
     }
+    // Disable filtering
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
     // Create renderer
     v->renderer = SDL_CreateRenderer(v->window, -1, SDL_RENDERER_ACCELERATED);
     if(v->renderer == NULL) {
@@ -251,11 +253,13 @@ int unk_init(UNK *v, int model, INI_STORE *ini_store) {
         return A2_ERR;
     }
     // Create texture for pixel rendering
+    SDL_SetTextureBlendMode(v->texture, SDL_BLENDMODE_NONE);
     v->texture_wide = SDL_CreateTextureFromSurface(v->renderer, v->surface_wide);
     if(v->texture_wide == NULL) {
         printf("Texture could not be created! SDL_Error: %s\n", SDL_GetError());
         return A2_ERR;
     }
+    SDL_SetTextureBlendMode(v->texture_wide, SDL_BLENDMODE_NONE);
     v->greenLED = load_png_texture_from_ram(v->renderer, led_green, led_green_len);
     v->redLED = load_png_texture_from_ram(v->renderer, led_red, led_red_len);
     if(!v->greenLED || !v->redLED) {
@@ -475,14 +479,9 @@ void unk_present(UNK *v) {
     // Commit changes to the texture And update renderer with the texture
     if(v->clear_a2_view) {
         // Clear the background that prev may have contained the texture to gray
-        SDL_SetRenderDrawColor(v->renderer, 0x2d, 0x2d, 0x2d, 0xFF);
-        SDL_Rect clear_rect;
-        if(v->debug_view) {
-            clear_rect = nk_to_sdl_rect(v->layout.apple2);
-        } else {
-            clear_rect = v->sdl_os_rect;
-        }
-        SDL_RenderFillRect(v->renderer, &clear_rect);
+        // If managing clear_a2_view becomes an issue, just always do this - makes little difference
+        SDL_SetRenderDrawColor(v->renderer, 0X2D, 0X2D, 0X2D, 0xFF);
+        SDL_RenderClear(v->renderer);
         v->clear_a2_view = 0;
     }
 
