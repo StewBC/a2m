@@ -1,10 +1,10 @@
 # Introduction
-a2m began as a small experiment after I discovered the Harte 6502 CPU tests. I wanted to see if I could write a cycle-accurate 6502 CPU emulator, just for fun. Once that worked, it became obvious that it wouldn't take much more code to wrap a minimal Apple\ 2 environment around it and run the Manic Miner clone I had written. That led to MMM (The Manic Miner Machine - https://github.com/StewBC/mminer-apple2/tree/master/src/mmm). Things escalated from there, and a2m V1.0 was done by the end of 2024. About a year later I started work on V2.0. Apparently, the emulation hook never really let go of me.
+a2m began as a small experiment after I discovered the Harte 6502 CPU tests. I wanted to see if I could write a cycle-accurate 6502 CPU emulator, just for fun. Once that worked, it became obvious that it wouldn't take much more code to wrap a minimal Apple 2 environment around it and run the Manic Miner clone I had written. That led to MMM (The Manic Miner Machine - https://github.com/StewBC/mminer-apple2/tree/master/src/mmm). Things escalated from there, and a2m V1.0 was done by the end of 2024. About a year later I started work on V2.0. Apparently, the emulation hook never really let go of me.
 
 a2m is released under the Unlicense, meaning it is free and unencumbered software placed in the public domain.
 
 # Overview
-a2m V2.0 emulates either an NTSC Apple\ ][+ or an Apple\ //e Enhanced. It runs on Windows, Linux, and macOS, with binaries available on the project's GitHub page (https://github.com/StewBC/a2m).
+a2m V2.0 emulates either an NTSC Apple ][+ or an Apple //e Enhanced. It runs on Windows, Linux, and macOS, with binaries available on the project's GitHub page (https://github.com/StewBC/a2m).
 
 Some of the key features include:
 
@@ -15,25 +15,26 @@ Some of the key features include:
 * Disk II NIB read support
 * SmartPort block read/write
 * SDL joystick support
-* Partial Franklin 80-column card emulation for the Apple\ ][+ model
+* Partial Franklin 80-column card emulation for the Apple ][+ model
 
-a2m is designed for people who enjoy developing or exploring Apple\ 2 software.
+a2m is designed for people who enjoy developing or exploring Apple 2 software.
 
 \Needspace{11\baselineskip}
 ## Quick Key Reference
 In both Normal and Debug Mode, these keys have the listed meanings:
 
-| Key       | Action                    | Key       | Action                           |
-|:----------|:--------------------------|:----------|:---------------------------------|
-| F1        | Show Help                 | F2        | Toggle Debug Mode View           |
-| F3        | Toggle Turbo Mode         | F4        |                                  |
-| F5        | Run                       | F6        | Run to cursor                    |
-| F7        |                           | F8        |                                  |
-| F9        | Toggle Breakpoint         | F10       | Step                             |
-| F11       | Break                     | F12       | Monitor Select                   |
-| SHIFT+F11 | Step Out                  | SHIFT+F12 | `][+` Franklin Ace Diplay toggle |
+| Key           | Action                    | Key       | Action                             |
+|:--------------|:--------------------------|:----------|:-----------------------------------|
+| F1            | Show Help                 | F2        | Toggle Debug Mode View             |
+| F3            | Toggle Turbo Mode         | F4        |                                    |
+| F5            | Run                       | F6        | Run to cursor                      |
+| F7            |                           | F8        |                                    |
+| F9            | Toggle Breakpoint         | F10       | Step                               |
+| F11           | Break                     | F12       | Monitor Select                     |
+| CTRL+SHIFT+F4 | Configure Assembler       | CTRL+F4   | Run Assembler                      |
+| SHIFT+F11     | Step Out                  | SHIFT+F12 | Toggle Franklin Ace Diplay on `][+`|
 
-Debug Mode (`F2`) also reveals the Miscellaneous view, and it is here where disks can be inserted, making the Apple\ 2 really useful.
+Debug Mode (`F2`) also reveals the Miscellaneous view, and it is here where disks can be inserted, making the Apple 2 really useful.
 
 # Running a2m
 a2m can be launched from the command line or as a GUI application without a console window.
@@ -51,21 +52,21 @@ By default, a2m loads `a2m.ini` from the current directory.
 See **INI Files in Depth** for full details.
 
 # User Interface
-a2m is primarily a GUI-based Apple\ 2 emulator. It also supports a text-based mode, enabled with `--ui text` (or `-u text`). This mode exists mostly as a demonstration of the cleaner architecture introduced after v1.0.
+a2m is primarily a GUI-based Apple 2 emulator. It also supports a text-based mode, enabled with `--ui text` (or `-u text`). This mode exists mostly as a demonstration of the cleaner architecture introduced after v1.0.
 
-The text mode emulator runs Apple\ 2 text-based software in 40 or 80 columns in a terminal window. On Windows it opens a new terminal window (I could not get curses input connected to the existing terminal if launched that way) but on a Unix-style OS it runs in the launch terminal.
+The text mode emulator runs Apple 2 text-based software in 40 or 80 columns in a terminal window. On Windows it opens a new terminal window (I could not get curses input connected to the existing terminal if launched that way) but on a Unix-style OS it runs in the launch terminal.
 
-Should the Apple\ 2 enable a graphics mode, the text-based emulator will simply draw a box and label it as LOWRES, HGR, DOUBLE LOWRES or DOUBLE HIRES. For mixed modes you will see the box in the upper portion of the screen and the normal text in the lower portion.
+Should the Apple 2 enable a graphics mode, the text-based emulator will simply draw a box and label it as LOWRES, HGR, DOUBLE LOWRES or DOUBLE HIRES. For mixed modes you will see the box in the upper portion of the screen and the normal text in the lower portion.
 
 This mode works well when booting ProDOS with Bitsy Bye, for example.
 
-On a Unix-style OS, CTRL-C will quit the emulator, so there are meta-keys to press for CTRL and Open- and Close-Apple. Press F1 in the emulator to see a Key Quick Reference. Note that the debugger is not available in the text mode emulator. It is only for running text-based Apple\ 2 applications.
+On a Unix-style OS, CTRL-C will quit the emulator, so there are meta-keys to press for CTRL and Open- and Close-Apple. Press F1 in the emulator to see a Key Quick Reference. Note that the debugger is not available in the text mode emulator. It is only for running text-based Apple 2 applications.
 
 The text mode emulator will not be discussed any further.
 
 # Normal Mode
-When launched normally, a2m displays the Apple\ 2's video output in the full application window. It behaves like a ][+ or //e.  
-The Apple\ 2 will attempt to boot from:
+When launched normally, a2m displays the Apple 2's video output in the full application window. It behaves like a ][+ or //e.  
+The Apple 2 will attempt to boot from:
 
 * **Slot 6 Drive 0** (floppy), or
 * **Slot 7 Device 0** (hard-disk image)
@@ -73,14 +74,14 @@ The Apple\ 2 will attempt to boot from:
 These defaults can be overridden in an INI file.
 
 ## Keyboard Usage
-Regular keys are sent directly to the emulated Apple\ 2. Function keys control the debugger, which is always running "behind the scenes" even when the Apple\ 2 display fills the window.
+Regular keys are sent directly to the emulated Apple 2. Function keys control the debugger, which is always running "behind the scenes" even when the Apple 2 display fills the window.
 
 On the //e model:
 
 * **Open-Apple** - joystick button A or Left-ALT
 * **Closed-Apple** - joystick button B or Right-ALT  
 
-To paste text into the Apple\ 2, use **SHIFT+INSERT**.  
+To paste text into the Apple 2, use **SHIFT+INSERT**.  
 **PAUSE** acts as RESET. Some laptops require combinations such as **Fn+B** or **Fn+P**.
 
 **F1** opens a help screen and pauses emulation.  
@@ -88,12 +89,12 @@ All other function keys remain debugger controls even while in Normal Mode.
 
 ## Resizing
 The window can be resized using standard OS controls.  
-The Apple\ 2 display is always drawn within the largest 4:3 region that fits inside the window's client area.
+The Apple 2 display is always drawn within the largest 4:3 region that fits inside the window's client area.
 
 # Debug Mode
-Debug Mode is where a2m really shines. Every part of the emulated Apple\ 2 can be inspected, and many parts can be modified.
+Debug Mode is where a2m really shines. Every part of the emulated Apple 2 can be inspected, and many parts can be modified.
 
-Although Debug Mode is often described as a separate mode, it is always active. All function keys route to the debugger even when only the Apple\ 2 display is visible. Once the debugger views are shown, the full set of tools becomes available.
+Although Debug Mode is often described as a separate mode, it is always active. All function keys route to the debugger even when only the Apple 2 display is visible. Once the debugger views are shown, the full set of tools becomes available.
 
 \Needspace{10\baselineskip}
 ***Keyboard controls***
@@ -114,7 +115,7 @@ Press **F2** to open the Debug Mode View. Press **F2** again to hide it. The fol
 
 | Position             | View |
 |:---------------------|:----------------------------------------------------------------------------|
-|Upper left: | Apple\ 2 display |
+|Upper left: | Apple 2 display |
 |Upper right: | CPU view |
 |Right, below CPU: | Disassembly view |
 |Lower left: | Memory view (hex + text; any bank can be inspected) |
@@ -123,24 +124,24 @@ Press **F2** to open the Debug Mode View. Press **F2** again to hide it. The fol
 ## Basic UI Philosophy
 a2m uses the **Nuklear** immediate-mode GUI library. Nuklear uses a *hover-active* model: when the CPU is stopped, whichever view the mouse is over becomes active and receives input. Active views have a green header; inactive ones use grey.
 
-When the emulator is running, all keys except function keys and SHIFT+INSERT go to the Apple\ 2.
+When the emulator is running, all keys except function keys and SHIFT+INSERT go to the Apple 2.
 
 In the rest of this manual, "in Debug Mode" is omitted for brevity-assume Debug Mode unless noted.
 
 The debugger layout is resizable:
 
-* a **vertical slider** between the Apple\ 2 and the CPU/Disassembly views
-* a **horizontal slider** between the Apple\ 2 and the Memory/Misc views  
+* a **vertical slider** between the Apple 2 and the CPU/Disassembly views
+* a **horizontal slider** between the Apple 2 and the Memory/Misc views  
 
 Dragging these sliders resizes the layout.  
-A "hot spot" in the lower-right corner of the Apple\ 2 view moves both sliders together, scaling the layout proportionally.  
-If the Apple\ 2 view is letterboxed, clicking this hot spot snaps it back to a perfect 4:3 region.
+A "hot spot" in the lower-right corner of the Apple 2 view moves both sliders together, scaling the layout proportionally.  
+If the Apple 2 view is letterboxed, clicking this hot spot snaps it back to a perfect 4:3 region.
 
-## Apple\ 2 View
-As in Normal Mode, the Apple\ 2 display is always shown in a 4:3 region inside the largest area available.
+## Apple 2 View
+As in Normal Mode, the Apple 2 display is always shown in a 4:3 region inside the largest area available.
 
 ### Keyboard controls
-When the emulator is running, regular keys go to the Apple\ 2, while function keys and SHIFT+INSERT always go to the debugger.
+When the emulator is running, regular keys go to the Apple 2, while function keys and SHIFT+INSERT always go to the debugger.
 
 See **Disassembly View - Keyboard controls** for details on function-key behaviour.
 
@@ -217,7 +218,7 @@ These keys apply **when emulation is stopped**:
 \Needspace{9\baselineskip}
 ### Mouse Controls
 At the bottom of the view are **selector buttons** that choose which memory bank to display.  
-On the Apple\ ][+ model, the 128 K option is disabled.
+On the Apple ][+ model, the 128 K option is disabled.
 
 | Label  | Action
 |:-------|:---------------------------------------------------------------|
@@ -233,7 +234,7 @@ Click on any row, outside the address section, to put the cursor on that row. Cl
 
 \Needspace{11\baselineskip}
 ## Memory View
-The memory view is a way of inspecting larger areas of the Apple\ 2 RAM. The display shows rows of memory in the format:
+The memory view is a way of inspecting larger areas of the Apple 2 RAM. The display shows rows of memory in the format:
 
 **`0000: 54 68 69 73 20 69 73 20 41 53 43 49 49 00 00 00 This is ASCII...`**
 
@@ -293,14 +294,14 @@ The sub-views are:
 
 | View Name     | Contents |
 |:--------------|:--------------------------------------------------------------------------|
-| Slots         | Devices inside the Apple\ 2 slots, such as Disk II or SmartPort cards |
+| Slots         | Devices inside the Apple 2 slots, such as Disk II or SmartPort cards |
 | Debugger      | Cycle counters, call stack, breakpoints, etc. |
-| Soft Switches | Memory locations in the $C000–$C0FF range that affect Apple\ 2 operations |
+| Soft Switches | Memory locations in the $C000–$C0FF range that affect Apple 2 operations |
 
 Each of these is discussed in more detail below.
 
 ### Slots Misc View
-The Slots view shows the hardware installed in the slots of the Apple\ 2. It is also the panel used for working with disks, both SmartPort and floppy.
+The Slots view shows the hardware installed in the slots of the Apple 2. It is also the panel used for working with disks, both SmartPort and floppy.
 
 \Needspace{7\baselineskip}
 With both SmartPort and floppy devices, there are a few buttons exposed. Next to Disk or Device 0, there is a button with the slot number, a dot, and a zero. Next to that is an Eject button, followed by an Insert button. The display looks something like this:
@@ -340,7 +341,7 @@ By default, the Debugger View shows status information under the heading **Debug
 |                | stepping over an INC of ZP will show 5 cycles, but stepping over a JSR    |
 |                | will show however many cycles the subroutine cost, plus the 6 JSR cycles  |
 | Total Cycles   | Shows the total cycles since the emulator started running the             |
-|                | Apple\ 2 ROM code                                                         |
+|                | Apple 2 ROM code                                                         |
 
 \Needspace{11\baselineskip}
 There is also a **Call Stack** display. This is a window with its own scrollbar if the entries exceed what the window can show. The call stack entries have the form:
@@ -381,7 +382,7 @@ The label describes the breakpoint. These are all possible label values, where n
 | z[nnnn]              | Stop on specified access to an address                                  |
 | z[nnnn] (counters)   | Stop on specified access to an address, subject to counters             |
 
-For type keys, the mechanism is similar to how paste works. When address `$C010` is accessed, another key is inserted into the `$C000` keyboard address for the Apple\ 2 to read. This is useful for pressing a key when, for example, there is a prompt that says "Insert disk 2 and press enter". Type can be used in conjunction with Swap to swap disk 2 in, press enter, and continue execution without user intervention.
+For type keys, the mechanism is similar to how paste works. When address `$C010` is accessed, another key is inserted into the `$C000` keyboard address for the Apple 2 to read. This is useful for pressing a key when, for example, there is a prompt that says "Insert disk 2 and press enter". Type can be used in conjunction with Swap to swap disk 2 in, press enter, and continue execution without user intervention.
 
 \Needspace{10\baselineskip}
 In the above table, these symbols mean:
@@ -402,9 +403,9 @@ In the above table, these symbols mean:
 * When there is more than one breakpoint, a `[Clear All]` button appears at the top of the list to delete all breakpoints (including disabled ones).
 
 ### Soft Switches Misc View
-The soft switches view shows the addresses of soft switches in the Apple\ //e (currently even in Apple\ ][+ mode). These are read-only, but there is a button to override the display switches. When the override is enabled, the interface does not change the hardware settings, but it behaves as though the hardware is set to the user settings from a UI perspective. 
+The soft switches view shows the addresses of soft switches in the Apple //e (currently even in Apple ][+ mode). These are read-only, but there is a button to override the display switches. When the override is enabled, the interface does not change the hardware settings, but it behaves as though the hardware is set to the user settings from a UI perspective. 
 
-For example, setting Mixed to ON will draw the Apple\ 2 screen as though Mixed is enabled. This is quite useful when drawing to an off-screen buffer. The override can be turned on and the off-screen buffer can be set as the visible buffer so that the drawing can be seen on-screen. When the display override is turned off, all switches return to showing their actual settings.
+For example, setting Mixed to ON will draw the Apple 2 screen as though Mixed is enabled. This is quite useful when drawing to an off-screen buffer. The override can be turned on and the off-screen buffer can be set as the visible buffer so that the drawing can be seen on-screen. When the display override is turned off, all switches return to showing their actual settings.
 
 Note that the addresses work in pairs, and only the first address is shown in the table. The odd address turns the setting on, and the even address turns the setting off. For example, `$C000` sets `80STORE` and `$C001` clears `80STORE`.
 
@@ -456,7 +457,7 @@ The `Actions`:
 | Swap    | Enter the slot and drive, and a swap is done on that floppy.             |
 | Troff   | Turns off trace file logging.                                            |
 | Tron    | Turns on trace logging to a file called `./trace.txt`.                   |
-| Type    | Enter text to be "typed" into the Apple\ 2 when the breakpoint is hit    |
+| Type    | Enter text to be "typed" into the Apple 2 when the breakpoint is hit    |
 
 Lastly, there is the `[] use Counter` setting. Select this option to enter two counter values. The first value is how many times the breakpoint must be hit before it causes its action, and the second value specifies what value to install as the counter once the breakpoint has been hit. As an example, setting `Counter` to 10 and `Reset Counter` to 2 means that the breakpoint must be hit 10 times before its action is executed, and after that it will only execute the action every second time the breakpoint is hit.
 
@@ -481,6 +482,10 @@ In the section titled **`Disassembly View`**, it was shown how to set an assembl
 
 In the remainder of the assembler documentation, 6502 means 6502 or 65C02, unless specifically stated otherwise.
 
+Note:
+
+* There is a complete assembler sample in `./samples/mminer`.  The root file is `mminer.asm`.
+
 ## Invoking from the command line
 The assembler can also be used stand-alone using the program `asm6502`. This is the same assembler used in the emulator, but with a command-line interface.
 
@@ -492,8 +497,6 @@ Where: infile is a 6502 assembly language file
        symbolfile contains a list of the addresses of all the named variables and labels
        -v turns on verbose and will dump the hex 6502 as it is assembled
 ```
-
-It is worth noting that assembly files can include other assembly files. This can be seen in `samples/mminer/mminer.asm`.
 
 \Needspace{12\baselineskip}
 ## Assembler Features and Syntax
@@ -536,6 +539,10 @@ There is a set of directives that control how a 6502 source file is assembled. T
 | .include "f"   | Include a 6502 assembler file for assembly at this point                           |
 | .string "s"    | Insert the string s into the output                                                |
 | .strcode       | Set a string character parser; an expression is applied to each character          |
+
+Note:
+
+* The assembler runs in the folder of the input file, so includes must be relative to that folder.
 
 \Needspace{11\baselineskip}
 The following dot directives work with dot commands:
@@ -720,7 +727,7 @@ Comments can be used in INI files, but note that if a2m saves out an INI file, t
 
 \Needspace{7\baselineskip}
 ## Machine Section
-The Machine section is used to configure the Apple\ 2 machine that is being emulated. Variables are:
+The Machine section is used to configure the Apple 2 machine that is being emulated. Variables are:
 
 | Variable | Value                                                                 |
 |:---------|:----------------------------------------------------------------------|
@@ -743,7 +750,7 @@ The Config section is mostly UI configuration. Variables are:
 
 \Needspace{7\baselineskip}
 ## Video Section
-The Video section has only one valid variable, and it is only used to configure the 80-column card on the Apple\ ][+ model. Using this will install the Franklin Ace Display card into a slot on an Apple\ ][+ machine.
+The Video section has only one valid variable, and it is only used to configure the 80-column card on the Apple ][+ model. Using this will install the Franklin Ace Display card into a slot on an Apple ][+ machine.
 
 | Variable | Value                                                                 |
 |:---------|:----------------------------------------------------------------------|
@@ -751,7 +758,7 @@ The Video section has only one valid variable, and it is only used to configure 
 
 \Needspace{6\baselineskip}
 ## DiskII Section
-The Disk\ II section configures an Apple Disk\ II floppy drive.
+The Disk II section configures an Apple Disk II floppy drive.
 
 | Variable | Value                                       |
 |:---------|:--------------------------------------------|
@@ -762,7 +769,7 @@ The `N` and `X` in `sNdX` are slot and drive numbers. The slot is usually 6, and
 Example:  
 `s6d0 = "./disks/Leaderboard side A.nib","./disks/Leaderboard side B.nib"`
 
-In the example, both floppy disk images are configured for a Disk\ II in slot 6, drive 0. Side A will be mounted, and using the Swap button in the UI, or the Swap action in a breakpoint, the Side B floppy can be swapped into the drive for use.
+In the example, both floppy disk images are configured for a Disk II in slot 6, drive 0. Side A will be mounted, and using the Swap button in the UI, or the Swap action in a breakpoint, the Side B floppy can be swapped into the drive for use.
 
 \Needspace{8\baselineskip}
 ## SmartPort Section
@@ -773,7 +780,7 @@ The SmartPort section configures a slot for use as a SmartPort block device. The
 | sNdX     | Path to a disk image                       |
 | bs       | A value of `1` will force-boot that device |
 
-As with the Disk\ II section, the values for `N` and `X` are a valid, unused slot number and device number, where device numbers are `0` or `1`. Usually the slot numbers are `5` or `7`. The Apple\ //e will try to boot from a SmartPort device `0` in slot `7`. The `bs` setting can be used to force an Apple\ 2 to boot a SmartPort device `0` in a slot other than slot `7`, or to boot an Apple\ ][+ from a SmartPort device instead of the Disk\ II device.
+As with the Disk II section, the values for `N` and `X` are a valid, unused slot number and device number, where device numbers are `0` or `1`. Usually the slot numbers are `5` or `7`. The Apple //e will try to boot from a SmartPort device `0` in slot `7`. The `bs` setting can be used to force an Apple 2 to boot a SmartPort device `0` in a slot other than slot `7`, or to boot an Apple ][+ from a SmartPort device instead of the Disk II device.
 
 ## Debug Section
 The Debug section is not a normal INI section. Normally, a variable (or key, in INI parlance) must have a unique name. In the Debug section, the `break` variable is used repeatedly.
@@ -815,10 +822,24 @@ Here are a few examples:
 `; thereafter, every second access will cause a break`  
 `break = 0x5000-0x5002,access,10,2`  
 
+## Assembler Section
+The assembler section sets up a root file to assemble using the built-in assembler.
+
+\Needspace{7\baselineskip}
+| Variable    | Value                                                     |
+|:------------|:----------------------------------------------------------|
+| source      | Fully qualified path to the file                          |
+| dest        | `6502`, `64K`, `128K` or `LC Bank`. `6502` is the default |
+| auto_run    | `yes` or `1` to auto run after successful assembly        |
+| address     | Address at which to start auto-run (example: `0x6000`)    |
+| reset_stack | `yes` or `1` to reset/clear the stack when auto-running   |
+
+Since the assembler is mapped to `CTRL+F4`, configuring the assembler settings in an `.ini` file makes it possible to assemble and run a program under development by pressing `CTRL+F4` after editing the assembly source, without having to restart or stop the emulator.
+
 \Needspace{9\baselineskip}
 # Appendix A: Version History
 31 Oct 2024 - Initial release  
  8 Dec 2024 - Version 1.0 release  
 10 Dec 2024 - Version 1.1 release  
 23 Dec 2025 - Version 2.0 release  
-    The version 2 release is a re-architecture of the entire code base, as well as a rewrite of the 6502 core, adding a 65C02 mode. The Apple\ //e is also supported, along with many new features such as a NIB Disk II, resizable window, window pane sliders, and many more.
+    The version 2 release is a re-architecture of the entire code base, as well as a rewrite of the 6502 core, adding a 65C02 mode. The Apple //e is also supported, along with many new features such as a NIB Disk II, resizable window, window pane sliders, and many more.

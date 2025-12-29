@@ -215,7 +215,7 @@ void unk_config_ui(UNK *v, INI_STORE *ini_store) {
             flags = MEM_MAIN;
         } else if (0 == stricmp(val, "128K")) {
             flags = MEM_AUX;
-        } else if (0 == stricmp(val, "128K")) {
+        } else if (0 == stricmp(val, "LC Bank")) {
             flags = MEM_LC_BANK2;
         }
         v->viewdasm.assembler_config.flags = flags;

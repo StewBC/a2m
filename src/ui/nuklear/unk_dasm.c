@@ -402,7 +402,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
 
         case SDLK_F4:
             if((mod & KMOD_CTRL) && (mod & KMOD_SHIFT) && !v->debug_view) {
-                v->debug_view = 1;
+                unk_toggle_debug(v);
             }
         case SDLK_b:
             if(!v->dlg_modal_active) {
@@ -456,7 +456,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                             v->dlg_modal_active = 1;
                             v->dlg_assembler_errors = 1;
                             if(!v->debug_view) {
-                                v->debug_view = 1;
+                                unk_toggle_debug(v);
                             }
                         } else {
                             if(ac->reset_stack) {
