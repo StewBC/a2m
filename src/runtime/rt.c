@@ -319,7 +319,7 @@ int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
             }
             // Sleep for coarse delay
             if(sleep_ms > 1) {
-                SDL_Delay(sleep_ms - 1);
+                perf_sleep(sleep_ms - 1);
             }
             // The emulation + rendering fit in a frame, no compensation
             overhead_ticks = 0;

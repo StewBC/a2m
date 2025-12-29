@@ -28,7 +28,11 @@ static inline uint64_t perf_now_ns(void) {
     return s * 1000000000ull + (r * 1000000000ull) / f;
 }
 
-#elif defined(__APPLE__)
+static inline perf_sleep(uint32_t ms) {
+    Sleep(ms);
+}
+
+#else // macOS, Linux, etc.
 
 #include <time.h>
 static inline uint64_t perf_now_ns(void) {
@@ -45,21 +49,11 @@ static inline uint64_t perf_frequency(void) {
     return 1000000000ull;
 }
 
-#else // Linux, etc.
-
-#include <time.h>
-static inline uint64_t perf_now_ns(void) {
+static inline perf_sleep(uint32_t ms) {
     struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
-}
-
-static inline uint64_t perf_counter(void) {
-    return perf_now_ns();
-}
-
-static inline uint64_t perf_frequency(void) {
-    return 1000000000ull;
+    ts.tv_sec = ms / 1000;
+    ts.tv_nsec = (ms % 1000) * 1000000;
+    nanosleep(&ts, NULL);
 }
 
 #endif
