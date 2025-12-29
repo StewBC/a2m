@@ -4,10 +4,6 @@
 
 #pragma once
 
-// SDL related - SDL used for timing -- SQW - might be good to ditch this dependency
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
-
 #include "common.h"
 #include "utils_lib.h"
 #include "hardware_lib.h"

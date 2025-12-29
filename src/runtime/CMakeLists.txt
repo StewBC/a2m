@@ -22,9 +22,4 @@ target_precompile_headers(runtime PUBLIC "rt_lib.h")
 
 target_link_libraries(runtime PUBLIC
     hardware
-    # SQW It's not ideal that runtime links to SDL but is needed for performance ounters and such
-    SDL2::SDL2
-    SDL2::SDL2main
-    $<IF:$<TARGET_EXISTS:SDL2_mixer::SDL2_mixer>,SDL2_mixer::SDL2_mixer,SDL2_mixer::SDL2_mixer-static>
-    $<IF:$<TARGET_EXISTS:SDL2_image::SDL2_image>,SDL2_image::SDL2_image,SDL2_image::SDL2_image-static>
 )

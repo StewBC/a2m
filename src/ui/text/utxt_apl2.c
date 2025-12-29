@@ -170,8 +170,8 @@ void utxt_apl2_screen_box(UTXT *v, int start, int end, int width, char *text) {
 
 void utxt_apl2_screen_txt(UTXT *v, int start, int end, int width) {
     APPLE2 *m = v->m;
-    Uint64 now = SDL_GetPerformanceCounter();
-    double freq = (double)SDL_GetPerformanceFrequency();
+    uint64_t now = perf_counter();
+    double freq = (double)perf_frequency();
     // I got 3.7 from recording a flash on my Platinum //e - 0.17 to 0.44 for a change so 0.27
     uint8_t time_inv = (((uint64_t)(now * 3.7 / freq)) & 1) ? 0xFF : 0x00;
     int alt_charset = m->model ? m->altcharset : 0;

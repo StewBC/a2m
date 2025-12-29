@@ -264,13 +264,13 @@ int rt_init(RUNTIME *rt, INI_STORE *ini_store) {
 int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
     int ret_val = A2_OK;
     int quit = 0;
-    const uint64_t pfreq = SDL_GetPerformanceFrequency();
+    const uint64_t pfreq = perf_frequency();
     const uint64_t ticks_per_ms = pfreq / 1000;
     const double clock_cycles_per_tick = CPU_FREQUENCY / (double)pfreq;
     const uint64_t ticks_per_frame = pfreq / TARGET_FPS;
     uint64_t overhead_ticks = 0; // Assume emulation and rendering fit in 1 frame's time
     while(!quit) {
-        uint64_t frame_start_ticks = SDL_GetPerformanceCounter();
+        uint64_t frame_start_ticks = perf_counter();
         uint64_t desired_frame_end_ticks = frame_start_ticks + ticks_per_frame;
         int dirty_view = 0;
 
@@ -291,7 +291,7 @@ int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
                 }
             } else {
                 uint64_t emulation_cycles = frame_start_ticks + ticks_per_frame - overhead_ticks;
-                while(SDL_GetPerformanceCounter() < emulation_cycles) {
+                while(perf_counter() < emulation_cycles) {
                     // See if a breakpoint was hit (will clear rt->run)
                     if(!rt_step_okay(rt)) {
                         break;
@@ -308,14 +308,14 @@ int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
         }
         ui->ops->render(ui, m, dirty_view);
 
-        uint64_t frame_end_ticks = SDL_GetPerformanceCounter();
+        uint64_t frame_end_ticks = perf_counter();
         // Delay to get the MHz emulation right for the desired FPS - no vsync
         if(frame_end_ticks < desired_frame_end_ticks) {
             uint32_t sleep_ms = (desired_frame_end_ticks - frame_end_ticks) / ticks_per_ms;
             // SQW Debug fix
             if(sleep_ms > (1000 / TARGET_FPS)) {
                 sleep_ms = (1000 / TARGET_FPS) - 1;
-                desired_frame_end_ticks = SDL_GetPerformanceCounter();
+                desired_frame_end_ticks = perf_counter();
             }
             // Sleep for coarse delay
             if(sleep_ms > 1) {
@@ -330,7 +330,7 @@ int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
             overhead_ticks = frame_end_ticks - desired_frame_end_ticks;
         }
         // Tail spin for accuracy
-        while(SDL_GetPerformanceCounter() < desired_frame_end_ticks) {
+        while(perf_counter() < desired_frame_end_ticks) {
         }
     }
 

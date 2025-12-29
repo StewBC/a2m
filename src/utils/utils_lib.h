@@ -45,4 +45,5 @@
 #include "dbgopcds.h"
 #include "errorlog.h"
 #include "inifiles.h"
+#include "perf.h"
 #include "util.h"

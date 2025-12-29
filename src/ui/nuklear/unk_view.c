@@ -555,8 +555,8 @@ void unk_present(UNK *v) {
     if(1) {
         char sdl_window_title[80];
         if(rt->run) {
-            uint64_t freq = SDL_GetPerformanceFrequency();
-            uint64_t now_ticks = SDL_GetPerformanceCounter();
+            uint64_t freq = perf_frequency();
+            uint64_t now_ticks = perf_counter();
             uint64_t dt_ticks = now_ticks - v->prev_ticks;
             uint64_t dc = v->m->cpu.cycles - v->prev_cycles;
             v->prev_ticks  = now_ticks;

@@ -879,8 +879,8 @@ void unk_apl2_screen_txt40(UNK *v, int start, int end) {
     SDL_Surface *surface = v->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
     uint16_t page = v->shadow_flags.b.page2set ? 0x0800 : 0x0400;
-    Uint64 now = SDL_GetPerformanceCounter();
-    double freq = (double)SDL_GetPerformanceFrequency();
+    uint64_t now = perf_counter();
+    double freq = (double)perf_frequency();
     // I got 3.7 from recording a flash on my Platinum //e - 0.17 to 0.44 for a change so 0.27
     uint8_t time_inv = (((uint64_t)(now * 3.7 / freq)) & 1) ? 0xFF : 0x00;
     int alt_charset = m->model ? m->altcharset : 0;
@@ -928,8 +928,8 @@ void unk_apl2_screen_txt80(UNK *v, int start, int end) {
     APPLE2 *m = v->m;
     SDL_Surface *surface = v->surface_wide;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    Uint64 now = SDL_GetPerformanceCounter();
-    double freq = (double)SDL_GetPerformanceFrequency();
+    uint64_t now = perf_counter();
+    double freq = (double)perf_frequency();
     // I got 3.7 from recording a flash on my Platinum //e - 0.17 to 0.44 for a change so 0.27
     uint8_t time_inv = (((uint64_t)(now * 3.7 / freq)) & 1) ? 0xFF : 0x00;
     int alt_charset = m->model ? m->altcharset : 0;
