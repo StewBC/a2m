@@ -195,11 +195,11 @@ void handle_help(int num_params, const char **params, OPTS *opts) {
     printf("  <break> is <ad[-ad]>[,pc|read|write|access[,reset|fast|slow][,count[,reset]]]\n");
     printf("    ad is a hex, decimal or octal 16-bit address\n");
     printf("  <csv> is a list of 1MHz multiplier numbers, or max\n");
-    printf("  <drive> is a device number in the range 0..1\n");
+    printf("  <drive> is Dn where n is a number in the range 0..1\n");
     printf("  <image> is a disk image (.po|hdv|2img for SmartPort and .nib for disk II)\n");
     printf("    if <image> contains spaces it needs to be in quotations (\"image file\")\n");
     printf("  <on|off> is either on, or 1 for on, or off or 0 for off\n");
-    printf("  <slot> is a slot in number in the range 1..7\n");
+    printf("  <slot> is Sn where n is a number in the range 1..7\n");
     printf("  Option values are not separated by spaces, example --turbo takes 1,8,16,max\n");
     printf("Command line options override (and potentially overwrite) any ini loaded options\n");
 }
