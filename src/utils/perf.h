@@ -28,7 +28,7 @@ static inline uint64_t perf_now_ns(void) {
     return s * 1000000000ull + (r * 1000000000ull) / f;
 }
 
-static inline perf_sleep(uint32_t ms) {
+static inline void perf_sleep(uint32_t ms) {
     Sleep(ms);
 }
 
@@ -49,7 +49,7 @@ static inline uint64_t perf_frequency(void) {
     return 1000000000ull;
 }
 
-static inline perf_sleep(uint32_t ms) {
+static inline void perf_sleep(uint32_t ms) {
     struct timespec ts;
     ts.tv_sec = ms / 1000;
     ts.tv_nsec = (ms % 1000) * 1000000;
