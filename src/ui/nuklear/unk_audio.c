@@ -66,7 +66,7 @@ int unk_audio_speaker_init(VIEWSPEAKER *speaker, double cpu_hz, int sample_rate,
     SDL_AudioSpec want = {0}, have = {0};
     want.freq = (sample_rate > 0) ? sample_rate : 48000;
     want.format = AUDIO_F32SYS;
-    want.channels = (Uint8)((channels == 1 || channels == 2) ? channels : 2);
+    want.channels = (uint8_t)((channels == 1 || channels == 2) ? channels : 2);
     want.samples = 256;
     want.callback = NULL;            // push model
     speaker->dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
@@ -125,7 +125,7 @@ void unk_audio_speaker_toggle(UI *ui) {
 
 // Feed SDL from ring, but cap queue to target latency
 void unk_audio_speaker_pump(VIEWSPEAKER *speaker) {
-    Uint32 queued = SDL_GetQueuedAudioSize(speaker->dev);
+    uint32_t queued = SDL_GetQueuedAudioSize(speaker->dev);
     if(queued >= speaker->target_q_bytes) {
         return;
     }
