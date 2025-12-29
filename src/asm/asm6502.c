@@ -1632,6 +1632,18 @@ int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, void *user, output_byte ob
 int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) {
     as->pass = 0;
     as->current_file = input_file;
+    char start_path[PATH_MAX];
+    const char *name = util_strrtok(input_file, "\\/");
+    if(name) {
+        util_dir_get_current(start_path, PATH_MAX);
+        char file_path[PATH_MAX];
+        int len = name - input_file;
+        len = len > PATH_MAX ? PATH_MAX : len;
+        strncpy(file_path, input_file, len);
+        file_path[len] = '\0';
+        util_dir_change(file_path);
+        input_file = name + 1;
+    }
     while(as->pass < 2) {
         if(A2_OK != include_files_push(as, input_file)) {
             return A2_ERR;
@@ -1689,6 +1701,9 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
         // Flush the macros between passes so they can be re-parsed and
         // errors reported properly om the second pass
         flush_macros(as);
+    }
+    if(name) {
+        util_dir_change(start_path);
     }
     return A2_OK;
 }

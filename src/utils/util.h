@@ -55,6 +55,6 @@ void *util_memset32(void *ptr, uint32_t value, size_t count);
 char *util_strndup(const char *string, size_t length);
 char util_character_in_characters(const char character, const char *characters);
 int util_is_newline(char c);
-char *util_extract_file_name(const char *string, int str_len, int *index);
+char *util_extract_fqn(const char *string, int str_len, int *index);
 
 uint32_t util_fnv_1a_hash(const char *key, size_t len);

@@ -35,7 +35,7 @@ static void apple2_slot_setup(APPLE2 *m, INI_STORE *ini_store) {
                         char *fn;
                         int index = 0;
                         int str_len = strlen(val);
-                        while((fn = util_extract_file_name(val, str_len, &index))) {
+                        while((fn = util_extract_fqn(val, str_len, &index))) {
                             diskii_mount(m, slot, device, fn);
                             free(fn);
                         }
@@ -62,7 +62,7 @@ static void apple2_slot_setup(APPLE2 *m, INI_STORE *ini_store) {
                 if(val[0]) {
                     int index = 0;
                     int str_len = strlen(val);
-                    char *fn = util_extract_file_name(val, str_len, &index);
+                    char *fn = util_extract_fqn(val, str_len, &index);
                     sp_mount(m, slot, device, fn);
                     free(fn);
                 }

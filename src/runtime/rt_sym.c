@@ -105,7 +105,7 @@ int rt_sym_init(RUNTIME *rt, INI_STORE *ini_store) {
         char *fn;
         int index = 0;
         int str_len = strlen(val);
-        while((fn = util_extract_file_name(val, str_len, &index))) {
+        while((fn = util_extract_fqn(val, str_len, &index))) {
             if(A2_OK == util_file_load(&symbol_file, fn, "r")) {
                 int len;
                 const char *name = util_strrtok(fn, "\\/");

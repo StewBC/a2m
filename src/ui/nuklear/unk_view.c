@@ -201,10 +201,53 @@ void unk_config_ui(UNK *v, INI_STORE *ini_store) {
             v->scroll_wheel_lines = state;
         }
     }
+    // Assembler variables
+    val = ini_get(ini_store, "Assembler", "source");
+    if(val) {
+        size_t len = strlen(val);
+        v->viewdasm.assembler_config.file_browser.dir_selected.name_length = len > PATH_MAX ? PATH_MAX : len;
+        strncpy(v->viewdasm.assembler_config.file_browser.dir_selected.name, val, PATH_MAX);
+    }
+    val = ini_get(ini_store, "Assembler", "dest");
+    if(val) {
+        RAMVIEW_FLAGS flags = MEM_MAPPED_6502;
+        if (0 == stricmp(val, "64K")) {
+            flags = MEM_MAIN;
+        } else if (0 == stricmp(val, "128K")) {
+            flags = MEM_AUX;
+        } else if (0 == stricmp(val, "128K")) {
+            flags = MEM_LC_BANK2;
+        }
+        v->viewdasm.assembler_config.flags = flags;
+    }
+    val = ini_get(ini_store, "Assembler", "reset_stack");
+    if(val) {
+        if(0 == stricmp(val, "yes") || 0 == stricmp(val, "1")) {
+            v->viewdasm.assembler_config.reset_stack = 1;
+        }
+    }
+    val = ini_get(ini_store, "Assembler", "auto_run");
+    if(val) {
+        if(0 == stricmp(val, "yes") || 0 == stricmp(val, "1")) {
+            v->viewdasm.assembler_config.auto_run_after_assemble = 1;
+        }
+    }
+    val = ini_get(ini_store, "Assembler", "address");
+    if(val) {
+        v->viewdasm.assembler_config.start_address = strtoul(val, NULL, 0);
+        snprintf(v->viewdasm.assembler_config.start_address_text, 5, "%04X", v->viewdasm.assembler_config.start_address);
+        v->viewdasm.assembler_config.start_address_text_len = strlen(v->viewdasm.assembler_config.start_address_text);
+    }
 }
 
 int unk_init(UNK *v, int model, INI_STORE *ini_store) {
     v->scroll_wheel_lines = 4;
+
+    // Init the dasm config before seeing if the ini file overrides it
+    if(A2_OK != unk_dasm_init(&v->viewdasm, model)) {
+        return A2_ERR;
+    }
+
     unk_config_ui(v, ini_store);
     v->sdl_os_rect = v->target_rect;        // Remember the size
 
@@ -263,10 +306,6 @@ int unk_init(UNK *v, int model, INI_STORE *ini_store) {
     v->greenLED = load_png_texture_from_ram(v->renderer, led_green, led_green_len);
     v->redLED = load_png_texture_from_ram(v->renderer, led_red, led_red_len);
     if(!v->greenLED || !v->redLED) {
-        return A2_ERR;
-    }
-
-    if(A2_OK != unk_dasm_init(&v->viewdasm, model)) {
         return A2_ERR;
     }
 

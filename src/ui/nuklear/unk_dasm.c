@@ -400,6 +400,10 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
             }
             break;
 
+        case SDLK_F4:
+            if((mod & KMOD_CTRL) && (mod & KMOD_SHIFT) && !v->debug_view) {
+                v->debug_view = 1;
+            }
         case SDLK_b:
             if(!v->dlg_modal_active) {
                 if((mod & KMOD_CTRL) && !(mod & KMOD_SHIFT)) {
@@ -451,6 +455,9 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                         if(dv->errorlog.log_array.items) {
                             v->dlg_modal_active = 1;
                             v->dlg_assembler_errors = 1;
+                            if(!v->debug_view) {
+                                v->debug_view = 1;
+                            }
                         } else {
                             if(ac->reset_stack) {
                                 rt_machine_set_sp(rt, 0x1ff);

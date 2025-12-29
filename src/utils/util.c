@@ -541,7 +541,7 @@ int util_is_newline(char c) {
     return (c == '\n' || c == '\r');
 }
 
-char *util_extract_file_name(const char *string, int str_len, int *index) {
+char *util_extract_fqn(const char *string, int str_len, int *index) {
     if(*index >= str_len) {
         return NULL;
     }

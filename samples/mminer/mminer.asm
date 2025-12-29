@@ -9,6 +9,8 @@
 ZEROPAGE    = $50
 LOWMEM      = $0800
 HGR         = $4000
+SETAN3      = $C05F
+CLR80STORE  = $C000
 
 .include "apple2.inc"
 .include "defs.inc"
@@ -74,6 +76,9 @@ mainInit:
     lda #>HGRPage1                               ; set the current hidden (back) page to page 1
     sta currPageH                                ; (page 2 was made visible by the loader)
 
+    sta SETAN3
+    sta CLR80STORE
+    sta CLR80COL
     bit TXTCLR
     bit MIXCLR
     bit HISCR
