@@ -153,7 +153,7 @@ int apple2_init(APPLE2 *m, INI_STORE *ini_store) {
     // 4K ($0000 - $0FFF) Bank 1 @ $D000 - $DFFF
     // 4K ($1000 - $1FFF) Bank 2 @ $D000 - $DFFF
     // 8K ($2000 - $3FFF)        @ $E000 - $FFFF
-    // That's 16K but 2x for AUX version in IIe (allocated on ][+ as well) // SQW
+    // That's 16K but 2x for AUX version in IIe (allocated on ][+ as well)
     m->RAM_LC = (uint8_t *) malloc(32 * 1024);
     if(!m->RAM_LC) {
         return A2_ERR;

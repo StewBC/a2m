@@ -463,7 +463,6 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                 }
                 break;
             case 0xC010:
-                // SQW - replace with a ctx callback that's installed by paste
                 if(m->a2out_cb.cb_clipboard_ctx.cb_clipboard &&
                         !m->a2out_cb.cb_clipboard_ctx.cb_clipboard(m->a2out_cb.cb_clipboard_ctx.user)) {
                     m->RAM_MAIN[KBD] &= 0x7F;
@@ -517,12 +516,12 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                             set_memory_map(m);
                         }
                         break;
-                    case CLRAN0: // SQW - hires or dhires if text off
-                    case SETAN0: // SQW
-                    case CLRAN1: // SQW
-                    case SETAN1: // SQW
-                    case CLRAN2: // SQW
-                    case SETAN2: // SQW
+                    case CLRAN0:
+                    case SETAN0:
+                    case CLRAN1:
+                    case SETAN1:
+                    case CLRAN2:
+                    case SETAN2:
                         break;
                     case CLRAN3:
                         m->dhires = 1;
