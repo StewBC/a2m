@@ -32,7 +32,44 @@ static inline void perf_sleep(uint32_t ms) {
     Sleep(ms);
 }
 
-#else // macOS, Linux, etc.
+#elif defined(__APPLE__) // macOS
+
+#include <time.h>
+#include <mach/mach_time.h>
+
+static inline uint64_t perf_counter(void) {
+  return mach_continuous_time(); // or mach_absolute_time()
+}
+
+static inline uint64_t perf_frequency(void) {
+  // ticks per second = 1e9 * denom / numer
+  static mach_timebase_info_data_t tb;
+  static uint64_t freq = 0;
+  if (!freq) {
+    mach_timebase_info(&tb);
+    // Convert: ns = ticks * numer / denom  => ticks/sec = 1e9 * denom / numer
+    freq = (1000000000ull * (uint64_t)tb.denom) / (uint64_t)tb.numer;
+  }
+  return freq;
+}
+
+static inline uint64_t perf_now_ns(void) {
+  static mach_timebase_info_data_t tb;
+  static int inited = 0;
+  if (!inited) { mach_timebase_info(&tb); inited = 1; }
+  uint64_t t = mach_continuous_time();
+  // ns = t * numer / denom
+  return (t * (uint64_t)tb.numer) / (uint64_t)tb.denom;
+}
+
+static inline void perf_sleep(uint32_t ms) {
+    struct timespec ts;
+    ts.tv_sec = ms / 1000;
+    ts.tv_nsec = (ms % 1000) * 1000000;
+    nanosleep(&ts, NULL);
+}
+
+#else // Linux, etc.
 
 #include <time.h>
 static inline uint64_t perf_now_ns(void) {
