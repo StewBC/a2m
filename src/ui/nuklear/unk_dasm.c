@@ -667,8 +667,8 @@ void unk_dasm_show(UNK *v, int dirty) {
                 struct nk_rect r = nk_widget_bounds(ctx);
                 int cursor_y = 0; // SQW Because the PC is sometimes not on col 0 (asm didn't work out) this remains unset
                 struct nk_color ob = ctx->style.window.background;
-                // This has gotten a bit messey.  I am fixing a bu where the line address changes
-                // due to data typed in, in the mem-view.  This cathes that with the contol_pc
+                // This has gotten a bit messey.  I am fixing a bug where the line address changes
+                // due to data typed in, in the mem-view.  This catches the bug with the contol_pc
                 // but perhaps this can all be made clearer - even though I wrote this code in the last
                 // month or two, I can't remember why I did all of this, this way.
                 uint16_t control_pc = unk_dasm_get_line_info(dv, 0)->address;

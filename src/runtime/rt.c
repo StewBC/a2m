@@ -406,7 +406,7 @@ int rt_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, int force_
     char *text = str_buf;
     int remain = str_buf_len;
     uint8_t instruction = read_from_memory_selected(m, pc, selected);
-    int length = force_byte ? 0 : opcode_lengths[instruction];
+    int length = force_byte ? 1 : opcode_lengths[instruction];
     *address += length;
     int prt_len;
     uint16_t operands;
@@ -422,6 +422,7 @@ int rt_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, int force_
     uint8_t mode = addr_mode[instruction];
     if(force_byte) {
         mode = 0;
+        length = 0;
     }
 
     switch(length) {
