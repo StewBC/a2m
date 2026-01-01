@@ -194,6 +194,15 @@ void unk_config_ui(UNK *v, INI_STORE *ini_store) {
             v->show_leds = 1;
         }
     }
+    val = ini_get(ini_store, "Config", "symbol_view");
+    if(val) {
+        int state = 0;
+        if(1 == sscanf(val, "%d", &state)) {
+            if(state >= 0 && state <= 3) {
+                v->viewdasm.symbol_view = state;
+            }
+        }
+    }
     val = ini_get(ini_store, "Config", "wheel_speed");
     if(val) {
         int state = 0;

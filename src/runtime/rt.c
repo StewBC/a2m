@@ -6,7 +6,46 @@
 
 #define TARGET_FPS              60
 #define OPCODE_JSR              0x20
+#define OPCODE_JMP_ABS          0x4C
 #define OPCODE_RTS              0x60
+#define OPCODE_JMP_IND          0x6C
+
+enum AddrMode {
+    AM_NONE = 0,
+    AM_A    = 1,   // Accumulator
+    AM_ABS  = 2,
+    AM_ABSX = 3,
+    AM_ABSY = 4,
+    AM_IMM  = 5,
+    AM_IMPL = 6,
+    AM_IND  = 7,
+    AM_XIND = 8,
+    AM_INDY = 9,
+    AM_REL  = 10,
+    AM_ZPG  = 11,
+    AM_ZPGX = 12,
+    AM_ZPGY = 13
+};
+
+static const uint8_t addr_mode[256] = {
+/*      0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F */
+/*0*/   6, 8, 0, 0, 0,11,11, 0, 6, 5, 1, 0, 0, 2, 2, 0,
+/*1*/  10, 9, 0, 0, 0,12,12, 0, 6, 4, 0, 0, 0, 3, 3, 0,
+/*2*/   2, 8, 0, 0,11,11,11, 0, 6, 5, 1, 0, 2, 2, 2, 0,
+/*3*/  10, 9, 0, 0, 0,12,12, 0, 6, 4, 0, 0, 0, 3, 3, 0,
+/*4*/   6, 8, 0, 0, 0,11,11, 0, 6, 5, 1, 0, 2, 2, 2, 0,
+/*5*/  10, 9, 0, 0, 0,12,12, 0, 6, 4, 0, 0, 0, 3, 3, 0,
+/*6*/   6, 8, 0, 0, 0,11,11, 0, 6, 5, 1, 0, 7, 2, 2, 0,
+/*7*/  10, 9, 0, 0, 0,12,12, 0, 6, 4, 0, 0, 0, 3, 3, 0,
+/*8*/  10, 8, 0, 0,11,11,11, 0, 6, 0, 6, 0, 2, 2, 2, 0,
+/*9*/  10, 9, 0, 0,12,12,13, 0, 6, 4, 6, 0, 0, 3, 0, 0,
+/*A*/   5, 8, 5, 0,11,11,11, 0, 6, 5, 6, 0, 2, 2, 2, 0,
+/*B*/  10, 9, 0, 0,12,12,13, 0, 6, 4, 6, 0, 3, 3, 4, 0,
+/*C*/   5, 8, 0, 0,11,11,11, 0, 6, 5, 6, 0, 2, 2, 2, 0,
+/*D*/  10, 9, 0, 0, 0,12,12, 0, 6, 4, 0, 0, 0, 3, 3, 0,
+/*E*/   5, 8, 0, 0,11,11,11, 0, 6, 5, 6, 0, 2, 2, 2, 0,
+/*F*/  10, 9, 0, 0, 0,12,12, 0, 6, 4, 0, 0, 0, 3, 3, 0,
+};
 
 // This is the code that checks breakpoints and controls flow and marks cycle counts
 // It's okay to return 1, but not 0 at any point before the end (so not to skip cycle marking)
@@ -360,7 +399,6 @@ void rt_brk_callback(RUNTIME *rt, uint16_t address, uint8_t mask) {
     rt->run = 0;
 }
 
-
 int rt_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, int force_byte, char symbol_view, char *str_buf, int str_buf_len) {
     APPLE2 *m = rt->m;
     char address_symbol[11];
@@ -368,7 +406,7 @@ int rt_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, int force_
     char *text = str_buf;
     int remain = str_buf_len;
     uint8_t instruction = read_from_memory_selected(m, pc, selected);
-    int length = force_byte ? 1 : opcode_lengths[instruction];
+    int length = force_byte ? 0 : opcode_lengths[instruction];
     *address += length;
     int prt_len;
     uint16_t operands;
@@ -380,7 +418,17 @@ int rt_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, int force_
     adjust(text, remain, prt_len);
     prt_len = snprintf(text, remain, "%-*.*s ", SYMBOL_COL_LEN - 1, SYMBOL_COL_LEN - 1, symbol);
     adjust(text, remain, prt_len);
+
+    uint8_t mode = addr_mode[instruction];
+    if(force_byte) {
+        mode = 0;
+    }
+
     switch(length) {
+        case 0:
+            prt_len = snprintf(text, remain, "%02X", instruction);
+            adjust(text, remain, prt_len);
+            break;
         case 1:
             prt_len = snprintf(text, remain, "%02X        %s", instruction, opcode_text[instruction]);
             adjust(text, remain, prt_len);
@@ -389,34 +437,11 @@ int rt_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, int force_
             operands = read_from_memory_selected(m, pc + 1, selected);
             prt_len = snprintf(text, remain, "%02X %02X     %s", instruction, operands, opcode_text[instruction]);
             adjust(text, remain, prt_len);
-            // Decode the class to decide if a symbol lookup is needed
-            // SQW 65c02 probably needs something here...
-            switch(instruction & 0x0f) {
-                case 0x00:                                          // Branches, adjusted (destination) lookup
-                    if(symbol_view || instruction == 0xa0 || instruction == 0xc0 || instruction == 0xe0) {
-                        symbol = 0;
-                    } else {
-                        symbol = rt_sym_find_symbols(rt, pc + 2 + (int8_t) operands);
-                        // If no symbol but symbol view is on - resolve to an address and pretend that's the symbol
-                        if(!symbol) {
-                            snprintf(address_symbol, 11, "$%02X [%04X]", (uint8_t) operands, (uint16_t)(pc + 2 + (int8_t) operands));
-                            symbol = address_symbol;
-                        }
-                    }
-                    break;
-                case 0x09:                                          // Immediate - no lookup
-                    symbol = 0;
-                    break;
-                default:                                            // just look for the byte address
-                    symbol = symbol_view ? 0 : rt_sym_find_symbols(rt, operands);
-                    break;
-            }
-            if(!symbol) {
-                prt_len = snprintf(text, remain, opcode_hex_params[instruction], operands);
+            if(mode == AM_REL) {
+                symbol = rt_sym_find_symbols(rt, pc + 2 + (int8_t) operands);
             } else {
-                prt_len = snprintf(text, remain, opcode_symbol_params[instruction], symbol);
+                symbol = symbol_view & SYMBOL_VIEW_MARGIN ? 0 : rt_sym_find_symbols(rt, operands);
             }
-            adjust(text, remain, prt_len);
             break;
         case 3: {
                 uint8_t al = read_from_memory_selected(m, pc + 1, selected);
@@ -425,14 +450,68 @@ int rt_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, int force_
                 prt_len = snprintf(text, remain, "%02X %02X %02X  %s", instruction, al, ah, opcode_text[instruction]);
                 adjust(text, remain, prt_len);
                 symbol = symbol_view & SYMBOL_VIEW_MARGIN ? 0 : rt_sym_find_symbols(rt, operands);
-                if(!symbol) {
-                    snprintf(text, remain, opcode_hex_params[instruction], operands);
-                } else {
-                    snprintf(text, remain, opcode_symbol_params[instruction], symbol);
+            }
+            break;
+    }
+
+    if(!symbol) {
+        prt_len = snprintf(text, remain, opcode_hex_params[instruction], operands);
+    } else {
+        prt_len = snprintf(text, remain, opcode_symbol_params[instruction], symbol);
+    }
+    adjust(text, remain, prt_len);
+
+    if(!symbol_view && length > 1) {
+        // Align the '['s for the lookup
+        int len = text - str_buf;
+        if(str_buf_len > 55 && len < 51) {
+            memset(text, 0x20, 51 - len);
+            text = &str_buf[51];
+            *text = '\0';
+        }
+        
+        switch(mode) {
+            case AM_NONE:
+            case AM_A:
+            case AM_IMM:
+            case AM_IMPL:
+                break;
+            case AM_ABS:
+            case AM_ZPG:
+                if(instruction != OPCODE_JMP_ABS && instruction != OPCODE_JMP_IND && instruction != OPCODE_JSR) {
+                    snprintf(text, remain, " [%02X]", read_from_memory_selected(m, operands, selected));
                 }
                 break;
-            }
+            case AM_ABSX:
+            case AM_ZPGX:
+                snprintf(text, remain, " [%02X]", read_from_memory_selected(m, operands + m->cpu.X, selected));
+                break;
+            case AM_ABSY:
+            case AM_ZPGY:
+                snprintf(text, remain, " [%02X]", read_from_memory_selected(m, operands + m->cpu.Y, selected));
+                break;
+            case AM_IND: {
+                uint8_t al = read_from_memory_selected(m, operands, selected);
+                uint8_t ah = read_from_memory_selected(m, operands + 1, selected);
+                operands = ((ah << 8) | al);
+                snprintf(text, remain, " [%02X]", read_from_memory_selected(m, operands, selected));
+                }
+                break;
+            case AM_XIND:
+                break;
+            case AM_INDY: {
+                uint8_t al = read_from_memory_selected(m, operands, selected);
+                uint8_t ah = read_from_memory_selected(m, operands + 1, selected);
+                operands = ((ah << 8) | al);
+                snprintf(text, remain, " [%02X]", read_from_memory_selected(m, operands + m->cpu.Y, selected));
+                }
+                break;
+            case AM_REL:
+                snprintf(text, remain, " [%04X]", (uint16_t)(pc + 2 + (int8_t) operands));
+                break;
+        }
     }
+
     return str_buf_len - remain;
 }
 

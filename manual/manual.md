@@ -191,27 +191,27 @@ See **Symbols Dialog** for more information.
 ### Keyboard controls
 These keys apply **when emulation is stopped**:
 
-| Key           | Action                                                                  |
-|:--------------|:------------------------------------------------------------------------|
-| C+a           | Edit the memory address of the cursor line                              |
-| C+S+b         | Open the Assembler Configuration Dialog                                 |
-| C+b           | Assemble the configured source file                                     |
-| C+e           | Show the assembler errors dialog                                        |
-| C+p           | Set the PC to the cursor address                                        |
-| C+s           | Open the symbol lookup dialog                                           |
-| ENTER         | Finish "edit memory address" mode                                       |
-| TAB           | Cycle through symbol / branch offset / raw hex display modes            |
-| HOME          | Move the cursor to the top of the view                                  |
-| C+HOME        | Jump to address `$0000`                                                 |
-| END           | Move the cursor to the last line of the view                            |
-| C+END         | Jump to address `$FFFF`                                                 |
-| UP/DOWN       | Move the cursor, scrolling if needed                                    |
-| LEFT          | Scroll to show the cursor                                               |
-| C+LEFT        | Set PC to cursor and scroll to it                                       |
-| RIGHT         | Scroll to show the PC                                                   |
-| C+RIGHT       | Set cursor to PC and scroll to it                                       |
-| PAGE UP       | Page up by one full view                                                |
-| PAGE DOWN     | Page down by one full view                                              |
+| Key           | Action                                                             |
+|:--------------|:-------------------------------------------------------------------|
+| C+a           | Edit the memory address of the cursor line                         |
+| C+S+b         | Open the Assembler Configuration Dialog                            |
+| C+b           | Assemble the configured source file                                |
+| C+e           | Show the assembler errors dialog                                   |
+| C+p           | Set the PC to the cursor address                                   |
+| C+s           | Open the symbol lookup dialog                                      |
+| ENTER         | Finish "edit memory address" mode                                  |
+| TAB           | Cycle through lookup, syms & labels; syms & labels; labels; or raw |
+| HOME          | Move the cursor to the top of the view                             |
+| C+HOME        | Jump to address `$0000`                                            |
+| END           | Move the cursor to the last line of the view                       |
+| C+END         | Jump to address `$FFFF`                                            |
+| UP/DOWN       | Move the cursor, scrolling if needed                               |
+| LEFT          | Scroll to show the cursor                                          |
+| C+LEFT        | Set PC to cursor and scroll to it                                  |
+| RIGHT         | Scroll to show the PC                                              |
+| C+RIGHT       | Set cursor to PC and scroll to it                                  |
+| PAGE UP       | Page up by one full view                                           |
+| PAGE DOWN     | Page down by one full view                                         |
 
 **C+ and S+ mean CONTROL+ and SHIFT+, respectively.**
 
@@ -745,6 +745,7 @@ The Config section is mostly UI configuration. Variables are:
 | disk_leds    | Value `on` or `1` shows disk activity LEDs in the lower right of the UI |
 | save         | `yes` means save the INI file on exit                                   |
 | symbols      | Comma-separated files that contain symbol information                   |
+| symbol_view  | In disassembler `0`: lookup, syms & labels, `1`: syms & labels, `2`: labels, `3`: raw   |
 | ui           | `text` for text based UI.  Anything else means GUI based UI             |
 | wheel_speed  | Number of lines to scroll when using the mouse scroll wheel             |
 
