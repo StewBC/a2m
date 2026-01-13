@@ -4,12 +4,11 @@
 
 #pragma once
 
-typedef enum {
-    MODE_PC     = 0,        // These are bit masks but pc == 0 for memset
-    MODE_READ   = 1,
-    MODE_WRITE  = 2,
-    MODE_ACCESS = 3
-} BRKMODE;
+enum {
+    BREAK_MODE_PC       = 0,
+    BREAK_MODE_READ     = 1 << 0,
+    BREAK_MODE_WRITE    = 1 << 1,
+};
 
 typedef enum {
     ACTION_UNUSED,
@@ -25,7 +24,7 @@ typedef enum {
 typedef struct {
     uint32_t    start;     // required
     uint32_t    end;       // = start if no range
-    BRKMODE     mode;      // default = MODE_PC
+    uint32_t    mode;      // default = BREAK_MODE_PC
     BRKACTION   action;    // default = ACTION_UNUSED
     int         count;     // optional; 0 if unset
     int         reset;     // optional; 0 if unset

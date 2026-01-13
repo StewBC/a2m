@@ -10,7 +10,6 @@
 
 #define SYMBOL_COL_LEN          17
 
-#include "breakpoint.h"
 #include "rt_bp.h"
 #include "rt_sym.h"
 #include "rt_trace.h"

@@ -303,7 +303,7 @@ int unk_dasm_init(VIEWDASM *dv, int model) {
     dv->cursor_field = CURSOR_ASCII;
 
     errlog_init(&dv->errorlog);
-    dv->assembler_config.auto_run_after_assemble = nk_true;
+    dv->assembler_config.auto_run_after_assemble = nk_false;
     dv->assembler_config.start_address = 0x2000;
     dv->assembler_config.start_address_text_len =
         sprintf(dv->assembler_config.start_address_text, "%04X", dv->assembler_config.start_address);
@@ -464,7 +464,11 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                             }
                             if(ac->auto_run_after_assemble) {
                                 rt_machine_set_pc(rt, ac->start_address);
-                                rt_machine_run(rt);
+                                // In this case, don't run if the start address has a breakpoint
+                                BREAKPOINT *bp = rt_bp_get_at_address(rt, ac->start_address, 0);
+                                if(!bp) {
+                                    rt_machine_run(rt);
+                                }
                             }
                         }
                     }
@@ -584,7 +588,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                     BREAKPOINT bp;
                     memset(&bp, 0, sizeof(bp));
                     bp.address = dv->cursor_address;
-                    bp.use_pc = bp.break_on_read = bp.break_on_write = 1;
+                    bp.break_on_exec = bp.break_on_read = bp.break_on_write = 1;
                     bp.counter_stop_value = bp.counter_reset = 1;
                     ARRAY_ADD(&rt->breakpoints, bp);
                 } else {
@@ -658,172 +662,181 @@ void unk_dasm_show(UNK *v, int dirty) {
         ctx->style.window.group_padding = nk_vec2(0, 0);
         ctx->style.window.border        = 0.0f;
 
-        nk_layout_row_begin(ctx, NK_STATIC, v->layout.dasm.h, 2);
-        nk_layout_row_push(ctx, v->layout.dasm.w - SCROLLBAR_W);
-        if(nk_group_begin(ctx, "dasm-view", NK_WINDOW_NO_SCROLLBAR)) {
-            nk_layout_row_dynamic(ctx, dv->rows * ROW_H, 1);
-            if(nk_group_begin(ctx, "dasm-rows", NK_WINDOW_NO_SCROLLBAR)) {
-                nk_layout_row_dynamic(ctx, ROW_H, 1);
-                struct nk_rect r = nk_widget_bounds(ctx);
-                int cursor_y = 0; // SQW Because the PC is sometimes not on col 0 (asm didn't work out) this remains unset
-                struct nk_color ob = ctx->style.window.background;
-                // This has gotten a bit messey.  I am fixing a bug where the line address changes
-                // due to data typed in, in the mem-view.  This catches the bug with the contol_pc
-                // but perhaps this can all be made clearer - even though I wrote this code in the last
-                // month or two, I can't remember why I did all of this, this way.
-                uint16_t control_pc = unk_dasm_get_line_info(dv, 0)->address;
-                uint16_t current_pc = control_pc;
-                for(int i = 0; i < dv->rows; i++) {
-                    LINE_INFO *li = unk_dasm_get_line_info(dv, i);
-                    uint16_t pc = li->address;
-                    if(pc != control_pc) {
-                        unk_dasm_fill_lines_down(dv, m, current_pc, i-1);
-                        pc = control_pc;
-                    }
-                    current_pc = pc;
-                    rt_disassemble_line(rt, &pc, dv->flags, li->force_byte, dv->symbol_view, dv->str_buf, dv->str_buf_len);
-                    control_pc = pc;
-                    struct nk_color bg = ob;
-                    struct nk_color fg = ctx->style.text.color;
-                    if(li->force_byte) {
-                        fg = unk_dasm_blend(fg, nk_rgb(0, 0, 0), 0.5f);
-                    }
-                    BREAKPOINT *bp = rt_bp_get_at_address(rt, current_pc, 0);
-                    // See if the mouse has been clicked over this row to be drawn
-                    if(!v->dlg_modal_active && !v->dlg_modal_mouse_down && nk_widget_is_mouse_clicked(ctx, NK_BUTTON_LEFT)) {
-                        float rel_x = (ctx->input.mouse.pos.x - r.x) / v->font_width;
-                        dv->cursor_address = current_pc;
-                        if(rel_x < 4) {
-                            dv->cursor_field = CURSOR_ADDRESS;
-                            dv->cursor_digit = rel_x;
-                        } else {
-                            dv->cursor_field = CURSOR_ASCII;
+        // This is the main display, split into the display and the scrolbar columns
+        nk_layout_row_begin(ctx, NK_STATIC, v->layout.dasm.h, 2); {
+
+            // 1) st column - Push the display column width
+            nk_layout_row_push(ctx, v->layout.dasm.w - SCROLLBAR_W);
+            // Make the display column a group
+            if(nk_group_begin(ctx, "dasm-view", NK_WINDOW_NO_SCROLLBAR)) {
+                // A) The rows of disasembly lines
+                nk_layout_row_dynamic(ctx, ROW_H, 1); {
+                    struct nk_rect r = nk_widget_bounds(ctx);
+                    int cursor_y = 0; // SQW Because the PC is sometimes not on col 0 (asm didn't work out) this remains unset
+                    struct nk_color ob = ctx->style.window.background;
+                    // This has gotten a bit messey.  I am fixing a bug where the line address changes
+                    // due to data typed in, in the mem-view.  This catches the bug with the contol_pc
+                    // but perhaps this can all be made clearer - even though I wrote this code in the last
+                    // month or two, I can't remember why I did all of this, this way.
+                    uint16_t control_pc = unk_dasm_get_line_info(dv, 0)->address;
+                    uint16_t current_pc = control_pc;
+                    // Show all of the lines
+                    for(int i = 0; i < dv->rows; i++) {
+                        LINE_INFO *li = unk_dasm_get_line_info(dv, i);
+                        uint16_t pc = li->address;
+                        if(pc != control_pc) {
+                            unk_dasm_fill_lines_down(dv, m, current_pc, i-1);
+                            pc = control_pc;
                         }
-                    }
-                    if(current_pc == m->cpu.pc) {
-                        if(dirty) {
+                        current_pc = pc;
+                        rt_disassemble_line(rt, &pc, dv->flags, li->force_byte, dv->symbol_view, dv->str_buf, dv->str_buf_len);
+                        control_pc = pc;
+                        struct nk_color bg = ob;
+                        struct nk_color fg = ctx->style.text.color;
+                        if(li->force_byte) {
+                            fg = unk_dasm_blend(fg, nk_rgb(0, 0, 0), 0.5f);
+                        }
+                        BREAKPOINT *bp = rt_bp_get_at_address(rt, current_pc, 0);
+                        // See if the mouse has been clicked over this row to be drawn
+                        if(!v->dlg_modal_active && !v->dlg_modal_mouse_down && nk_widget_is_mouse_clicked(ctx, NK_BUTTON_LEFT)) {
+                            float rel_x = (ctx->input.mouse.pos.x - r.x) / v->font_width;
                             dv->cursor_address = current_pc;
+                            if(rel_x < 4) {
+                                dv->cursor_field = CURSOR_ADDRESS;
+                                dv->cursor_digit = rel_x;
+                            } else {
+                                dv->cursor_field = CURSOR_ASCII;
+                            }
                         }
-                        fg = color_fg_pc;
-                        bg = color_bg_pc;
-                        if(dv->cursor_address != current_pc) {
-                            fg = unk_dasm_blend(color_fg_pc, color_fg_cursor, 0.5);
-                            bg = unk_dasm_blend(color_bg_pc, color_bg_cursor, 0.5);
+                        if(current_pc == m->cpu.pc) {
+                            if(dirty) {
+                                dv->cursor_address = current_pc;
+                            }
+                            fg = color_fg_pc;
+                            bg = color_bg_pc;
+                            if(dv->cursor_address != current_pc) {
+                                fg = unk_dasm_blend(color_fg_pc, color_fg_cursor, 0.5);
+                                bg = unk_dasm_blend(color_bg_pc, color_bg_cursor, 0.5);
+                            }
+                            if(bp) {
+                                fg = unk_dasm_blend(fg, color_fg_breakpoint, 0.5);
+                                bg = unk_dasm_blend(fg, color_bg_breakpoint, 0.5);
+                            }
+                        } else if(!dirty && current_pc == dv->cursor_address) {
+                            fg = color_fg_cursor;
+                            bg = color_bg_cursor;
+                            if(bp) {
+                                fg = unk_dasm_blend(fg, color_fg_breakpoint, 0.5);
+                                bg = unk_dasm_blend(fg, color_bg_breakpoint, 0.5);
+                            }
+                        } else if(bp) {
+                            fg = color_fg_breakpoint;
+                            bg = color_bg_breakpoint;
                         }
-                        if(bp) {
-                            fg = unk_dasm_blend(fg, color_fg_breakpoint, 0.5);
-                            bg = unk_dasm_blend(fg, color_bg_breakpoint, 0.5);
+                        if(dv->cursor_field == CURSOR_ADDRESS && current_pc == dv->cursor_address) {
+                            // Can't draw the cursor here yet - ctx->current->layout->bounds does
+                            // not yet include this row
+                            cursor_y = i * ROW_H;
                         }
-                    } else if(!dirty && current_pc == dv->cursor_address) {
-                        fg = color_fg_cursor;
-                        bg = color_bg_cursor;
-                        if(bp) {
-                            fg = unk_dasm_blend(fg, color_fg_breakpoint, 0.5);
-                            bg = unk_dasm_blend(fg, color_bg_breakpoint, 0.5);
-                        }
-                    } else if(bp) {
-                        fg = color_fg_breakpoint;
-                        bg = color_bg_breakpoint;
+                        ctx->style.window.background = bg;
+                        nk_label_colored(ctx, dv->str_buf, NK_TEXT_LEFT, fg);
+                        ctx->style.window.background = ob;
                     }
-                    if(dv->cursor_field == CURSOR_ADDRESS && current_pc == dv->cursor_address) {
-                        // Can't draw the cursor here yet - ctx->current->layout->bounds does
-                        // not yet include this row
-                        cursor_y = i * ROW_H;
+
+                    // Show the cursor for any line where the address is being edited
+                    if(dv->cursor_field == CURSOR_ADDRESS) {
+                        struct nk_rect r = ctx->current->layout->bounds;
+                        r.h = ROW_H;
+                        r.w = v->font_width;
+                        r.y += cursor_y;
+                        r.x = ctx->current->layout->at_x + v->font_width * dv->cursor_digit;
+                        uint16_t row_address = dv->cursor_address;
+                        uint8_t shift = (4 * (3 - dv->cursor_digit));
+                        char dc = (row_address >> shift) & 0x0f;
+                        dc += (dc > 9) ? 'A' - 10 : '0';
+                        struct nk_command_buffer *canvas = nk_window_get_canvas(ctx);
+                        nk_draw_text(canvas, r, &dc, 1, ctx->style.font, nk_rgb(0, 0, 0), nk_rgb(255, 255, 255));
                     }
-                    ctx->style.window.background = bg;
-                    nk_label_colored(ctx, dv->str_buf, NK_TEXT_LEFT, fg);
-                    ctx->style.window.background = ob;
                 }
-                if(dv->cursor_field == CURSOR_ADDRESS) {
-                    struct nk_rect r = ctx->current->layout->bounds;
-                    r.h = ROW_H;
-                    r.w = v->font_width;
-                    r.y += cursor_y;
-                    r.x = ctx->current->layout->at_x + v->font_width * dv->cursor_digit;
-                    uint16_t row_address = dv->cursor_address;
-                    uint8_t shift = (4 * (3 - dv->cursor_digit));
-                    char dc = (row_address >> shift) & 0x0f;
-                    dc += (dc > 9) ? 'A' - 10 : '0';
-                    struct nk_command_buffer *canvas = nk_window_get_canvas(ctx);
-                    nk_draw_text(canvas, r, &dc, 1, ctx->style.font, nk_rgb(0, 0, 0), nk_rgb(255, 255, 255));
+
+                // b) The row with the memory bank access buttons
+                nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 4); {
+                    nk_layout_row_push(ctx, 0.35);
+                    nk_spacer(ctx);
+                    nk_layout_row_push(ctx, 0.15);
+                    if(nk_option_label(ctx, "6502", !tst_flags(dv->flags, MEM_MAIN | MEM_AUX)) && tst_flags(dv->flags, MEM_MAIN | MEM_AUX)) {
+                        clr_flags(dv->flags, MEM_MAIN);
+                        clr_flags(dv->flags, MEM_AUX);
+                        clr_flags(dv->flags, MEM_LC_BANK2);
+                    }
+                    if(nk_option_label(ctx, "64K", tst_flags(dv->flags, MEM_MAIN)) && !tst_flags(dv->flags, MEM_MAIN)) {
+                        clr_flags(dv->flags, MEM_AUX);
+                        set_flags(dv->flags, MEM_MAIN);
+                        if(m->lc_bank2_enable) {
+                            set_flags(dv->flags, MEM_LC_BANK2);
+                        } else {
+                            clr_flags(dv->flags, MEM_LC_BANK2);
+                        }
+                    }
+                    if(nk_option_label_disabled(ctx, "128K", tst_flags(dv->flags, MEM_AUX), !m->model) && !tst_flags(dv->flags, MEM_AUX)) {
+                        clr_flags(dv->flags, MEM_MAIN);
+                        set_flags(dv->flags, MEM_AUX);
+                        if(m->lc_bank2_enable) {
+                            set_flags(dv->flags, MEM_LC_BANK2);
+                        } else {
+                            clr_flags(dv->flags, MEM_LC_BANK2);
+                        }
+                    }
+                    int before = tst_flags(dv->flags, MEM_LC_BANK2);
+                    int after = nk_option_label_disabled(ctx, "LC Bank2", before, !tst_flags(dv->flags, MEM_MAIN | MEM_AUX));
+                    if(after != before) {
+                        if(after) {
+                            set_flags(dv->flags, MEM_LC_BANK2);
+                        } else {
+                            clr_flags(dv->flags, MEM_LC_BANK2);
+                        }
+                    }
                 }
+                nk_layout_row_end(ctx); // memory bank windows
                 nk_group_end(ctx);
             }
 
-            nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 4);
-            nk_layout_row_push(ctx, 0.35);
-            nk_spacer(ctx);
-            nk_layout_row_push(ctx, 0.15);
-            if(nk_option_label(ctx, "6502", !tst_flags(dv->flags, MEM_MAIN | MEM_AUX)) && tst_flags(dv->flags, MEM_MAIN | MEM_AUX)) {
-                clr_flags(dv->flags, MEM_MAIN);
-                clr_flags(dv->flags, MEM_AUX);
-                clr_flags(dv->flags, MEM_LC_BANK2);
-            }
-            if(nk_option_label(ctx, "64K", tst_flags(dv->flags, MEM_MAIN)) && !tst_flags(dv->flags, MEM_MAIN)) {
-                clr_flags(dv->flags, MEM_AUX);
-                set_flags(dv->flags, MEM_MAIN);
-                if(m->lc_bank2_enable) {
-                    set_flags(dv->flags, MEM_LC_BANK2);
-                } else {
-                    clr_flags(dv->flags, MEM_LC_BANK2);
-                }
-            }
-            if(nk_option_label_disabled(ctx, "128K", tst_flags(dv->flags, MEM_AUX), !m->model) && !tst_flags(dv->flags, MEM_AUX)) {
-                clr_flags(dv->flags, MEM_MAIN);
-                set_flags(dv->flags, MEM_AUX);
-                if(m->lc_bank2_enable) {
-                    set_flags(dv->flags, MEM_LC_BANK2);
-                } else {
-                    clr_flags(dv->flags, MEM_LC_BANK2);
-                }
-            }
-            int before = tst_flags(dv->flags, MEM_LC_BANK2);
-            int after = nk_option_label_disabled(ctx, "LC Bank2", before, !tst_flags(dv->flags, MEM_MAIN | MEM_AUX));
-            if(after != before) {
-                if(after) {
-                    set_flags(dv->flags, MEM_LC_BANK2);
-                } else {
-                    clr_flags(dv->flags, MEM_LC_BANK2);
-                }
-            }
-            nk_group_end(ctx);
-        }
-
-
-        // Scrollbar
-        nk_layout_row_push(ctx, SCROLLBAR_W);
-        struct nk_rect sbar_bounds = v->layout.dasm;
-        sbar_bounds.x += sbar_bounds.w - SCROLLBAR_W;
-        sbar_bounds.w = SCROLLBAR_W;
-        sbar_bounds.h -= (dv->header_height + ADDRESS_LABEL_H);
-        sbar_bounds.y += dv->header_height;
-        if(nk_input_is_mouse_hovering_rect(&ctx->input, v->layout.dasm)) {
-            int wheel = (int)ctx->input.mouse.scroll_delta.y;
-            if(wheel) {
-                wheel *= v->scroll_wheel_lines;
-                int line = 0;
-                if(wheel < 0) {
-                    // down
-                    wheel = abs(wheel);
-                    if(wheel > dv->rows - 1) {
-                        wheel = dv->rows - 1;
+            // 2) nd column - Scrollbar
+            nk_layout_row_push(ctx, SCROLLBAR_W);
+            struct nk_rect sbar_bounds = v->layout.dasm;
+            sbar_bounds.x += sbar_bounds.w - SCROLLBAR_W;
+            sbar_bounds.w = SCROLLBAR_W;
+            sbar_bounds.h -= (dv->header_height + ADDRESS_LABEL_H);
+            sbar_bounds.y += dv->header_height;
+            if(nk_input_is_mouse_hovering_rect(&ctx->input, v->layout.dasm)) {
+                int wheel = (int)ctx->input.mouse.scroll_delta.y;
+                if(wheel) {
+                    wheel *= v->scroll_wheel_lines;
+                    int line = 0;
+                    if(wheel < 0) {
+                        // down
+                        wheel = abs(wheel);
+                        if(wheel > dv->rows - 1) {
+                            wheel = dv->rows - 1;
+                        }
+                        unk_dasm_put_address_on_line(dv, m, unk_dasm_get_line_info(dv, wheel)->address, 0);
+                    } else {
+                        if(wheel > dv->rows - 1) {
+                            wheel = dv->rows - 1;
+                        }
+                        unk_dasm_put_address_on_line(dv, m, unk_dasm_get_line_info(dv, 0)->address, wheel);
                     }
-                    unk_dasm_put_address_on_line(dv, m, unk_dasm_get_line_info(dv, wheel)->address, 0);
-                } else {
-                    if(wheel > dv->rows - 1) {
-                        wheel = dv->rows - 1;
-                    }
-                    unk_dasm_put_address_on_line(dv, m, unk_dasm_get_line_info(dv, 0)->address, wheel);
                 }
             }
+            // The dv->rows * 2 is "2 = average bytes per row" - this can actually be calculated for better results
+            int view_address = unk_dasm_get_line_info(dv, 0)->address;
+            int address = view_address;
+            nk_custom_scrollbarv(ctx, sbar_bounds, 0x10000, dv->rows * 2, &address, &dv->dragging, &dv->grab_offset);
+            if(view_address != address) {
+                unk_dasm_put_address_on_line(dv, m, address, 0);
+            }
         }
-        // The dv->rows * 2 is "2 = average bytes per row" - this can actually be calculated for better results
-        int view_address = unk_dasm_get_line_info(dv, 0)->address;
-        int address = view_address;
-        nk_custom_scrollbarv(ctx, sbar_bounds, 0x10000, dv->rows * 2, &address, &dv->dragging, &dv->grab_offset);
-        if(view_address != address) {
-            unk_dasm_put_address_on_line(dv, m, address, 0);
-        }
+        nk_layout_row_end(ctx); // Main Display
 
         // Restore style padding
         ctx->style.window.padding       = pad;
@@ -831,6 +844,7 @@ void unk_dasm_show(UNK *v, int dirty) {
         ctx->style.window.group_padding = gpd;
         ctx->style.window.border        = border;
 
+        // Dialogs
         if(v->dlg_assembler_config) {
             dv->temp_assembler_config.model = m->model;
             if((ret = unk_dlg_assembler_config(ctx, nk_rect(0, 0, 360, 140), &dv->temp_assembler_config))) {
@@ -864,6 +878,8 @@ void unk_dasm_show(UNK *v, int dirty) {
         }
     }
     nk_end(ctx);
+
+    // File browser as a seperate windows after dialogs
     if(dv->temp_assembler_config.dlg_asm_filebrowser) {
         FILE_BROWSER *fb = &dv->temp_assembler_config.file_browser;
         int ret = unk_dlg_file_browser(ctx, fb);

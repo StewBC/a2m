@@ -54,10 +54,11 @@ enum {
 
 // The mask for the bits in the RAM_WATCH array
 enum RAM_WATCH_MASK {
-    WATCH_NONE             = 0,                             // Nothing to watch
-    WATCH_IO_PORT          = 1 << 0,                        // Call an IO callback function
-    WATCH_READ_BREAKPOINT  = 1 << 1,                        // When !use_pc
-    WATCH_WRITE_BREAKPOINT = 1 << 2,                        // When !use_pc
+    WATCH_NONE             = 0,                     // Nothing to watch
+    WATCH_IO_PORT          = 1 << 0,                // Call an IO callback function
+    WATCH_EXEC_BREAKPOINT  = 1 << 1,                // break on execute
+    WATCH_READ_BREAKPOINT  = 1 << 2,                // break on read access
+    WATCH_WRITE_BREAKPOINT = 1 << 3,                // break on write access
 };
 
 // The joystick interface to runtime

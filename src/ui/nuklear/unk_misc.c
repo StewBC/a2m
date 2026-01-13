@@ -70,341 +70,443 @@ void unk_misc_show(UNK *v) {
         flags |= NK_WINDOW_NO_INPUT;
     }
     if(nk_begin(ctx, "Miscellaneous", v->layout.misc, flags)) {
-        // Show the slot if it has a card in it
+
+        // 1) Show the slot if it has a card in it
         if(nk_tree_push(ctx, NK_TREE_TAB, "Slots", NK_MAXIMIZED)) {
             for(int i = 1; i < 8; i++) {
-                if(m->slot_cards[i].slot_type != SLOT_TYPE_EMPTY) {
-                    nk_layout_row_dynamic(ctx, 13, 1);
+                if(m->slot_cards[i].slot_type == SLOT_TYPE_EMPTY) {
+                    continue;
                 }
-                if(m->slot_cards[i].slot_type == SLOT_TYPE_SMARTPORT) {
-                    SP_DEVICE *spd = m->sp_device;
-                    nk_labelf(ctx, NK_TEXT_LEFT, "Slot %d: SmartPort", i);
-                    for(int j = 0; j < 2; j++) {
-                        nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 5);
-                        nk_layout_row_push(ctx, 0.08f);
-                        if(!j) {
-                            char label[4];
-                            sprintf(label, "%d.%d", i, j);
-                            if(nk_button_label(ctx, label)) {
-                                rt_machine_reset(rt);
-                                m->cpu.pc = 0xc000 + i * 0x100;
+
+                // A) Start the row for the slot details
+                nk_layout_row_dynamic(ctx, 13, 1); {
+                    if(m->slot_cards[i].slot_type == SLOT_TYPE_SMARTPORT) {
+                        SP_DEVICE *spd = m->sp_device;
+                        nk_labelf(ctx, NK_TEXT_LEFT, "Slot %d: SmartPort", i);
+                        for(int j = 0; j < 2; j++) {
+
+                            // A1) The smartport details
+                            nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 5); {
+                                nk_layout_row_push(ctx, 0.08f);
+                                if(!j) {
+                                    char label[4];
+                                    sprintf(label, "%d.%d", i, j);
+                                    if(nk_button_label(ctx, label)) {
+                                        rt_machine_reset(rt);
+                                        m->cpu.pc = 0xc000 + i * 0x100;
+                                    }
+                                } else {
+                                    nk_labelf(ctx, NK_TEXT_CENTERED, "%d.%d", i, j);
+                                }
+                                nk_layout_row_push(ctx, 0.08f);
+                                if(nk_button_label(ctx, "Eject")) {
+                                    util_file_discard(&spd[i].sp_files[j]);
+                                }
+                                nk_layout_row_push(ctx, 0.1f);
+                                if(nk_button_label(ctx, "Insert")) {
+                                    if(!v->dlg_modal_active) {
+                                        fb->slot = i;
+                                        fb->device = j;
+                                        fb->device_type = SLOT_TYPE_SMARTPORT;
+                                        fb->dir_contents.items = 0;
+                                        v->dlg_modal_active = 1;
+                                        v->dlg_filebrowser = 1;
+                                    }
+                                }
+                                nk_layout_row_push(ctx, 0.74f);
+                                if(spd[i].sp_files[j].is_file_open) {
+                                    nk_label(ctx, spd[i].sp_files[j].file_display_name, NK_TEXT_LEFT);
+                                }
                             }
-                        } else {
-                            nk_labelf(ctx, NK_TEXT_CENTERED, "%d.%d", i, j);
+                            nk_layout_row_end(ctx);
                         }
-                        nk_layout_row_push(ctx, 0.08f);
-                        if(nk_button_label(ctx, "Eject")) {
-                            util_file_discard(&spd[i].sp_files[j]);
-                        }
-                        nk_layout_row_push(ctx, 0.1f);
-                        if(nk_button_label(ctx, "Insert")) {
-                            if(!v->dlg_modal_active) {
-                                fb->slot = i;
-                                fb->device = j;
-                                fb->device_type = SLOT_TYPE_SMARTPORT;
-                                fb->dir_contents.items = 0;
-                                v->dlg_modal_active = 1;
-                                v->dlg_filebrowser = 1;
+                    } else if(m->slot_cards[i].slot_type == SLOT_TYPE_DISKII) {
+                        // The Disk II
+                        DISKII_CONTROLLER *d = m->diskii_controller;
+                        nk_labelf(ctx, NK_TEXT_LEFT, "Slot %d: Disk II", i);
+                        for(int j = 0; j < 2; j++) {
+
+                            // A2) The DiskII Details
+                            nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 5); {
+                                float w = 1.0f - 0.08f;
+                                nk_layout_row_push(ctx, 0.08f);
+                                if(!j) {
+                                    char label[4];
+                                    sprintf(label, "%d.%d", i, j);
+                                    if(nk_button_label(ctx, label)) {
+                                        rt_machine_reset(rt);
+                                        m->cpu.pc = 0xc000 + i * 0x100;
+                                    }
+                                } else {
+                                    nk_labelf(ctx, NK_TEXT_CENTERED, "%d.%d", i, j);
+                                }
+                                w -= 0.08f;
+                                nk_layout_row_push(ctx, 0.08f);
+                                if(nk_button_label(ctx, "Eject")) {
+                                    diskii_eject(m, i, j, 1);
+                                }
+                                w -= 0.1f;
+                                nk_layout_row_push(ctx, 0.1f);
+                                if(nk_button_label(ctx, "Insert")) {
+                                    if(!v->dlg_modal_active) {
+                                        fb->slot = i;
+                                        fb->device = j;
+                                        fb->device_type = SLOT_TYPE_DISKII;
+                                        fb->dir_contents.items = 0;
+                                        v->dlg_modal_active = 1;
+                                        v->dlg_filebrowser = 1;
+                                    }
+                                }
+                                if(d[i].diskii_drive[j].images.items > 1) {
+                                    char low[3], high[3], title[13];
+                                    int index;
+                                    size_t items;
+                                    index = d[i].diskii_drive[j].image_index + 1;
+                                    items = d[i].diskii_drive[j].images.items;
+                                    snprintf(low, 3, "%02d", index);
+                                    snprintf(high, 3, "%02zd", items);
+                                    sprintf(title, "Swap (%s/%s)", low, high);
+                                    w -= 0.18f;
+                                    nk_layout_row_push(ctx, 0.18f);
+                                    if(nk_button_label(ctx, title)) {
+                                        diskii_mount_image(m, i, j, index >= items ? 0 : index);
+                                    }
+                                }
+                                nk_layout_row_push(ctx, w);
+                                if(d[i].diskii_drive[j].active_image && d[i].diskii_drive[j].active_image->file.is_file_loaded) {
+                                    nk_label(ctx, d[i].diskii_drive[j].active_image->file.file_display_name, NK_TEXT_LEFT);
+                                }
                             }
+                            nk_layout_row_end(ctx);
                         }
-                        nk_layout_row_push(ctx, 0.74f);
-                        if(spd[i].sp_files[j].is_file_open) {
-                            nk_label(ctx, spd[i].sp_files[j].file_display_name, NK_TEXT_LEFT);
-                        }
-                        nk_layout_row_end(ctx);
+                    } else if(m->slot_cards[i].slot_type == SLOT_TYPE_VIDEX_API) {
+                        // A3) The ][+ Video Ace display details
+                        nk_labelf(ctx, NK_TEXT_LEFT, "Slot %d: Franklin Ace Display", i);
+                    } else if(m->slot_cards[i].slot_type != SLOT_TYPE_EMPTY) {
+                        // A4) Catch all for unidentified card - should never be seen
+                        nk_labelf(ctx, NK_TEXT_LEFT, "Slot %d: Undefined Card", i);
                     }
-                } else if(m->slot_cards[i].slot_type == SLOT_TYPE_DISKII) {
-                    // The Disk II
-                    DISKII_CONTROLLER *d = m->diskii_controller;
-                    nk_labelf(ctx, NK_TEXT_LEFT, "Slot %d: Disk II", i);
-                    for(int j = 0; j < 2; j++) {
-                        nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 5);
-                        float w = 1.0f - 0.08f;
-                        nk_layout_row_push(ctx, 0.08f);
-                        if(!j) {
-                            char label[4];
-                            sprintf(label, "%d.%d", i, j);
-                            if(nk_button_label(ctx, label)) {
-                                rt_machine_reset(rt);
-                                m->cpu.pc = 0xc000 + i * 0x100;
-                            }
-                        } else {
-                            nk_labelf(ctx, NK_TEXT_CENTERED, "%d.%d", i, j);
-                        }
-                        w -= 0.08f;
-                        nk_layout_row_push(ctx, 0.08f);
-                        if(nk_button_label(ctx, "Eject")) {
-                            diskii_eject(m, i, j, 1);
-                        }
-                        w -= 0.1f;
-                        nk_layout_row_push(ctx, 0.1f);
-                        if(nk_button_label(ctx, "Insert")) {
-                            if(!v->dlg_modal_active) {
-                                fb->slot = i;
-                                fb->device = j;
-                                fb->device_type = SLOT_TYPE_DISKII;
-                                fb->dir_contents.items = 0;
-                                v->dlg_modal_active = 1;
-                                v->dlg_filebrowser = 1;
-                            }
-                        }
-                        if(d[i].diskii_drive[j].images.items > 1) {
-                            char low[3], high[3], title[13];
-                            int index;
-                            size_t items;
-                            index = d[i].diskii_drive[j].image_index + 1;
-                            items = d[i].diskii_drive[j].images.items;
-                            snprintf(low, 3, "%02d", index);
-                            snprintf(high, 3, "%02zd", items);
-                            sprintf(title, "Swap (%s/%s)", low, high);
-                            w -= 0.18f;
-                            nk_layout_row_push(ctx, 0.18f);
-                            if(nk_button_label(ctx, title)) {
-                                diskii_mount_image(m, i, j, index >= items ? 0 : index);
-                            }
-                        }
-                        nk_layout_row_push(ctx, w);
-                        if(d[i].diskii_drive[j].active_image && d[i].diskii_drive[j].active_image->file.is_file_loaded) {
-                            nk_label(ctx, d[i].diskii_drive[j].active_image->file.file_display_name, NK_TEXT_LEFT);
-                        }
-                        nk_layout_row_end(ctx);
-                    }
-                } else if(m->slot_cards[i].slot_type == SLOT_TYPE_VIDEX_API) {
-                    nk_labelf(ctx, NK_TEXT_LEFT, "Slot %d: Franklin Ace Display", i);
-                } else if(m->slot_cards[i].slot_type != SLOT_TYPE_EMPTY) {
-                    nk_labelf(ctx, NK_TEXT_LEFT, "Slot %d: Undefined Card", i);
                 }
             }
-            nk_tree_pop(ctx);
+            nk_tree_pop(ctx); // Slots
         }
-        // The Breakpoints tab
+
+        // 2) The Debugger tab
         if(nk_tree_push(ctx, NK_TREE_TAB, "Debugger", NK_MAXIMIZED)) {
-            nk_layout_row_dynamic(ctx, 13, 1);
-            nk_label(ctx, "Debug Status", NK_TEXT_LEFT);
-            nk_layout_row_begin(ctx, NK_DYNAMIC, 120, 2);
-            nk_layout_row_push(ctx, 0.40f);
-            if(nk_group_begin(ctx, "run status group", NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_BORDER)) {
-                nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 2);
-                nk_layout_row_push(ctx, 0.49f);
-                nk_option_label(ctx, "Run to PC", rt->run_to_pc);
-                nk_layout_row_push(ctx, 0.49f);
-                nk_labelf(ctx, NK_TEXT_LEFT, "%04X", rt->run_to_pc_address);
-                nk_layout_row_end(ctx);
-                nk_layout_row_dynamic(ctx, 18, 1);
-                nk_option_label(ctx, "Step Out", rt->run_step_out);
-                nk_layout_row_dynamic(ctx, 28, 2);
-                nk_label(ctx, "Step Cycles", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_BOTTOM);
-                nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_BOTTOM, "%"PRIu64, m->cpu.cycles - rt->prev_stop_cycles);
-                nk_layout_row_dynamic(ctx, 18, 2);
-                nk_label(ctx, "Total Cycles", NK_TEXT_LEFT);
-                nk_labelf(ctx, NK_TEXT_LEFT, "%"PRIu64, m->cpu.cycles);
-                nk_group_end(ctx);
-            }
-            nk_layout_row_push(ctx, 0.59999f);
-            if(nk_group_begin(ctx, "callstack group", NK_WINDOW_BORDER)) {
-                nk_layout_row_dynamic(ctx, 18, 1);
+            // Change the vertical to 0 for a more compact display
+            nk_style_push_vec2(ctx, &ctx->style.window.group_padding, nk_vec2(2, 0));
+            nk_style_push_vec2(ctx, &ctx->style.window.spacing, nk_vec2(2, 0));
+            
+            // A) Headers for status and callstack
+            nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 2); {
+                nk_layout_row_push(ctx, 0.40f);
+                nk_label(ctx, "Debug Status", NK_TEXT_LEFT);
+                nk_layout_row_push(ctx, 0.59999f);
                 nk_label(ctx, "Call Stack", NK_TEXT_LEFT);
-                nk_layout_row_dynamic(ctx, 75, 1);
-                // SQW  - Probably need a manual scrollbarV
-                if(nk_group_begin(ctx, "Callstack", NK_WINDOW_BORDER)) {
+            }
+            nk_layout_row_end(ctx);
+
+            // B) The status and callstack "columns"
+            nk_layout_row_begin(ctx, NK_DYNAMIC, 90, 2); {
+                // B1) Left Col - run status
+                nk_layout_row_push(ctx, 0.40f);
+                if(nk_group_begin(ctx, "run status", NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_BORDER)) {
+                    // Run to PC
+                    nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 2); {
+                        nk_layout_row_push(ctx, 0.49f);
+                        nk_option_label(ctx, "Run to PC", rt->run_to_pc);
+                        nk_layout_row_push(ctx, 0.49f);
+                        nk_labelf(ctx, NK_TEXT_LEFT, "%04X", rt->run_to_pc_address);
+                    }
+                    nk_layout_row_end(ctx);
+
+                    // Step Out
+                    nk_layout_row_dynamic(ctx, 18, 1); {
+                        nk_option_label(ctx, "Step Out", rt->run_step_out);
+                    }
+
+                    // Step Cycles
+                    nk_layout_row_dynamic(ctx, 28, 2); {
+                        nk_label(ctx, "Step Cycles", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_BOTTOM);
+                        nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_BOTTOM, "%"PRIu64, m->cpu.cycles - rt->prev_stop_cycles);
+                    }
+
+                    // Total Cycles
+                    nk_layout_row_dynamic(ctx, 18, 2); {
+                        nk_label(ctx, "Total Cycles", NK_TEXT_LEFT);
+                        nk_labelf(ctx, NK_TEXT_LEFT, "%"PRIu64, m->cpu.cycles);
+                    }
+                    nk_group_end(ctx); // run status
+                }
+
+                // B2) Right Col - Callstack
+                nk_layout_row_push(ctx, 0.59999f);
+                // Count entries to see if a scrollbar will show up
+                // if not, then use the NK_WINDOW_NO_SCROLLBAR flag so that scroll
+                // events go to the parent and scroll the panel - otherwise the 
+                // panel scroll stops as soon as this thing is hovered and it's
+                // both confusing and frustrating
+                int count = 0;
+                flags = NK_WINDOW_BORDER;
+                uint16_t address = m->cpu.sp + 1;
+                while(address < 0x1ff && count < 6) {
+                    uint16_t stack_addr = read_from_memory_debug_16(m, address);
+                    if(stack_addr >= 2 && read_from_memory_debug(m, stack_addr - 2) == 0x20) {
+                        count++;
+                        address += 2;
+                    } else {
+                        address++;
+                    }
+                }
+                if(count < 6) {
+                    flags |= NK_WINDOW_NO_SCROLLBAR;
+                }
+
+                if(nk_group_begin(ctx, "callstack group", flags)) {
                     char callstack_display[256];
-                    uint16_t address = m->cpu.sp + 1;
+                            
+                    address = m->cpu.sp + 1;
                     while(address < 0x1ff) {
-                        uint16_t stack_addr = read_from_memory_debug(m, address) + read_from_memory_debug(m, address + 1) * 256;
-                        if(read_from_memory_debug(m, stack_addr - 2) == 0x20) {
-                            nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 2);
-                            uint16_t dest_addr = read_from_memory_debug(m, stack_addr - 1) + read_from_memory_debug(m, stack_addr) * 256;
-                            char *symbol = rt_sym_find_symbols(rt, dest_addr);
-                            sprintf(callstack_display, "%04X", stack_addr - 2);
-                            nk_layout_row_push(ctx, 0.1f);
-                            if(nk_select_label(ctx, callstack_display, NK_TEXT_ALIGN_LEFT, 0)) {
-                                dv->cursor_address = stack_addr - 2;
-                                dv->cursor_line = dv->rows / 2;
-                                unk_dasm_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
+                        uint16_t stack_addr = read_from_memory_debug_16(m, address);
+                        if(stack_addr >= 2 && read_from_memory_debug(m, stack_addr - 2) == 0x20) {
+                            // B2a) The row with a call stack entry in 2 cols
+                            nk_layout_row_begin(ctx, NK_DYNAMIC, 15, 2); {
+                                // uint16_t dest_addr = read_from_memory_debug(m, stack_addr - 1) + read_from_memory_debug(m, stack_addr) * 256;
+                                uint16_t dest_addr = read_from_memory_debug_16(m, stack_addr - 1);
+                                char *symbol = rt_sym_find_symbols(rt, dest_addr);
+                                sprintf(callstack_display, "%04X", stack_addr - 2);
+
+                                // B2a1) The left side (from where)
+                                nk_layout_row_push(ctx, 0.1f);
+                                if(nk_select_label(ctx, callstack_display, NK_TEXT_ALIGN_LEFT, 0)) {
+                                    dv->cursor_address = stack_addr - 2;
+                                    dv->cursor_line = dv->rows / 2;
+                                    unk_dasm_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
+                                }
+                                if(symbol) {
+                                    snprintf(callstack_display, 256, "JSR %04X %s", dest_addr, symbol);
+                                } else {
+                                    snprintf(callstack_display, 256, "JSR %04X", dest_addr);
+                                }
+
+                                // B2a2) The Right side, to where
+                                nk_layout_row_push(ctx, 0.89f);
+                                if(nk_select_label(ctx, callstack_display, NK_TEXT_ALIGN_LEFT, 0)) {
+                                    dv->cursor_address = dest_addr;
+                                    dv->cursor_line = dv->rows / 2;
+                                    unk_dasm_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
+                                }
+                                address += 2;
                             }
-                            if(symbol) {
-                                snprintf(callstack_display, 256, "JSR %04X %s", dest_addr, symbol);
-                            } else {
-                                snprintf(callstack_display, 256, "JSR %04X", dest_addr);
-                            }
-                            nk_layout_row_push(ctx, 0.9f);
-                            if(nk_select_label(ctx, callstack_display, NK_TEXT_ALIGN_LEFT, 0)) {
-                                dv->cursor_address = dest_addr;
-                                dv->cursor_line = dv->rows / 2;
-                                unk_dasm_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
-                            }
-                            address += 2;
+                            nk_layout_row_end(ctx);
                         } else {
                             address++;
                         }
-                    }
-                    nk_group_end(ctx);
+                    }                    
+                    nk_group_end(ctx); // callstack group
                 }
-                nk_group_end(ctx);
+            }
+            nk_style_pop_vec2(ctx);
+            nk_style_pop_vec2(ctx);
+            nk_layout_row_dynamic(ctx, 4, 1); {
+                nk_spacer(ctx);
             }
 
-            // Now a list of breakpoints
+            // C) Breakpoints
+            nk_layout_row_dynamic(ctx, 18, 1); {
+                nk_label(ctx, "Breakpoints", NK_TEXT_LEFT);
+            }
+
             if(rt->breakpoints.items) {
-                // nk_layout_row_dynamic(ctx, 29*(rt->breakpoints.items + 1), 2);
-                nk_layout_row_begin(ctx, NK_DYNAMIC, 29 * (rt->breakpoints.items + 1), 2);
-                nk_layout_row_push(ctx, 0.80f);
-                if(nk_group_begin(ctx, "breakpoints group", 0)) {
-                    for(int i = 0; i < rt->breakpoints.items; i++) {
-                        char label[32];
-                        BREAKPOINT *bp = ARRAY_GET(&rt->breakpoints, BREAKPOINT, i);
-                        nk_layout_row_begin(ctx, NK_DYNAMIC, 25, 5);
-                        nk_layout_row_push(ctx, 0.399f);
-                        if(bp->use_pc) {
-                            if(bp->use_counter) {
-                                nk_labelf(ctx, NK_TEXT_CENTERED, "%04X (%d/%d)", bp->address,
-                                          bp->counter_count, bp->counter_stop_value);
-                            } else if(bp->action) {
-                                switch(bp->action) {
-                                    case ACTION_FAST:
-                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Fast", bp->address);
-                                        break;
-                                    case ACTION_RESTORE:
-                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Restore", bp->address);
-                                        break;
-                                    case ACTION_SLOW:
-                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Slow", bp->address);
-                                        break;
-                                    case ACTION_SWAP:
-                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Swap s%dd%d", bp->address, bp->slot, bp->device);
-                                        break;
-                                    case ACTION_TROFF:
-                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Troff", bp->address);
-                                        break;
-                                    case ACTION_TRON:
-                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Tron", bp->address);
-                                        break;
-                                    case ACTION_TYPE:
-                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Type", bp->address);
-                                        break;
-                                    default:
-                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Action", bp->address);
-                                        break;
+                nk_layout_row_dynamic(ctx, 12 + (4 + 25) * rt->breakpoints.items, 1); {
+                    if(nk_group_begin(ctx, "bp group", NK_WINDOW_BORDER | NK_WINDOW_NO_SCROLLBAR)) {
+                        // Create 2 columns, 1 for the breakpoints and one for a possible "clear all" button
+                        nk_layout_row_begin(ctx, NK_DYNAMIC, (4 + 25) * rt->breakpoints.items, 2); {
+                            // C1) Create a group to hold all the breakpoints
+                            nk_layout_row_push(ctx, 0.80f);
+                            if(nk_group_begin(ctx, "bp group", NK_WINDOW_NO_SCROLLBAR)) {
+                                for(int i = 0; i < rt->breakpoints.items; i++) {
+                                    char label[32];
+                                    BREAKPOINT *bp = ARRAY_GET(&rt->breakpoints, BREAKPOINT, i);
+                                    nk_layout_row_begin(ctx, NK_DYNAMIC, 25, 5); {
+                                        nk_layout_row_push(ctx, 0.399f);
+                                        if(bp->break_on_exec) {
+                                            if(bp->use_counter) {
+                                                nk_labelf(ctx, NK_TEXT_CENTERED, "%04X (%d/%d)", bp->address,
+                                                        bp->counter_count, bp->counter_stop_value);
+                                            } else if(bp->action) {
+                                                switch(bp->action) {
+                                                    case ACTION_FAST:
+                                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Fast", bp->address);
+                                                        break;
+                                                    case ACTION_RESTORE:
+                                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Restore", bp->address);
+                                                        break;
+                                                    case ACTION_SLOW:
+                                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Slow", bp->address);
+                                                        break;
+                                                    case ACTION_SWAP:
+                                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Swap s%dd%d", bp->address, bp->slot, bp->device);
+                                                        break;
+                                                    case ACTION_TROFF:
+                                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Troff", bp->address);
+                                                        break;
+                                                    case ACTION_TRON:
+                                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Tron", bp->address);
+                                                        break;
+                                                    case ACTION_TYPE:
+                                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Type", bp->address);
+                                                        break;
+                                                    default:
+                                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Action", bp->address);
+                                                        break;
+                                                }
+                                            } else {
+                                                nk_labelf(ctx, NK_TEXT_CENTERED, "%04X", bp->address);
+                                            }
+                                        } else {
+                                            int access = (bp->access_mask >> 1) - 1;
+                                            if(bp->use_range) {
+                                                if(bp->use_counter) {
+                                                    nk_labelf(ctx, NK_TEXT_LEFT, "%s[%04X-%04X] (%d/%d)", access_mode[access],
+                                                            bp->address, bp->address_range_end, bp->counter_count, bp->counter_stop_value);
+                                                } else {
+                                                    nk_labelf(ctx, NK_TEXT_CENTERED, "%s[%04X-%04X]", access_mode[access],
+                                                            bp->address, bp->address_range_end);
+                                                }
+                                            } else {
+                                                if(bp->use_counter) {
+                                                    nk_labelf(ctx, NK_TEXT_CENTERED, "%s[%04X] (%d/%d)", access_mode[access],
+                                                            bp->address, bp->counter_count, bp->counter_stop_value);
+                                                } else {
+                                                    nk_labelf(ctx, NK_TEXT_CENTERED, "%s[%04X]", access_mode[access],
+                                                            bp->address);
+                                                }
+                                            }
+                                        }
+                                        
+                                        // 
+                                        nk_layout_row_push(ctx, 0.15f);
+                                        if(nk_button_label(ctx, "Edit")) {
+                                            bpe->bp_original = bp;
+                                            bpe->bp_under_edit = *bp;
+                                            bpe->string_type_len = parse_encode_c_string(bp->type_text, bpe->string_type, 128);
+                                            bpe->string_address_len[0] = sprintf(bpe->string_address[0], "%04X", bp->address);
+                                            bpe->string_address_len[1] = sprintf(bpe->string_address[1], "%04X", bp->address_range_end);
+                                            bpe->string_counter_len[0] = sprintf(bpe->string_counter[0], "%d", bp->counter_stop_value);
+                                            bpe->string_counter_len[1] = sprintf(bpe->string_counter[1], "%d", bp->counter_reset);
+                                            v->dlg_modal_active = 1;
+                                            v->dlg_breakpoint = 1;
+                                            // This fixes an issue where selecting edit passes through to the pop-up and
+                                            // selects Cancel as well.
+                                            ctx->input.mouse.buttons->down = 0;
+                                        }
+                                        
+                                        //
+                                        nk_layout_row_push(ctx, 0.15f);
+                                        if(nk_button_label(ctx, bp->disabled ? "Enable" : "Disable")) {
+                                            bp->disabled ^= 1;
+                                            if(!bp->break_on_exec) {
+                                                rt_bp_apply_masks(rt);
+                                            }
+                                        }
+                                        if(!bp->break_on_exec) {
+                                            nk_widget_disable_begin(ctx);
+                                        }
+
+                                        //
+                                        nk_layout_row_push(ctx, 0.15f);
+                                        if(nk_button_label(ctx, "View PC")) {
+                                            dv->cursor_address = bp->address;
+                                            dv->cursor_line = dv->rows / 2;
+                                            unk_dasm_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
+                                        }
+                                        if(!bp->break_on_exec) {
+                                            nk_widget_disable_end(ctx);
+                                        }
+
+                                        //
+                                        nk_layout_row_push(ctx, 0.15f);
+                                        if(nk_button_label(ctx, "Clear")) {
+                                            // Delete the breakpoint
+                                            array_remove(&rt->breakpoints, bp);
+                                            // And reset the mask on memory to watch for any remaining address breakpoint
+                                            rt_bp_apply_masks(rt);
+                                        }
+                                    }
+                                    nk_layout_row_end(ctx);
                                 }
-                            } else {
-                                nk_labelf(ctx, NK_TEXT_CENTERED, "%04X", bp->address);
+                                nk_group_end(ctx); // bp group
                             }
-                        } else {
-                            int access = (bp->access >> 1) - 1;
-                            if(bp->use_range) {
-                                if(bp->use_counter) {
-                                    nk_labelf(ctx, NK_TEXT_LEFT, "%s[%04X-%04X] (%d/%d)", access_mode[access],
-                                              bp->address, bp->address_range_end, bp->counter_count, bp->counter_stop_value);
-                                } else {
-                                    nk_labelf(ctx, NK_TEXT_CENTERED, "%s[%04X-%04X]", access_mode[access],
-                                              bp->address, bp->address_range_end);
+                            nk_layout_row_push(ctx, 0.19f);
+                            if(nk_group_begin(ctx, "clear bp group", NK_WINDOW_NO_SCROLLBAR)) {
+                                if(rt->breakpoints.items >= 2) {
+                                    nk_layout_row_dynamic(ctx, 25, 1); {
+                                        if(nk_button_label(ctx, "Clear All")) {
+                                            rt->breakpoints.items = 0;
+                                        }
+                                    }
                                 }
-                            } else {
-                                if(bp->use_counter) {
-                                    nk_labelf(ctx, NK_TEXT_CENTERED, "%s[%04X] (%d/%d)", access_mode[access],
-                                              bp->address, bp->counter_count, bp->counter_stop_value);
-                                } else {
-                                    nk_labelf(ctx, NK_TEXT_CENTERED, "%s[%04X]", access_mode[access],
-                                              bp->address);
-                                }
+                                nk_group_end(ctx); // clear bp group
                             }
                         }
-                        nk_layout_row_push(ctx, 0.15f);
-                        if(nk_button_label(ctx, "Edit")) {
-                            bpe->bp_original = bp;
-                            bpe->bp_under_edit = *bp;
-                            bpe->string_type_len = parse_encode_c_string(bp->type_text, bpe->string_type, 128);
-                            bpe->string_address_len[0] = sprintf(bpe->string_address[0], "%04X", bp->address);
-                            bpe->string_address_len[1] = sprintf(bpe->string_address[1], "%04X", bp->address_range_end);
-                            bpe->string_counter_len[0] = sprintf(bpe->string_counter[0], "%d", bp->counter_stop_value);
-                            bpe->string_counter_len[1] = sprintf(bpe->string_counter[1], "%d", bp->counter_reset);
-                            v->dlg_modal_active = 1;
-                            v->dlg_breakpoint = 1;
-                            // This fixes an issue where selecting edit passes through to the pop-up and
-                            // selects Cancel as well.
-                            ctx->input.mouse.buttons->down = 0;
-                        }
-                        nk_layout_row_push(ctx, 0.15f);
-                        if(nk_button_label(ctx, bp->disabled ? "Enable" : "Disable")) {
-                            bp->disabled ^= 1;
-                            if(!bp->use_pc) {
-                                rt_bp_apply_masks(rt);
-                            }
-                        }
-                        if(!bp->use_pc) {
-                            nk_widget_disable_begin(ctx);
-                        }
-                        nk_layout_row_push(ctx, 0.15f);
-                        if(nk_button_label(ctx, "View PC")) {
-                            dv->cursor_address = bp->address;
-                            dv->cursor_line = dv->rows / 2;
-                            unk_dasm_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
-                        }
-                        if(!bp->use_pc) {
-                            nk_widget_disable_end(ctx);
-                        }
-                        nk_layout_row_push(ctx, 0.15f);
-                        if(nk_button_label(ctx, "Clear")) {
-                            // Delete the breakpoint
-                            array_remove(&rt->breakpoints, bp);
-                            // And reset the mask on memory to watch for any remaining address breakpoint
-                            rt_bp_apply_masks(rt);
-                        }
-                        nk_layout_row_end(ctx);
-                    }
-                    nk_group_end(ctx);
-                    nk_layout_row_push(ctx, 0.19f);
-                    if(nk_group_begin(ctx, "clear all group", 0)) {
-                        if(rt->breakpoints.items >= 2) {
-                            nk_layout_row_dynamic(ctx, 25, 1);
-                            if(nk_button_label(ctx, "Clear All")) {
-                                rt->breakpoints.items = 0;
-                            }
-                        }
+                        nk_layout_row_end(ctx); // 2 coulumn bp row
                         nk_group_end(ctx);
                     }
                 }
-                nk_layout_row_end(ctx);
+            } else {
+                nk_layout_row_dynamic(ctx, 22, 1); {
+                    nk_stroke_rect(&ctx->current->buffer, nk_widget_bounds(ctx), 0.0f, 1.0f, ctx->style.window.border_color );
+                    nk_label(ctx, "No breakpoints set", NK_TEXT_LEFT);
+                }
             }
-            nk_tree_pop(ctx);
+            nk_tree_pop(ctx); // Debugger
         }
+
+        // 3) The soft switches
         if(nk_tree_push(ctx, NK_TREE_TAB, "Soft Switches", NK_MAXIMIZED)) {
-            nk_layout_row_dynamic(ctx, 13, 4);
-            v->shadow_flags.b.store80set = nk_option_label_disabled(ctx, "C000-80STORE", v->shadow_flags.b.store80set, 1);
-            v->shadow_flags.b.ramrdset   = nk_option_label_disabled(ctx, "C003-RAMRD", v->shadow_flags.b.ramrdset, 1);
-            v->shadow_flags.b.ramwrtset  = nk_option_label_disabled(ctx, "C005-RAMWRT", v->shadow_flags.b.ramwrtset, 1);
-            v->shadow_flags.b.cxromset   = nk_option_label_disabled(ctx, "C007-CXROM", v->shadow_flags.b.cxromset, 1);
-            v->shadow_flags.b.altzpset   = nk_option_label_disabled(ctx, "C009-ALTZP", v->shadow_flags.b.altzpset, 1);
-            v->shadow_flags.b.c3slotrom  = nk_option_label_disabled(ctx, "C00B-C3ROM", v->shadow_flags.b.c3slotrom, 1);
-            nk_layout_row_dynamic(ctx, 13, 1);
-            nk_spacer(ctx);
-            v->display_override          = nk_option_label(ctx, "Display override", v->display_override);
-            nk_layout_row_dynamic(ctx, 13, 4);
-            v->shadow_flags.b.col80set   = nk_option_label_disabled(ctx, "C00D-80COL", v->shadow_flags.b.col80set, !v->display_override);
-            v->shadow_flags.b.altcharset = nk_option_label_disabled(ctx, "C00F-ALTCHAR", v->shadow_flags.b.altcharset, !v->display_override);
-            v->shadow_flags.b.text       = nk_option_label_disabled(ctx, "C051-TEXT", v->shadow_flags.b.text, !v->display_override);
-            v->shadow_flags.b.mixed      = nk_option_label_disabled(ctx, "C053-MIXED", v->shadow_flags.b.mixed, !v->display_override);
-            v->shadow_flags.b.page2set   = nk_option_label_disabled(ctx, "C055-PAGE2", v->shadow_flags.b.page2set, !v->display_override);
-            v->shadow_flags.b.hires      = nk_option_label_disabled(ctx, "C057-HIRES", v->shadow_flags.b.hires, !v->display_override);
-            v->shadow_flags.b.dhires     = nk_option_label_disabled(ctx, "C05E-DHGR", v->shadow_flags.b.dhires, !v->display_override);
-            nk_layout_row_dynamic(ctx, 13, 1);
-            nk_spacer(ctx);
-            nk_label(ctx, "Language Card", NK_TEXT_LEFT);
-            nk_layout_row_dynamic(ctx, 13, 4);
-            v->shadow_flags.b.lc_bank2_enable     = nk_option_label_disabled(ctx, "LCBANK2", v->shadow_flags.b.lc_bank2_enable, 1);
-            v->shadow_flags.b.lc_read_ram_enable  = nk_option_label_disabled(ctx, "LCREAD", v->shadow_flags.b.lc_read_ram_enable, 1);
-            v->shadow_flags.b.lc_pre_write        = nk_option_label_disabled(ctx, "LCPREWRITE", v->shadow_flags.b.lc_pre_write, 1);
-            v->shadow_flags.b.lc_write_enable     = nk_option_label_disabled(ctx, "LCWRITE", v->shadow_flags.b.lc_write_enable, 1);
-            nk_tree_pop(ctx);
+            nk_layout_row_dynamic(ctx, 13, 4); {
+                v->shadow_flags.b.store80set = nk_option_label_disabled(ctx, "C000-80STORE", v->shadow_flags.b.store80set, 1);
+                v->shadow_flags.b.ramrdset   = nk_option_label_disabled(ctx, "C003-RAMRD", v->shadow_flags.b.ramrdset, 1);
+                v->shadow_flags.b.ramwrtset  = nk_option_label_disabled(ctx, "C005-RAMWRT", v->shadow_flags.b.ramwrtset, 1);
+                v->shadow_flags.b.cxromset   = nk_option_label_disabled(ctx, "C007-CXROM", v->shadow_flags.b.cxromset, 1);
+                v->shadow_flags.b.altzpset   = nk_option_label_disabled(ctx, "C009-ALTZP", v->shadow_flags.b.altzpset, 1);
+                v->shadow_flags.b.c3slotrom  = nk_option_label_disabled(ctx, "C00B-C3ROM", v->shadow_flags.b.c3slotrom, 1);
+            }
+            nk_layout_row_dynamic(ctx, 13, 1); {
+                nk_spacer(ctx);
+                v->display_override          = nk_option_label(ctx, "Display override", v->display_override);
+            }
+            nk_layout_row_dynamic(ctx, 13, 4); {
+                v->shadow_flags.b.col80set   = nk_option_label_disabled(ctx, "C00D-80COL", v->shadow_flags.b.col80set, !v->display_override);
+                v->shadow_flags.b.altcharset = nk_option_label_disabled(ctx, "C00F-ALTCHAR", v->shadow_flags.b.altcharset, !v->display_override);
+                v->shadow_flags.b.text       = nk_option_label_disabled(ctx, "C051-TEXT", v->shadow_flags.b.text, !v->display_override);
+                v->shadow_flags.b.mixed      = nk_option_label_disabled(ctx, "C053-MIXED", v->shadow_flags.b.mixed, !v->display_override);
+                v->shadow_flags.b.page2set   = nk_option_label_disabled(ctx, "C055-PAGE2", v->shadow_flags.b.page2set, !v->display_override);
+                v->shadow_flags.b.hires      = nk_option_label_disabled(ctx, "C057-HIRES", v->shadow_flags.b.hires, !v->display_override);
+                v->shadow_flags.b.dhires     = nk_option_label_disabled(ctx, "C05E-DHGR", v->shadow_flags.b.dhires, !v->display_override);
+            }
+            nk_layout_row_dynamic(ctx, 13, 1); {
+                nk_spacer(ctx);
+                nk_label(ctx, "Language Card", NK_TEXT_LEFT);
+            }
+            nk_layout_row_dynamic(ctx, 13, 4); {
+                v->shadow_flags.b.lc_bank2_enable     = nk_option_label_disabled(ctx, "LCBANK2", v->shadow_flags.b.lc_bank2_enable, 1);
+                v->shadow_flags.b.lc_read_ram_enable  = nk_option_label_disabled(ctx, "LCREAD", v->shadow_flags.b.lc_read_ram_enable, 1);
+                v->shadow_flags.b.lc_pre_write        = nk_option_label_disabled(ctx, "LCPREWRITE", v->shadow_flags.b.lc_pre_write, 1);
+                v->shadow_flags.b.lc_write_enable     = nk_option_label_disabled(ctx, "LCWRITE", v->shadow_flags.b.lc_write_enable, 1);
+            }
+            nk_tree_pop(ctx); // Soft Switches
         }
     }
     // Set a flag if the scrollbar is being dragged (scrollbar_active in unk_view)
     update_nk_scroll_drag(ctx, &v->viewmisc);
     nk_end(ctx);
 
-    // Pop-up windows after the main windows
+    // Dialogs
     if(v->dlg_breakpoint) {
         struct nk_rect mvr = v->layout.misc;
-        struct nk_rect r = nk_rect(mvr.x + 10, mvr.y + 10, 568, 180);
+        struct nk_rect r = nk_rect(mvr.x + 10, mvr.y + 10, 480, 170);
         int ret = unk_dlg_breakpoint_edit(ctx, r, &v->viewmisc.breakpoint_edit);
         if(ret >= 0) {
             v->dlg_breakpoint = 0;
@@ -429,7 +531,7 @@ void unk_misc_show(UNK *v) {
         }
     }
 
-    // Floating windows outside the main misc window
+    // File Browser (Floating windows outside the main misc window)
     ctx->style.window.background = ob;
     if(v->dlg_filebrowser) {
         int ret = unk_dlg_file_browser(ctx, &v->viewmisc.file_browser);

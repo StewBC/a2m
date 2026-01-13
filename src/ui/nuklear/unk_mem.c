@@ -535,179 +535,195 @@ void unk_mem_show(UNK *v) {
         int num_views = v->viewmem.memviews.items;
         struct nk_color active_background = ctx->style.window.background;
 
-        nk_layout_row_begin(ctx, NK_STATIC, v->layout.mem.h, 2);
-        nk_layout_row_push(ctx, v->layout.mem.w - SCROLLBAR_W);
-        int active_top_row, view_top_row = 0;
-        if(nk_group_begin(ctx, "mem-views", NK_WINDOW_NO_SCROLLBAR)) {
-            for(int view = 0; view < num_views; view++) {
-                VIEWMEM_VIEW *mv = ARRAY_GET(&ms->memviews, VIEWMEM_VIEW, view);
-                if(ms->active_view_index == view) {
-                    active_view = mv;
-                    active_top_row = view_top_row;
-                }
-                uint16_t view_address = mv->view_address;
-                nk_layout_row_dynamic(ctx, mv->rows * ROW_H, 1);
-                view_top_row += mv->rows;
-                if(nk_group_begin(ctx, "mem-rows", NK_WINDOW_NO_SCROLLBAR)) {
-                    nk_layout_row_dynamic(ctx, ROW_H, 1);
-                    struct nk_rect r = nk_widget_bounds(ctx);
-                    struct nk_color last_c = ctx->style.window.background = unk_mem_range_colors[view].background_color;
-                    for(int row = 0; row < mv->rows; row++) {
-                        memset(ms->str_buf, 0x20, ms->str_buf_len);
-                        snprintf(ms->str_buf, ms->str_buf_len, "%04X:", view_address);
-                        for(int col = 0; col < ms->cols; col++) {
-                            uint8_t c = ms->u8_buf[col] = read_from_memory_selected(m, view_address + col, mv->flags);
-                            snprintf(&ms->str_buf[5 + col * 3], ms->str_buf_len - 5 - (ms->cols * 3), "%02X ", c);
-                        }
-                        for(int col = 0; col < ms->cols; col++) {
-                            uint8_t c = ms->u8_buf[col];
-                            snprintf(&ms->str_buf[5 + ms->cols * 3 + col], ms->str_buf_len - 5 - (ms->cols * 3) - col, "%c", isprint(c) ? c : '.');
-                        }
-                        if(!v->dlg_modal_active) {
-                            if(!v->dlg_modal_mouse_down && (nk_widget_is_mouse_clicked(ctx, NK_BUTTON_LEFT) || nk_widget_is_mouse_clicked(ctx, NK_BUTTON_RIGHT))) {
-                                float rel_x = (ctx->input.mouse.pos.x - r.x) / v->font_width;
-                                ms->active_view_index = view;
-                                active_view = mv;
-                                active_top_row = view_top_row;
-                                v->right_click_address = 0x10000;
-                                if(rel_x < 4) {
-                                    // First 4 digits is the hex address
-                                    if(mv->cursor_field != CURSOR_ADDRESS) {
-                                        unk_mem_cursor_toggle_address_mode(ms, mv);
+        // 1) The colums - hex and scrollbar
+        nk_layout_row_begin(ctx, NK_STATIC, v->layout.mem.h, 2); {
+            // The width of the hex view
+            nk_layout_row_push(ctx, v->layout.mem.w - SCROLLBAR_W);
+            int active_top_row, view_top_row = 0;
+            // The hex view as a group
+            if(nk_group_begin(ctx, "mem-views", NK_WINDOW_NO_SCROLLBAR)) {
+                for(int view = 0; view < num_views; view++) {
+                    VIEWMEM_VIEW *mv = ARRAY_GET(&ms->memviews, VIEWMEM_VIEW, view);
+                    if(ms->active_view_index == view) {
+                        active_view = mv;
+                        active_top_row = view_top_row;
+                    }
+                    uint16_t view_address = mv->view_address;
+
+                    // A) Each row in the hex view (as a group again, inside a dynamic row)
+                    nk_layout_row_dynamic(ctx, mv->rows * ROW_H, 1); {
+                        view_top_row += mv->rows;
+                        if(nk_group_begin(ctx, "mem-rows", NK_WINDOW_NO_SCROLLBAR)) {
+                            // A1) The actual data per row
+                            nk_layout_row_dynamic(ctx, ROW_H, 1); {
+                                struct nk_rect r = nk_widget_bounds(ctx);
+                                struct nk_color last_c = ctx->style.window.background = unk_mem_range_colors[view].background_color;
+                                for(int row = 0; row < mv->rows; row++) {
+                                    memset(ms->str_buf, 0x20, ms->str_buf_len);
+                                    snprintf(ms->str_buf, ms->str_buf_len, "%04X:", view_address);
+                                    for(int col = 0; col < ms->cols; col++) {
+                                        uint8_t c = ms->u8_buf[col] = read_from_memory_selected(m, view_address + col, mv->flags);
+                                        snprintf(&ms->str_buf[5 + col * 3], ms->str_buf_len - 5 - (ms->cols * 3), "%02X ", c);
                                     }
-                                    mv->cursor_address = view_address;
-                                    mv->cursor_digit = rel_x;
-                                } else if(rel_x > 5 && rel_x < 5 + ms->cols * 3) {
-                                    if(mv->cursor_field == CURSOR_ADDRESS) {
-                                        unk_mem_cursor_toggle_address_mode(ms, mv);
+                                    for(int col = 0; col < ms->cols; col++) {
+                                        uint8_t c = ms->u8_buf[col];
+                                        snprintf(&ms->str_buf[5 + ms->cols * 3 + col], ms->str_buf_len - 5 - (ms->cols * 3) - col, "%c", isprint(c) ? c : '.');
                                     }
-                                    mv->cursor_field = CURSOR_HEX;
-                                    // 5 is ignored.  6 .. ms->cols * 3 is hex
-                                    rel_x -= 5;
-                                    v->right_click_address = mv->cursor_address = view_address + rel_x / 3;
-                                } else {
-                                    if(mv->cursor_field == CURSOR_ADDRESS) {
-                                        unk_mem_cursor_toggle_address_mode(ms, mv);
+
+                                    // This guards against the mouse click going to this window when it should not
+                                    if(!v->dlg_modal_active) {
+                                        if(!v->dlg_modal_mouse_down && (nk_widget_is_mouse_clicked(ctx, NK_BUTTON_LEFT) || nk_widget_is_mouse_clicked(ctx, NK_BUTTON_RIGHT))) {
+                                            float rel_x = (ctx->input.mouse.pos.x - r.x) / v->font_width;
+                                            ms->active_view_index = view;
+                                            active_view = mv;
+                                            active_top_row = view_top_row;
+                                            v->right_click_address = 0x10000;
+                                            if(rel_x < 4) {
+                                                // First 4 digits is the hex address
+                                                if(mv->cursor_field != CURSOR_ADDRESS) {
+                                                    unk_mem_cursor_toggle_address_mode(ms, mv);
+                                                }
+                                                mv->cursor_address = view_address;
+                                                mv->cursor_digit = rel_x;
+                                            } else if(rel_x > 5 && rel_x < 5 + ms->cols * 3) {
+                                                if(mv->cursor_field == CURSOR_ADDRESS) {
+                                                    unk_mem_cursor_toggle_address_mode(ms, mv);
+                                                }
+                                                mv->cursor_field = CURSOR_HEX;
+                                                // 5 is ignored.  6 .. ms->cols * 3 is hex
+                                                rel_x -= 5;
+                                                v->right_click_address = mv->cursor_address = view_address + rel_x / 3;
+                                            } else {
+                                                if(mv->cursor_field == CURSOR_ADDRESS) {
+                                                    unk_mem_cursor_toggle_address_mode(ms, mv);
+                                                }
+                                                mv->cursor_field = CURSOR_ASCII;
+                                                // 5 (address) + cols * 3 skipped to get to ascii
+                                                rel_x -= 5 + ms->cols * 3;
+                                                v->right_click_address = mv->cursor_address = view_address + rel_x;
+                                            }
+                                        }
+                                        if(nk_widget_is_mouse_clicked(ctx, NK_BUTTON_RIGHT) && v->right_click_address < 0x10000) {
+                                            v->right_click_menu_open = 1;
+                                            v->right_click_menu_pos  = ctx->input.mouse.pos;
+                                        }                        
                                     }
-                                    mv->cursor_field = CURSOR_ASCII;
-                                    // 5 (address) + cols * 3 skipped to get to ascii
-                                    rel_x -= 5 + ms->cols * 3;
-                                    v->right_click_address = mv->cursor_address = view_address + rel_x;
+                                    nk_label_colored(ctx, ms->str_buf, NK_TEXT_LEFT, unk_mem_range_colors[view].text_color);
+                                    view_address += ms->cols;
                                 }
                             }
-                            if(nk_widget_is_mouse_clicked(ctx, NK_BUTTON_RIGHT) && v->right_click_address < 0x10000) {
-                                v->right_click_menu_open = 1;
-                                v->right_click_menu_pos  = ctx->input.mouse.pos;
-                            }                        
+                            nk_group_end(ctx);
                         }
-                        nk_label_colored(ctx, ms->str_buf, NK_TEXT_LEFT, unk_mem_range_colors[view].text_color);
-                        view_address += ms->cols;
                     }
-                    nk_group_end(ctx);
                 }
-            }
 
-            // Cursor
-            if(ctx->active->name == VIEWMEM_NAME_HASH && !rt->run) {
-                VIEWMEM_VIEW *mv = active_view;
-                int delta = unk_mem_circular_delta(mv->cursor_address, mv->view_address);
-                if(delta >= 0 && delta < (mv->rows * ms->cols)) {
-                    int row = delta / ms->cols;
-                    int col = delta % ms->cols;
-                    struct nk_rect r = ctx->current->layout->bounds;
-                    r.h = ROW_H;
-                    r.w = v->font_width;
-                    r.y += (active_top_row + row) * ROW_H;
-                    uint8_t dc, c = read_from_memory_selected(m, mv->cursor_address, mv->flags);
-                    switch(mv->cursor_field) {
-                        case CURSOR_ADDRESS: {
-                                r.x = ctx->current->layout->at_x + v->font_width * mv->cursor_digit;
-                                uint16_t row_address = mv->cursor_address - col;
-                                uint8_t shift = (4 * (3 - mv->cursor_digit));
-                                dc = (row_address >> shift) & 0x0f;
-                                dc += (dc > 9) ? 'A' - 10 : '0';
-                            }
-                            break;
-                        case CURSOR_HEX: {
-                                r.x = v->font_width * ((col * 3 + 6) + mv->cursor_digit);
-                                uint8_t shift = (4 * (1 - mv->cursor_digit));
-                                dc = (c >> shift) & 0x0f;
-                                dc += (dc > 9) ? 'A' - 10 : '0';
-                            }
-                            break;
-                        case CURSOR_ASCII:
-                            r.x = v->font_width * ((ms->cols * 3 + 6) + col);
-                            dc = isprint(c) ? c : '.';
-                            break;
+                // Draw the Cursor when debugger is stopped
+                if(ctx->active->name == VIEWMEM_NAME_HASH && !rt->run) {
+                    VIEWMEM_VIEW *mv = active_view;
+                    int delta = unk_mem_circular_delta(mv->cursor_address, mv->view_address);
+                    if(delta >= 0 && delta < (mv->rows * ms->cols)) {
+                        int row = delta / ms->cols;
+                        int col = delta % ms->cols;
+                        struct nk_rect r = ctx->current->layout->bounds;
+                        r.h = ROW_H;
+                        r.w = v->font_width;
+                        r.y += (active_top_row + row) * ROW_H;
+                        uint8_t dc, c = read_from_memory_selected(m, mv->cursor_address, mv->flags);
+                        switch(mv->cursor_field) {
+                            case CURSOR_ADDRESS: {
+                                    r.x = ctx->current->layout->at_x + v->font_width * mv->cursor_digit;
+                                    uint16_t row_address = mv->cursor_address - col;
+                                    uint8_t shift = (4 * (3 - mv->cursor_digit));
+                                    dc = (row_address >> shift) & 0x0f;
+                                    dc += (dc > 9) ? 'A' - 10 : '0';
+                                }
+                                break;
+                            case CURSOR_HEX: {
+                                    r.x = v->font_width * ((col * 3 + 6) + mv->cursor_digit);
+                                    uint8_t shift = (4 * (1 - mv->cursor_digit));
+                                    dc = (c >> shift) & 0x0f;
+                                    dc += (dc > 9) ? 'A' - 10 : '0';
+                                }
+                                break;
+                            case CURSOR_ASCII:
+                                r.x = v->font_width * ((ms->cols * 3 + 6) + col);
+                                dc = isprint(c) ? c : '.';
+                                break;
+                        }
+                        struct nk_command_buffer *canvas = nk_window_get_canvas(ctx);
+                        nk_draw_text(canvas, r, (char *)&dc, 1, ctx->style.font, unk_mem_range_colors[ms->active_view_index].text_color, unk_mem_range_colors[ms->active_view_index].background_color);
                     }
-                    struct nk_command_buffer *canvas = nk_window_get_canvas(ctx);
-                    nk_draw_text(canvas, r, (char *)&dc, 1, ctx->style.font, unk_mem_range_colors[ms->active_view_index].text_color, unk_mem_range_colors[ms->active_view_index].background_color);
                 }
-            }
 
-            ctx->style.window.background = active_background;
-            nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 4);
-            nk_layout_row_push(ctx, 0.4);
-            nk_labelf(ctx, NK_TEXT_ALIGN_LEFT, "Address: %04X", active_view->cursor_address);
-            nk_layout_row_push(ctx, 0.14);
-            if(nk_option_label(ctx, "6502", !tst_flags(active_view->flags, MEM_MAIN | MEM_AUX)) && tst_flags(active_view->flags, MEM_MAIN | MEM_AUX)) {
-                clr_flags(active_view->flags, MEM_MAIN);
-                clr_flags(active_view->flags, MEM_AUX);
-                clr_flags(active_view->flags, MEM_LC_BANK2);
-            }
-            if(nk_option_label(ctx, "64K", tst_flags(active_view->flags, MEM_MAIN)) && !tst_flags(active_view->flags, MEM_MAIN)) {
-                clr_flags(active_view->flags, MEM_AUX);
-                set_flags(active_view->flags, MEM_MAIN);
-                if(m->lc_bank2_enable) {
-                    set_flags(active_view->flags, MEM_LC_BANK2);
-                } else {
-                    clr_flags(active_view->flags, MEM_LC_BANK2);
+                ctx->style.window.background = active_background;
+
+                // B) Draw the memory bank access buttons
+                nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 4); {
+                    nk_layout_row_push(ctx, 0.4);
+                    nk_labelf(ctx, NK_TEXT_ALIGN_LEFT, "Address: %04X", active_view->cursor_address);
+                    nk_layout_row_push(ctx, 0.14);
+                    if(nk_option_label(ctx, "6502", !tst_flags(active_view->flags, MEM_MAIN | MEM_AUX)) && tst_flags(active_view->flags, MEM_MAIN | MEM_AUX)) {
+                        clr_flags(active_view->flags, MEM_MAIN);
+                        clr_flags(active_view->flags, MEM_AUX);
+                        clr_flags(active_view->flags, MEM_LC_BANK2);
+                    }
+                    if(nk_option_label(ctx, "64K", tst_flags(active_view->flags, MEM_MAIN)) && !tst_flags(active_view->flags, MEM_MAIN)) {
+                        clr_flags(active_view->flags, MEM_AUX);
+                        set_flags(active_view->flags, MEM_MAIN);
+                        if(m->lc_bank2_enable) {
+                            set_flags(active_view->flags, MEM_LC_BANK2);
+                        } else {
+                            clr_flags(active_view->flags, MEM_LC_BANK2);
+                        }
+                    }
+                    if(nk_option_label_disabled(ctx, "128K", tst_flags(active_view->flags, MEM_AUX), !m->model) && !tst_flags(active_view->flags, MEM_AUX)) {
+                        clr_flags(active_view->flags, MEM_MAIN);
+                        set_flags(active_view->flags, MEM_AUX);
+                        if(m->lc_bank2_enable) {
+                            set_flags(active_view->flags, MEM_LC_BANK2);
+                        } else {
+                            clr_flags(active_view->flags, MEM_LC_BANK2);
+                        }
+                    }
+                    int before = tst_flags(active_view->flags, MEM_LC_BANK2);
+                    int after = nk_option_label_disabled(ctx, "LC Bank2", before, !tst_flags(active_view->flags, MEM_MAIN | MEM_AUX));
+                    if(after != before) {
+                        if(after) {
+                            set_flags(active_view->flags, MEM_LC_BANK2);
+                        } else {
+                            clr_flags(active_view->flags, MEM_LC_BANK2);
+                        }
+                    }
                 }
+                nk_group_end(ctx);
             }
-            if(nk_option_label_disabled(ctx, "128K", tst_flags(active_view->flags, MEM_AUX), !m->model) && !tst_flags(active_view->flags, MEM_AUX)) {
-                clr_flags(active_view->flags, MEM_MAIN);
-                set_flags(active_view->flags, MEM_AUX);
-                if(m->lc_bank2_enable) {
-                    set_flags(active_view->flags, MEM_LC_BANK2);
-                } else {
-                    clr_flags(active_view->flags, MEM_LC_BANK2);
-                }
-            }
-            int before = tst_flags(active_view->flags, MEM_LC_BANK2);
-            int after = nk_option_label_disabled(ctx, "LC Bank2", before, !tst_flags(active_view->flags, MEM_MAIN | MEM_AUX));
-            if(after != before) {
-                if(after) {
-                    set_flags(active_view->flags, MEM_LC_BANK2);
-                } else {
-                    clr_flags(active_view->flags, MEM_LC_BANK2);
-                }
-            }
-            nk_group_end(ctx);
         }
+        nk_layout_row_end(ctx); // The row that contains the whole hex view (left column)
 
         // Lower down uses this
         VIEWMEM_VIEW *mv = ARRAY_GET(&ms->memviews, VIEWMEM_VIEW, ms->active_view_index);
 
-        // Scrollbar
-        nk_layout_row_push(ctx, SCROLLBAR_W);
-        struct nk_rect sbar_bounds = v->layout.mem;
-        sbar_bounds.x += sbar_bounds.w - SCROLLBAR_W;
-        sbar_bounds.w = SCROLLBAR_W;
-        sbar_bounds.h -= (ms->header_height + ADDRESS_LABEL_H);
-        sbar_bounds.y += ms->header_height;
-        int address = mv->view_address;
-        if(nk_input_is_mouse_hovering_rect(&ctx->input, v->layout.mem)) {
-            int wheel = (int)ctx->input.mouse.scroll_delta.y;
-            if(wheel) {
-                wheel *= v->scroll_wheel_lines;
-                address = (address - wheel * ms->cols) % 0x10000;
-                if(address < 0) {
-                    address += 0x10000;
+        // 2) Scrollbar is the right column
+        nk_layout_row_push(ctx, SCROLLBAR_W); {
+            struct nk_rect sbar_bounds = v->layout.mem;
+            sbar_bounds.x += sbar_bounds.w - SCROLLBAR_W;
+            sbar_bounds.w = SCROLLBAR_W;
+            sbar_bounds.h -= (ms->header_height + ADDRESS_LABEL_H);
+            sbar_bounds.y += ms->header_height;
+            int address = mv->view_address;
+            if(nk_input_is_mouse_hovering_rect(&ctx->input, v->layout.mem)) {
+                int wheel = (int)ctx->input.mouse.scroll_delta.y;
+                if(wheel) {
+                    wheel *= v->scroll_wheel_lines;
+                    address = (address - wheel * ms->cols) % 0x10000;
+                    if(address < 0) {
+                        address += 0x10000;
+                    }
                 }
             }
+            nk_custom_scrollbarv(ctx, sbar_bounds, 0x10000, mv->rows * ms->cols, &address, &ms->dragging, &ms->grab_offset);
+            mv->view_address = (uint16_t)address;
         }
-        nk_custom_scrollbarv(ctx, sbar_bounds, 0x10000, mv->rows * ms->cols, &address, &ms->dragging, &ms->grab_offset);
-        mv->view_address = (uint16_t)address;
 
         // Restore style padding
         ctx->style.window.padding = pad;
@@ -715,6 +731,7 @@ void unk_mem_show(UNK *v) {
         ctx->style.window.group_padding = gpd;
         ctx->style.window.border = border;
 
+        // Handle Dialogs
         if(v->dlg_memory_find && ms->find_string_cap) {
             int ret;
             if((ret = unk_dlg_find(ctx, nk_rect(10, 10, 400, 120), ms->find_string, &ms->find_string_len, ms->find_string_cap))) {
@@ -766,16 +783,17 @@ void unk_mem_show(UNK *v) {
             if (nk_contextual_begin(ctx, NK_WINDOW_NO_SCROLLBAR, nk_vec2(160, 180), nk_rect(v->right_click_menu_pos.x, v->right_click_menu_pos.y, 1, 1))) {
                 uint64_t last_write = m->RAM_LAST_WRITE[v->right_click_address];
                 char options_text[6];
-                nk_layout_row_dynamic(ctx, 22, 1);
-                for(int i=0; i < 4; i++) {
-                    uint16_t address = last_write & 0xFFFF;
-                    snprintf(options_text, 6, "$%04X", address);
-                    last_write >>= 16;
-                    if (nk_menu_item_label(ctx, options_text, NK_TEXT_LEFT)) {
-                        VIEWDASM *dv = &v->viewdasm;
-                        dv->cursor_address = address;
-                        dv->cursor_line = dv->rows / 2;
-                        unk_dasm_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
+                nk_layout_row_dynamic(ctx, 22, 1); {
+                    for(int i=0; i < 4; i++) {
+                        uint16_t address = last_write & 0xFFFF;
+                        snprintf(options_text, 6, "$%04X", address);
+                        last_write >>= 16;
+                        if (nk_menu_item_label(ctx, options_text, NK_TEXT_LEFT)) {
+                            VIEWDASM *dv = &v->viewdasm;
+                            dv->cursor_address = address;
+                            dv->cursor_line = dv->rows / 2;
+                            unk_dasm_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
+                        }
                     }
                 }
                 nk_contextual_end(ctx);

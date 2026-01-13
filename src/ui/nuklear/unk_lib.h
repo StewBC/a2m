@@ -57,7 +57,6 @@ typedef enum CURSOR_DIGIT {
 
 #define HELP_MAX_PAGES 8
 
-#include "breakpoint.h"
 #include "unk_joy.h"
 #include "unk_layout.h"
 #include "unk_leds.h"

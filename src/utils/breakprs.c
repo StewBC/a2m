@@ -241,13 +241,13 @@ int parse_breakpoint_line(const char *val, PARSEDBP *out) {
         if(*param != '\0') {
             // Try keywords first
             if(stricmp(param, "pc") == 0) {
-                out->mode = MODE_PC;
+                out->mode |= BREAK_MODE_PC;
             } else if(0 == stricmp(param, "access")) {
-                out->mode = MODE_ACCESS;
+                out->mode = BREAK_MODE_PC | BREAK_MODE_READ | BREAK_MODE_WRITE;
             } else if(0 == stricmp(param, "fast")) {
                 out->action = ACTION_FAST;
             } else if(0 == stricmp(param, "read")) {
-                out->mode = MODE_READ;
+                out->mode |= BREAK_MODE_READ;
             } else if(0 == stricmp(param, "restore")) {
                 out->action = ACTION_RESTORE;
             } else if(0 == stricmp(param, "slow")) {
@@ -270,7 +270,7 @@ int parse_breakpoint_line(const char *val, PARSEDBP *out) {
                     out->type_text = parse_decode_c_string(&param[5], NULL);
                 }
             } else if(0 == stricmp(param, "write")) {
-                out->mode = MODE_WRITE;
+                out->mode |= BREAK_MODE_WRITE;
             } else {
                 // Otherwise, treat as integer (count then reset)
                 char *endp = NULL;

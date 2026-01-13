@@ -21,10 +21,10 @@ static inline uint8_t read_from_memory(APPLE2 *m, uint16_t address) {
         if(cb_mask & WATCH_READ_BREAKPOINT) {
             m->a2out_cb.cb_breakpoint_ctx.cb_breakpoint(m->a2out_cb.cb_breakpoint_ctx.user, address, cb_mask);
         }
-        // If the read was done, return that value
-        if(cb_mask & WATCH_WRITE_BREAKPOINT) {
-            return byte;
-        }
+        // // If the read was done, return that value
+        // if(cb_mask & WATCH_WRITE_BREAKPOINT) {
+        //     return byte;
+        // }
     }
     return byte;
 }
@@ -32,6 +32,12 @@ static inline uint8_t read_from_memory(APPLE2 *m, uint16_t address) {
 static inline uint8_t read_from_memory_debug(APPLE2 *m, uint16_t address) {
     assert(address / PAGE_SIZE < m->read_pages.num_pages);
     return m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
+}
+
+static inline uint16_t read_from_memory_debug_16(APPLE2 *m, uint16_t address) {
+    uint8_t lo = read_from_memory_debug(m, address);
+    uint8_t hi = read_from_memory_debug(m, (uint16_t)(address + 1));
+    return (uint16_t)(lo | ((uint16_t)hi << 8));
 }
 
 static inline uint8_t read_from_memory_selected(APPLE2 *m, uint16_t address, int selected) {

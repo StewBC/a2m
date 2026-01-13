@@ -12,7 +12,7 @@ BREAKPOINT *rt_bp_get_at_address(RUNTIME *rt, uint16_t pc, int running) {
     for(int i = 0; i < items; i++) {
         // Find a breakpoint at address
         BREAKPOINT *bp = ARRAY_GET(&rt->breakpoints, BREAKPOINT, i);
-        if(!bp->disabled && bp->use_pc) {
+        if(!bp->disabled && bp->break_on_exec) {
             if(pc == bp->address) {
                 // The breakpoint matches the address
                 if(running && bp->use_counter) {
@@ -40,11 +40,11 @@ void rt_bp_callback(void *user, uint16_t address, uint8_t mask) {
     // Access triggered breakpoint - find the BP that set this
     for(size_t i = 0; i < items; i++) {
         BREAKPOINT *bp = ARRAY_GET(&rt->breakpoints, BREAKPOINT, i);
-        if(!bp->disabled && !bp->use_pc) {
+        if(!bp->disabled && !bp->break_on_exec) {
             // Can't be disabled or pc break, must be access break
             if(bp->use_range) {
                 // address must be in range to trigger
-                if(bp->address > address || bp->address_range_end < address || !(bp->access & m->RAM_WATCH[address])) {
+                if(bp->address > address || bp->address_range_end < address || !(bp->access_mask & m->RAM_WATCH[address])) {
                     continue;
                 }
             } else if(bp->address != address) {
@@ -77,14 +77,14 @@ void rt_bp_apply_masks(RUNTIME *rt) {
     int items = rt->breakpoints.items;
     // Clear all the callback masks for access breakpoints
     for(size_t i = 0; i < BANK_SIZE; i++) {
-        m->RAM_WATCH[i] &= ~6;                              // See BREAKPOINT access for reason
+        m->RAM_WATCH[i] &= ~(WATCH_EXEC_BREAKPOINT | WATCH_READ_BREAKPOINT | WATCH_WRITE_BREAKPOINT);
     }
     // re-install the masks for the active breakpoints
     for(size_t i = 0; i < items; i++) {
         BREAKPOINT *bp = ARRAY_GET(&rt->breakpoints, BREAKPOINT, i);
-        if(!bp->disabled && !bp->use_pc) {
+        if(!bp->disabled && !bp->break_on_exec) {
             for(int address = bp->address; address <= bp->address_range_end; address++) {
-                m->RAM_WATCH[address] |= bp->access;
+                m->RAM_WATCH[address] |= bp->access_mask;
             }
         }
     }

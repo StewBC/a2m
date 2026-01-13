@@ -36,7 +36,7 @@
 
 // The flags that tell memory functions where to read/write
 // These are not used by hardware, but exist so external friends can ask hardware for
-// values from banks other than RAM_MAIN
+// values from banks other than whatever is mapped into the 6502 space (MEM_MAPPED_6502)
 typedef enum RAMVIEW_FLAGS {
     MEM_MAPPED_6502     = 0,
     MEM_MAIN            = (1 << 0),

@@ -18,86 +18,87 @@ void unk_cpu_show(UNK *v, int dirty) {
     }
     if(nk_begin(ctx, "CPU", v->layout.cpu, NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
         ctx->current->edit.mode = NK_TEXT_EDIT_MODE_REPLACE;
-        nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 10);
-        nk_layout_row_push(ctx, 0.05f);
-        nk_label(ctx, "PC", NK_TEXT_LEFT);
-        nk_layout_row_push(ctx, 0.15f);
-        if(NK_EDIT_COMMITED &
-                nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->registers[0],
-                               &vcpu->register_lengths[0], 5, nk_filter_hex)) {
-            vcpu->registers[0][vcpu->register_lengths[0]] = 0;
-            ctx->current->edit.active = 0;
-            sscanf(vcpu->registers[0], "%x", &value);
-            rt_machine_set_pc(rt, value);
-            // m->cpu.pc = value;
-        }
-        nk_layout_row_push(ctx, 0.05f);
-        nk_label(ctx, "SP", NK_TEXT_LEFT);
-        nk_layout_row_push(ctx, 0.15f);
-        if(NK_EDIT_COMMITED &
-                nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->registers[1],
-                               &vcpu->register_lengths[1], 5, nk_filter_hex)) {
-            vcpu->registers[1][vcpu->register_lengths[1]] = 0;
-            ctx->current->edit.active = 0;
-            sscanf(vcpu->registers[1], "%x", &value);
-            rt_machine_set_sp(rt, value);
-            // m->cpu.sp = value;
-        }
-        nk_layout_row_push(ctx, 0.05f);
-        nk_label(ctx, "A", NK_TEXT_LEFT);
-        nk_layout_row_push(ctx, 0.10f);
-        if(NK_EDIT_COMMITED &
-                nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->registers[2],
-                               &vcpu->register_lengths[2], 3, nk_filter_hex)) {
-            vcpu->registers[2][vcpu->register_lengths[2]] = 0;
-            ctx->current->edit.active = 0;
-            sscanf(vcpu->registers[2], "%x", &value);
-            rt_machine_set_A(rt, value);
-            // m->cpu.A = value;
-        }
-        nk_layout_row_push(ctx, 0.05f);
-        nk_label(ctx, "X", NK_TEXT_LEFT);
-        nk_layout_row_push(ctx, 0.10f);
-        if(NK_EDIT_COMMITED &
-                nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->registers[3],
-                               &vcpu->register_lengths[3], 3, nk_filter_hex)) {
-            vcpu->registers[3][vcpu->register_lengths[3]] = 0;
-            ctx->current->edit.active = 0;
-            sscanf(vcpu->registers[3], "%x", &value);
-            rt_machine_set_X(rt, value);
-            // m->cpu.X = value;
-        }
-        nk_layout_row_push(ctx, 0.05f);
-        nk_label(ctx, "Y", NK_TEXT_LEFT);
-        nk_layout_row_push(ctx, 0.10f);
-        if(NK_EDIT_COMMITED &
-                nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->registers[4],
-                               &vcpu->register_lengths[4], 3, nk_filter_hex)) {
-            vcpu->registers[4][vcpu->register_lengths[4]] = 0;
-            ctx->current->edit.active = 0;
-            sscanf(vcpu->registers[4], "%x", &value);
-            rt_machine_set_Y(rt, value);
-            // m->cpu.Y = value;
-        }
-        nk_layout_row_end(ctx);
-        nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 10);
-        // nk_layout_row_dynamic(ctx, 13, 1);
-        for(int i = 0; i < 8; i++) {
-            nk_layout_row_push(ctx, 0.025f);
-            nk_labelf(ctx, NK_TEXT_LEFT, "%c", (i)["NVEBDIZC"]);
-            nk_layout_row_push(ctx, 0.075f);
+
+        // The top of 2 rows showing PC, SP etc
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 10); {
+            nk_layout_row_push(ctx, 0.05f);
+            nk_label(ctx, "PC", NK_TEXT_LEFT);
+            nk_layout_row_push(ctx, 0.15f);
             if(NK_EDIT_COMMITED &
-                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->flags[i], &vcpu->flag_lengths[i],
-                                   2, nk_filter_binary)) {
-                vcpu->flags[i][vcpu->flag_lengths[i]] = 0;
+                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->registers[0],
+                                &vcpu->register_lengths[0], 5, nk_filter_hex)) {
+                vcpu->registers[0][vcpu->register_lengths[0]] = 0;
                 ctx->current->edit.active = 0;
-                sscanf(vcpu->flags[i], "%d", &value);
-                uint8_t flags = m->cpu.flags;
-                flags &= ~(1 << (7 - i));
-                flags |= (value << (7 - i));
-                rt_machine_set_flags(rt, flags);
+                sscanf(vcpu->registers[0], "%x", &value);
+                rt_machine_set_pc(rt, value);
+            }
+            nk_layout_row_push(ctx, 0.05f);
+            nk_label(ctx, "SP", NK_TEXT_LEFT);
+            nk_layout_row_push(ctx, 0.15f);
+            if(NK_EDIT_COMMITED &
+                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->registers[1],
+                                &vcpu->register_lengths[1], 5, nk_filter_hex)) {
+                vcpu->registers[1][vcpu->register_lengths[1]] = 0;
+                ctx->current->edit.active = 0;
+                sscanf(vcpu->registers[1], "%x", &value);
+                rt_machine_set_sp(rt, value);
+            }
+            nk_layout_row_push(ctx, 0.05f);
+            nk_label(ctx, "A", NK_TEXT_LEFT);
+            nk_layout_row_push(ctx, 0.10f);
+            if(NK_EDIT_COMMITED &
+                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->registers[2],
+                                &vcpu->register_lengths[2], 3, nk_filter_hex)) {
+                vcpu->registers[2][vcpu->register_lengths[2]] = 0;
+                ctx->current->edit.active = 0;
+                sscanf(vcpu->registers[2], "%x", &value);
+                rt_machine_set_A(rt, value);
+            }
+            nk_layout_row_push(ctx, 0.05f);
+            nk_label(ctx, "X", NK_TEXT_LEFT);
+            nk_layout_row_push(ctx, 0.10f);
+            if(NK_EDIT_COMMITED &
+                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->registers[3],
+                                &vcpu->register_lengths[3], 3, nk_filter_hex)) {
+                vcpu->registers[3][vcpu->register_lengths[3]] = 0;
+                ctx->current->edit.active = 0;
+                sscanf(vcpu->registers[3], "%x", &value);
+                rt_machine_set_X(rt, value);
+            }
+            nk_layout_row_push(ctx, 0.05f);
+            nk_label(ctx, "Y", NK_TEXT_LEFT);
+            nk_layout_row_push(ctx, 0.10f);
+            if(NK_EDIT_COMMITED &
+                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->registers[4],
+                                &vcpu->register_lengths[4], 3, nk_filter_hex)) {
+                vcpu->registers[4][vcpu->register_lengths[4]] = 0;
+                ctx->current->edit.active = 0;
+                sscanf(vcpu->registers[4], "%x", &value);
+                rt_machine_set_Y(rt, value);
             }
         }
+        nk_layout_row_end(ctx); // PC, SP etc
+        
+        // The second row showing the flags
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 10); {
+            for(int i = 0; i < 8; i++) {
+                nk_layout_row_push(ctx, 0.025f);
+                nk_labelf(ctx, NK_TEXT_LEFT, "%c", (i)["NVEBDIZC"]);
+                nk_layout_row_push(ctx, 0.075f);
+                if(NK_EDIT_COMMITED &
+                        nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, vcpu->flags[i], &vcpu->flag_lengths[i],
+                                    2, nk_filter_binary)) {
+                    vcpu->flags[i][vcpu->flag_lengths[i]] = 0;
+                    ctx->current->edit.active = 0;
+                    sscanf(vcpu->flags[i], "%d", &value);
+                    uint8_t flags = m->cpu.flags;
+                    flags &= ~(1 << (7 - i));
+                    flags |= (value << (7 - i));
+                    rt_machine_set_flags(rt, flags);
+                }
+            }
+        }
+        nk_layout_row_end(ctx); // Flags
     }
     nk_end(ctx);
 }

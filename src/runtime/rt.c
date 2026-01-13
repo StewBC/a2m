@@ -213,11 +213,11 @@ void rt_apply_ini(RUNTIME *rt, INI_STORE *ini_store) {
                         bp.address = (uint16_t)parsed_line.start;
                         bp.address_range_end = (uint16_t)parsed_line.end;
                         bp.use_range = bp.address != bp.address_range_end;
-                        bp.use_pc = MODE_PC == parsed_line.mode;
-                        bp.break_on_read = MODE_READ & parsed_line.mode ? 1 : 0;
-                        bp.break_on_write = MODE_WRITE & parsed_line.mode ? 1 : 0;
+                        bp.break_on_exec = BREAK_MODE_PC == parsed_line.mode;
+                        bp.break_on_read = BREAK_MODE_READ & parsed_line.mode ? 1 : 0;
+                        bp.break_on_write = BREAK_MODE_WRITE & parsed_line.mode ? 1 : 0;
                         // SQW Look at why you set this up the way it is
-                        bp.access = (bp.break_on_write << 2) | (bp.break_on_read << 1);
+                        bp.access_mask = (bp.break_on_write << 2) | (bp.break_on_read << 1);
                         bp.counter_stop_value = parsed_line.count;
                         bp.counter_reset = parsed_line.reset;
                         bp.use_counter = bp.counter_stop_value || bp.counter_reset ? 1 : 0;
@@ -474,8 +474,12 @@ int rt_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, int force_
         switch(mode) {
             case AM_NONE:
             case AM_A:
-            case AM_IMM:
             case AM_IMPL:
+                break;
+            case AM_IMM:
+                if(isprint(operands)) {
+                    snprintf(text, remain, " '%c'", operands);
+                }
                 break;
             case AM_ABS:
             case AM_ZPG:

@@ -154,86 +154,87 @@ static void unk_help_draw_rich_segment(struct nk_context *ctx, const char *s, in
     const struct nk_user_font *font = ctx->style.font;
     struct nk_command_buffer *out = nk_window_get_canvas(ctx);
 
-    nk_layout_row_dynamic(ctx, line_height, 1);
+    nk_layout_row_dynamic(ctx, line_height, 1); {
 
-    struct nk_rect bounds;
-    if(!nk_widget(&bounds, ctx)) {
-        // Not visible: still advance THE color through this segment
-        unk_help_consume_color_tags(s, len, cur_color);
-        return;
-    }
-
-    const char *p   = s;
-    const char *end = s + len;
-
-    // Measure visible width for centering (tags have no width)
-    float total_w = 0.0f;
-    while(p < end) {
-        int tlen = 0;
-
-        if(*p == '<' && unk_help_is_inline_color_tag(p, &tlen) && (p + tlen) <= end) {
-            p += tlen;
-            continue;
+        struct nk_rect bounds;
+        if(!nk_widget(&bounds, ctx)) {
+            // Not visible: still advance THE color through this segment
+            unk_help_consume_color_tags(s, len, cur_color);
+            return;
         }
 
-        const char *run = p;
+        const char *p   = s;
+        const char *end = s + len;
+
+        // Measure visible width for centering (tags have no width)
+        float total_w = 0.0f;
         while(p < end) {
+            int tlen = 0;
+
             if(*p == '<' && unk_help_is_inline_color_tag(p, &tlen) && (p + tlen) <= end) {
-                break;
+                p += tlen;
+                continue;
             }
-            p++;
+
+            const char *run = p;
+            while(p < end) {
+                if(*p == '<' && unk_help_is_inline_color_tag(p, &tlen) && (p + tlen) <= end) {
+                    break;
+                }
+                p++;
+            }
+
+            int run_len = (int)(p - run);
+            if(run_len > 0) {
+                total_w += font->width(font->userdata, font->height, run, run_len);
+            }
         }
 
-        int run_len = (int)(p - run);
-        if(run_len > 0) {
-            total_w += font->width(font->userdata, font->height, run, run_len);
-        }
-    }
-
-    float x = bounds.x;
-    if(align == NK_TEXT_CENTERED && total_w < bounds.w) {
-        x = bounds.x + (bounds.w - total_w) * 0.5f;
-    }
-
-    // Push scissor for this widget, remember previous clip to restore
-    struct nk_rect prev_clip = out->clip;
-    nk_push_scissor(out, bounds);
-
-    // Draw runs; when a tag is encountered, advance THE color via consume helper
-    p = s;
-    while(p < end) {
-        int tlen = 0;
-
-        if(*p == '<' && unk_help_is_inline_color_tag(p, &tlen) && (p + tlen) <= end) {
-            // Update THE color (tag has no width)
-            unk_help_consume_color_tags(p, tlen, cur_color);
-            p += tlen;
-            continue;
+        float x = bounds.x;
+        if(align == NK_TEXT_CENTERED && total_w < bounds.w) {
+            x = bounds.x + (bounds.w - total_w) * 0.5f;
         }
 
-        const char *run = p;
+        // Push scissor for this widget, remember previous clip to restore
+        struct nk_rect prev_clip = out->clip;
+        nk_push_scissor(out, bounds);
+
+        // Draw runs; when a tag is encountered, advance THE color via consume helper
+        p = s;
         while(p < end) {
+            int tlen = 0;
+
             if(*p == '<' && unk_help_is_inline_color_tag(p, &tlen) && (p + tlen) <= end) {
-                break;
+                // Update THE color (tag has no width)
+                unk_help_consume_color_tags(p, tlen, cur_color);
+                p += tlen;
+                continue;
             }
-            p++;
+
+            const char *run = p;
+            while(p < end) {
+                if(*p == '<' && unk_help_is_inline_color_tag(p, &tlen) && (p + tlen) <= end) {
+                    break;
+                }
+                p++;
+            }
+
+            int run_len = (int)(p - run);
+            if(run_len > 0) {
+                float w = font->width(font->userdata, font->height, run, run_len);
+
+                struct nk_rect r = bounds;
+                r.x = x;
+                r.w = w;
+
+                nk_draw_text(out, r, run, run_len, font, ctx->style.window.background, *cur_color);
+                x += w;
+            }
         }
 
-        int run_len = (int)(p - run);
-        if(run_len > 0) {
-            float w = font->width(font->userdata, font->height, run, run_len);
-
-            struct nk_rect r = bounds;
-            r.x = x;
-            r.w = w;
-
-            nk_draw_text(out, r, run, run_len, font, ctx->style.window.background, *cur_color);
-            x += w;
-        }
+        // Restore previous scissor
+        nk_push_scissor(out, prev_clip);
     }
-
-    // Restore previous scissor
-    nk_push_scissor(out, prev_clip);
 }
 
 static void unk_help_draw_wrapped_rich_line(struct nk_context *ctx, const char *s, int max_visible_chars, int line_height, nk_flags align, struct nk_color *cur_color) {
@@ -393,8 +394,9 @@ static void unk_help_render_text(struct nk_context *ctx, const char *help_text, 
         visible[ind_len + rem_len] = '\0';
 
         if(visible[0] == '\0') {
-            nk_layout_row_dynamic(ctx, line_height, 1);
-            nk_label(ctx, " ", NK_TEXT_LEFT);
+            nk_layout_row_dynamic(ctx, line_height, 1); {
+                nk_label(ctx, " ", NK_TEXT_LEFT);
+            }
             continue;
         }
 
@@ -423,41 +425,42 @@ void unk_show_help(UNK *v) {
     }
 
     if(nk_begin(ctx, "Help", nk_rect(r.x, r.y, r.w, r.h), NK_WINDOW_NO_SCROLLBAR)) {
-        nk_layout_row_dynamic(ctx, 30, 1);
-        nk_label_colored(ctx, "Apple ][+ and //e Enhanced emulator by Stefan Wessels, 2025.", NK_TEXT_CENTERED, nk_rgb(0, 255, 255));
+        nk_layout_row_dynamic(ctx, 30, 1); {
+            nk_label_colored(ctx, "Apple ][+ and //e Enhanced emulator by Stefan Wessels, 2025.", NK_TEXT_CENTERED, nk_rgb(0, 255, 255));
+        }
         // main help area
-        nk_layout_row_dynamic(ctx, r.h - 5 * HELP_DEFAULT_LINE_HEIGHT, 1);
-        struct nk_scroll *scr = &v->help_scroll[v->help_page];
+        nk_layout_row_dynamic(ctx, r.h - 5 * HELP_DEFAULT_LINE_HEIGHT, 1); {
+            struct nk_scroll *scr = &v->help_scroll[v->help_page];
 
-        if(nk_group_scrolled_begin(ctx, scr, "Help Pages", 0)) {
-            unk_help_render_text(ctx, unk_help_text[v->help_page], max_chars_per_line);
-            nk_group_scrolled_end(ctx);
+            if(nk_group_scrolled_begin(ctx, scr, "Help Pages", 0)) {
+                unk_help_render_text(ctx, unk_help_text[v->help_page], max_chars_per_line);
+                nk_group_scrolled_end(ctx);
+            }
         }
 
         // page selector row (Page: [1][2] etc)
         const struct nk_color active = {0xff, 0xff, 0x00, 0xff};
 
         // one label + N buttons
-        nk_layout_row_begin(ctx, NK_STATIC, 1.5 * HELP_DEFAULT_LINE_HEIGHT, 1 + unk_help_page_count);
+        nk_layout_row_begin(ctx, NK_STATIC, 1.5 * HELP_DEFAULT_LINE_HEIGHT, 1 + unk_help_page_count); {
+            // label
+            nk_layout_row_push(ctx, 40.0f);
+            nk_label_colored(ctx, "Page:", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, nk_rgb(255, 0, 0));
 
-        // label
-        nk_layout_row_push(ctx, 40.0f);
-        nk_label_colored(ctx, "Page:", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, nk_rgb(255, 0, 0));
+            // buttons
+            for(int i = 0; i < unk_help_page_count; ++i) {
+                nk_layout_row_push(ctx, 80.0f); // button width
 
-        // buttons
-        for(int i = 0; i < unk_help_page_count; ++i) {
-            nk_layout_row_push(ctx, 80.0f); // button width
+                struct nk_style_button style = ctx->style.button;  // base style
+                if(v->help_page == i) {
+                    style.text_normal = style.text_hover = style.text_active = active;
+                }
 
-            struct nk_style_button style = ctx->style.button;  // base style
-            if(v->help_page == i) {
-                style.text_normal = style.text_hover = style.text_active = active;
-            }
-
-            if(nk_button_label_styled(ctx, &style, unk_page_titles[i])) {
-                v->help_page = i;
+                if(nk_button_label_styled(ctx, &style, unk_page_titles[i])) {
+                    v->help_page = i;
+                }
             }
         }
-
         nk_layout_row_end(ctx);
     }
 
