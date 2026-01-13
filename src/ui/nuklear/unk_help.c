@@ -154,8 +154,8 @@ static void unk_help_draw_rich_segment(struct nk_context *ctx, const char *s, in
     const struct nk_user_font *font = ctx->style.font;
     struct nk_command_buffer *out = nk_window_get_canvas(ctx);
 
-    nk_layout_row_dynamic(ctx, line_height, 1); {
-
+    nk_layout_row_dynamic(ctx, line_height, 1);
+    {
         struct nk_rect bounds;
         if(!nk_widget(&bounds, ctx)) {
             // Not visible: still advance THE color through this segment
@@ -394,7 +394,8 @@ static void unk_help_render_text(struct nk_context *ctx, const char *help_text, 
         visible[ind_len + rem_len] = '\0';
 
         if(visible[0] == '\0') {
-            nk_layout_row_dynamic(ctx, line_height, 1); {
+            nk_layout_row_dynamic(ctx, line_height, 1);
+            {
                 nk_label(ctx, " ", NK_TEXT_LEFT);
             }
             continue;
@@ -425,11 +426,13 @@ void unk_show_help(UNK *v) {
     }
 
     if(nk_begin(ctx, "Help", nk_rect(r.x, r.y, r.w, r.h), NK_WINDOW_NO_SCROLLBAR)) {
-        nk_layout_row_dynamic(ctx, 30, 1); {
+        nk_layout_row_dynamic(ctx, 30, 1);
+        {
             nk_label_colored(ctx, "Apple ][+ and //e Enhanced emulator by Stefan Wessels, 2025.", NK_TEXT_CENTERED, nk_rgb(0, 255, 255));
         }
         // main help area
-        nk_layout_row_dynamic(ctx, r.h - 5 * HELP_DEFAULT_LINE_HEIGHT, 1); {
+        nk_layout_row_dynamic(ctx, r.h - 5 * HELP_DEFAULT_LINE_HEIGHT, 1);
+        {
             struct nk_scroll *scr = &v->help_scroll[v->help_page];
 
             if(nk_group_scrolled_begin(ctx, scr, "Help Pages", 0)) {
@@ -442,7 +445,8 @@ void unk_show_help(UNK *v) {
         const struct nk_color active = {0xff, 0xff, 0x00, 0xff};
 
         // one label + N buttons
-        nk_layout_row_begin(ctx, NK_STATIC, 1.5 * HELP_DEFAULT_LINE_HEIGHT, 1 + unk_help_page_count); {
+        nk_layout_row_begin(ctx, NK_STATIC, 1.5 * HELP_DEFAULT_LINE_HEIGHT, 1 + unk_help_page_count);
+        {
             // label
             nk_layout_row_push(ctx, 40.0f);
             nk_label_colored(ctx, "Page:", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE, nk_rgb(255, 0, 0));

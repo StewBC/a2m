@@ -536,7 +536,8 @@ void unk_mem_show(UNK *v) {
         struct nk_color active_background = ctx->style.window.background;
 
         // 1) The colums - hex and scrollbar
-        nk_layout_row_begin(ctx, NK_STATIC, v->layout.mem.h, 2); {
+        nk_layout_row_begin(ctx, NK_STATIC, v->layout.mem.h, 2);
+        {
             // The width of the hex view
             nk_layout_row_push(ctx, v->layout.mem.w - SCROLLBAR_W);
             int active_top_row, view_top_row = 0;
@@ -551,11 +552,13 @@ void unk_mem_show(UNK *v) {
                     uint16_t view_address = mv->view_address;
 
                     // A) Each row in the hex view (as a group again, inside a dynamic row)
-                    nk_layout_row_dynamic(ctx, mv->rows * ROW_H, 1); {
+                    nk_layout_row_dynamic(ctx, mv->rows * ROW_H, 1);
+                    {
                         view_top_row += mv->rows;
                         if(nk_group_begin(ctx, "mem-rows", NK_WINDOW_NO_SCROLLBAR)) {
                             // A1) The actual data per row
-                            nk_layout_row_dynamic(ctx, ROW_H, 1); {
+                            nk_layout_row_dynamic(ctx, ROW_H, 1);
+                            {
                                 struct nk_rect r = nk_widget_bounds(ctx);
                                 struct nk_color last_c = ctx->style.window.background = unk_mem_range_colors[view].background_color;
                                 for(int row = 0; row < mv->rows; row++) {
@@ -606,7 +609,7 @@ void unk_mem_show(UNK *v) {
                                         if(nk_widget_is_mouse_clicked(ctx, NK_BUTTON_RIGHT) && v->right_click_address < 0x10000) {
                                             v->right_click_menu_open = 1;
                                             v->right_click_menu_pos  = ctx->input.mouse.pos;
-                                        }                        
+                                        }
                                     }
                                     nk_label_colored(ctx, ms->str_buf, NK_TEXT_LEFT, unk_mem_range_colors[view].text_color);
                                     view_address += ms->cols;
@@ -658,7 +661,8 @@ void unk_mem_show(UNK *v) {
                 ctx->style.window.background = active_background;
 
                 // B) Draw the memory bank access buttons
-                nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 4); {
+                nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 4);
+                {
                     nk_layout_row_push(ctx, 0.4);
                     nk_labelf(ctx, NK_TEXT_ALIGN_LEFT, "Address: %04X", active_view->cursor_address);
                     nk_layout_row_push(ctx, 0.14);
@@ -704,7 +708,8 @@ void unk_mem_show(UNK *v) {
         VIEWMEM_VIEW *mv = ARRAY_GET(&ms->memviews, VIEWMEM_VIEW, ms->active_view_index);
 
         // 2) Scrollbar is the right column
-        nk_layout_row_push(ctx, SCROLLBAR_W); {
+        nk_layout_row_push(ctx, SCROLLBAR_W);
+        {
             struct nk_rect sbar_bounds = v->layout.mem;
             sbar_bounds.x += sbar_bounds.w - SCROLLBAR_W;
             sbar_bounds.w = SCROLLBAR_W;
@@ -779,16 +784,17 @@ void unk_mem_show(UNK *v) {
             }
         }
 
-        if (v->right_click_menu_open) {
-            if (nk_contextual_begin(ctx, NK_WINDOW_NO_SCROLLBAR, nk_vec2(160, 180), nk_rect(v->right_click_menu_pos.x, v->right_click_menu_pos.y, 1, 1))) {
+        if(v->right_click_menu_open) {
+            if(nk_contextual_begin(ctx, NK_WINDOW_NO_SCROLLBAR, nk_vec2(160, 180), nk_rect(v->right_click_menu_pos.x, v->right_click_menu_pos.y, 1, 1))) {
                 uint64_t last_write = m->RAM_LAST_WRITE[v->right_click_address];
                 char options_text[6];
-                nk_layout_row_dynamic(ctx, 22, 1); {
-                    for(int i=0; i < 4; i++) {
+                nk_layout_row_dynamic(ctx, 22, 1);
+                {
+                    for(int i = 0; i < 4; i++) {
                         uint16_t address = last_write & 0xFFFF;
                         snprintf(options_text, 6, "$%04X", address);
                         last_write >>= 16;
-                        if (nk_menu_item_label(ctx, options_text, NK_TEXT_LEFT)) {
+                        if(nk_menu_item_label(ctx, options_text, NK_TEXT_LEFT)) {
                             VIEWDASM *dv = &v->viewdasm;
                             dv->cursor_address = address;
                             dv->cursor_line = dv->rows / 2;

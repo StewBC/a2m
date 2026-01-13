@@ -86,7 +86,7 @@ static inline void unk_dasm_prev_opcode(VIEWDASM *dv, APPLE2 *m, uint16_t addres
     DECODE_ENTRY de;
 
     uint16_t seek_address = address - 1;
-    for(int i=0; i < 3; i++) {
+    for(int i = 0; i < 3; i++) {
         uint16_t next_address = unk_dasm_next_opcode_address(m, seek_address - i, &de.opcode);
         if(next_address == address) {
             de.address = seek_address - i;
@@ -134,10 +134,10 @@ static inline int unk_dasm_center_pc_if_in_view(VIEWDASM *dv, APPLE2 *m) {
                 size_t size = dv->line_info.element_size;
                 if(delta < 0) {
                     // delta is negative - remember for signs (invered below) - move data "back" by delta rowa
-                    memmove(dv->line_info.data, (char*)dv->line_info.data - delta * size, (top_line_offset + dv->rows + delta) * size);
+                    memmove(dv->line_info.data, (char *)dv->line_info.data - delta * size, (top_line_offset + dv->rows + delta) * size);
                     unk_dasm_fill_lines_down(dv, m, last_address, dv->rows - 1 + delta);
                 } else {
-                    memmove((char*)dv->line_info.data + delta * size, dv->line_info.data , (top_line_offset + dv->rows - delta) * size);
+                    memmove((char *)dv->line_info.data + delta * size, dv->line_info.data, (top_line_offset + dv->rows - delta) * size);
                     unk_dasm_put_address_on_line(dv, m, first_address, delta);
                 }
                 return 1;
@@ -202,7 +202,7 @@ void unk_dasm_cursor_down(UNK *v, VIEWDASM *dv) {
             dv->cursor_address = unk_dasm_get_line_info(dv, dv->cursor_line)->address;
         } else {
             int size = dv->line_info.element_size;
-            memmove(dv->line_info.data, (char*)dv->line_info.data + size, (dv->line_info.size - 1) * size);
+            memmove(dv->line_info.data, (char *)dv->line_info.data + size, (dv->line_info.size - 1) * size);
             dv->cursor_address = unk_dasm_get_line_info(dv, dv->cursor_line)->address;
             unk_dasm_fill_lines_down(dv, v->m, dv->cursor_address, dv->cursor_line);
         }
@@ -235,9 +235,9 @@ void unk_dasm_cursor_right(UNK *v, VIEWDASM *dv, int mod) {
     if(v->m->cpu.pc != unk_dasm_get_line_info(dv, dv->rows / 2)->address) {
         unk_dasm_put_address_on_line(dv, v->m, v->m->cpu.pc, dv->rows / 2);
         // The cursor might now be off-screen
-        if(dv->cursor_address < unk_dasm_get_line_info(dv, 0)->address || 
-            dv->cursor_address > unk_dasm_get_line_info(dv, dv->rows-1)->address) {
-                // if it is, set the cursor line just somewhere off-screen
+        if(dv->cursor_address < unk_dasm_get_line_info(dv, 0)->address ||
+                dv->cursor_address > unk_dasm_get_line_info(dv, dv->rows - 1)->address) {
+            // if it is, set the cursor line just somewhere off-screen
             dv->cursor_line = dv->rows + 5;
         } else {
             // cursor is still on-screen, find the line - force a match
@@ -345,7 +345,7 @@ void unk_dasm_resize_view(UNK *v) {
         // This will force unk_dasm_centre_pc_if_in_view to fail and redo the lines
         memset(dv->line_info.data, 0, dv->line_info.element_size * dv->line_info.size);
         // if PC is 0 that would be bad, so gaurantee a fail, always
-        ((LINE_INFO*)dv->line_info.data)[top_line_offset].address = 1;
+        ((LINE_INFO *)dv->line_info.data)[top_line_offset].address = 1;
     } else {
         unk_dasm_fill_lines_down(dv, v->m, unk_dasm_get_line_info(dv, 0)->address, 1);
     }
@@ -652,7 +652,7 @@ void unk_dasm_show(UNK *v, int dirty) {
             unk_dasm_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
         }
     }
-    
+
     if(nk_begin(ctx, "Disassembly", v->layout.dasm, NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
         float w_offset = ctx->current->layout->bounds.x;
         ctx->current->layout->bounds.w += w_offset;
@@ -663,14 +663,15 @@ void unk_dasm_show(UNK *v, int dirty) {
         ctx->style.window.border        = 0.0f;
 
         // This is the main display, split into the display and the scrolbar columns
-        nk_layout_row_begin(ctx, NK_STATIC, v->layout.dasm.h, 2); {
-
+        nk_layout_row_begin(ctx, NK_STATIC, v->layout.dasm.h, 2);
+        {
             // 1) st column - Push the display column width
             nk_layout_row_push(ctx, v->layout.dasm.w - SCROLLBAR_W);
             // Make the display column a group
             if(nk_group_begin(ctx, "dasm-view", NK_WINDOW_NO_SCROLLBAR)) {
                 // A) The rows of disasembly lines
-                nk_layout_row_dynamic(ctx, ROW_H, 1); {
+                nk_layout_row_dynamic(ctx, ROW_H, 1);
+                {
                     struct nk_rect r = nk_widget_bounds(ctx);
                     int cursor_y = 0; // SQW Because the PC is sometimes not on col 0 (asm didn't work out) this remains unset
                     struct nk_color ob = ctx->style.window.background;
@@ -685,7 +686,7 @@ void unk_dasm_show(UNK *v, int dirty) {
                         LINE_INFO *li = unk_dasm_get_line_info(dv, i);
                         uint16_t pc = li->address;
                         if(pc != control_pc) {
-                            unk_dasm_fill_lines_down(dv, m, current_pc, i-1);
+                            unk_dasm_fill_lines_down(dv, m, current_pc, i - 1);
                             pc = control_pc;
                         }
                         current_pc = pc;
@@ -760,7 +761,8 @@ void unk_dasm_show(UNK *v, int dirty) {
                 }
 
                 // b) The row with the memory bank access buttons
-                nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 4); {
+                nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 4);
+                {
                     nk_layout_row_push(ctx, 0.35);
                     nk_spacer(ctx);
                     nk_layout_row_push(ctx, 0.15);

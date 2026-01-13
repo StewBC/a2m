@@ -14,14 +14,15 @@ int unk_dlg_assembler_config(struct nk_context *ctx, struct nk_rect r, ASSEMBLER
     FILE_BROWSER *fb = &ac->file_browser;
     if(nk_popup_begin(ctx, NK_POPUP_STATIC, "Assembler Config", 0, r)) {
         // 1) Path row with BROWSE button
-        nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 3); {
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 3);
+        {
             nk_layout_row_push(ctx, 0.20f);
             nk_label(ctx, "Path", NK_TEXT_LEFT);
             nk_layout_row_push(ctx, 0.60f);
             ctx->current->edit.mode = NK_TEXT_EDIT_MODE_REPLACE;
             if(NK_EDIT_COMMITED &
                     nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, fb->dir_selected.name,
-                                &fb->dir_selected.name_length, PATH_MAX - 1, nk_filter_default)) {
+                                   &fb->dir_selected.name_length, PATH_MAX - 1, nk_filter_default)) {
                 UTIL_FILE file;
                 memset(&file, 0, sizeof(file));
                 fb->dir_selected.name[fb->dir_selected.name_length] = '\0';
@@ -53,7 +54,8 @@ int unk_dlg_assembler_config(struct nk_context *ctx, struct nk_rect r, ASSEMBLER
         nk_layout_row_end(ctx);
 
         // 2) Memory bank access row
-        nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 4); {
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 4);
+        {
             nk_layout_row_push(ctx, 0.25);
             if(nk_option_label(ctx, "6502", !tst_flags(ac->flags, (MEM_MAIN | MEM_AUX))) && tst_flags(ac->flags, (MEM_MAIN | MEM_AUX))) {
                 clr_flags(ac->flags, MEM_MAIN);
@@ -81,7 +83,8 @@ int unk_dlg_assembler_config(struct nk_context *ctx, struct nk_rect r, ASSEMBLER
         nk_layout_row_end(ctx);
 
         // 3)  Toggles and address
-        nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 3); {
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 3);
+        {
             nk_layout_row_push(ctx, 0.30f);
             nk_checkbox_label_align(ctx, "Reset Stack", &ac->reset_stack, 0, NK_TEXT_LEFT);
             nk_layout_row_push(ctx, 0.29f);
@@ -91,14 +94,15 @@ int unk_dlg_assembler_config(struct nk_context *ctx, struct nk_rect r, ASSEMBLER
             nk_layout_row_push(ctx, 0.3f);
             if(NK_EDIT_COMMITED &
                     nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER,
-                                ac->start_address_text, &ac->start_address_text_len, 5, nk_filter_hex)) {
+                                   ac->start_address_text, &ac->start_address_text_len, 5, nk_filter_hex)) {
                 ac->start_address = strtol(ac->start_address_text, NULL, 16);
             }
         }
         nk_layout_row_end(ctx);
 
         // 4) Cancel / OK buttons
-        nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 3); {
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 3);
+        {
             nk_layout_row_push(ctx, 0.40f);
             nk_spacer(ctx);
             nk_layout_row_push(ctx, 0.30f);
@@ -122,7 +126,8 @@ int unk_dlg_assembler_errors(UNK *v, struct nk_context *ctx, struct nk_rect r) {
     VIEWDASM *dv = &v->viewdasm;
     static nk_uint x_offset = 0, y_offset = 0;
     if(nk_popup_begin(ctx, NK_POPUP_STATIC, "Assembler errors", 0, r)) {
-        nk_layout_row_dynamic(ctx, 360, 1); {
+        nk_layout_row_dynamic(ctx, 360, 1);
+        {
             if(nk_group_scrolled_offset_begin(ctx, &x_offset, &y_offset, "Error Messages", NK_WINDOW_BORDER)) {
                 size_t i;
                 nk_layout_row_static(ctx, 13, 8 * dv->errorlog.longest_error_message_length, 1);
@@ -133,7 +138,8 @@ int unk_dlg_assembler_errors(UNK *v, struct nk_context *ctx, struct nk_rect r) {
                 nk_group_end(ctx);
             }
         }
-        nk_layout_row_dynamic(ctx, 28, 1); {
+        nk_layout_row_dynamic(ctx, 28, 1);
+        {
             if(nk_button_label(ctx, "OK")) {
                 ret = 1;
             }
@@ -153,7 +159,8 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
     nk_style_push_color(ctx, &ctx->style.window.border_color, ctx->style.window.popup_border_color);
 
     if(nk_begin_titled(ctx, "EditBreakpoint", "Edit Breakpoint", r, NK_WINDOW_BORDER | NK_WINDOW_NO_SCROLLBAR)) {
-        nk_layout_row_dynamic(ctx, 22, 4); {
+        nk_layout_row_dynamic(ctx, 22, 4);
+        {
             // 1)
             // nk_layout_row_push(ctx, 0.04f);
             nk_label(ctx, "On access", NK_TEXT_LEFT);
@@ -176,14 +183,15 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
         }
 
         // B) Address range
-        nk_layout_row_dynamic(ctx, 22, 4); {
+        nk_layout_row_dynamic(ctx, 22, 4);
+        {
             // 1)
             // nk_layout_row_push(ctx, 0.20f);
             nk_label(ctx, "At address", NK_TEXT_LEFT);
             // 2)
             if(NK_EDIT_COMMITED &
                     nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_address[0],
-                                &bpe->string_address_len[0], 5, nk_filter_hex)) {
+                                   &bpe->string_address_len[0], 5, nk_filter_hex)) {
                 ctx->current->edit.active = 0;
             }
             // 3)
@@ -192,13 +200,14 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
             // 4)
             if(NK_EDIT_COMMITED &
                     nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_address[1],
-                                &bpe->string_address_len[1], 5, nk_filter_hex)) {
+                                   &bpe->string_address_len[1], 5, nk_filter_hex)) {
                 ctx->current->edit.active = 0;
             }
         }
 
         // C) Memory bank access
-        nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 5); {
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 5);
+        {
             // 1)
             nk_layout_row_push(ctx, 0.25f);
             nk_label(ctx, "In Bank", NK_TEXT_LEFT);
@@ -236,7 +245,8 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
         // nk_layout_row_end(ctx);
 
         // D) Counters
-        nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 5); {
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 5);
+        {
             // 1)
             nk_layout_row_push(ctx, 0.25f);
             bpe->bp_under_edit.use_counter = nk_check_label(ctx, "Use counter", bpe->bp_under_edit.use_counter ? 1 : 0) ? 1 : 0;
@@ -250,7 +260,7 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
             nk_layout_row_push(ctx, 0.17f);
             if(NK_EDIT_COMMITED &
                     nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_counter[0],
-                                &bpe->string_counter_len[0], 8, nk_filter_decimal)) {
+                                   &bpe->string_counter_len[0], 8, nk_filter_decimal)) {
                 ctx->current->edit.active = 0;
             }
             // 4)
@@ -260,7 +270,7 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
             nk_layout_row_push(ctx, 0.17f);
             if(NK_EDIT_COMMITED &
                     nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_counter[1],
-                                &bpe->string_counter_len[1], 8, nk_filter_decimal)) {
+                                   &bpe->string_counter_len[1], 8, nk_filter_decimal)) {
                 ctx->current->edit.active = 0;
             }
             if(!bpe->bp_under_edit.use_counter) {
@@ -270,7 +280,8 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
         nk_layout_row_end(ctx);
 
         // E) Actions
-        nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 6); {
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 6);
+        {
             if(!bpe->bp_under_edit.break_on_exec) {
                 nk_widget_disable_begin(ctx);
             }
@@ -298,7 +309,7 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
                     nk_layout_row_push(ctx, 0.05f);
                     if(NK_EDIT_COMMITED &
                             nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER,
-                                        bpe->string_device[0], &bpe->string_device_len[0], 2, nk_filter_decimal)) {
+                                           bpe->string_device[0], &bpe->string_device_len[0], 2, nk_filter_decimal)) {
                         if(!bpe->string_device_len[0]) {
                             bpe->string_device_len[0] = 1;
                         }
@@ -315,7 +326,7 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
                     nk_layout_row_push(ctx, 0.05f);
                     if(NK_EDIT_COMMITED &
                             nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER,
-                                        bpe->string_device[1], &bpe->string_device_len[1], 2, nk_filter_decimal)) {
+                                           bpe->string_device[1], &bpe->string_device_len[1], 2, nk_filter_decimal)) {
                         if(!bpe->string_device_len[1]) {
                             bpe->string_device_len[1] = 1;
                         }
@@ -331,7 +342,7 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
                     nk_layout_row_push(ctx, 0.5f);
                     if(NK_EDIT_COMMITED &
                             nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER,
-                                        bpe->string_type, &bpe->string_type_len, 128, nk_filter_ascii)) {
+                                           bpe->string_type, &bpe->string_type_len, 128, nk_filter_ascii)) {
                         bpe->string_type[bpe->string_type_len] = '\0';
                         ctx->current->edit.active = 0;
                     }
@@ -343,12 +354,14 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
         }
         nk_layout_row_end(ctx);
         ctx->current->edit.mode = NK_TEXT_EDIT_MODE_REPLACE;
-        nk_layout_row_dynamic(ctx, 4, 2); {
+        nk_layout_row_dynamic(ctx, 4, 2);
+        {
             nk_spacer(ctx);
         }
 
         // 2) Cancel / Apply buttons
-        nk_layout_row_dynamic(ctx, 24, 2); {
+        nk_layout_row_dynamic(ctx, 24, 2);
+        {
             // 1)
             if(nk_button_label(ctx, "Cancel")) {
                 // Ignore all edits, retain original
@@ -419,7 +432,8 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
 
     // Set the draw-space to where the combo box wants to be drawn
     // And draw the combo-box last, so the drop down draws over everything "below" it as well.
-    nk_layout_space_begin(ctx, NK_STATIC, bpe->combo_rect.h, 1); {
+    nk_layout_space_begin(ctx, NK_STATIC, bpe->combo_rect.h, 1);
+    {
         struct nk_rect local = nk_layout_space_rect_to_local(ctx, bpe->combo_rect);
         nk_layout_space_push(ctx, local);
         // Enable/disable based on BP type
@@ -428,7 +442,8 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
         }
         // The combo box itself (tuned to just fit inside the window)
         if(nk_combo_begin_label(ctx, str_actions[bpe->bp_under_edit.action], nk_vec2(bpe->combo_rect.w, -2 + 4 * 25))) {
-            nk_layout_row_dynamic(ctx, 20, 1); {
+            nk_layout_row_dynamic(ctx, 20, 1);
+            {
                 nk_bool selected = bpe->bp_under_edit.action;
                 for(int i = 0; i < num_actions; ++i) {
                     if(nk_selectable_label(ctx, str_actions[i], NK_TEXT_LEFT, &selected)) {
@@ -473,13 +488,14 @@ int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
     if(nk_begin(ctx, "File Browser", nk_rect(0, 0, 600, 600),
                 NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER | NK_WINDOW_MOVABLE)) {
         // 1) Row with Path
-        nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 2); {
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 2);
+        {
             nk_layout_row_push(ctx, 0.10f);
             nk_label(ctx, "Path", NK_TEXT_LEFT);
             nk_layout_row_push(ctx, 0.90f);
             if(NK_EDIT_COMMITED &
                     nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, fb->dir_selected.name,
-                                &fb->dir_selected.name_length, PATH_MAX - 1, nk_filter_default)) {
+                                   &fb->dir_selected.name_length, PATH_MAX - 1, nk_filter_default)) {
                 UTIL_FILE file;
                 memset(&file, 0, sizeof(file));
                 fb->dir_selected.name[fb->dir_selected.name_length] = '\0';
@@ -504,13 +520,15 @@ int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
         nk_layout_row_end(ctx);
 
         // 2) Dir/File list
-        nk_layout_row_dynamic(ctx, 400, 1); {
+        nk_layout_row_dynamic(ctx, 400, 1);
+        {
             if(nk_group_begin(ctx, "files group", NK_WINDOW_BORDER)) {
                 for(int i = 0; i < fb->dir_contents.items; i++) {
                     FILE_INFO *fi = ARRAY_GET(&fb->dir_contents, FILE_INFO, i);
 
                     // A) The row with the file/dir name details
-                    nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 3); {
+                    nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 3);
+                    {
                         nk_layout_row_push(ctx, 0.8f);
                         if(nk_select_label(ctx, fi->name, NK_TEXT_ALIGN_LEFT, 0)) {
                             if(!fi->is_directory) {
@@ -537,7 +555,8 @@ int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
         }
 
         // 3) Cancel button
-        nk_layout_row_dynamic(ctx, 20, 1); {
+        nk_layout_row_dynamic(ctx, 20, 1);
+        {
             if(nk_button_label(ctx, "Cancel")) {
                 ret = 0;
             }
@@ -564,7 +583,8 @@ int unk_dlg_find(struct nk_context *ctx, struct nk_rect r, uint8_t *data, int *d
         int edit_state = NK_EDIT_INACTIVE;
 
         // 1) Search mode (string/hex/case)
-        nk_layout_row_dynamic(ctx, 20, 3); {
+        nk_layout_row_dynamic(ctx, 20, 3);
+        {
             find_mode_setting = nk_option_label(ctx, "String", (find_mode & 1)) ? (find_mode & ~2) | 1 : find_mode;
             find_mode_setting = nk_option_label(ctx, "Hex", find_mode_setting & 2) ? ((find_mode & ~1) | 2) : find_mode_setting;
             int find_case_setting = nk_option_label_disabled(ctx, "Ignore Case", find_mode_setting & 4, !(find_mode_setting & 1));
@@ -580,12 +600,13 @@ int unk_dlg_find(struct nk_context *ctx, struct nk_rect r, uint8_t *data, int *d
         }
 
         // 2) Serach string edit box and label
-        nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 2); {
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 2);
+        {
             nk_layout_row_push(ctx, 0.20f);
             nk_label(ctx, (find_mode & 1) ? "String" : "HEX", NK_TEXT_CENTERED);
             nk_layout_row_push(ctx, 0.80f);
             edit_state = nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, (char *)data, data_length, max_len,
-                                            (find_mode & 1) ? nk_filter_default : nk_filter_hex);
+                                        (find_mode & 1) ? nk_filter_default : nk_filter_hex);
         }
         nk_layout_row_end(ctx);
         if(!ctx->active->edit.active) {
@@ -594,7 +615,8 @@ int unk_dlg_find(struct nk_context *ctx, struct nk_rect r, uint8_t *data, int *d
         }
 
         // 3) OK / Cancel buttons
-        nk_layout_row_dynamic(ctx, 28, 2); {
+        nk_layout_row_dynamic(ctx, 28, 2);
+        {
             if(edit_state & NK_EDIT_COMMITED || nk_button_label(ctx, "OK")) {
                 if((find_mode & 2) && *data_length & 1) {
                     error_status = 1;
@@ -610,7 +632,8 @@ int unk_dlg_find(struct nk_context *ctx, struct nk_rect r, uint8_t *data, int *d
         }
 
         // 4) Status message
-        nk_layout_row_dynamic(ctx, 28, 2); {
+        nk_layout_row_dynamic(ctx, 28, 2);
+        {
             nk_label(ctx, error_status ? "Uneven # of hex digits" : "Okay", NK_TEXT_ALIGN_LEFT);
         }
     }
@@ -629,7 +652,8 @@ int unk_dlg_symbol_lookup(struct nk_context *ctx, struct nk_rect r, DYNARRAY *sy
         int edit_state = NK_EDIT_INACTIVE;
 
         // 1) Symbol to serach for edit box
-        nk_layout_row_dynamic(ctx, 28, 2); {
+        nk_layout_row_dynamic(ctx, 28, 2);
+        {
             nk_label(ctx, "Symbol Serach:", NK_TEXT_CENTERED);
             edit_state = nk_edit_string(ctx, NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, name, name_length, 256, 0);
             if(!ctx->active->edit.active) {
@@ -639,7 +663,8 @@ int unk_dlg_symbol_lookup(struct nk_context *ctx, struct nk_rect r, DYNARRAY *sy
         }
 
         // Symbols that match seach criteria
-        nk_layout_row_dynamic(ctx, r.h - 85, 1); {
+        nk_layout_row_dynamic(ctx, r.h - 85, 1);
+        {
             if(nk_group_begin(ctx, "symbols group", NK_WINDOW_BORDER)) {
                 int i;
                 for(i = 0; i < symbols_search->items; i++) {
@@ -651,7 +676,8 @@ int unk_dlg_symbol_lookup(struct nk_context *ctx, struct nk_rect r, DYNARRAY *sy
                         }
                     }
                     if(insert) {
-                        nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 3); {
+                        nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 3);
+                        {
                             nk_layout_row_push(ctx, 0.64f);
                             if(nk_select_label(ctx, s->symbol_name, NK_TEXT_ALIGN_LEFT, 0)) {
                                 *pc = s->pc;
@@ -670,7 +696,8 @@ int unk_dlg_symbol_lookup(struct nk_context *ctx, struct nk_rect r, DYNARRAY *sy
         }
 
         // 3) OK / Cancel buttons
-        nk_layout_row_dynamic(ctx, 28, 2); {
+        nk_layout_row_dynamic(ctx, 28, 2);
+        {
             if(edit_state & NK_EDIT_COMMITED || nk_button_label(ctx, "OK")) {
                 nk_popup_close(ctx);
                 ret = 2;

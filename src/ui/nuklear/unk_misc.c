@@ -79,14 +79,16 @@ void unk_misc_show(UNK *v) {
                 }
 
                 // A) Start the row for the slot details
-                nk_layout_row_dynamic(ctx, 13, 1); {
+                nk_layout_row_dynamic(ctx, 13, 1);
+                {
                     if(m->slot_cards[i].slot_type == SLOT_TYPE_SMARTPORT) {
                         SP_DEVICE *spd = m->sp_device;
                         nk_labelf(ctx, NK_TEXT_LEFT, "Slot %d: SmartPort", i);
                         for(int j = 0; j < 2; j++) {
 
                             // A1) The smartport details
-                            nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 5); {
+                            nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 5);
+                            {
                                 nk_layout_row_push(ctx, 0.08f);
                                 if(!j) {
                                     char label[4];
@@ -127,7 +129,8 @@ void unk_misc_show(UNK *v) {
                         for(int j = 0; j < 2; j++) {
 
                             // A2) The DiskII Details
-                            nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 5); {
+                            nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 5);
+                            {
                                 float w = 1.0f - 0.08f;
                                 nk_layout_row_push(ctx, 0.08f);
                                 if(!j) {
@@ -196,9 +199,10 @@ void unk_misc_show(UNK *v) {
             // Change the vertical to 0 for a more compact display
             nk_style_push_vec2(ctx, &ctx->style.window.group_padding, nk_vec2(2, 0));
             nk_style_push_vec2(ctx, &ctx->style.window.spacing, nk_vec2(2, 0));
-            
+
             // A) Headers for status and callstack
-            nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 2); {
+            nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 2);
+            {
                 nk_layout_row_push(ctx, 0.40f);
                 nk_label(ctx, "Debug Status", NK_TEXT_LEFT);
                 nk_layout_row_push(ctx, 0.59999f);
@@ -207,12 +211,14 @@ void unk_misc_show(UNK *v) {
             nk_layout_row_end(ctx);
 
             // B) The status and callstack "columns"
-            nk_layout_row_begin(ctx, NK_DYNAMIC, 90, 2); {
+            nk_layout_row_begin(ctx, NK_DYNAMIC, 90, 2);
+            {
                 // B1) Left Col - run status
                 nk_layout_row_push(ctx, 0.40f);
                 if(nk_group_begin(ctx, "run status", NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_BORDER)) {
                     // Run to PC
-                    nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 2); {
+                    nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 2);
+                    {
                         nk_layout_row_push(ctx, 0.49f);
                         nk_option_label(ctx, "Run to PC", rt->run_to_pc);
                         nk_layout_row_push(ctx, 0.49f);
@@ -221,18 +227,21 @@ void unk_misc_show(UNK *v) {
                     nk_layout_row_end(ctx);
 
                     // Step Out
-                    nk_layout_row_dynamic(ctx, 18, 1); {
+                    nk_layout_row_dynamic(ctx, 18, 1);
+                    {
                         nk_option_label(ctx, "Step Out", rt->run_step_out);
                     }
 
                     // Step Cycles
-                    nk_layout_row_dynamic(ctx, 28, 2); {
+                    nk_layout_row_dynamic(ctx, 28, 2);
+                    {
                         nk_label(ctx, "Step Cycles", NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_BOTTOM);
                         nk_labelf(ctx, NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_BOTTOM, "%"PRIu64, m->cpu.cycles - rt->prev_stop_cycles);
                     }
 
                     // Total Cycles
-                    nk_layout_row_dynamic(ctx, 18, 2); {
+                    nk_layout_row_dynamic(ctx, 18, 2);
+                    {
                         nk_label(ctx, "Total Cycles", NK_TEXT_LEFT);
                         nk_labelf(ctx, NK_TEXT_LEFT, "%"PRIu64, m->cpu.cycles);
                     }
@@ -243,7 +252,7 @@ void unk_misc_show(UNK *v) {
                 nk_layout_row_push(ctx, 0.59999f);
                 // Count entries to see if a scrollbar will show up
                 // if not, then use the NK_WINDOW_NO_SCROLLBAR flag so that scroll
-                // events go to the parent and scroll the panel - otherwise the 
+                // events go to the parent and scroll the panel - otherwise the
                 // panel scroll stops as soon as this thing is hovered and it's
                 // both confusing and frustrating
                 int count = 0;
@@ -264,13 +273,14 @@ void unk_misc_show(UNK *v) {
 
                 if(nk_group_begin(ctx, "callstack group", flags)) {
                     char callstack_display[256];
-                            
+
                     address = m->cpu.sp + 1;
                     while(address < 0x1ff) {
                         uint16_t stack_addr = read_from_memory_debug_16(m, address);
                         if(stack_addr >= 2 && read_from_memory_debug(m, stack_addr - 2) == 0x20) {
                             // B2a) The row with a call stack entry in 2 cols
-                            nk_layout_row_begin(ctx, NK_DYNAMIC, 15, 2); {
+                            nk_layout_row_begin(ctx, NK_DYNAMIC, 15, 2);
+                            {
                                 // uint16_t dest_addr = read_from_memory_debug(m, stack_addr - 1) + read_from_memory_debug(m, stack_addr) * 256;
                                 uint16_t dest_addr = read_from_memory_debug_16(m, stack_addr - 1);
                                 char *symbol = rt_sym_find_symbols(rt, dest_addr);
@@ -302,38 +312,43 @@ void unk_misc_show(UNK *v) {
                         } else {
                             address++;
                         }
-                    }                    
+                    }
                     nk_group_end(ctx); // callstack group
                 }
             }
             nk_style_pop_vec2(ctx);
             nk_style_pop_vec2(ctx);
-            nk_layout_row_dynamic(ctx, 4, 1); {
+            nk_layout_row_dynamic(ctx, 4, 1);
+            {
                 nk_spacer(ctx);
             }
 
             // C) Breakpoints
-            nk_layout_row_dynamic(ctx, 18, 1); {
+            nk_layout_row_dynamic(ctx, 18, 1);
+            {
                 nk_label(ctx, "Breakpoints", NK_TEXT_LEFT);
             }
 
             if(rt->breakpoints.items) {
-                nk_layout_row_dynamic(ctx, 12 + (4 + 25) * rt->breakpoints.items, 1); {
+                nk_layout_row_dynamic(ctx, 12 + (4 + 25) * rt->breakpoints.items, 1);
+                {
                     if(nk_group_begin(ctx, "bp group", NK_WINDOW_BORDER | NK_WINDOW_NO_SCROLLBAR)) {
                         // Create 2 columns, 1 for the breakpoints and one for a possible "clear all" button
-                        nk_layout_row_begin(ctx, NK_DYNAMIC, (4 + 25) * rt->breakpoints.items, 2); {
+                        nk_layout_row_begin(ctx, NK_DYNAMIC, (4 + 25) * rt->breakpoints.items, 2);
+                        {
                             // C1) Create a group to hold all the breakpoints
                             nk_layout_row_push(ctx, 0.80f);
                             if(nk_group_begin(ctx, "bp group", NK_WINDOW_NO_SCROLLBAR)) {
                                 for(int i = 0; i < rt->breakpoints.items; i++) {
                                     char label[32];
                                     BREAKPOINT *bp = ARRAY_GET(&rt->breakpoints, BREAKPOINT, i);
-                                    nk_layout_row_begin(ctx, NK_DYNAMIC, 25, 5); {
+                                    nk_layout_row_begin(ctx, NK_DYNAMIC, 25, 5);
+                                    {
                                         nk_layout_row_push(ctx, 0.399f);
                                         if(bp->break_on_exec) {
                                             if(bp->use_counter) {
                                                 nk_labelf(ctx, NK_TEXT_CENTERED, "%04X (%d/%d)", bp->address,
-                                                        bp->counter_count, bp->counter_stop_value);
+                                                          bp->counter_count, bp->counter_stop_value);
                                             } else if(bp->action) {
                                                 switch(bp->action) {
                                                     case ACTION_FAST:
@@ -369,23 +384,22 @@ void unk_misc_show(UNK *v) {
                                             if(bp->use_range) {
                                                 if(bp->use_counter) {
                                                     nk_labelf(ctx, NK_TEXT_LEFT, "%s[%04X-%04X] (%d/%d)", access_mode[access],
-                                                            bp->address, bp->address_range_end, bp->counter_count, bp->counter_stop_value);
+                                                              bp->address, bp->address_range_end, bp->counter_count, bp->counter_stop_value);
                                                 } else {
                                                     nk_labelf(ctx, NK_TEXT_CENTERED, "%s[%04X-%04X]", access_mode[access],
-                                                            bp->address, bp->address_range_end);
+                                                              bp->address, bp->address_range_end);
                                                 }
                                             } else {
                                                 if(bp->use_counter) {
                                                     nk_labelf(ctx, NK_TEXT_CENTERED, "%s[%04X] (%d/%d)", access_mode[access],
-                                                            bp->address, bp->counter_count, bp->counter_stop_value);
+                                                              bp->address, bp->counter_count, bp->counter_stop_value);
                                                 } else {
                                                     nk_labelf(ctx, NK_TEXT_CENTERED, "%s[%04X]", access_mode[access],
-                                                            bp->address);
+                                                              bp->address);
                                                 }
                                             }
                                         }
-                                        
-                                        // 
+
                                         nk_layout_row_push(ctx, 0.15f);
                                         if(nk_button_label(ctx, "Edit")) {
                                             bpe->bp_original = bp;
@@ -401,8 +415,7 @@ void unk_misc_show(UNK *v) {
                                             // selects Cancel as well.
                                             ctx->input.mouse.buttons->down = 0;
                                         }
-                                        
-                                        //
+
                                         nk_layout_row_push(ctx, 0.15f);
                                         if(nk_button_label(ctx, bp->disabled ? "Enable" : "Disable")) {
                                             bp->disabled ^= 1;
@@ -414,7 +427,6 @@ void unk_misc_show(UNK *v) {
                                             nk_widget_disable_begin(ctx);
                                         }
 
-                                        //
                                         nk_layout_row_push(ctx, 0.15f);
                                         if(nk_button_label(ctx, "View PC")) {
                                             dv->cursor_address = bp->address;
@@ -425,7 +437,6 @@ void unk_misc_show(UNK *v) {
                                             nk_widget_disable_end(ctx);
                                         }
 
-                                        //
                                         nk_layout_row_push(ctx, 0.15f);
                                         if(nk_button_label(ctx, "Clear")) {
                                             // Delete the breakpoint
@@ -441,7 +452,8 @@ void unk_misc_show(UNK *v) {
                             nk_layout_row_push(ctx, 0.19f);
                             if(nk_group_begin(ctx, "clear bp group", NK_WINDOW_NO_SCROLLBAR)) {
                                 if(rt->breakpoints.items >= 2) {
-                                    nk_layout_row_dynamic(ctx, 25, 1); {
+                                    nk_layout_row_dynamic(ctx, 25, 1);
+                                    {
                                         if(nk_button_label(ctx, "Clear All")) {
                                             rt->breakpoints.items = 0;
                                         }
@@ -455,8 +467,9 @@ void unk_misc_show(UNK *v) {
                     }
                 }
             } else {
-                nk_layout_row_dynamic(ctx, 22, 1); {
-                    nk_stroke_rect(&ctx->current->buffer, nk_widget_bounds(ctx), 0.0f, 1.0f, ctx->style.window.border_color );
+                nk_layout_row_dynamic(ctx, 22, 1);
+                {
+                    nk_stroke_rect(&ctx->current->buffer, nk_widget_bounds(ctx), 0.0f, 1.0f, ctx->style.window.border_color);
                     nk_label(ctx, "No breakpoints set", NK_TEXT_LEFT);
                 }
             }
@@ -465,7 +478,8 @@ void unk_misc_show(UNK *v) {
 
         // 3) The soft switches
         if(nk_tree_push(ctx, NK_TREE_TAB, "Soft Switches", NK_MAXIMIZED)) {
-            nk_layout_row_dynamic(ctx, 13, 4); {
+            nk_layout_row_dynamic(ctx, 13, 4);
+            {
                 v->shadow_flags.b.store80set = nk_option_label_disabled(ctx, "C000-80STORE", v->shadow_flags.b.store80set, 1);
                 v->shadow_flags.b.ramrdset   = nk_option_label_disabled(ctx, "C003-RAMRD", v->shadow_flags.b.ramrdset, 1);
                 v->shadow_flags.b.ramwrtset  = nk_option_label_disabled(ctx, "C005-RAMWRT", v->shadow_flags.b.ramwrtset, 1);
@@ -473,11 +487,13 @@ void unk_misc_show(UNK *v) {
                 v->shadow_flags.b.altzpset   = nk_option_label_disabled(ctx, "C009-ALTZP", v->shadow_flags.b.altzpset, 1);
                 v->shadow_flags.b.c3slotrom  = nk_option_label_disabled(ctx, "C00B-C3ROM", v->shadow_flags.b.c3slotrom, 1);
             }
-            nk_layout_row_dynamic(ctx, 13, 1); {
+            nk_layout_row_dynamic(ctx, 13, 1);
+            {
                 nk_spacer(ctx);
                 v->display_override          = nk_option_label(ctx, "Display override", v->display_override);
             }
-            nk_layout_row_dynamic(ctx, 13, 4); {
+            nk_layout_row_dynamic(ctx, 13, 4);
+            {
                 v->shadow_flags.b.col80set   = nk_option_label_disabled(ctx, "C00D-80COL", v->shadow_flags.b.col80set, !v->display_override);
                 v->shadow_flags.b.altcharset = nk_option_label_disabled(ctx, "C00F-ALTCHAR", v->shadow_flags.b.altcharset, !v->display_override);
                 v->shadow_flags.b.text       = nk_option_label_disabled(ctx, "C051-TEXT", v->shadow_flags.b.text, !v->display_override);
@@ -486,11 +502,13 @@ void unk_misc_show(UNK *v) {
                 v->shadow_flags.b.hires      = nk_option_label_disabled(ctx, "C057-HIRES", v->shadow_flags.b.hires, !v->display_override);
                 v->shadow_flags.b.dhires     = nk_option_label_disabled(ctx, "C05E-DHGR", v->shadow_flags.b.dhires, !v->display_override);
             }
-            nk_layout_row_dynamic(ctx, 13, 1); {
+            nk_layout_row_dynamic(ctx, 13, 1);
+            {
                 nk_spacer(ctx);
                 nk_label(ctx, "Language Card", NK_TEXT_LEFT);
             }
-            nk_layout_row_dynamic(ctx, 13, 4); {
+            nk_layout_row_dynamic(ctx, 13, 4);
+            {
                 v->shadow_flags.b.lc_bank2_enable     = nk_option_label_disabled(ctx, "LCBANK2", v->shadow_flags.b.lc_bank2_enable, 1);
                 v->shadow_flags.b.lc_read_ram_enable  = nk_option_label_disabled(ctx, "LCREAD", v->shadow_flags.b.lc_read_ram_enable, 1);
                 v->shadow_flags.b.lc_pre_write        = nk_option_label_disabled(ctx, "LCPREWRITE", v->shadow_flags.b.lc_pre_write, 1);
