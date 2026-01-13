@@ -11,7 +11,7 @@ enum {
 };
 
 typedef enum {
-    ACTION_UNUSED,
+    ACTION_BREAK,
     ACTION_FAST,
     ACTION_RESTORE,
     ACTION_SLOW,
@@ -25,7 +25,7 @@ typedef struct {
     uint32_t    start;     // required
     uint32_t    end;       // = start if no range
     uint32_t    mode;      // default = BREAK_MODE_PC
-    BRKACTION   action;    // default = ACTION_UNUSED
+    BRKACTION   action;    // default = ACTION_BREAK
     int         count;     // optional; 0 if unset
     int         reset;     // optional; 0 if unset
     int         slot;

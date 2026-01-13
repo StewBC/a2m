@@ -162,46 +162,52 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
         nk_layout_row_dynamic(ctx, 22, 4);
         {
             // 1)
-            // nk_layout_row_push(ctx, 0.04f);
             nk_label(ctx, "On access", NK_TEXT_LEFT);
             // 2)
-            // nk_layout_row_push(ctx, 0.15f);
-            if(!nk_check_label(ctx, "Execute", bpe->bp_under_edit.break_on_exec)) {
-            }
+            bpe->bp_under_edit.break_on_exec = nk_check_label(ctx, "Execute", bpe->bp_under_edit.break_on_exec);
             // 3)
-            if(!nk_check_label(ctx, "Read", bpe->bp_under_edit.break_on_read)) {
-                if(!bpe->bp_under_edit.break_on_write) {
-                    bpe->bp_under_edit.break_on_write = 1;
-                }
-                bpe->bp_under_edit.break_on_read = 0;
-            } else {
-                bpe->bp_under_edit.break_on_read = 1;
-            }
+            bpe->bp_under_edit.break_on_read = nk_check_label(ctx, "Read", bpe->bp_under_edit.break_on_read);
             // 4)
-            if(!nk_check_label(ctx, "Write", bpe->bp_under_edit.break_on_write)) {
+            bpe->bp_under_edit.break_on_write = nk_check_label(ctx, "Write", bpe->bp_under_edit.break_on_write);
+            // One has to be true
+            if(!bpe->bp_under_edit.break_on_write && !bpe->bp_under_edit.break_on_read && !bpe->bp_under_edit.break_on_exec) {
+                bpe->bp_under_edit.break_on_exec = 1;
             }
         }
 
         // B) Address range
         nk_layout_row_dynamic(ctx, 22, 4);
         {
+            int value;
             // 1)
-            // nk_layout_row_push(ctx, 0.20f);
             nk_label(ctx, "At address", NK_TEXT_LEFT);
             // 2)
             if(NK_EDIT_COMMITED &
                     nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_address[0],
                                    &bpe->string_address_len[0], 5, nk_filter_hex)) {
-                ctx->current->edit.active = 0;
+                    bpe->string_address[0][bpe->string_address_len[0]] = '\0';
+                    if(1 == sscanf(bpe->string_address[0], "%x", &value) && value >= 0 && value <= 65535) {
+                        bpe->bp_under_edit.address = value;
+                        ctx->current->edit.active = 0;
+                    }
             }
             // 3)
-            if(!nk_check_label(ctx, "Range End", bpe->bp_under_edit.break_on_exec)) {
-            }
+            bpe->bp_under_edit.use_range = nk_check_label(ctx, "Range End", bpe->bp_under_edit.use_range);
             // 4)
+            if(!bpe->bp_under_edit.use_range) {
+                nk_widget_disable_begin(ctx);
+            }
             if(NK_EDIT_COMMITED &
                     nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, bpe->string_address[1],
                                    &bpe->string_address_len[1], 5, nk_filter_hex)) {
-                ctx->current->edit.active = 0;
+                    bpe->string_address[1][bpe->string_address_len[1]] = '\0';
+                    if(1 == sscanf(bpe->string_address[1], "%x", &value) && value >= 0 && value <= 65535 && value >= bpe->bp_under_edit.address) {
+                        bpe->bp_under_edit.address_range_end = value;
+                        ctx->current->edit.active = 0;
+                    }
+            }
+            if(!bpe->bp_under_edit.use_range) {
+                nk_widget_disable_end(ctx);
             }
         }
 
@@ -242,7 +248,6 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
                 }
             }
         }
-        // nk_layout_row_end(ctx);
 
         // D) Counters
         nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 5);
@@ -282,9 +287,6 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
         // E) Actions
         nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 6);
         {
-            if(!bpe->bp_under_edit.break_on_exec) {
-                nk_widget_disable_begin(ctx);
-            }
             // 1)
             nk_layout_row_push(ctx, 0.25f);
             nk_text(ctx, "Action", 6, NK_TEXT_ALIGN_MIDDLE);
@@ -294,7 +296,7 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
             bpe->combo_rect = nk_widget_bounds(ctx);
             nk_spacer(ctx);
             switch(bpe->bp_under_edit.action) {
-                case ACTION_UNUSED:
+                case ACTION_BREAK:
                 case ACTION_FAST:
                 case ACTION_RESTORE:
                 case ACTION_SLOW:
@@ -348,9 +350,6 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
                     }
                     break;
             }
-            if(!bpe->bp_under_edit.break_on_exec) {
-                nk_widget_disable_end(ctx);
-            }
         }
         nk_layout_row_end(ctx);
         ctx->current->edit.mode = NK_TEXT_EDIT_MODE_REPLACE;
@@ -372,8 +371,7 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
                 int value;
                 // Validate that the options make sense
                 ctx->current->edit.active = 0;
-                // Reset the count
-                bpe->bp_under_edit.counter_count = 0;
+
                 // Address
                 bpe->string_address[0][bpe->string_address_len[0]] = '\0';
                 if(1 == sscanf(bpe->string_address[0], "%x", &value) && value >= 0 && value <= 65535) {
@@ -384,7 +382,7 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
                 if(bpe->bp_under_edit.use_range) {
                     // Range Address
                     bpe->string_address[1][bpe->string_address_len[1]] = '\0';
-                    if(1 == sscanf(bpe->string_address[1], "%x", &value) && value >= 0 && value <= 65535) {
+                    if(1 == sscanf(bpe->string_address[1], "%x", &value) && value >= 0 && value <= 65535 && value >= bpe->bp_under_edit.address) {
                         bpe->bp_under_edit.address_range_end = value;
                     } else {
                         ctx->current->edit.active = 1;
@@ -392,8 +390,14 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
                 } else {
                     bpe->bp_under_edit.address_range_end = bpe->bp_under_edit.address;
                 }
+
                 // Set the access rights
-                bpe->bp_under_edit.access_mask = ((bpe->bp_under_edit.break_on_read ? 2 : 0) + (bpe->bp_under_edit.break_on_write ? 4 : 0));
+                bpe->bp_under_edit.access_mask = bpe->bp_under_edit.break_on_exec ? WATCH_EXEC_BREAKPOINT : 0;
+                bpe->bp_under_edit.access_mask |= bpe->bp_under_edit.break_on_read ? WATCH_READ_BREAKPOINT : 0;
+                bpe->bp_under_edit.access_mask |= bpe->bp_under_edit.break_on_write ? WATCH_WRITE_BREAKPOINT : 0;
+
+                // Set the counters (start by resetting an active count)
+                bpe->bp_under_edit.counter_count = 0;
                 if(bpe->bp_under_edit.use_counter) {
                     // Counter stop
                     bpe->string_counter[0][bpe->string_counter_len[0]] = '\0';
@@ -410,18 +414,16 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
                         ctx->current->edit.active = 1;
                     }
                 }
-                if(bpe->bp_under_edit.break_on_exec) {
-                    if(ACTION_SWAP == bpe->bp_under_edit.action) {
-                        bpe->string_device_len[0] = bpe->string_device_len[1] = 1;
-                        bpe->string_device[0][1] = '\0';
-                        bpe->string_device[1][1] = '\0';
-                        bpe->bp_under_edit.slot = strtol(bpe->string_device[0], NULL, 10);
-                        bpe->bp_under_edit.device = strtol(bpe->string_device[1], NULL, 10);
-                    } else if(ACTION_TYPE == bpe->bp_under_edit.action) {
-                        bpe->string_type[bpe->string_type_len] = '\0';
-                    }
-                } else {
-                    bpe->bp_under_edit.action = ACTION_UNUSED;
+
+                // Some ACTIONS require more processing
+                if(ACTION_SWAP == bpe->bp_under_edit.action) {
+                    bpe->string_device_len[0] = bpe->string_device_len[1] = 1;
+                    bpe->string_device[0][1] = '\0';
+                    bpe->string_device[1][1] = '\0';
+                    bpe->bp_under_edit.slot = strtol(bpe->string_device[0], NULL, 10);
+                    bpe->bp_under_edit.device = strtol(bpe->string_device[1], NULL, 10);
+                } else if(ACTION_TYPE == bpe->bp_under_edit.action) {
+                    bpe->string_type[bpe->string_type_len] = '\0';
                 }
                 if(!ctx->current->edit.active) {
                     ret = 1;
@@ -436,10 +438,6 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
     {
         struct nk_rect local = nk_layout_space_rect_to_local(ctx, bpe->combo_rect);
         nk_layout_space_push(ctx, local);
-        // Enable/disable based on BP type
-        if(!bpe->bp_under_edit.break_on_exec) {
-            nk_widget_disable_begin(ctx);
-        }
         // The combo box itself (tuned to just fit inside the window)
         if(nk_combo_begin_label(ctx, str_actions[bpe->bp_under_edit.action], nk_vec2(bpe->combo_rect.w, -2 + 4 * 25))) {
             nk_layout_row_dynamic(ctx, 20, 1);
@@ -454,9 +452,6 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
                 }
             }
             nk_combo_end(ctx);
-        }
-        if(!bpe->bp_under_edit.break_on_exec) {
-            nk_widget_disable_end(ctx);
         }
     }
     nk_layout_space_end(ctx);

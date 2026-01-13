@@ -5,7 +5,7 @@
 #include "unk_lib.h"
 
 // Display variables
-static const char *access_mode[3] = { "R", "W", "RW" };
+// static const char *access_mode[3] = { "E", "R", "W" };
 
 // Calculate the rect where the scrollbar lives
 static struct nk_rect nk_window_vscroll_rect(struct nk_context *ctx) {
@@ -330,75 +330,78 @@ void unk_misc_show(UNK *v) {
             }
 
             if(rt->breakpoints.items) {
-                nk_layout_row_dynamic(ctx, 12 + (4 + 25) * rt->breakpoints.items, 1);
+                nk_layout_row_dynamic(ctx, 12 + (4 + 28) * rt->breakpoints.items, 1);
                 {
                     if(nk_group_begin(ctx, "bp group", NK_WINDOW_BORDER | NK_WINDOW_NO_SCROLLBAR)) {
                         // Create 2 columns, 1 for the breakpoints and one for a possible "clear all" button
-                        nk_layout_row_begin(ctx, NK_DYNAMIC, (4 + 25) * rt->breakpoints.items, 2);
+                        nk_layout_row_begin(ctx, NK_DYNAMIC, (4 + 28) * rt->breakpoints.items, 2);
                         {
                             // C1) Create a group to hold all the breakpoints
                             nk_layout_row_push(ctx, 0.80f);
                             if(nk_group_begin(ctx, "bp group", NK_WINDOW_NO_SCROLLBAR)) {
                                 for(int i = 0; i < rt->breakpoints.items; i++) {
-                                    char label[32];
+                                    char label[64];
+                                    int index = 0;
                                     BREAKPOINT *bp = ARRAY_GET(&rt->breakpoints, BREAKPOINT, i);
-                                    nk_layout_row_begin(ctx, NK_DYNAMIC, 25, 5);
+                                    
+                                    // Prepare the breakpoint string
+                                    if(bp->access_mask & WATCH_EXEC_BREAKPOINT) {
+                                        label[index++] = 'X';
+                                    }
+                                    if(bp->access_mask & WATCH_READ_BREAKPOINT) {
+                                        label[index++] = 'R';
+                                    }
+                                    if(bp->access_mask & WATCH_WRITE_BREAKPOINT) {
+                                        label[index++] = 'W';
+                                    }
+                                    label[index++] = ' ';
+                                    switch(bp->action) {
+                                        case ACTION_BREAK:
+                                            index += sprintf(&label[index], "Break");
+                                            break;
+                                        case ACTION_FAST:
+                                            index += sprintf(&label[index], "Fast");
+                                            break;
+                                        case ACTION_RESTORE:
+                                            index += sprintf(&label[index], "Restore");
+                                            break;
+                                        case ACTION_SLOW:
+                                            index += sprintf(&label[index], "Slow");
+                                            break;
+                                        case ACTION_SWAP:
+                                            index += sprintf(&label[index], "Swap s%dd%d", bp->slot, bp->device);
+                                            break;
+                                        case ACTION_TROFF:
+                                            index += sprintf(&label[index], "Troff");
+                                            break;
+                                        case ACTION_TRON:
+                                            index += sprintf(&label[index], "Tron");
+                                            break;
+                                        case ACTION_TYPE:
+                                            index += sprintf(&label[index], "Type");
+                                            break;
+                                        default:
+                                            // Should never see this
+                                            index += sprintf(&label[index], "Action");
+                                            break;
+                                    }
+                                    index += sprintf(&label[index]," [%04X", bp->address);
+                                    if(bp->use_range) {
+                                        index += sprintf(&label[index], "-%03X", bp->address_range_end);
+                                    }
+                                    label[index++] = ']';
+                                    if(bp->use_counter) {
+                                        index += sprintf(&label[index], " (%d/%d)", bp->counter_count, bp->counter_stop_value);
+                                    } else {
+                                        label[index] = '\0';
+                                    }
+
+                                    // Now show breakpoint
+                                    nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 5);
                                     {
                                         nk_layout_row_push(ctx, 0.399f);
-                                        if(bp->break_on_exec) {
-                                            if(bp->use_counter) {
-                                                nk_labelf(ctx, NK_TEXT_CENTERED, "%04X (%d/%d)", bp->address,
-                                                          bp->counter_count, bp->counter_stop_value);
-                                            } else if(bp->action) {
-                                                switch(bp->action) {
-                                                    case ACTION_FAST:
-                                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Fast", bp->address);
-                                                        break;
-                                                    case ACTION_RESTORE:
-                                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Restore", bp->address);
-                                                        break;
-                                                    case ACTION_SLOW:
-                                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Slow", bp->address);
-                                                        break;
-                                                    case ACTION_SWAP:
-                                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Swap s%dd%d", bp->address, bp->slot, bp->device);
-                                                        break;
-                                                    case ACTION_TROFF:
-                                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Troff", bp->address);
-                                                        break;
-                                                    case ACTION_TRON:
-                                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Tron", bp->address);
-                                                        break;
-                                                    case ACTION_TYPE:
-                                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Type", bp->address);
-                                                        break;
-                                                    default:
-                                                        nk_labelf(ctx, NK_TEXT_CENTERED, "%04X Action", bp->address);
-                                                        break;
-                                                }
-                                            } else {
-                                                nk_labelf(ctx, NK_TEXT_CENTERED, "%04X", bp->address);
-                                            }
-                                        } else {
-                                            int access = (bp->access_mask >> 1) - 1;
-                                            if(bp->use_range) {
-                                                if(bp->use_counter) {
-                                                    nk_labelf(ctx, NK_TEXT_LEFT, "%s[%04X-%04X] (%d/%d)", access_mode[access],
-                                                              bp->address, bp->address_range_end, bp->counter_count, bp->counter_stop_value);
-                                                } else {
-                                                    nk_labelf(ctx, NK_TEXT_CENTERED, "%s[%04X-%04X]", access_mode[access],
-                                                              bp->address, bp->address_range_end);
-                                                }
-                                            } else {
-                                                if(bp->use_counter) {
-                                                    nk_labelf(ctx, NK_TEXT_CENTERED, "%s[%04X] (%d/%d)", access_mode[access],
-                                                              bp->address, bp->counter_count, bp->counter_stop_value);
-                                                } else {
-                                                    nk_labelf(ctx, NK_TEXT_CENTERED, "%s[%04X]", access_mode[access],
-                                                              bp->address);
-                                                }
-                                            }
-                                        }
+                                        // Disabled breakpoints show up purple (they are now bookmarks, really)
+                                        nk_label_colored_wrap(ctx, label, bp->disabled ? nk_rgb(175, 0, 175) : nk_rgb(175, 175, 175));
 
                                         nk_layout_row_push(ctx, 0.15f);
                                         if(nk_button_label(ctx, "Edit")) {
@@ -423,18 +426,12 @@ void unk_misc_show(UNK *v) {
                                                 rt_bp_apply_masks(rt);
                                             }
                                         }
-                                        if(!bp->break_on_exec) {
-                                            nk_widget_disable_begin(ctx);
-                                        }
 
                                         nk_layout_row_push(ctx, 0.15f);
                                         if(nk_button_label(ctx, "View PC")) {
                                             dv->cursor_address = bp->address;
                                             dv->cursor_line = dv->rows / 2;
                                             unk_dasm_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
-                                        }
-                                        if(!bp->break_on_exec) {
-                                            nk_widget_disable_end(ctx);
                                         }
 
                                         nk_layout_row_push(ctx, 0.15f);

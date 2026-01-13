@@ -90,7 +90,7 @@ static int rt_step_okay(RUNTIME *rt) {
         BREAKPOINT *bp = rt_bp_get_at_address(rt, m->cpu.pc, 1);
         if(bp) {
             switch(bp->action) {
-                case ACTION_UNUSED:
+                case ACTION_BREAK:
                     rt_machine_stop(rt);
                     break;
                 case ACTION_FAST:
