@@ -252,7 +252,7 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
     // Keyboard keys directly to emulator
     if(e->type == SDL_TEXTINPUT) {
         // Handle regular text input (letters, symbols, etc.)
-        m->RAM_MAIN[KBD] = 0x80 | e->text.text[0];
+        m->ram.RAM_MAIN[KBD] = 0x80 | e->text.text[0];
     } else if(e->type == SDL_KEYDOWN) {
         SDL_Keymod mod = SDL_GetModState();
 
@@ -276,7 +276,7 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
                         break;
                     default:
                         // CTRL+A = 1, etc.
-                        m->RAM_MAIN[KBD] = 0x80 | (e->key.keysym.sym - 0x60);
+                        m->ram.RAM_MAIN[KBD] = 0x80 | (e->key.keysym.sym - 0x60);
                         break;
                 }
             }
@@ -286,9 +286,9 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
                 case SDLK_BACKSPACE:
                     // SQW
                     if(v->original_del) {                       // Apple ][ key for del
-                        m->RAM_MAIN[KBD] = 0x80 + 127;
+                        m->ram.RAM_MAIN[KBD] = 0x80 + 127;
                     } else {                                    // CRSR left on del
-                        m->RAM_MAIN[KBD] = 0x80 | e->key.keysym.sym;
+                        m->ram.RAM_MAIN[KBD] = 0x80 | e->key.keysym.sym;
                     }
                     break;
 
@@ -297,23 +297,23 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
                 case SDLK_TAB:
                     // SQW - Maybe reactivate?  Kill the paste from the clipboard
 
-                    m->RAM_MAIN[KBD] = 0x80 | e->key.keysym.sym;
+                    m->ram.RAM_MAIN[KBD] = 0x80 | e->key.keysym.sym;
                     break;
 
                 case SDLK_UP:
-                    m->RAM_MAIN[KBD] = 0x8B;                    // UP arrow
+                    m->ram.RAM_MAIN[KBD] = 0x8B;                    // UP arrow
                     break;
 
                 case SDLK_DOWN:
-                    m->RAM_MAIN[KBD] = 0x8A;                    // DOWN arrow
+                    m->ram.RAM_MAIN[KBD] = 0x8A;                    // DOWN arrow
                     break;
 
                 case SDLK_LEFT:
-                    m->RAM_MAIN[KBD] = 0x88;                    // LEFT arrow
+                    m->ram.RAM_MAIN[KBD] = 0x88;                    // LEFT arrow
                     break;
 
                 case SDLK_RIGHT:
-                    m->RAM_MAIN[KBD] = 0x95;                    // RIGHT arrow
+                    m->ram.RAM_MAIN[KBD] = 0x95;                    // RIGHT arrow
                     break;
 
                 case SDLK_INSERT:
@@ -479,8 +479,8 @@ void unk_apl2_screen_dlores(UNK *v, int start, int end) {
 
     for(y = start; y < end; y++) {
         uint32_t *p = &pixels[y * 8 * surface_width];
-        const uint8_t *man = m->RAM_MAIN + 0x00400 + apl2_txt_row_start[y];
-        const uint8_t *aux = m->RAM_MAIN + 0x10400 + apl2_txt_row_start[y];
+        const uint8_t *man = m->ram.RAM_MAIN + 0x00400 + apl2_txt_row_start[y];
+        const uint8_t *aux = m->ram.RAM_MAIN + 0x10400 + apl2_txt_row_start[y];
 
         for(int col = 0; col < 80; col++) {
             int r;
@@ -519,8 +519,8 @@ void unk_apl2_screen_dlores_mono(UNK *v, int start, int end) {
 
     for(y = start; y < end; y++) {
         uint32_t *p = &pixels[y * 8 * surface_width];
-        const uint8_t *man = m->RAM_MAIN + 0x00400 + apl2_txt_row_start[y];
-        const uint8_t *aux = m->RAM_MAIN + 0x10400 + apl2_txt_row_start[y];
+        const uint8_t *man = m->ram.RAM_MAIN + 0x00400 + apl2_txt_row_start[y];
+        const uint8_t *aux = m->ram.RAM_MAIN + 0x10400 + apl2_txt_row_start[y];
 
         for(int col = 0; col < 80; col++) {
             int r;
@@ -573,7 +573,7 @@ void unk_apl2_screen_lores(UNK *v, int start, int end) {
         for(int x = 0; x < 40; x++) {
             int r;
             // Get the byte on screen
-            uint8_t character = m->RAM_MAIN[address + x];
+            uint8_t character = m->ram.RAM_MAIN[address + x];
             uint8_t upper = character & 0x0f;
             uint8_t lower = (character >> 4) & 0X0F;
             uint32_t *pr = p;
@@ -608,7 +608,7 @@ void unk_apl2_screen_lores_mono(UNK *v, int start, int end) {
         for(int x = 0; x < 40; x++) {
             int r;
             // Get the byte on screen
-            uint8_t character = m->RAM_MAIN[address + x];
+            uint8_t character = m->ram.RAM_MAIN[address + x];
             uint8_t upper = character & 0x0f;
             uint8_t lower = (character >> 4) & 0X0F;
             uint32_t *pr = p;
@@ -715,8 +715,8 @@ void unk_apl2_screen_dhgr(UNK *v, int start, int end) {
     for(int y = start; y < end; y++) {
         uint32_t *p = &pixels[y * surface->w];
 
-        const uint8_t *aux = m->RAM_MAIN + page + hgr_row_start[y] + 0x10000;
-        const uint8_t *man = m->RAM_MAIN + page + hgr_row_start[y];
+        const uint8_t *aux = m->ram.RAM_MAIN + page + hgr_row_start[y] + 0x10000;
+        const uint8_t *man = m->ram.RAM_MAIN + page + hgr_row_start[y];
         float row_560[560];
         int index = 0;
         for(int col = 0; col < 40; col += 2) {
@@ -812,13 +812,13 @@ void unk_apl2_screen_hgr(UNK *v, int start, int end) {
         uint32_t *p = &pixels[y * surface_width];
         int px = 0;
         uint16_t address = page + hgr_row_start[y];
-        uint8_t byte = m->RAM_MAIN[address];
+        uint8_t byte = m->ram.RAM_MAIN[address];
 
         int bit_column = 0;                 // start of scanline
         int prev_bit = 0;                   // first column "left neighbor" is 0
 
         for(int col = 0; col < 40; ++col) {
-            uint8_t next_byte = (col + 1 < 40) ? m->RAM_MAIN[address + col + 1] : 0;
+            uint8_t next_byte = (col + 1 < 40) ? m->ram.RAM_MAIN[address + col + 1] : 0;
             int next_lsb = next_byte & 1;
             int phase   = (byte >> 7) & 1;
 
@@ -858,7 +858,7 @@ void unk_apl2_screen_hgr_mono(UNK *v, int start, int end) {
         int address = page + hgr_row_start[y];
 
         // Loop through every column (40 iterations for each 280-pixel row)
-        uint8_t *bytes = &m->RAM_MAIN[address];
+        uint8_t *bytes = &m->ram.RAM_MAIN[address];
         for(int x = 0; x < 40; x++) {
             const HGRLUTENTRY *e = &hgr_mono_lut[*bytes++ & 0x7F];
             p[0] = e->pixel[0];
@@ -896,7 +896,7 @@ void unk_apl2_screen_txt40(UNK *v, int start, int end) {
         for(int x = 0; x < 40; x++) {
             int r;
             uint8_t inv = 0x00;
-            uint8_t character = m->RAM_MAIN[address + x];   // Get the character on screen
+            uint8_t character = m->ram.RAM_MAIN[address + x];   // Get the character on screen
             if(character < 0x80) {
                 if(character >= 0x40) {
                     if(!alt_charset) {
@@ -946,7 +946,7 @@ void unk_apl2_screen_txt80(UNK *v, int start, int end) {
             int r;
             uint8_t inv = 0x00;
             int char_in_bank = (x & 1) ? (x >> 1) : (x >> 1) + 0x10000;
-            uint8_t character = m->RAM_MAIN[address + char_in_bank];   // Get the character on screen
+            uint8_t character = m->ram.RAM_MAIN[address + char_in_bank];   // Get the character on screen
             if(character < 0x80) {
                 if(character >= 0x40) {
                     if(!alt_charset) {

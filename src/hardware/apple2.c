@@ -90,7 +90,7 @@ static void apple2_slot_setup(APPLE2 *m, INI_STORE *ini_store) {
                     if(A2_OK == franklin_display_init(&m->franklin_display)) {
                         slot_add_card(m, slot, SLOT_TYPE_VIDEX_API, &m->franklin_display,
                                       &m->roms.blocks[ROM_FRANKLIN_ACE_DISPLAY].bytes[0x600], franklin_display_map_cx_rom);
-                        memset(m->RAM_WATCH + 0xCC00, 1, 0x200);
+                        memset(m->ram.RAM_WATCH + 0xCC00, 1, 0x200);
                         m->franklin80installed = 1;
                     }
                 }
@@ -132,90 +132,77 @@ int apple2_init(APPLE2 *m, INI_STORE *ini_store) {
     apple2_cofig_from_ini(m, ini_store);
 
     // Allocate the RAM
-    m->RAM_MAIN = (uint8_t *) malloc(m->ram_size);
-    // Allocate the WATCH RAM (for breakpoints and IO callbacks)
-    m->RAM_WATCH = (uint8_t *) malloc(m->ram_size);
-    m->RAM_LAST_WRITE = (uint64_t *) malloc(64 * 1024 * sizeof(uint64_t));
-    if(!m->RAM_MAIN || !m->RAM_WATCH || !m->RAM_LAST_WRITE) {
-        return A2_ERR;
-    }
-
-    memset(m->RAM_LAST_WRITE, 0, 64 * 1024 * sizeof(uint64_t));
-    // Init RAM to a fixed pattern
-    util_memset32(m->RAM_MAIN, 0x0000ffff, m->ram_size / 4);
-    // And IO area floating bus is a lot of 160's
-    memset(&m->RAM_MAIN[0xC001], 0xA0, 0x0FFE);
-    if(m->ram_size >= 0x1D000) {
-        memset(&m->RAM_MAIN[0x10000 + 0xC001], 0xA0, 0x0FFE);
-    }
-
+    m->ram.RAM_MAIN = (uint8_t *) malloc(m->ram_size);
+    m->ram.RAM_WATCH = (uint8_t *) malloc(m->ram_size);
+    m->ram.RAM_LAST_WRITE = (uint64_t *) malloc(m->ram_size * sizeof(uint64_t));
     // The language_card has 16 KB.  It is set up as
     // 4K ($0000 - $0FFF) Bank 1 @ $D000 - $DFFF
     // 4K ($1000 - $1FFF) Bank 2 @ $D000 - $DFFF
     // 8K ($2000 - $3FFF)        @ $E000 - $FFFF
     // That's 16K but 2x for AUX version in IIe (allocated on ][+ as well)
-    m->RAM_LC = (uint8_t *) malloc(32 * 1024);
-    if(!m->RAM_LC) {
+    // Allocate the WATCH RAM (for breakpoints and IO callbacks)
+    m->ram.RAM_LC = (uint8_t *) malloc(32 * 1024 * sizeof(uint8_t));
+    m->ram.RAM_LC_WATCH = (uint8_t *) malloc(32 * 1024 * sizeof(uint8_t));
+    m->ram.RAM_LC_LAST_WRITE = (uint64_t *) malloc(32 * 1024 * sizeof(uint64_t));
+    if(!m->ram.RAM_MAIN || !m->ram.RAM_LC || !m->ram.RAM_WATCH || 
+        !m->ram.RAM_LC_WATCH || !m->ram.RAM_LAST_WRITE || !m->ram.RAM_LC_LAST_WRITE) {
         return A2_ERR;
     }
-    util_memset32(m->RAM_LC, 0x0000ffff, 32 * 1024 / 4);
+    // Init RAM to a fixed pattern
+    util_memset32(m->ram.RAM_MAIN, 0x0000ffff, m->ram_size / 4);
+    util_memset32(m->ram.RAM_LC, 0x0000ffff, 32 * 1024 / 4);
+    // Set last write to all zero's
+    memset(m->ram.RAM_LAST_WRITE, 0, m->ram_size * sizeof(uint64_t));
+    memset(m->ram.RAM_LC_LAST_WRITE, 0, 32 * 1024 * sizeof(uint64_t));
+    // Set the watch to not watching anything
+    memset(m->ram.RAM_WATCH, WATCH_NONE, m->ram_size);
+    memset(m->ram.RAM_LC_WATCH, WATCH_NONE, 32 * 1024 * sizeof(uint8_t));
 
-    // RAM
-    if(!memory_init(&m->ram, m->model ? 2 : 1)) {
-        return A2_ERR;
+    // And IO area floating bus is a lot of 160's
+    memset(&m->ram.RAM_MAIN[0xC001], 0xA0, 0x0FFE);
+    if(m->ram_size >= 0x1D000) {
+        memset(&m->ram.RAM_MAIN[0x10000 + 0xC001], 0xA0, 0x0FFE);
     }
-    memory_add(&m->ram, 0, 0x0000, BANK_SIZE, &m->RAM_MAIN[0]);
-    if(m->model) {
-        memory_add(&m->ram, 1, 0x0000, BANK_SIZE, &m->RAM_MAIN[BANK_SIZE]);
-    }
-    // ROMS
-    if(!memory_init(&m->roms, ROM_NUM_ROMS)) {
+
+    // Populate the ROMs
+    if(A2_OK != rom_init(&m->roms, ROM_NUM_ROMS)) {
         return A2_ERR;
     }
     if(!m->model) {
-        memory_add(&m->roms, ROM_APPLE2, 0xD000, a2p_rom_size, a2p_rom);
-        memory_add(&m->roms, ROM_APPLE2_CHARACTER, 0x0000, a2p_character_rom_size, a2p_character_rom);
+        rom_add(&m->roms, ROM_APPLE2, 0xD000, a2p_rom_size, a2p_rom);
+        rom_add(&m->roms, ROM_APPLE2_CHARACTER, 0x0000, a2p_character_rom_size, a2p_character_rom);
     } else {
-        memory_add(&m->roms, ROM_APPLE2, 0xD000, 0x3000, &a2ee_rom[0X1000]);
-        memory_add(&m->roms, ROM_APPLE2_SLOTS, 0xC000, 0x1000, a2ee_rom);
-        memory_add(&m->roms, ROM_APPLE2_CHARACTER, 0x0000, a2ee_character_rom_size, a2ee_character_rom);
+        rom_add(&m->roms, ROM_APPLE2, 0xD000, 0x3000, &a2ee_rom[0X1000]);
+        rom_add(&m->roms, ROM_APPLE2_SLOTS, 0xC000, 0x1000, a2ee_rom);
+        rom_add(&m->roms, ROM_APPLE2_CHARACTER, 0x0000, a2ee_character_rom_size, a2ee_character_rom);
     }
-    memory_add(&m->roms, ROM_DISKII_13SECTOR, 0xC000, 256, disk2_rom[DSK_ENCODING_13SECTOR]);
-    memory_add(&m->roms, ROM_DISKII_16SECTOR, 0xC000, 256, disk2_rom[DSK_ENCODING_16SECTOR]);
-    memory_add(&m->roms, ROM_SMARTPORT, 0xC000, smartport_rom_size, smartport_rom);
-    memory_add(&m->roms, ROM_FRANKLIN_ACE_DISPLAY, 0x0000, franklin_ace_display_rom_size, franklin_ace_display_rom);
-    memory_add(&m->roms, ROM_FRANKLIN_ACE_CHARACTER, 0x0000, franklin_ace_character_rom_size, franklin_ace_character_rom);
+    rom_add(&m->roms, ROM_DISKII_13SECTOR, 0xC000, 256, disk2_rom[DSK_ENCODING_13SECTOR]);
+    rom_add(&m->roms, ROM_DISKII_16SECTOR, 0xC000, 256, disk2_rom[DSK_ENCODING_16SECTOR]);
+    rom_add(&m->roms, ROM_SMARTPORT, 0xC000, smartport_rom_size, smartport_rom);
+    rom_add(&m->roms, ROM_FRANKLIN_ACE_DISPLAY, 0x0000, franklin_ace_display_rom_size, franklin_ace_display_rom);
+    rom_add(&m->roms, ROM_FRANKLIN_ACE_CHARACTER, 0x0000, franklin_ace_character_rom_size, franklin_ace_character_rom);
 
-    // PAGES
-    if(!pages_init(&m->read_pages, BANK_SIZE / PAGE_SIZE)) {
-        return A2_ERR;
-    }
-    if(!pages_init(&m->write_pages, BANK_SIZE / PAGE_SIZE)) {
-        return A2_ERR;
-    }
-    if(!pages_init(&m->watch_pages, BANK_SIZE / PAGE_SIZE)) {
+    // Create all the pages
+    if(A2_OK != pages_init(&m->pages, BANK_SIZE)) {
         return A2_ERR;
     }
 
     // Map main write ram
-    pages_map(&m->write_pages, 0, BANK_SIZE / PAGE_SIZE, m->ram.blocks[MAIN_RAM].bytes);
-    // Map read ram (same as write ram in this case)
-    pages_map(&m->read_pages, 0, BANK_SIZE / PAGE_SIZE, m->ram.blocks[MAIN_RAM].bytes);
+    pages_map(&m->pages, PAGE_MAP_READ, 0, BANK_SIZE, &m->ram);
+    pages_map(&m->pages, PAGE_MAP_WRITE, 0, BANK_SIZE, &m->ram);
+
     // Map the rom ($D000-$FFFF) as read pages
-    pages_map_memory_block(&m->read_pages, &m->roms.blocks[ROM_APPLE2]);
+    pages_map_rom_block(&m->pages, &m->roms.blocks[ROM_APPLE2], &m->ram);
 
     // Map watch area checks - start with no watch
-    memset(m->RAM_WATCH, WATCH_NONE, BANK_SIZE);
     // Add the IO ports by flagging them as 1 in the RAM watch
-    memset(&m->RAM_WATCH[0xC000], WATCH_IO_PORT, 0xFF);
+    memset(&m->ram.RAM_WATCH[0xC000], WATCH_IO_PORT, 0xFF);
     if(m->model) {
         // On a //e, also watch Slot 3
-        memset(&m->RAM_WATCH[0xC300], WATCH_IO_PORT, 0xFF);
+        memset(&m->ram.RAM_WATCH[0xC300], WATCH_IO_PORT, 0xFF);
     }
     // Watch the location to clear slot rom
-    m->RAM_WATCH[CLRROM] = WATCH_IO_PORT;
-    // Set up the Watch Pages (RAM_WATCH can be changed without re-doing the map)
-    pages_map(&m->watch_pages, 0, BANK_SIZE / PAGE_SIZE, m->RAM_WATCH);
+    m->ram.RAM_WATCH[CLRROM] = WATCH_IO_PORT;
 
     // Set up the Language Card
     language_card_init(m);
@@ -231,7 +218,7 @@ int apple2_init(APPLE2 *m, INI_STORE *ini_store) {
     apple2_slot_setup(m, ini_store);
 
     // Shadow the slot read area for easy restore - this captures maps set by slot_add_card, and outside of slot_add_card
-    memcpy(m->rom_shadow_pages, &m->read_pages.pages[(0xC000 / PAGE_SIZE)], sizeof(uint8_t *) * (0xC800 - 0xC000) / PAGE_SIZE);
+    memcpy(m->rom_shadow_pages, &m->pages.read_pages[(0xC000 / PAGE_SIZE)], sizeof(uint8_t *) * (0xC800 - 0xC000) / PAGE_SIZE);
 
     return A2_OK;
 }
@@ -249,7 +236,7 @@ void apple2_machine_reset(APPLE2 *m) {
     language_card_init(m);
 
     // Clear the screen
-    memset(&m->RAM_MAIN[0x0400], 0xA0, 0x400);
+    memset(&m->ram.RAM_MAIN[0x0400], 0xA0, 0x400);
 
     //e - Set up soft-switches
     if(m->model) {
@@ -274,29 +261,26 @@ void apple2_shutdown(APPLE2 *m) {
         franklin_display_shutdown(&m->franklin_display);
     }
     // pages
-    free(m->read_pages.pages);
-    m->read_pages.pages = NULL;
-    m->read_pages.num_pages = 0;
-    free(m->write_pages.pages);
-    m->write_pages.pages = NULL;
-    m->write_pages.num_pages = 0;
-    free(m->watch_pages.pages);
-    m->watch_pages.pages = NULL;
-    m->watch_pages.num_pages = 0;
-    // memory
-    free(m->ram.blocks);
-    m->ram.blocks = 0;
-    m->ram.num_blocks = 0;
+    free(m->pages.read_pages);
+    m->pages.read_pages = NULL;
+    free(m->pages.write_pages);
+    m->pages.write_pages = NULL;
+    free(m->pages.watch_read_pages);
+    m->pages.watch_read_pages = NULL;
+    free(m->pages.watch_write_pages);
+    m->pages.watch_write_pages = NULL;
+    m->pages.num_pages = 0;
+    // ROMS
     free(m->roms.blocks);
     m->roms.blocks = 0;
     m->roms.num_blocks = 0;
     // RAM
-    free(m->RAM_MAIN);
-    m->RAM_MAIN = NULL;
-    free(m->RAM_WATCH);
-    m->RAM_WATCH = NULL;
-    free(m->RAM_LC);
-    m->RAM_LC = NULL;
-    free(m->RAM_LAST_WRITE);
-    m->RAM_LAST_WRITE = NULL;
+    free(m->ram.RAM_MAIN);
+    m->ram.RAM_MAIN = NULL;
+    free(m->ram.RAM_WATCH);
+    m->ram.RAM_WATCH = NULL;
+    free(m->ram.RAM_LC);
+    m->ram.RAM_LC = NULL;
+    free(m->ram.RAM_LAST_WRITE);
+    m->ram.RAM_LAST_WRITE = NULL;
 }

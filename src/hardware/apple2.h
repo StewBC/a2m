@@ -53,7 +53,7 @@ enum {
 };
 
 // The mask for the bits in the RAM_WATCH array
-enum RAM_WATCH_MASK {
+enum WATCH_MASK {
     WATCH_NONE             = 0,                     // Nothing to watch
     WATCH_IO_PORT          = 1 << 0,                // Call an IO callback function
     WATCH_EXEC_BREAKPOINT  = 1 << 1,                // break on execute
@@ -144,11 +144,8 @@ typedef struct A2OUT_CB {
 typedef struct APPLE2 {
     // Hardware
     CPU cpu;                                                // 6502
-    PAGES read_pages;                                       // Up to 64K of bytes currently visible to CPU when reading
-    PAGES write_pages;                                      // Up to 64K of bytes currently visible to CPU when writing
-    PAGES watch_pages;                                      // Up to 64K of bytes where 0 means this is MEMORY/ROM and 1 means it is a port
-    MEMORY ram;                                             // All MEMORY in the system (may be > 64K but up to 64K) mapped in throug pages
-    MEMORY roms;                                            // All MEMORY in the system, may be mapped into 64K, through read_pages
+    PAGES pages;
+    ROMS roms;                                              // All ROM in the system, may be mapped into 64K, through read_pages
     SLOT_CARDS slot_cards[8];                               // The 8 slots and their status and option ROMs
     DISKII_CONTROLLER diskii_controller[8];                 // Any slot can have a disk ii controller (and drives)
     SP_DEVICE sp_device[8];                                 // All slots could be made smartport
@@ -156,11 +153,8 @@ typedef struct APPLE2 {
     A2OUT_CB a2out_cb;                                      // Apple2->external callbacks
 
     // Base setup
-    uint32_t ram_size;                                      // How much ram this machine has
-    uint8_t *RAM_MAIN;                                      // The ram_size MEMORY - addressable in max 64k chunks
-    uint8_t *RAM_WATCH;                                     // IO "mask" (0 = not watched). See RAM_WATCH_MASK
-    uint8_t *RAM_LC;                                        // 16 KB LC Ram (Always 2*16 for ease with //e)
-    uint64_t *RAM_LAST_WRITE;                               // 64KB of write pointers
+    uint32_t ram_size;
+    RAM ram;                                                // Holds main, aux, lc and helper ram arrays
 
     uint8_t *rom_shadow_pages[(0xC800 - 0xC000) / PAGE_SIZE]; // Slot ram page mappings when SETC?ROM active
     uint8_t mapped_slot;                                    // 0 = not mapped, 1-7 means that slot card is strobe mapped (to C800)

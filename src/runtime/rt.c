@@ -604,7 +604,7 @@ int rt_feed_clipboard_key(RUNTIME *rt) {
                 byte = (uint8_t)toupper(byte); // BASIC-friendly
             }
             // Emit whatever we have (including other control chars unchanged)
-            m->RAM_MAIN[KBD] = byte | 0x80;
+            m->ram.RAM_MAIN[KBD] = byte | 0x80;
             return 1;
         }
 

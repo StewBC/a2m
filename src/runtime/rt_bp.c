@@ -16,7 +16,7 @@ BREAKPOINT *rt_find_breakpoint(RUNTIME *rt, uint16_t address) {
     return NULL;
 }
 
-static inline void rt_breakpoint_exec(RUNTIME *rt, BREAKPOINT *bp) {
+static inline void rt_breakpoint_hit(RUNTIME *rt, BREAKPOINT *bp) {
     APPLE2 *m = rt->m;
 
     if(bp->use_counter) {
@@ -88,7 +88,7 @@ void rt_exec_matching_breakpoint(RUNTIME *rt, uint16_t address) {
             }
         }
 
-        rt_breakpoint_exec(rt, bp);
+        rt_breakpoint_hit(rt, bp);
         return;
     }
 }
@@ -101,7 +101,7 @@ void rt_bp_callback(void *user, uint16_t address, uint8_t mask) {
     // Access triggered breakpoint - find the BP that set this
     for(size_t i = 0; i < items; i++) {
         BREAKPOINT *bp = ARRAY_GET(&rt->breakpoints, BREAKPOINT, i);
-        if(!bp->disabled && bp->access_mask & (WATCH_READ_BREAKPOINT | WATCH_WRITE_BREAKPOINT)) {
+        if(!bp->disabled && bp->access_mask & mask) {
             if(bp->use_range) {
                 if(address < bp->address || address > bp->address_range_end) {
                     // Not in range
@@ -114,7 +114,7 @@ void rt_bp_callback(void *user, uint16_t address, uint8_t mask) {
                 }
             }
 
-            rt_breakpoint_exec(rt, bp);
+            rt_breakpoint_hit(rt, bp);
             if(!rt->run) {
                 // If the access caused a break, remember where exactly
                 rt->access_bp = bp;
@@ -138,11 +138,11 @@ void rt_apply_bp_mask(RUNTIME *rt, BREAKPOINT *bp, int clear) {
 
     if(clear) {
         for(;address <= end; address++) {
-            m->RAM_WATCH[address] &= ~(WATCH_EXEC_BREAKPOINT | WATCH_READ_BREAKPOINT | WATCH_WRITE_BREAKPOINT);
+            m->ram.RAM_WATCH[address] &= ~(WATCH_EXEC_BREAKPOINT | WATCH_READ_BREAKPOINT | WATCH_WRITE_BREAKPOINT);
         }
     } else {
         for(;address <= end; address++) {
-            m->RAM_WATCH[address] |= bp->access_mask;
+            m->ram.RAM_WATCH[address] |= bp->access_mask;
         }
     }
 }

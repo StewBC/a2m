@@ -45,18 +45,18 @@ void language_card_map_memory(APPLE2 *m) {
     uint16_t bank_addr = m->lc_bank2_enable ? 0x1000 : 0x0000;
     uint16_t aux_addr  =        m->altzpset ? 0x4000 : 0x0000; // Note - offset in LC RAM_LC, not RAM_MAIN
     if(m->lc_read_ram_enable) {
-        pages_map(&m->read_pages, 0xD000 / PAGE_SIZE, 0x1000 / PAGE_SIZE, &m->RAM_LC[bank_addr + aux_addr]);
-        pages_map(&m->read_pages, 0xE000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_LC[0x2000 + aux_addr]);
+        pages_map_lc(&m->pages, PAGE_MAP_READ, 0xD000, 0x1000, bank_addr + aux_addr, &m->ram);
+        pages_map_lc(&m->pages, PAGE_MAP_READ, 0xE000, 0x2000, 0x2000 + aux_addr, &m->ram);
     } else {
-        pages_map_memory_block(&m->read_pages, &m->roms.blocks[ROM_APPLE2]);
+        pages_map_rom_block(&m->pages, &m->roms.blocks[ROM_APPLE2], &m->ram);
     }
 
     if(m->lc_write_enable) {
-        pages_map(&m->write_pages, 0xD000 / PAGE_SIZE, 0x1000 / PAGE_SIZE, &m->RAM_LC[bank_addr + aux_addr]);
-        pages_map(&m->write_pages, 0xE000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_LC[0x2000 + aux_addr]);
+        pages_map_lc(&m->pages, PAGE_MAP_WRITE, 0xD000, 0x1000, bank_addr + aux_addr, &m->ram);
+        pages_map_lc(&m->pages, PAGE_MAP_WRITE, 0xE000, 0x2000, 0x2000 + aux_addr, &m->ram);
     } else {
         // Writes to ROM go here but its a bit-bucket - aux doesn't matter
-        pages_map(&m->write_pages, 0xD000 / PAGE_SIZE, 0x3000 / PAGE_SIZE, &m->RAM_MAIN[0xD000]);
+        pages_map(&m->pages, PAGE_MAP_WRITE, 0xD000, 0x3000, &m->ram);
     }
 }
 

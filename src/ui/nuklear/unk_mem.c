@@ -786,7 +786,7 @@ void unk_mem_show(UNK *v) {
 
         if(v->right_click_menu_open) {
             if(nk_contextual_begin(ctx, NK_WINDOW_NO_SCROLLBAR, nk_vec2(160, 180), nk_rect(v->right_click_menu_pos.x, v->right_click_menu_pos.y, 1, 1))) {
-                uint64_t last_write = m->RAM_LAST_WRITE[v->right_click_address];
+                uint64_t last_write = read_last_write_from_selected(m, v->right_click_address, mv->flags);
                 char options_text[6];
                 nk_layout_row_dynamic(ctx, 22, 1);
                 {

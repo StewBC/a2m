@@ -3,7 +3,7 @@
 // This is free and unencumbered software released into the public domain.
 
 static inline uint8_t apple2_softswitch_read_callback_IIplus(APPLE2 *m, uint16_t address) {
-    uint8_t byte = m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
+    uint8_t byte = m->pages.read_pages[address / PAGE_SIZE][address % PAGE_SIZE];
 
     if(address >= 0xc080 && address < 0xC090) {
         language_card(m, address, 0);
@@ -76,16 +76,16 @@ static inline uint8_t apple2_softswitch_read_callback_IIplus(APPLE2 *m, uint16_t
             m->slot_cards[i].cx_rom_mapped = 0;
         }
         // On a ][+ this C800-CFFF becomes "nothing" (RAM in my case)
-        pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, 0x800 / PAGE_SIZE, &m->RAM_MAIN[0XC800]);
+        pages_map(&m->pages, PAGE_MAP_READ, 0xC800, 0x800, &m->ram);
     } else {
         switch(address) {
             case KBD:
-                byte = m->RAM_MAIN[KBD];
+                byte = m->ram.RAM_MAIN[KBD];
                 break;
             case KBDSTRB:
                 if(m->a2out_cb.cb_clipboard_ctx.cb_clipboard &&
                         !m->a2out_cb.cb_clipboard_ctx.cb_clipboard(m->a2out_cb.cb_clipboard_ctx.user)) {
-                    m->RAM_MAIN[KBD] &= 0x7F;
+                    m->ram.RAM_MAIN[KBD] &= 0x7F;
                 }
                 break;
             case A2SPEAKER:
@@ -199,7 +199,7 @@ static inline uint8_t apple2_softswitch_read_callback_IIplus(APPLE2 *m, uint16_t
 }
 
 static inline void apple2_softswitch_write_callback_IIplus(APPLE2 *m, uint16_t address, uint8_t value) {
-    uint8_t byte = m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
+    uint8_t byte = m->pages.read_pages[address / PAGE_SIZE][address % PAGE_SIZE];
     if(address >= 0xc080 && address < 0xC090) {
         language_card(m, address, 1);
     } else if(address >= 0xc090 && address < 0xC100) {
@@ -285,14 +285,14 @@ static inline void apple2_softswitch_write_callback_IIplus(APPLE2 *m, uint16_t a
             m->slot_cards[i].cx_rom_mapped = 0;
         }
         // On a ][+ this C800-CFFF becomes "nothing" (RAM in my case)
-        pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, 0x800 / PAGE_SIZE, &m->RAM_MAIN[0XC800]);
+        pages_map(&m->pages, PAGE_MAP_READ, 0xC800, 0x800, &m->ram);
     } else {
         // All other addresses
         switch(address) {
             case KBDSTRB:
                 if(m->a2out_cb.cb_clipboard_ctx.cb_clipboard &&
                         !m->a2out_cb.cb_clipboard_ctx.cb_clipboard(m->a2out_cb.cb_clipboard_ctx.user)) {
-                    m->RAM_MAIN[KBD] &= 0x7F;
+                    m->ram.RAM_MAIN[KBD] &= 0x7F;
                 }
                 break;
             case A2SPEAKER:

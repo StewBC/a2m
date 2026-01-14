@@ -188,7 +188,7 @@ void utxt_apl2_screen_txt(UTXT *v, int start, int end, int width) {
             int r;
             uint8_t inv = 0x00;
             int char_in_bank = width == 80 ? ((x & 1) ? (x >> 1) : (x >> 1) + 0x10000) : x;
-            uint8_t character = m->RAM_MAIN[address + char_in_bank];   // Get the character on screen
+            uint8_t character = m->ram.RAM_MAIN[address + char_in_bank];   // Get the character on screen
             if(character < 0x80) {
                 if(character >= 0x40) {
                     if(!alt_charset) {

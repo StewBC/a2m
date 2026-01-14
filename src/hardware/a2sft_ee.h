@@ -8,7 +8,7 @@ static void slot_io(APPLE2 *m, uint16_t address) {
     // slot 3 and not m->c3slotrom overrides m->strobed
     if(slot == 3 && !m->c3slotrom) {
         // Map 80 col firmware
-        pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, 0x800 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x800]);
+        pages_map_rom(&m->pages, 0xC800, 0x800, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x800], &m->ram);
         m->strobed = 1;
         m->mapped_slot = 0;
     } else if(!m->strobed && !m->cxromset && m->slot_cards[slot].slot_map_cx_rom) {
@@ -26,47 +26,47 @@ static inline void slot_clrrom(APPLE2 *m, uint16_t address) {
             m->slot_cards[m->mapped_slot].cx_rom_mapped = 0;
             m->mapped_slot = 0;
         }
-        pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, 0x800 / PAGE_SIZE, &m->RAM_MAIN[0xC800]);
+        pages_map(&m->pages, PAGE_MAP_READ, 0xC800, 0x800, &m->ram);
         m->strobed = 0;
     }
 }
 
 static inline void set_memory_map(APPLE2 *m) {
     // Start by restoring everything
-    pages_map(&m->read_pages,  0x0000 / PAGE_SIZE, 0xC000 / PAGE_SIZE, &m->RAM_MAIN[0x00000]);
-    pages_map(&m->write_pages, 0x0000 / PAGE_SIZE, 0xC000 / PAGE_SIZE, &m->RAM_MAIN[0x00000]);
+    pages_map(&m->pages, PAGE_MAP_READ,  0x0000, 0xC000, &m->ram);
+    pages_map(&m->pages, PAGE_MAP_WRITE, 0x0000, 0xC000, &m->ram);
     language_card_map_memory(m);
 
     // SETALTZP
     if(m->altzpset) {
-        pages_map(&m->read_pages,  0x0000 / PAGE_SIZE, 0x0200 / PAGE_SIZE, &m->RAM_MAIN[0x10000]);
-        pages_map(&m->write_pages, 0x0000 / PAGE_SIZE, 0x0200 / PAGE_SIZE, &m->RAM_MAIN[0x10000]);
+        pages_map(&m->pages, PAGE_MAP_READ,  0x10000, 0x0200, &m->ram);
+        pages_map(&m->pages, PAGE_MAP_WRITE, 0x10000, 0x0200, &m->ram);
     }
 
     //SETRAMRD
     if(m->ramrdset) {
-        pages_map(&m->read_pages,  0x0200 / PAGE_SIZE, 0xBE00 / PAGE_SIZE, &m->RAM_MAIN[0x10200]);
+        pages_map(&m->pages, PAGE_MAP_READ,  0x10200, 0xBE00, &m->ram);
     }
 
     // SETRAMWRT
     if(m->ramwrtset) {
-        pages_map(&m->write_pages, 0x0200 / PAGE_SIZE, 0xBE00 / PAGE_SIZE, &m->RAM_MAIN[0x10200]);
+        pages_map(&m->pages, PAGE_MAP_WRITE, 0x10200, 0xBE00, &m->ram);
     }
 
     // SET80
     if(m->store80set) {
-        pages_map(&m->read_pages,  0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x00400]);
-        pages_map(&m->write_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x00400]);
+        pages_map(&m->pages, PAGE_MAP_READ,  0x0400, 0x0400, &m->ram);
+        pages_map(&m->pages, PAGE_MAP_WRITE, 0x0400, 0x0400, &m->ram);
         if(m->hires) {
-            pages_map(&m->read_pages,  0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x02000]);
-            pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x02000]);
+            pages_map(&m->pages, PAGE_MAP_READ,  0x2000, 0x2000, &m->ram);
+            pages_map(&m->pages, PAGE_MAP_WRITE, 0x2000, 0x2000, &m->ram);
         }
         if(m->page2set) {
-            pages_map(&m->read_pages,  0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x10400]);
-            pages_map(&m->write_pages, 0x0400 / PAGE_SIZE, 0x0400 / PAGE_SIZE, &m->RAM_MAIN[0x10400]);
+            pages_map(&m->pages, PAGE_MAP_READ,  0x10400, 0x0400, &m->ram);
+            pages_map(&m->pages, PAGE_MAP_WRITE, 0x10400, 0x0400, &m->ram);
             if(m->hires) {
-                pages_map(&m->read_pages,  0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
-                pages_map(&m->write_pages, 0x2000 / PAGE_SIZE, 0x2000 / PAGE_SIZE, &m->RAM_MAIN[0x12000]);
+                pages_map(&m->pages, PAGE_MAP_READ,  0x12000, 0x2000, &m->ram);
+                pages_map(&m->pages, PAGE_MAP_WRITE, 0x12000, 0x2000, &m->ram);
             }
         }
     }
@@ -76,23 +76,23 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
     uint8_t byte = 0xA0; // Floating bus value
     if(address >= 0xc100 && address < 0xC7FF) {
         slot_io(m, address);
-        byte = m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
+        byte = m->pages.read_pages[address / PAGE_SIZE][address % PAGE_SIZE];
     } else if(address == CLRROM) {
         slot_clrrom(m, address);
-        byte = m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
+        byte = m->pages.read_pages[address / PAGE_SIZE][address % PAGE_SIZE];
     } else {
         // Split into 16-byte "chunks"
         switch(address & 0xC0F0) {
             case 0xC000:
-                byte = m->RAM_MAIN[KBD];
+                byte = m->ram.RAM_MAIN[KBD];
                 break;
             case 0xC010:
-                byte = m->RAM_MAIN[KBD] & 0x7F;
+                byte = m->ram.RAM_MAIN[KBD] & 0x7F;
                 switch(address) {
                     case KBDSTRB:
                         // I believe you get the key, pre-stobe-reset back
-                        byte = m->RAM_MAIN[KBD];
-                        m->write_pages.pages[KBD / PAGE_SIZE].bytes[KBD % PAGE_SIZE] &= 0x7F;
+                        byte = m->ram.RAM_MAIN[KBD];
+                        m->pages.write_pages[KBD / PAGE_SIZE][KBD % PAGE_SIZE] &= 0x7F;
                         break;
                     case HRAMRD:      //e
                         byte |= m->lc_bank2_enable << 7;
@@ -307,7 +307,7 @@ static inline uint8_t apple2_softswitch_read_callback_IIe(APPLE2 *m, uint16_t ad
             case 0xC0F0: {
                     // Device Select
                     int slot = (address >> 4) & 0x7;
-                    byte = m->read_pages.pages[address / PAGE_SIZE].bytes[address % PAGE_SIZE];
+                    byte = m->pages.read_pages[address / PAGE_SIZE][address % PAGE_SIZE];
                     switch(m->slot_cards[slot].slot_type) {
                         case SLOT_TYPE_DISKII: {
                                 uint8_t soft_switch = address & 0x0f;
@@ -403,15 +403,15 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                     case CLRCXROM:  //e
                         m->cxromset = 0;
                         // Restore the slot mappings
-                        m->read_pages.pages[0xC100 / PAGE_SIZE].bytes = m->rom_shadow_pages[1];
-                        m->read_pages.pages[0xC200 / PAGE_SIZE].bytes = m->rom_shadow_pages[2];
-                        m->read_pages.pages[0xC400 / PAGE_SIZE].bytes = m->rom_shadow_pages[4];
-                        m->read_pages.pages[0xC500 / PAGE_SIZE].bytes = m->rom_shadow_pages[5];
-                        m->read_pages.pages[0xC600 / PAGE_SIZE].bytes = m->rom_shadow_pages[6];
-                        m->read_pages.pages[0xC700 / PAGE_SIZE].bytes = m->rom_shadow_pages[7];
+                        m->pages.read_pages[0xC100 / PAGE_SIZE] = m->rom_shadow_pages[1];
+                        m->pages.read_pages[0xC200 / PAGE_SIZE] = m->rom_shadow_pages[2];
+                        m->pages.read_pages[0xC400 / PAGE_SIZE] = m->rom_shadow_pages[4];
+                        m->pages.read_pages[0xC500 / PAGE_SIZE] = m->rom_shadow_pages[5];
+                        m->pages.read_pages[0xC600 / PAGE_SIZE] = m->rom_shadow_pages[6];
+                        m->pages.read_pages[0xC700 / PAGE_SIZE] = m->rom_shadow_pages[7];
                         // Only if internal slot3 is not overriding the card rom
                         if(m->c3slotrom) {
-                            m->read_pages.pages[0xC300 / PAGE_SIZE].bytes = m->rom_shadow_pages[3];
+                            m->pages.read_pages[0xC300 / PAGE_SIZE] = m->rom_shadow_pages[3];
                         }
                         // If a card was mapped to c800, restore that mapping
                         if(m->strobed) {
@@ -419,13 +419,13 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                                 m->slot_cards[m->mapped_slot].slot_map_cx_rom(m, address);
                             }
                         } else {
-                            pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, 0x800 / PAGE_SIZE, &m->RAM_MAIN[0xC800]);
+                            pages_map(&m->pages, PAGE_MAP_READ, 0xC800, 0x800, &m->ram);
                         }
                         break;
                     case SETCXROM:  //e
                         m->cxromset = 1;
                         // C100-D000
-                        pages_map(&m->read_pages, 0xC100 / PAGE_SIZE, 0xF00 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x100]);
+                        pages_map_rom(&m->pages, 0xC100, 0xF00, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x100], &m->ram);
                         break;
                     case CLRALTZP:
                         // 0000-01ff
@@ -441,12 +441,12 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
                         // C300-C3FF
                         // Turn internal rom on, slot rom off
                         m->c3slotrom = 0;
-                        pages_map(&m->read_pages, 0xC300 / PAGE_SIZE, 0x100 / PAGE_SIZE, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x300]);
+                        pages_map_rom(&m->pages, 0xC300, 0x100, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x300], &m->ram);
                         break;
                     case SETC3ROM: // e
                         // Turn internal rom off, slot rom on
                         m->c3slotrom = 1;
-                        m->read_pages.pages[0xC300 / PAGE_SIZE].bytes = m->rom_shadow_pages[3];
+                        m->pages.read_pages[0xC300 / PAGE_SIZE] = m->rom_shadow_pages[3];
                         break;
                     case CLR80COL: //e
                         m->col80set = 0;
@@ -465,7 +465,7 @@ static inline void apple2_softswitch_write_callback_IIe(APPLE2 *m, uint16_t addr
             case 0xC010:
                 if(m->a2out_cb.cb_clipboard_ctx.cb_clipboard &&
                         !m->a2out_cb.cb_clipboard_ctx.cb_clipboard(m->a2out_cb.cb_clipboard_ctx.user)) {
-                    m->RAM_MAIN[KBD] &= 0x7F;
+                    m->ram.RAM_MAIN[KBD] &= 0x7F;
                 }
                 break;
             case 0xC020:

@@ -234,35 +234,35 @@ int utxt_process_events(UI *ui, APPLE2 *m) {
                 } else {
                     e.ch -= 'A';
                 }
-                m->RAM_MAIN[KBD] = 0x80 | (uint8_t)(e.ch + 1);
+                m->ram.RAM_MAIN[KBD] = 0x80 | (uint8_t)(e.ch + 1);
             } else {
-                m->RAM_MAIN[KBD] = 0x80 | (uint8_t)(e.ch);
+                m->ram.RAM_MAIN[KBD] = 0x80 | (uint8_t)(e.ch);
             }
         } else if(e.type == RT_IN_KEY) {
             switch(e.key) {
                 case RTK_BACKSPACE:
-                    m->RAM_MAIN[KBD] = 0x88;
+                    m->ram.RAM_MAIN[KBD] = 0x88;
                     break;
                 case RTK_RETURN:
-                    m->RAM_MAIN[KBD] = 0x8D;
+                    m->ram.RAM_MAIN[KBD] = 0x8D;
                     break;
                 case RTK_ESCAPE:
-                    m->RAM_MAIN[KBD] = 0x9B;
+                    m->ram.RAM_MAIN[KBD] = 0x9B;
                     break;
                 case RTK_TAB:
-                    m->RAM_MAIN[KBD] = 0x89;
+                    m->ram.RAM_MAIN[KBD] = 0x89;
                     break;
                 case RTK_UP:
-                    m->RAM_MAIN[KBD] = 0x8B;
+                    m->ram.RAM_MAIN[KBD] = 0x8B;
                     break;
                 case RTK_DOWN:
-                    m->RAM_MAIN[KBD] = 0x8A;
+                    m->ram.RAM_MAIN[KBD] = 0x8A;
                     break;
                 case RTK_LEFT:
-                    m->RAM_MAIN[KBD] = 0x88;
+                    m->ram.RAM_MAIN[KBD] = 0x88;
                     break;
                 case RTK_RIGHT:
-                    m->RAM_MAIN[KBD] = 0x95;
+                    m->ram.RAM_MAIN[KBD] = 0x95;
                     break;
                 case RTK_PAGE_UP:
                     m->open_apple ^= 1;

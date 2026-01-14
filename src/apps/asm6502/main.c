@@ -7,15 +7,19 @@
 #include "utils_lib.h"
 #include "asm_lib.h"
 
+typedef struct RAM {
+    uint8_t RAM_MAIN[64 * 1024];
+} RAM;
+
 typedef struct MACHINE {
     ASSEMBLER as;
-    uint8_t RAM_MAIN[64 * 1024];
+    RAM ram;
 } MACHINE;
 
 
 void write_to_memory_selected(MACHINE *m, RAMVIEW_FLAGS selected, uint16_t address, uint8_t value) {
     UNUSED(selected);
-    m->RAM_MAIN[address] = value;
+    m->ram.RAM_MAIN[address] = value;
 }
 
 void output_byte_at_address(void *user, RAMVIEW_FLAGS selected, uint16_t address, uint8_t byte_value) {
@@ -67,7 +71,7 @@ int main(int argc, char **argv) {
     ERRORLOG errorlog;
 
     // Set the "machine" RAM to all 0's
-    memset(m.RAM_MAIN, 0, 64 * 1024);
+    memset(m.ram.RAM_MAIN, 0, 64 * 1024);
     errlog_init(&errorlog);
 
     if(A2_OK != assembler_init(&m.as, &errorlog, &m, output_byte_at_address)) {
@@ -109,7 +113,7 @@ int main(int argc, char **argv) {
         if(A2_OK != util_file_open(&output_file, output_file_name, "wb")) {
             fprintf(stderr, "Could not open output file %s for writing\n", output_file_name);
         } else {
-            fwrite(&m.RAM_MAIN[m.as.start_address], 1, m.as.last_address - m.as.start_address, output_file.fp);
+            fwrite(&m.ram.RAM_MAIN[m.as.start_address], 1, m.as.last_address - m.as.start_address, output_file.fp);
         }
         util_file_discard(&output_file);
     }

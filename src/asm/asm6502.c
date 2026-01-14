@@ -985,12 +985,12 @@ int is_macro_parse_macro(ASSEMBLER *as) {
             if(cursor < body_end) {
                 append_bytes(&out, &out_len, &out_cap, cursor, (size_t)(body_end - cursor));
             }
-			// Add the body to the list
-			// Note that these have to stay past pass 1 so that
-			// symbols in pass 2, from here in pass 1, still exist
-			// I could reuse the buffer in pass 2 if I hash the sig
-			// or I can just live with all of these buffers, which
-			// is what I currently choose to do
+            // Add the body to the list
+            // Note that these have to stay past pass 1 so that
+            // symbols in pass 2, from here in pass 1, still exist
+            // I could reuse the buffer in pass 2 if I hash the sig
+            // or I can just live with all of these buffers, which
+            // is what I currently choose to do
             ARRAY_ADD(&as->macro_buffers, out);
 
 

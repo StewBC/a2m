@@ -10,29 +10,44 @@
 #define PAGE_SIZE       (256)
 #define NUM_PAGES       ((BANK_SIZE)/(PAGE_SIZE))
 
-/* A MEMORY_BLOCK tracks a block of bytes, be that ROM, MEMORY or IO Port*/
-typedef struct MEMORY_BLOCK {
+// A ROM_BLOCK tracks a block of rom bytes
+typedef struct ROM_BLOCK {
     uint32_t address;
     uint32_t length;
     uint8_t *bytes;
-} MEMORY_BLOCK;
+} ROM_BLOCK;
 
-/* MEMORY contains an array of MEMORY_BLOCKs which may (or not) be mapped into the 6502's 64K*/
-typedef struct MEMORY {
-    MEMORY_BLOCK *blocks;
+// ROM contains an array of ROM_BLOCKs which may (or not) be mapped into the 6502's 64K
+typedef struct ROMS {
+    ROM_BLOCK *blocks;
     uint16_t num_blocks;
-} MEMORY;
+} ROMS;
 
-/* PAGE points to a block of bytes, with a length of PAGE_SIZE (implied) */
-typedef struct PAGE {
-    uint8_t *bytes;
-} PAGE;
+// When mapping ram into the 6502 address space, this is used to map read or write ram
+typedef enum PAGE_MAP_TYPE {
+    PAGE_MAP_READ,
+    PAGE_MAP_WRITE
+} PAGE_MAP_TYPE;
 
-/* PAGES is an array of PAGE structures.  These can be mapped (or not) into the 6502 address space */
+// Pages is a bundle of arrays.  Each array has pointers to bytes which should
+// be seen as PAGE_SIZE in length (256 bytes)
 typedef struct PAGES {
-    PAGE *pages;
     uint16_t num_pages;
+    uint8_t **read_pages;                       // array of page bytes mapped for reading
+    uint8_t **write_pages;                      // array of page bytes mapped for writing
+    uint8_t **watch_read_pages;                 // array of page bytes mapped for watch (IO/Breakpoints)
+    uint8_t **watch_write_pages;                // array of page bytes mapped for watch (IO/Breakpoints)
+    uint64_t **last_write_pages;                // array of page 64 bit entries for tracking write addresses
 } PAGES;
+
+typedef struct RAM {
+    uint8_t *RAM_MAIN;                          // The ram_size memory - addressable in max 64k chunks
+    uint8_t *RAM_WATCH;                         // IO / Breakpoints. See WATCH_MASK
+    uint8_t *RAM_LC;                            // LC Ram (Always 2*16 for ease with //e)
+    uint8_t *RAM_LC_WATCH;                      // LC Ram watch (Always 2*16 for ease with //e)
+    uint64_t *RAM_LAST_WRITE;                   // 64-bit array of ram size
+    uint64_t *RAM_LC_LAST_WRITE;                // 64-bit array of 32K (LC ram size)
+} RAM;
 
 enum {
     CPU_6502,
@@ -41,20 +56,20 @@ enum {
 
 /* The 6502 internals*/
 typedef struct CPU {
-    uint16_t pc;                                            // Program counter
-    uint16_t opcode_pc;                                     // for last write, track last opcode pc
-    uint16_t sp;                                            // Stack pointer
-    uint8_t A, X, Y;                                        // 8 bit registers
+    uint16_t pc;                                // Program counter
+    uint16_t opcode_pc;                         // for last write, track last opcode pc
+    uint16_t sp;                                // Stack pointer
+    uint8_t A, X, Y;                            // 8 bit registers
     union {
         struct {
-            uint8_t C: 1;                                   // carry
-            uint8_t Z: 1;                                   // zero
-            uint8_t I: 1;                                   // Interrupt Disable
-            uint8_t D: 1;                                   // BCD mode
-            uint8_t B: 1;                                   // Break
-            uint8_t E: 1;                                   // Extra (almost unused)
-            uint8_t V: 1;                                   // Overflow
-            uint8_t N: 1;                                   // Negative
+            uint8_t C: 1;                       // carry
+            uint8_t Z: 1;                       // zero
+            uint8_t I: 1;                       // Interrupt Disable
+            uint8_t D: 1;                       // BCD mode
+            uint8_t B: 1;                       // Break
+            uint8_t E: 1;                       // Extra (almost unused)
+            uint8_t V: 1;                       // Overflow
+            uint8_t N: 1;                       // Negative
         };
         uint8_t flags;
     };
@@ -63,20 +78,20 @@ typedef struct CPU {
             uint8_t address_lo;
             uint8_t address_hi;
         };
-        uint16_t address_16;                                // For Emulation - Usually where bytes will be fetched
+        uint16_t address_16;                    // For Emulation - Usually where bytes will be fetched
     };
     union {
         struct {
             uint8_t scratch_lo;
             uint8_t scratch_hi;
         };
-        uint16_t scratch_16;                                // For Emulation - Placeholder
+        uint16_t scratch_16;                    // For Emulation - Placeholder
     };
     struct {
-        uint8_t page_fault: 1;                              // During stages where a page-fault could happen, denotes fault
+        uint8_t page_fault: 1;                  // During stages where a page-fault could happen, denotes fault
     };
-    uint32_t class;             							// CPU_6502 or CPU_65c02
-    uint64_t cycles;                                        // Total count of cycles the cpu has executed
+    uint32_t class;                             // CPU_6502 or CPU_65c02
+    uint64_t cycles;                            // Total count of cycles the cpu has executed
 } CPU;
 
 typedef enum {
@@ -132,12 +147,14 @@ typedef enum {
 // Forward declarations
 typedef struct APPLE2 APPLE2;
 
-// Configure the ram, MEMORY and bytes setup (what is mapped in)
-uint8_t memory_init(MEMORY *memory, uint16_t num_blocks);
-void memory_add(MEMORY *memory, uint8_t block_num, uint32_t address, uint32_t length, uint8_t *bytes);
-uint8_t pages_init(PAGES *pages, uint16_t num_pages);
-void pages_map(PAGES *pages, uint32_t start_page, uint32_t num_pages, uint8_t *bytes);
-void pages_map_memory_block(PAGES *pages, MEMORY_BLOCK *block);
+// Configure the ram, ROM and bytes setup (what is mapped in)
+uint8_t rom_init(ROMS *rom, uint16_t num_blocks);
+void rom_add(ROMS *rom, uint8_t block_num, uint32_t address, uint32_t length, uint8_t *bytes);
+uint8_t pages_init(PAGES *pages, uint32_t length);
+void pages_map(PAGES *pages, PAGE_MAP_TYPE map, uint32_t address, uint32_t length, RAM *ram);
+void pages_map_lc(PAGES *pages, PAGE_MAP_TYPE map_type, uint32_t address, uint32_t length, uint32_t from, RAM *ram);
+void pages_map_rom(PAGES *pages, uint32_t address, uint32_t length, uint8_t *rom_bytes, RAM *ram);
+void pages_map_rom_block(PAGES *pages, ROM_BLOCK *block, RAM *ram);
 
 // 1 time init
 void cpu_init(APPLE2 *m);

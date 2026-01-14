@@ -26,7 +26,7 @@ int franklin_display_init(FRANKLIN_DISPLAY *fd80) {
 }
 
 void franklin_display_map_cx_rom(APPLE2 *m, uint16_t address) {
-    pages_map(&m->read_pages, 0xC800 / PAGE_SIZE, 0x800 / PAGE_SIZE, m->roms.blocks[ROM_FRANKLIN_ACE_DISPLAY].bytes);
+    pages_map_rom(&m->pages, 0xC800, 0x800, m->roms.blocks[ROM_FRANKLIN_ACE_DISPLAY].bytes, &m->ram);
 }
 
 void franklin_display_set(APPLE2 *m, uint16_t address, uint8_t value) {
