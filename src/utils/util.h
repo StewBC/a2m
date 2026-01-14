@@ -50,7 +50,7 @@ int util_ini_save_file(const char *filename, INI_STORE *ini_store);
 
 const char *util_strinstr(const char *haystack, const char *needle, int needle_length);
 const char *util_strrtok(const char *str, const char *delim);
-int util_qsort_cmp(const void *p1, const void *p2);
+int util_file_info_qsort_cmp(const void *p1, const void *p2);
 void *util_memset32(void *ptr, uint32_t value, size_t count);
 char *util_strndup(const char *string, size_t length);
 char util_character_in_characters(const char character, const char *characters);

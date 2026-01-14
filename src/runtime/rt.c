@@ -86,43 +86,7 @@ static int rt_step_okay(RUNTIME *rt) {
     }
 
     if(rt->run) {
-        // Actual breakpoint check
-        BREAKPOINT *bp = rt_bp_get_at_address(rt, m->cpu.pc, 1);
-        if(bp) {
-            switch(bp->action) {
-                case ACTION_BREAK:
-                    rt_machine_stop(rt);
-                    break;
-                case ACTION_FAST:
-                    rt->turbo_active = -1.0;
-                    break;
-                case ACTION_RESTORE:
-                    rt->turbo_active = rt->turbo[rt->turbo_index];
-                    break;
-                case ACTION_SLOW:
-                    rt->turbo_active =  1.0;
-                    break;
-                case ACTION_SWAP: {
-                        int index = m->diskii_controller[bp->slot].diskii_drive[bp->device].image_index + 1;
-                        int items = m->diskii_controller[bp->slot].diskii_drive[bp->device].images.items;
-                        diskii_mount_image(m, bp->slot, bp->device, index >= items ? 0 : index);
-                    }
-                    break;
-                case ACTION_TROFF:
-                    rt_trace_off(rt);
-                    break;
-                case ACTION_TRON:
-                    rt_trace_on(rt);
-                    break;
-                case ACTION_TYPE:
-                    if(bp->type_text) {
-                        rt_paste_clipboard(rt, bp->type_text);
-                    }
-                    break;
-                default:
-                    break;
-            }
-        }
+        rt_exec_matching_breakpoint(rt, m->cpu.pc);
     }
 
     // Not else - the breakpoints can set rt->run to false
@@ -206,18 +170,19 @@ void rt_apply_ini(RUNTIME *rt, INI_STORE *ini_store) {
                 PARSEDBP parsed_line;
                 memset(&parsed_line, 0, sizeof(PARSEDBP));
                 if(A2_OK == parse_breakpoint_line(val, &parsed_line)) {
-                    BREAKPOINT *bp = rt_bp_get_at_address(rt, (uint16_t)parsed_line.start, 0);
+                    BREAKPOINT *bp = rt_find_breakpoint(rt, (uint16_t)parsed_line.start);
                     if(!bp) {
                         BREAKPOINT bp;
                         memset(&bp, 0, sizeof(bp));
                         bp.address = (uint16_t)parsed_line.start;
                         bp.address_range_end = (uint16_t)parsed_line.end;
                         bp.use_range = bp.address != bp.address_range_end;
-                        bp.break_on_exec = BREAK_MODE_PC == parsed_line.mode;
-                        bp.break_on_read = BREAK_MODE_READ & parsed_line.mode ? 1 : 0;
-                        bp.break_on_write = BREAK_MODE_WRITE & parsed_line.mode ? 1 : 0;
-                        // SQW Look at why you set this up the way it is
-                        bp.access_mask = (bp.break_on_write << 2) | (bp.break_on_read << 1);
+                        bp.access_mask = parsed_line.mode;
+                        bp.break_on_exec = WATCH_EXEC_BREAKPOINT & parsed_line.mode ? 1 : 0;
+                        bp.break_on_read = WATCH_READ_BREAKPOINT & parsed_line.mode ? 1 : 0;
+                        bp.break_on_write = WATCH_WRITE_BREAKPOINT & parsed_line.mode ? 1 : 0;
+                        // break_on_exec is forced on by parser if nothing specified so mask will
+                        // not be 0
                         bp.counter_stop_value = parsed_line.count;
                         bp.counter_reset = parsed_line.reset;
                         bp.use_counter = bp.counter_stop_value || bp.counter_reset ? 1 : 0;
@@ -263,7 +228,7 @@ void rt_bind(RUNTIME *rt, APPLE2 *m, UI *ui) {
 
     // The hardware is configured, so start binding
     apple2_set_callbacks(m, &a2rt_cb);
-    rt_bp_apply_masks(rt);
+    rt_apply_bp_masks(rt);
 };
 
 int rt_init(RUNTIME *rt, INI_STORE *ini_store) {
@@ -314,7 +279,7 @@ int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
         int dirty_view = 0;
 
         if(rt->run) {
-            dirty_view = rt->run;
+            dirty_view = 1;
             // If not going at max speed, or stepping the debugger
             if(rt->turbo_active > 0.0) {
                 double cycles_per_frame = max(1, (CPU_FREQUENCY * rt->turbo_active) / TARGET_FPS - (overhead_ticks * clock_cycles_per_tick));

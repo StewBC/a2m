@@ -4,11 +4,11 @@
 
 #pragma once
 
-enum {
-    BREAK_MODE_PC       = 0,
-    BREAK_MODE_READ     = 1 << 0,
-    BREAK_MODE_WRITE    = 1 << 1,
-};
+// enum {
+//     BREAK_MODE_PC       = 1 << 0,
+//     BREAK_MODE_READ     = 1 << 1,
+//     BREAK_MODE_WRITE    = 1 << 2,
+// };
 
 typedef enum {
     ACTION_BREAK,

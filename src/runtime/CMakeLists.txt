@@ -5,6 +5,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 add_library(runtime STATIC
+    breakprs.c
     rt_bp.c
     rt.c
     rt_sym.c

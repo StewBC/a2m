@@ -477,7 +477,7 @@ int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
         if(A2_OK != util_dir_load_contents(&fb->dir_contents)) {
             return 0;
         }
-        qsort(fb->dir_contents.data, fb->dir_contents.items, fb->dir_contents.element_size, util_qsort_cmp);
+        qsort(fb->dir_contents.data, fb->dir_contents.items, fb->dir_contents.element_size, util_file_info_qsort_cmp);
     }
 
     if(nk_begin(ctx, "File Browser", nk_rect(0, 0, 600, 600),

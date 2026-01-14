@@ -404,6 +404,8 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
             if((mod & KMOD_CTRL) && (mod & KMOD_SHIFT) && !v->debug_view) {
                 unk_toggle_debug(v);
             }
+            // Fall Through
+
         case SDLK_b:
             if(!v->dlg_modal_active) {
                 if((mod & KMOD_CTRL) && !(mod & KMOD_SHIFT)) {
@@ -465,9 +467,11 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                             if(ac->auto_run_after_assemble) {
                                 rt_machine_set_pc(rt, ac->start_address);
                                 // In this case, don't run if the start address has a breakpoint
-                                BREAKPOINT *bp = rt_bp_get_at_address(rt, ac->start_address, 0);
-                                if(!bp) {
+                                BREAKPOINT *bp = rt_find_breakpoint(rt, ac->start_address);
+                                if(!bp || !(bp->access_mask & WATCH_EXEC_BREAKPOINT)) {
                                     rt_machine_run(rt);
+                                } else {
+                                    rt_machine_stop(rt);
                                 }
                             }
                         }
@@ -582,13 +586,15 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
 
         case SDLK_F9:
             if(!rt->run) {
-                BREAKPOINT *b = rt_bp_get_at_address(rt, dv->cursor_address, 0);
+                BREAKPOINT *b = rt_find_breakpoint(rt, dv->cursor_address);
                 if(!b) {
                     // Toggle breakpoint
                     BREAKPOINT bp;
                     memset(&bp, 0, sizeof(bp));
                     bp.address = dv->cursor_address;
-                    bp.break_on_exec = bp.break_on_read = bp.break_on_write = 1;
+                    bp.access_mask = WATCH_EXEC_BREAKPOINT;
+                    bp.break_on_exec = 1;
+                    bp.break_on_read = bp.break_on_write = 0;
                     bp.counter_stop_value = bp.counter_reset = 1;
                     ARRAY_ADD(&rt->breakpoints, bp);
                 } else {
@@ -645,10 +651,19 @@ void unk_dasm_show(UNK *v, int dirty) {
 
     // Put the pc in the middle of the screen
     if(dirty) {
-        // The reason to even bother with this is that sometime a jump is made to a code stream
-        // that really doesn't decode so nice.  Then it changes after a step and it's pretty confusing
-        // This keeps the view - right or wrong, looking the same if it can
+        dv->cursor_address = m->cpu.address_16;
         if(!unk_dasm_center_pc_if_in_view(dv, m)) {
+            // The reason to even bother with this is that sometime a jump is made to a code stream
+            // that really doesn't decode so nice.  Then it changes after a step and it's pretty confusing
+            // This keeps the view - right or wrong, looking the same if it can
+            unk_dasm_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
+        }
+
+        // If a break was caused by an address access, put the cursor on the address where it happened
+        if(!rt->run && rt->access_bp) {
+            rt->access_bp = NULL;
+            dv->cursor_address = rt->access_address;
+            dv->cursor_line = dv->rows / 2;
             unk_dasm_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
         }
     }
@@ -697,7 +712,12 @@ void unk_dasm_show(UNK *v, int dirty) {
                         if(li->force_byte) {
                             fg = unk_dasm_blend(fg, nk_rgb(0, 0, 0), 0.5f);
                         }
-                        BREAKPOINT *bp = rt_bp_get_at_address(rt, current_pc, 0);
+                        BREAKPOINT *bp = rt_find_breakpoint(rt, current_pc);
+                        // SQW - Only exec breakpoints show up - I could make different bachground colours
+                        // for read/write and cover the range also...
+                        if(bp && !(bp->access_mask & WATCH_EXEC_BREAKPOINT)) {
+                            bp = NULL;
+                        }
                         // See if the mouse has been clicked over this row to be drawn
                         if(!v->dlg_modal_active && !v->dlg_modal_mouse_down && nk_widget_is_mouse_clicked(ctx, NK_BUTTON_LEFT)) {
                             float rel_x = (ctx->input.mouse.pos.x - r.x) / v->font_width;
@@ -710,9 +730,6 @@ void unk_dasm_show(UNK *v, int dirty) {
                             }
                         }
                         if(current_pc == m->cpu.pc) {
-                            if(dirty) {
-                                dv->cursor_address = current_pc;
-                            }
                             fg = color_fg_pc;
                             bg = color_bg_pc;
                             if(dv->cursor_address != current_pc) {
@@ -723,7 +740,7 @@ void unk_dasm_show(UNK *v, int dirty) {
                                 fg = unk_dasm_blend(fg, color_fg_breakpoint, 0.5);
                                 bg = unk_dasm_blend(fg, color_bg_breakpoint, 0.5);
                             }
-                        } else if(!dirty && current_pc == dv->cursor_address) {
+                        } else if(current_pc == dv->cursor_address) {
                             fg = color_fg_cursor;
                             bg = color_bg_cursor;
                             if(bp) {

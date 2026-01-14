@@ -423,7 +423,7 @@ void unk_misc_show(UNK *v) {
                                         if(nk_button_label(ctx, bp->disabled ? "Enable" : "Disable")) {
                                             bp->disabled ^= 1;
                                             if(!bp->break_on_exec) {
-                                                rt_bp_apply_masks(rt);
+                                                rt_apply_bp_mask(rt, bp, bp->disabled);
                                             }
                                         }
 
@@ -439,7 +439,7 @@ void unk_misc_show(UNK *v) {
                                             // Delete the breakpoint
                                             array_remove(&rt->breakpoints, bp);
                                             // And reset the mask on memory to watch for any remaining address breakpoint
-                                            rt_bp_apply_masks(rt);
+                                            rt_apply_bp_mask(rt, bp, 1);
                                         }
                                     }
                                     nk_layout_row_end(ctx);
@@ -532,7 +532,8 @@ void unk_misc_show(UNK *v) {
                 free(bpe->bp_original->type_text);
                 *bpe->bp_original = bpe->bp_under_edit;
                 bpe->bp_original->type_text = bpe->string_type_len ? parse_decode_c_string(bpe->string_type, NULL) : NULL;
-                rt_bp_apply_masks(rt);
+                rt_apply_bp_mask(rt, bpe->bp_original, 1);
+                rt_apply_bp_mask(rt, bpe->bp_original, bpe->bp_original->disabled);
             }
             // Nov 28, 2025 - Leaving here but I think this is resolved...
             // This is necessary to keep the Misc window active. Why 193?

@@ -28,6 +28,8 @@ typedef struct BREAKPOINT {
     char *type_text;                // Action = type, text to "type" 
 } BREAKPOINT;
 
-BREAKPOINT *rt_bp_get_at_address(RUNTIME *rt, uint16_t pc, int running);
+BREAKPOINT *rt_find_breakpoint(RUNTIME *rt, uint16_t address);
+void rt_exec_matching_breakpoint(RUNTIME *rt, uint16_t address);
 void rt_bp_callback(void *user, uint16_t address, uint8_t mask);
-void rt_bp_apply_masks(RUNTIME *rt);
+void rt_apply_bp_mask(RUNTIME *rt, BREAKPOINT *bp, int clear);
+void rt_apply_bp_masks(RUNTIME *rt);

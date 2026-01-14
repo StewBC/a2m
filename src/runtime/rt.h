@@ -64,6 +64,10 @@ typedef struct RUNTIME {
     size_t prev_stop_cycles;
     size_t stop_cycles;
 
+    // Access breakpoint track
+    BREAKPOINT *access_bp;
+    uint16_t access_address;
+
     // Flags
     uint16_t run: 1;                                        // 1 - not running, 0 - run
     uint16_t run_step: 1;

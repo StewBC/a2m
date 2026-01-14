@@ -241,13 +241,13 @@ int parse_breakpoint_line(const char *val, PARSEDBP *out) {
         if(*param != '\0') {
             // Try keywords first
             if(stricmp(param, "pc") == 0) {
-                out->mode |= BREAK_MODE_PC;
+                out->mode |= WATCH_EXEC_BREAKPOINT;
             } else if(0 == stricmp(param, "access")) {
-                out->mode = BREAK_MODE_PC | BREAK_MODE_READ | BREAK_MODE_WRITE;
+                out->mode |= WATCH_READ_BREAKPOINT | WATCH_WRITE_BREAKPOINT;
             } else if(0 == stricmp(param, "fast")) {
                 out->action = ACTION_FAST;
             } else if(0 == stricmp(param, "read")) {
-                out->mode |= BREAK_MODE_READ;
+                out->mode |= WATCH_READ_BREAKPOINT;
             } else if(0 == stricmp(param, "restore")) {
                 out->action = ACTION_RESTORE;
             } else if(0 == stricmp(param, "slow")) {
@@ -270,7 +270,7 @@ int parse_breakpoint_line(const char *val, PARSEDBP *out) {
                     out->type_text = parse_decode_c_string(&param[5], NULL);
                 }
             } else if(0 == stricmp(param, "write")) {
-                out->mode |= BREAK_MODE_WRITE;
+                out->mode |= WATCH_WRITE_BREAKPOINT;
             } else {
                 // Otherwise, treat as integer (count then reset)
                 char *endp = NULL;
@@ -306,6 +306,9 @@ int parse_breakpoint_line(const char *val, PARSEDBP *out) {
         rest = next_comma + 1;
     }
 
+    if(!out->mode) {
+        out->mode = WATCH_EXEC_BREAKPOINT;
+    }
     retval = A2_OK;
 done:
     free(buf);

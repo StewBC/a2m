@@ -464,7 +464,7 @@ int util_ini_save_file(const char *filename, INI_STORE *ini_store) {
 }
 
 // Misc helpers
-int util_qsort_cmp(const void *p1, const void *p2) {
+int util_file_info_qsort_cmp(const void *p1, const void *p2) {
     FILE_INFO *fip1 = (FILE_INFO *) p1;
     FILE_INFO *fip2 = (FILE_INFO *) p2;
     if(fip1->is_directory != fip2->is_directory) {
