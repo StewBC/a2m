@@ -41,8 +41,16 @@ typedef enum RAMVIEW_FLAGS {
     MEM_MAPPED_6502     = 0,
     MEM_MAIN            = (1 << 0),
     MEM_AUX             = (1 << 1),
-    MEM_LC_BANK2        = (1 << 2),
+    MEM_LC_BANK1        = (1 << 2),
+    MEM_LC_BANK2        = (1 << 3),
+    MEM_LC_E000_8K      = (1 << 4),  // LC fixed 8KB at $E000-$FFFF when LC RAM enabled
+    MEM_ROM             = (1 << 5),
+    MEM_IO              = (1 << 6),
+    MEM_MASK_ANY        = MEM_MAIN | MEM_AUX |
+                          MEM_LC_BANK1 | MEM_LC_BANK2 | MEM_LC_E000_8K |
+                          MEM_ROM | MEM_IO
 } RAMVIEW_FLAGS;
+
 
 // The UIs use this so a2m links in common.c, where it lives
 extern int apl2_txt_row_start[];
