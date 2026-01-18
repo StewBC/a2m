@@ -24,7 +24,7 @@ typedef struct ROMS {
 } ROMS;
 
 // When mapping ram into the 6502 address space, this is used to map read or write ram
-typedef enum PAGE_MAP_TYPE {
+typedef enum {
     PAGE_MAP_READ,
     PAGE_MAP_WRITE
 } PAGE_MAP_TYPE;

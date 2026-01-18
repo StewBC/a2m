@@ -24,12 +24,6 @@ enum {
     MONITOR_MONO,
 };
 
-// RAM
-enum {
-    MAIN_RAM,
-    AUX_RAM,
-};
-
 // ROM
 enum {
     ROM_APPLE2,
@@ -176,9 +170,6 @@ typedef struct APPLE2 {
 static inline uint8_t clamp_u8(uint32_t x, uint8_t lo, uint8_t hi) {
     return x < lo ? lo : (x > hi ? hi : x);
 }
-
-uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address);
-void apple2_softswitch_write_callback(APPLE2 *m, uint16_t address, uint8_t value);
 
 int apple2_init(APPLE2 *m, INI_STORE *ini_store);
 void apple2_machine_reset(APPLE2 *m);

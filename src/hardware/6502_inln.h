@@ -16,7 +16,7 @@ static inline uint8_t read_from_memory(APPLE2 *m, uint16_t address) {
     if(cb_mask) {
         // Want to do read before breakpoint is checked
         if(cb_mask & WATCH_IO_PORT) {
-            byte = apple2_softswitch_read_callback(m, address);
+            byte = io_callback_r(m, address);
         }
         if(cb_mask & WATCH_READ_BREAKPOINT) {
             m->a2out_cb.cb_breakpoint_ctx.cb_breakpoint(m->a2out_cb.cb_breakpoint_ctx.user, address, WATCH_READ_BREAKPOINT);
@@ -120,68 +120,6 @@ static inline uint64_t read_last_write_from_selected(APPLE2 *m, uint16_t address
     }
 }
 
-static inline RAMVIEW_FLAGS bank_0200_bfff_from_ramrdwrt(const APPLE2 *m, PAGE_MAP_TYPE map_type) {
-    if(map_type == PAGE_MAP_READ) {
-        return m->ramrdset ? MEM_AUX : MEM_MAIN;
-    }
-    return m->ramwrtset ? MEM_AUX : MEM_MAIN;
-}
-
-static inline RAMVIEW_FLAGS bank_video_override_80store(const APPLE2 *m, uint16_t address) {
-    // Returns MEM_MAPPED_6502 if no override applies.
-    if(address >= 0x0400 && address < 0x0800) {
-        return m->page2set ? MEM_AUX : MEM_MAIN;
-    }
-    if(m->hires && address >= 0x2000 && address < 0x4000) {
-        return m->page2set ? MEM_AUX : MEM_MAIN;
-    }
-    return MEM_MAPPED_6502;
-}
-
-static inline int lc_enabled_for_access(const APPLE2 *m, PAGE_MAP_TYPE map_type) {
-    if(map_type == PAGE_MAP_READ) {
-        return m->lc_read_ram_enable != 0;
-    }
-    return m->lc_write_enable != 0;
-}
-
-static inline RAMVIEW_FLAGS active_to_selected(const APPLE2 *m, uint16_t address, PAGE_MAP_TYPE map_type) {
-    // $0000-$01FF: ALTZP
-    if(address < 0x0200) {
-        return m->altzpset ? MEM_AUX : MEM_MAIN;
-    }
-
-    // $C000-$CFFF: I/O region (soft-switches, slots, etc.)
-    if((address & 0xF000) == 0xC000) {
-        return MEM_IO;
-    }
-
-    // $0200-$BFFF: normal RAM with RAMRD/RAMWRT selection, except 80STORE overrides
-    if(address < 0xC000) {
-        if(m->store80set) {
-            RAMVIEW_FLAGS ovr = bank_video_override_80store(m, address);
-            if(ovr != MEM_MAPPED_6502) {
-                return ovr;
-            }
-        }
-        return bank_0200_bfff_from_ramrdwrt(m, map_type);
-    }
-
-    // $D000-$FFFF: ROM vs LC RAM
-    if(!lc_enabled_for_access(m, map_type)) {
-        return MEM_ROM;
-    }
-
-    // LC RAM enabled: MAIN vs AUX based on ALTZP
-    RAMVIEW_FLAGS which64k = m->altzpset ? MEM_AUX : MEM_MAIN;
-
-    // $D000-$DFFF is banked, $E000-$FFFF is fixed 8KB.
-    if(address < 0xE000) {
-        return which64k | (m->lc_bank2_enable ? MEM_LC_BANK2 : MEM_LC_BANK1);
-    }
-    return which64k | MEM_LC_E000_8K;
-}
-
 static inline void write_to_memory(APPLE2 *m, uint16_t address, uint8_t value) {
     size_t page = address / PAGE_SIZE;
     size_t offset = address % PAGE_SIZE;
@@ -193,7 +131,7 @@ static inline void write_to_memory(APPLE2 *m, uint16_t address, uint8_t value) {
     m->pages.last_write_pages[page][offset] = last_write;
     if(cb_mask) {
         if(cb_mask & WATCH_IO_PORT) {
-            apple2_softswitch_write_callback(m, address, value);
+            io_callback_w(m, address, value);
         }
         if(cb_mask & WATCH_WRITE_BREAKPOINT) {
             m->a2out_cb.cb_breakpoint_ctx.cb_breakpoint(m->a2out_cb.cb_breakpoint_ctx.user, address, WATCH_WRITE_BREAKPOINT);

@@ -42,7 +42,7 @@ struct UI {
     int reconfig;
 };
 
-typedef enum KEY_MOD {
+typedef enum {
     KEYMOD_OPEN_APPLE,
     KEYMOD_CLOSED_APPLE,
 } KEY_MOD;

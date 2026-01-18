@@ -27,7 +27,7 @@
     uint32_t store80set: 1;\
     uint32_t strobed: 1;\
     uint32_t text: 1;\
-    uint32_t a2flags_pad: 11
+    uint32_t a2flags_pad: 9
 
 
 typedef struct A2FLAGS {

@@ -37,7 +37,7 @@
 // The flags that tell memory functions where to read/write
 // These are not used by hardware, but exist so external friends can ask hardware for
 // values from banks other than whatever is mapped into the 6502 space (MEM_MAPPED_6502)
-typedef enum RAMVIEW_FLAGS {
+typedef enum {
     MEM_MAPPED_6502     = 0,
     MEM_MAIN            = (1 << 0),
     MEM_AUX             = (1 << 1),
@@ -50,7 +50,6 @@ typedef enum RAMVIEW_FLAGS {
                           MEM_LC_BANK1 | MEM_LC_BANK2 | MEM_LC_E000_8K |
                           MEM_ROM | MEM_IO
 } RAMVIEW_FLAGS;
-
 
 // The UIs use this so a2m links in common.c, where it lives
 extern int apl2_txt_row_start[];

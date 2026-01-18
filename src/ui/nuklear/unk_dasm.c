@@ -596,11 +596,6 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                     bp.break_on_exec = 1;
                     bp.break_on_read = bp.break_on_write = 0;
                     bp.counter_stop_value = bp.counter_reset = 1;
-                    if(!dv->flags) {
-                        bp.selected_bank = active_to_selected(m, dv->cursor_address, PAGE_MAP_READ);
-                    } else {
-                        bp.selected_bank = dv->flags;
-                    }
                     ARRAY_ADD(&rt->breakpoints, bp);
                 } else {
                     array_remove(&rt->breakpoints, b);

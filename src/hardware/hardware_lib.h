@@ -9,7 +9,7 @@
 
 // Machine
 #include "65x02.h"
-#include "a2sft_defs.h"
+#include "io.h"
 #include "diskii.h"
 #include "frankdisp.h"
 #include "langcard.h"

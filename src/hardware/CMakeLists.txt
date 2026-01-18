@@ -6,8 +6,9 @@ cmake_minimum_required(VERSION 3.16)
 
 add_library(hardware STATIC
     6502_core.c
-    65c02.c
     6502.c
+    65c02.c
+    io.c
     apple2.c
     diskii.c
     frankdisp.c

@@ -4,8 +4,6 @@
 
 #include "common.h"
 #include "hardware_lib.h"
-#include "a2sft_p.h"
-#include "a2sft_ee.h"
 
 static void apple2_cofig_from_ini(APPLE2 *m, INI_STORE *ini_store) {
     const char *val = ini_get(ini_store, "machine", "model");
@@ -99,23 +97,6 @@ static void apple2_slot_setup(APPLE2 *m, INI_STORE *ini_store) {
     }
 }
 
-// Handle the Apple II sofswitches when read
-uint8_t apple2_softswitch_read_callback(APPLE2 *m, uint16_t address) {
-    if(m->model) {
-        return apple2_softswitch_read_callback_IIe(m, address);
-    }
-    return apple2_softswitch_read_callback_IIplus(m, address);
-}
-
-// Handle the Apple ][ softswitches when written to
-void apple2_softswitch_write_callback(APPLE2 *m, uint16_t address, uint8_t value) {
-    if(m->model) {
-        apple2_softswitch_write_callback_IIe(m, address, value);
-    } else {
-        apple2_softswitch_write_callback_IIplus(m, address, value);
-    }
-}
-
 // Set MACHINE up as an Apple II
 int apple2_init(APPLE2 *m, INI_STORE *ini_store) {
 
@@ -195,14 +176,19 @@ int apple2_init(APPLE2 *m, INI_STORE *ini_store) {
     pages_map_rom_block(&m->pages, &m->roms.blocks[ROM_APPLE2], &m->ram);
 
     // Map watch area checks - start with no watch
-    // Add the IO ports by flagging them as 1 in the RAM watch
-    memset(&m->ram.RAM_WATCH[0xC000], WATCH_IO_PORT, 0xFF);
+    // Add the IO ports by flagging them as 1 in the RAM watch (incl LC 0xc08x area)
+    memset(&m->ram.RAM_WATCH[0xC000], WATCH_IO_PORT, 0x90);
     if(m->model) {
         // On a //e, also watch Slot 3
+        memset(&m->ram.RAM_WATCH[0xC0B0], WATCH_IO_PORT, 0x0F);
         memset(&m->ram.RAM_WATCH[0xC300], WATCH_IO_PORT, 0xFF);
+        // The other slot areas are added in slot_add_card as-needed
     }
     // Watch the location to clear slot rom
     m->ram.RAM_WATCH[CLRROM] = WATCH_IO_PORT;
+
+    // Select the io handlers for this model
+    io_setup(m);
 
     // Set up the Language Card
     language_card_init(m);
@@ -240,8 +226,10 @@ void apple2_machine_reset(APPLE2 *m) {
 
     //e - Set up soft-switches
     if(m->model) {
-        set_memory_map(m);
-        apple2_softswitch_write_callback_IIe(m, CLRCXROM, 0);
+        // Re-select the IO handlers for this model (model may have changed)
+        io_setup(m);
+        // This is a noop on the ][+
+        io_callback_w(m, CLRCXROM, 0);
     }
 
     // Set up CPU

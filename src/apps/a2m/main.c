@@ -412,6 +412,9 @@ int main(int argc, char **argv) {
 
     main_ini_merge_to(&opts.ini_store, &ini_store);
 
+    // One time softswitch dispatch table init
+    io_c0_table_init();
+
     // This avoids reading ui.reconfig which might give a possible use of uninit var warning
     int reconfig = 0;
     do {

@@ -37,13 +37,13 @@
 
 typedef struct UNK UNK;
 
-typedef enum CURSOR_FIELD {
+typedef enum {
     CURSOR_HEX,
     CURSOR_ASCII,
     CURSOR_ADDRESS,
 } CURSOR_FIELD;
 
-typedef enum CURSOR_DIGIT {
+typedef enum {
     CURSOR_DIGIT0,
     CURSOR_DIGIT1,
     CURSOR_DIGIT2,
