@@ -107,20 +107,20 @@ static inline void set_memory_map(APPLE2 *m) {
 
 /*--------------------------------------------------------------------------*/
 
-static void c0_set_read_range(A2_C0_TABLE *t, int start, int end, ss_read read) {
-    for(int i = start; i <= end; i++) {
+static void c0_set_read_range(A2_C0_TABLE *t, int start, int length, ss_read read) {
+    for(int i = start; i < start + length; i++) {
         t->r[i] = read;
     }
 }
 
-// static void c0_set_write_range(A2_C0_TABLE *t, int start, int end, ss_write write) {
-//     for(int i = start; i <= end; i++) {
+// static void c0_set_write_range(A2_C0_TABLE *t, int start, int length, ss_write write) {
+//     for(int i = start; i < start + length; i++) {
 //         t->w[i] = write;
 //     }
 // }
 
-static void c0_set_range(A2_C0_TABLE *t, int start, int end, ss_read read_fn, ss_write write_fn) {
-    for(int i = start; i <= end; i++) {
+static void c0_set_range(A2_C0_TABLE *t, int start, int length, ss_read read_fn, ss_write write_fn) {
+    for(int i = start; i < start + length; i++) {
         t->r[i] = read_fn;
         t->w[i] = write_fn;
     }
@@ -912,14 +912,14 @@ void c0_write_slot(APPLE2 *m, uint16_t a, uint8_t v) {
 
 void io_c0_table_init(void) {
     // Set a base state
-    c0_set_range(&c0_iiplus, 0x00, 0x7F, c0_floating_r, c0_noop_w);
+    c0_set_range(&c0_iiplus, 0x00, 0x80, c0_floating_r, c0_noop_w);
     // 00
-    c0_set_read_range(&c0_iiplus, 0x00, 0x1F, c0_kbd_r);
+    c0_set_read_range(&c0_iiplus, 0x00, 0x10, c0_kbd_r);
     // 10
-    c0_set_range(&c0_iiplus, 0x10, 0x1F, c0_kbdstrb_r, c0_kbdstrb_w);
+    c0_set_range(&c0_iiplus, 0x10, 0x10, c0_kbdstrb_r, c0_kbdstrb_w);
     // 20
     // 30
-    c0_set_range(&c0_iiplus, 0x30, 0x1F, c0_a2speaker_r, c0_a2speaker_w);
+    c0_set_range(&c0_iiplus, 0x30, 0x10, c0_a2speaker_r, c0_a2speaker_w);
     // 40 -- VBL?
     // 50
     c0_iiplus.r[TXTCLR & 0xFF] = c0_txtclr_r;
@@ -947,11 +947,11 @@ void io_c0_table_init(void) {
     c0_iiplus.r[PADDL2 & 0xFF] = c0_paddl2_r;
     c0_iiplus.r[PADDL3 & 0xFF] = c0_paddl3_r;
     // 70
-    c0_set_range(&c0_iiplus, 0x30, 0x1F, c0_ptrig_r, c0_ptrig_w);
+    c0_set_range(&c0_iiplus, 0x70, 0x10, c0_ptrig_r, c0_ptrig_w);
     // 80 - 8F - Language card
-    c0_set_range(&c0_iiplus, 0x80, 0X8F, c0_read_lc, c0_write_lc);
+    c0_set_range(&c0_iiplus, 0x80, 0X10, c0_read_lc, c0_write_lc);
     // 90 - FF - Slot IO
-    c0_set_range(&c0_iiplus, 0x90, 0XFF, c0_read_slot, c0_write_slot);
+    c0_set_range(&c0_iiplus, 0x90, 0X70, c0_read_slot, c0_write_slot);
 
     // Make the iie the same as the iiplus (the base set)
     memcpy(&c0_iie, &c0_iiplus, sizeof(c0_iie));
@@ -992,7 +992,7 @@ void io_c0_table_init(void) {
     c0_iie.r[RDALTCHAR & 0xFF] = c0_rdaltchar_r;
     c0_iie.r[RD80COL & 0xFF] = c0_rd80col_r;
 
-    // 20 - Tape?
+    // 20
     // 30 - Speaker
     // 40 - ?
     // 50 - DHGR toggles
@@ -1000,8 +1000,7 @@ void io_c0_table_init(void) {
     c0_iie.w[CLRAN3 & 0xFF] = c0_clran3_w;
     c0_iie.r[SETAN3 & 0xFF] = c0_setan3_r;
     c0_iie.w[SETAN3 & 0xFF] = c0_setan3_w;
-    // 60
-    // 70
+    // 60 - FF
 }
 
 // IO area reads that trigger on mask (read_from_memory)
