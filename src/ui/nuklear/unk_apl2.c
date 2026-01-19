@@ -244,30 +244,25 @@ void unk_apl2_init_color_table(UNK *v) {
 
 }
 
+// Map a keycode taking caps/shift into account and assuming a US style keyboard layout
 static int a2_ascii_from_keydown(const SDL_Keycode k, SDL_Keymod mod, uint8_t *out) {
     int shift = (mod & KMOD_SHIFT) != 0;
     int caps  = (mod & KMOD_CAPS)  != 0;
 
     // Letters (SDLK_a..SDLK_z are lowercase keycodes)
     if(k >= SDLK_a && k <= SDLK_z) {
-        int upper = shift ^ caps;
-        uint8_t c = ('a' + (k - SDLK_a));
-        if(upper) {
-            c = ('A' + (k - SDLK_a));
-        }
-        *out = c;
+        *out = (shift ^ caps ? 'A' : 'a') + (k - SDLK_a);
         return 1;
     }
 
-    // Digits row (US-style shifted symbols)
+    // Digits row
     if(k >= SDLK_0 && k <= SDLK_9) {
         static const char shifted_digits[] = {')', '!', '@', '#', '$', '%', '^', '&', '*', '('};
-        uint8_t c = shift ? shifted_digits[k - SDLK_0] : ('0' + (k - SDLK_0));
-        *out = c;
+        *out = shift ? shifted_digits[k - SDLK_0] : ('0' + (k - SDLK_0));
         return 1;
     }
 
-    // Common punctuation (US mapping)
+    // Common punctuation
     switch(k) {
         case SDLK_SPACE:
             *out = ' ';
