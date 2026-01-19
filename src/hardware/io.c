@@ -29,16 +29,16 @@ static void io_slot_iie(APPLE2 *m, uint16_t address) {
     // IO Select, which can "strobe" c800-cfff
     int slot = (address >> 8) & 0x7;
     // slot 3 and not m->c3slotrom overrides m->strobed
-    if(slot == 3 && !m->c3slotrom) {
+    if(slot == 3 && !tst_flags(m->state_flags, A2S_C3ROM)) {
         // Map 80 col firmware
         pages_map_rom(&m->pages, 0xC800, 0x800, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x800], &m->ram);
-        m->strobed = 1;
+        set_flags(m->state_flags, A2S_STROBED);
         m->mapped_slot = 0;
-    } else if(!m->strobed && !m->cxromset && m->slot_cards[slot].slot_map_cx_rom) {
+    } else if(!tst_flags(m->state_flags, A2S_STROBED) && !tst_flags(m->state_flags, A2S_CXROM) && m->slot_cards[slot].slot_map_cx_rom) {
         // If nothing is strobed, and the rom is not active and the card has rom, map the rom
         m->slot_cards[slot].slot_map_cx_rom(m, address);
         m->mapped_slot = slot;
-        m->strobed = 1;
+        set_flags(m->state_flags, A2S_STROBED);
     }
 }
 
@@ -53,13 +53,13 @@ static void io_c8_free(APPLE2 *m) {
 
 static inline void slot_clrrom(APPLE2 *m, uint16_t address) {
     // cxromset overriders all - do nothing if cxromset
-    if(m->strobed && !m->cxromset) {
-        if(!m->mapped_slot) {
+    if(tst_flags(m->state_flags, A2S_STROBED) && !tst_flags(m->state_flags, A2S_CXROM)) {
+        if(m->mapped_slot) {
             m->slot_cards[m->mapped_slot].cx_rom_mapped = 0;
             m->mapped_slot = 0;
         }
         pages_map(&m->pages, PAGE_MAP_READ, 0xC800, 0x800, &m->ram);
-        m->strobed = 0;
+        clr_flags(m->state_flags, A2S_STROBED);
     }
 }
 
@@ -70,33 +70,33 @@ static inline void set_memory_map(APPLE2 *m) {
     language_card_map_memory(m);
 
     // SETALTZP
-    if(m->altzpset) {
+    if(tst_flags(m->state_flags, A2S_ALTZP)) {
         pages_map(&m->pages, PAGE_MAP_READ,  0x10000, 0x0200, &m->ram);
         pages_map(&m->pages, PAGE_MAP_WRITE, 0x10000, 0x0200, &m->ram);
     }
 
     //SETRAMRD
-    if(m->ramrdset) {
+    if(tst_flags(m->state_flags, A2S_RAMRD)) {
         pages_map(&m->pages, PAGE_MAP_READ,  0x10200, 0xBE00, &m->ram);
     }
 
     // SETRAMWRT
-    if(m->ramwrtset) {
+    if(tst_flags(m->state_flags, A2S_RAMWRT)) {
         pages_map(&m->pages, PAGE_MAP_WRITE, 0x10200, 0xBE00, &m->ram);
     }
 
     // SET80
-    if(m->store80set) {
+    if(tst_flags(m->state_flags, A2S_80STORE)) {
         pages_map(&m->pages, PAGE_MAP_READ,  0x0400, 0x0400, &m->ram);
         pages_map(&m->pages, PAGE_MAP_WRITE, 0x0400, 0x0400, &m->ram);
-        if(m->hires) {
+        if(tst_flags(m->state_flags, A2S_HIRES)) {
             pages_map(&m->pages, PAGE_MAP_READ,  0x2000, 0x2000, &m->ram);
             pages_map(&m->pages, PAGE_MAP_WRITE, 0x2000, 0x2000, &m->ram);
         }
-        if(m->page2set) {
+        if(tst_flags(m->state_flags, A2S_PAGE2)) {
             pages_map(&m->pages, PAGE_MAP_READ,  0x10400, 0x0400, &m->ram);
             pages_map(&m->pages, PAGE_MAP_WRITE, 0x10400, 0x0400, &m->ram);
-            if(m->hires) {
+            if(tst_flags(m->state_flags, A2S_HIRES)) {
                 pages_map(&m->pages, PAGE_MAP_READ,  0x12000, 0x2000, &m->ram);
                 pages_map(&m->pages, PAGE_MAP_WRITE, 0x12000, 0x2000, &m->ram);
             }
@@ -158,7 +158,7 @@ void c0_clr80store_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a);
     UNUSED(v);
     // This is just keeping the old system till I have table-converted the code
-    m->store80set = 0;
+    clr_flags(m->state_flags, A2S_80STORE);
     set_memory_map(m);
 }
 
@@ -167,7 +167,7 @@ void c0_set80store_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a);
     UNUSED(v);
     // This is just keeping the old system till I have table-converted the code
-    m->store80set = 1;
+    set_flags(m->state_flags, A2S_80STORE);
     set_memory_map(m);
 }
 
@@ -175,35 +175,35 @@ void c0_set80store_w(APPLE2 *m, uint16_t a, uint8_t v) {
 // 0xC002
 void c0_clrramrd_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a); UNUSED(v);
-    m->ramrdset = 0;
+    clr_flags(m->state_flags, A2S_RAMRD);
     set_memory_map(m);
 }
 
 // 0xC0003
 void c0_setramrd_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a); UNUSED(v);
-    m->ramrdset = 1;
+    set_flags(m->state_flags, A2S_RAMRD);
     set_memory_map(m);
 }
 
 // 0xC004
 void c0_clrramwrt_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a); UNUSED(v);
-    m->ramwrtset = 0;
+    clr_flags(m->state_flags, A2S_RAMWRT);
     set_memory_map(m);    
 }
 
 // 0xC005
 void c0_setramwrt_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a); UNUSED(v);
-    m->ramwrtset = 1;
+    set_flags(m->state_flags, A2S_RAMWRT);
     set_memory_map(m);
 }
 
 // 0xC006
 void c0_clrcxrom_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(v);
-    m->cxromset = 0;
+    clr_flags(m->state_flags, A2S_CXROM);
     // Restore the slot mappings
     m->pages.read_pages[0xC100 / PAGE_SIZE] = m->rom_shadow_pages[1];
     m->pages.read_pages[0xC200 / PAGE_SIZE] = m->rom_shadow_pages[2];
@@ -212,11 +212,11 @@ void c0_clrcxrom_w(APPLE2 *m, uint16_t a, uint8_t v) {
     m->pages.read_pages[0xC600 / PAGE_SIZE] = m->rom_shadow_pages[6];
     m->pages.read_pages[0xC700 / PAGE_SIZE] = m->rom_shadow_pages[7];
     // Only if internal slot3 is not overriding the card rom
-    if(m->c3slotrom) {
+    if(tst_flags(m->state_flags, A2S_C3ROM)) {
         m->pages.read_pages[0xC300 / PAGE_SIZE] = m->rom_shadow_pages[3];
     }
     // If a card was mapped to c800, restore that mapping
-    if(m->strobed) {
+    if(tst_flags(m->state_flags, A2S_STROBED)) {
         if(m->mapped_slot) {
             m->slot_cards[m->mapped_slot].slot_map_cx_rom(m, a);
         }
@@ -228,7 +228,7 @@ void c0_clrcxrom_w(APPLE2 *m, uint16_t a, uint8_t v) {
 // 0xC007
 void c0_setcxrom_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a); UNUSED(v);
-    m->cxromset = 1;
+    set_flags(m->state_flags, A2S_CXROM);
     // C100-D000
     pages_map_rom(&m->pages, 0xC100, 0xF00, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x100], &m->ram);
 }
@@ -236,14 +236,14 @@ void c0_setcxrom_w(APPLE2 *m, uint16_t a, uint8_t v) {
 // 0xC008
 void c0_clraltzp_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a); UNUSED(v);
-    m->altzpset = 0;
+    clr_flags(m->state_flags, A2S_ALTZP);
     set_memory_map(m);    
 }
 
 // 0xC009
 void c0_setaltzp_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a); UNUSED(v);
-    m->altzpset = 1;
+    set_flags(m->state_flags, A2S_ALTZP);
     set_memory_map(m);
 }
 
@@ -252,7 +252,7 @@ void c0_clrc3rom_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a); UNUSED(v);
     // C300-C3FF
     // Turn internal rom on, slot rom off
-    m->c3slotrom = 0;
+    clr_flags(m->state_flags, A2S_C3ROM);
     pages_map_rom(&m->pages, 0xC300, 0x100, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x300], &m->ram);
 }
 
@@ -260,32 +260,32 @@ void c0_clrc3rom_w(APPLE2 *m, uint16_t a, uint8_t v) {
 void c0_setc3rom_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a); UNUSED(v);
     // Turn internal rom off, slot rom on
-    m->c3slotrom = 1;
+    set_flags(m->state_flags, A2S_C3ROM);
     m->pages.read_pages[0xC300 / PAGE_SIZE] = m->rom_shadow_pages[3];
 }
 
 // 0xC00C
 void c0_clr80col_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a); UNUSED(v);
-    m->col80set = 0;
+    clr_flags(m->state_flags, A2S_COL80);
 }
 
 // 0xC00D
 void c0_set80col_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a); UNUSED(v);
-    m->col80set = 1;
+    set_flags(m->state_flags, A2S_COL80);
 }
 
 // 0xC00E
 void c0_clraltchar_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a); UNUSED(v);
-    m->altcharset = 0;
+    clr_flags(m->state_flags, A2S_ALTCHARSET);
 }
 
 // 0xC00F
 void c0_setaltchar_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a); UNUSED(v);
-    m->altcharset = 1;
+    set_flags(m->state_flags, A2S_ALTCHARSET);
 }
 
 static inline void kbdstrb_helper(APPLE2 *m) {
@@ -312,56 +312,56 @@ void c0_kbdstrb_w(APPLE2 *m, uint16_t a, uint8_t v) {
 uint8_t c0_hramrd_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
     kbdstrb_helper(m); 
-    return m->lc_bank2_enable << 7;
+    return tst_flags(m->state_flags, A2S_LC_BANK2) ? 0x80 : 0x00;;
 }
 
 // 0xC012
 uint8_t c0_hramwrt_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
     kbdstrb_helper(m); 
-    return m->lc_read_ram_enable << 7;
+    return tst_flags(m->state_flags, A2S_LC_READ) ? 0x80 : 0x00;;
 }
 
 // 0xC013
 uint8_t c0_rdramrd_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
     kbdstrb_helper(m); 
-    return m->ramrdset << 7;
+    return tst_flags(m->state_flags, A2S_RAMRD) ? 0x80 : 0x00;;
 }
 
 // 0xC014
 uint8_t c0_rdramwrt_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
     kbdstrb_helper(m); 
-    return m->ramwrtset << 7;
+    return tst_flags(m->state_flags, A2S_RAMWRT) ? 0x80 : 0x00;;
 }
 
 // 0xC015
 uint8_t c0_rdcxrom_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
     kbdstrb_helper(m); 
-    return m->cxromset << 7;
+    return tst_flags(m->state_flags, A2S_CXROM) ? 0x80 : 0x00;;
 }
 
 // 0xC016
 uint8_t c0_rdaltzp_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
     kbdstrb_helper(m); 
-    return m->altzpset << 7;
+    return tst_flags(m->state_flags, A2S_ALTZP) ? 0x80 : 0x00;;
 }
 
 // 0xc017
 uint8_t c0_rdc3rom_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
     kbdstrb_helper(m); 
-    return m->c3slotrom << 7;
+    return tst_flags(m->state_flags, A2S_C3ROM) ? 0x80 : 0x00;;
 }
 
 // 0xC018
 uint8_t c0_rd80store_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
     kbdstrb_helper(m); 
-    return m->store80set << 7;
+    return tst_flags(m->state_flags, A2S_80STORE) ? 0x80 : 0x00;;
 }
 
 // 0xC019
@@ -375,42 +375,42 @@ uint8_t c0_rdvbl_r(APPLE2 *m, uint16_t a) {
 uint8_t c0_rdtext_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
     kbdstrb_helper(m); 
-    return m->text << 7;
+    return tst_flags(m->state_flags, A2S_TEXT) ? 0x80 : 0x00;;
 }
 
 // 0xC01B
 uint8_t c0_rdmixed_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
     kbdstrb_helper(m); 
-    return m->mixed << 7;
+    return tst_flags(m->state_flags, A2S_MIXED) ? 0x80 : 0x00;;
 }
 
 // 0xC01C
 uint8_t c0_rdpage2_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
     kbdstrb_helper(m); 
-    return m->page2set << 7;
+    return tst_flags(m->state_flags, A2S_PAGE2) ? 0x80 : 0x00;;
 }
 
 // 0xC01D
 uint8_t c0_rdhires_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
     kbdstrb_helper(m); 
-    return m->hires << 7;
+    return tst_flags(m->state_flags, A2S_HIRES) ? 0x80 : 0x00;;
 }
 
 // 0xC01E
 uint8_t c0_rdaltchar_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
     kbdstrb_helper(m); 
-    return m->altcharset << 7;
+    return tst_flags(m->state_flags, A2S_ALTCHARSET) ? 0x80 : 0x00;;
 }
 
 // 0xC01F
 uint8_t c0_rd80col_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
     kbdstrb_helper(m); 
-    return m->col80set << 7;
+    return tst_flags(m->state_flags, A2S_COL80) ? 0x80 : 0x00;;
 }
 
 // 0xC030
@@ -455,60 +455,60 @@ void c0_rdvblmsk_w(APPLE2 *m, uint16_t a, uint8_t v) {
 // 0xC050
 uint8_t c0_txtclr_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    m->text = 0;
+    clr_flags(m->state_flags, A2S_TEXT);
     return floating_bus();
 }
 
 void c0_txtclr_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a);
     UNUSED(v);
-    m->text = 0;
+    clr_flags(m->state_flags, A2S_TEXT);
 }
 
 // 0xC051
 uint8_t c0_txtset_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    m->text = 1;
+    set_flags(m->state_flags, A2S_TEXT);
     return floating_bus();
 }
 
 void c0_txtset_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a);
     UNUSED(v);
-    m->text = 1;
+    set_flags(m->state_flags, A2S_TEXT);
 }
 
 // 0xC052
 uint8_t c0_mixclr_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    m->mixed = 0;
+    clr_flags(m->state_flags, A2S_MIXED);
     return floating_bus();
 }
 
 void c0_mixclr_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a);
     UNUSED(v);
-    m->mixed = 0;
+    clr_flags(m->state_flags, A2S_MIXED);
 }
 
 // 0xC053
 uint8_t c0_mixset_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    m->mixed = 1;
+    set_flags(m->state_flags, A2S_MIXED);
     return floating_bus();
 }
 
 void c0_mixset_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a);
     UNUSED(v);
-    m->mixed = 1;
+    set_flags(m->state_flags, A2S_MIXED);
 }
 
 // 0xC054
 uint8_t c0_clrpage2_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    m->page2set = 0;
-    if(m->store80set) {
+    clr_flags(m->state_flags, A2S_PAGE2);
+    if(tst_flags(m->state_flags, A2S_80STORE)) {
         set_memory_map(m);
     }
     return floating_bus();
@@ -517,8 +517,8 @@ uint8_t c0_clrpage2_r(APPLE2 *m, uint16_t a) {
 void c0_clrpage2_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a);
     UNUSED(v);
-    m->page2set = 0;
-    if(m->store80set) {
+    clr_flags(m->state_flags, A2S_PAGE2);
+    if(tst_flags(m->state_flags, A2S_80STORE)) {
         set_memory_map(m);
     }
 }
@@ -526,8 +526,8 @@ void c0_clrpage2_w(APPLE2 *m, uint16_t a, uint8_t v) {
 // 0xC055
 uint8_t c0_setpage2_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    m->page2set = 1;
-    if(m->store80set) {
+    set_flags(m->state_flags, A2S_PAGE2);
+    if(tst_flags(m->state_flags, A2S_80STORE)) {
         set_memory_map(m);
     }
     return floating_bus();
@@ -536,8 +536,8 @@ uint8_t c0_setpage2_r(APPLE2 *m, uint16_t a) {
 void c0_setpage2_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a);
     UNUSED(v);
-    m->page2set = 1;
-    if(m->store80set) {
+    set_flags(m->state_flags, A2S_PAGE2);
+    if(tst_flags(m->state_flags, A2S_80STORE)) {
         set_memory_map(m);
     }
 }
@@ -545,8 +545,8 @@ void c0_setpage2_w(APPLE2 *m, uint16_t a, uint8_t v) {
 // 0xC056
 uint8_t c0_clrhires_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    m->hires = 0;
-    if(m->store80set) {
+    clr_flags(m->state_flags, A2S_HIRES);
+    if(tst_flags(m->state_flags, A2S_80STORE)) {
         set_memory_map(m);
     }
     return floating_bus();
@@ -555,8 +555,8 @@ uint8_t c0_clrhires_r(APPLE2 *m, uint16_t a) {
 void c0_clrhires_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a);
     UNUSED(v);
-    m->hires = 0;
-    if(m->store80set) {
+    clr_flags(m->state_flags, A2S_HIRES);
+    if(tst_flags(m->state_flags, A2S_80STORE)) {
         set_memory_map(m);
     }
 }
@@ -564,8 +564,8 @@ void c0_clrhires_w(APPLE2 *m, uint16_t a, uint8_t v) {
 // 0xC057
 uint8_t c0_sethires_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    m->hires = 1;
-    if(m->store80set) {
+    set_flags(m->state_flags, A2S_HIRES);
+    if(tst_flags(m->state_flags, A2S_80STORE)) {
         set_memory_map(m);
     }
     return floating_bus();
@@ -574,119 +574,42 @@ uint8_t c0_sethires_r(APPLE2 *m, uint16_t a) {
 void c0_sethires_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a);
     UNUSED(v);
-    m->hires = 1;
-    if(m->store80set) {
+    set_flags(m->state_flags, A2S_HIRES);
+    if(tst_flags(m->state_flags, A2S_80STORE)) {
         set_memory_map(m);
     }
-}
-
-// 0xC058
-uint8_t c0_clran0_r(APPLE2 *m, uint16_t a) {
-    UNUSED(a);
-    return floating_bus();
-}
-
-void c0_clran0_w(APPLE2 *m, uint16_t a, uint8_t v) {
-    UNUSED(a);
-    UNUSED(v);
-}
-
-// 0xC059
-uint8_t c0_setan0_r(APPLE2 *m, uint16_t a) {
-    UNUSED(a);
-    return floating_bus();
-}
-
-void c0_setan0_w(APPLE2 *m, uint16_t a, uint8_t v) {
-    UNUSED(a);
-    UNUSED(v);
-}
-
-// 0xC05A
-uint8_t c0_clran1_r(APPLE2 *m, uint16_t a) {
-    UNUSED(a);
-    return floating_bus();
-}
-
-void c0_clran1_w(APPLE2 *m, uint16_t a, uint8_t v) {
-    UNUSED(a);
-    UNUSED(v);
-}
-
-// 0xC05B
-uint8_t c0_setan1_r(APPLE2 *m, uint16_t a) {
-    UNUSED(a);
-    return floating_bus();
-}
-
-void c0_setan1_w(APPLE2 *m, uint16_t a, uint8_t v) {
-    UNUSED(a);
-    UNUSED(v);
-}
-
-// 0xC05C
-uint8_t c0_clran2_r(APPLE2 *m, uint16_t a) {
-    UNUSED(a);
-    return floating_bus();
-}
-
-void c0_clran2_w(APPLE2 *m, uint16_t a, uint8_t v) {
-    UNUSED(a);
-    UNUSED(v);
-}
-
-// 0xC05D
-uint8_t c0_setan2_r(APPLE2 *m, uint16_t a) {
-    UNUSED(a);
-    return floating_bus();
-}
-
-void c0_setan2_w(APPLE2 *m, uint16_t a, uint8_t v) {
-    UNUSED(a);
-    UNUSED(v);
 }
 
 // 0xC05E
 uint8_t c0_clran3_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    m->dhires = 1;
+    set_flags(m->state_flags, A2S_DHIRES);
     return floating_bus();
 }
 
 void c0_clran3_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a);
     UNUSED(v);
-    m->dhires = 1;
+    set_flags(m->state_flags, A2S_DHIRES);
 }
 
 // 0xC05F
 uint8_t c0_setan3_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    m->dhires = 0;
+    clr_flags(m->state_flags, A2S_DHIRES);
     return floating_bus();
 }
 
 void c0_setan3_w(APPLE2 *m, uint16_t a, uint8_t v) {
     UNUSED(a);
     UNUSED(v);
-    m->dhires = 0;
-}
-
-// 0xC060
-uint8_t c0_tapein_r(APPLE2 *m, uint16_t a) {
-    UNUSED(a);
-    return floating_bus();
-}
-
-void c0_tapein_w(APPLE2 *m, uint16_t a, uint8_t v) {
-    UNUSED(a);
-    UNUSED(v);
+    clr_flags(m->state_flags, A2S_DHIRES);
 }
 
 // 0xC061
 uint8_t c0_butn0_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    uint8_t button = m->open_apple ? 0x80 : 0x00;
+    uint8_t button = tst_flags(m->state_flags, A2S_OPEN_APPLE) ? 0x80 : 0x00;
     cb_read_button rb = m->a2out_cb.cb_inputdevice_ctx.cb_read_button;
     if(rb) {
         for(int i = 0; i < 2; i++) {
@@ -699,7 +622,7 @@ uint8_t c0_butn0_r(APPLE2 *m, uint16_t a) {
 // 0xC062
 uint8_t c0_butn1_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    uint8_t button = m->closed_apple ? 0x80 : 0x00;
+    uint8_t button = tst_flags(m->state_flags, A2S_CLOSED_APPLE) ? 0x80 : 0x00;
     cb_read_button rb = m->a2out_cb.cb_inputdevice_ctx.cb_read_button;
     if(rb) {
         for(int i = 0; i < 2; i++) {
@@ -1010,7 +933,7 @@ uint8_t io_callback_r(APPLE2 *m, uint16_t address) {
     } else if(address >= 0xc100 && address < 0xC800) {
         io_slot_handler(m, address);
     } else if(address == CLRROM) {
-        io_c8_free(m);
+        slot_clrrom(m, address); // SQW not right for ii+
     }
     // If nothing is strobed, this is floating bus which in my case is 0xA0
     return m->pages.read_pages[address / PAGE_SIZE][address % PAGE_SIZE];
@@ -1022,17 +945,17 @@ void io_callback_w(APPLE2 *m, uint16_t address, uint8_t value) {
         c0_machine_table->w[address & 0xFF](m, address, value);
     } else if(address >= 0xc100 && address < 0xC800) {
         io_slot_handler(m, address);
-    } else if(m->franklin80installed && address >= 0xCC00 && address < 0xCE00) {
+    } else if(tst_flags(m->state_flags, A2S_FRANKLIN80INSTALLED) && address >= 0xCC00 && address < 0xCE00) {
         m->franklin_display.display_ram[(address & 0x01ff) + m->franklin_display.bank * 0x200] = value;
     } else if(address == CLRROM) {
-        io_c8_free(m);
+        slot_clrrom(m, address); // SQW not right for ii+
     }
 }
 
 void io_setup(APPLE2 *m) {
     c0_machine_table = &c0_iiplus;
     io_slot_handler = &io_slot_iiplus;
-    if(m->model) {
+    if(m->model == MODEL_APPLE_IIEE) {
         c0_machine_table = &c0_iie;
         io_slot_handler = &io_slot_iie;
         set_memory_map(m);

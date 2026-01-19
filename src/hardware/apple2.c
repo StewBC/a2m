@@ -89,7 +89,7 @@ static void apple2_slot_setup(APPLE2 *m, INI_STORE *ini_store) {
                         slot_add_card(m, slot, SLOT_TYPE_VIDEX_API, &m->franklin_display,
                                       &m->roms.blocks[ROM_FRANKLIN_ACE_DISPLAY].bytes[0x600], franklin_display_map_cx_rom);
                         memset(m->ram.RAM_WATCH + 0xCC00, 1, 0x200);
-                        m->franklin80installed = 1;
+                        set_flags(m->state_flags, A2S_FRANKLIN80INSTALLED);
                     }
                 }
             }
@@ -107,7 +107,7 @@ int apple2_init(APPLE2 *m, INI_STORE *ini_store) {
     m->model = MODEL_APPLE_IIEE;    //e
     m->cpu.class = CPU_65c02;       // with appropriate cpu
     m->ram_size = 128 * 1024;       // and 128k ram
-    m->text = 1;                    // staring in text mode
+    m->state_flags = A2S_TEXT;      // starting in text mode
 
     // Now see if the config is overridden from the cli/ini file
     apple2_cofig_from_ini(m, ini_store);
@@ -149,7 +149,7 @@ int apple2_init(APPLE2 *m, INI_STORE *ini_store) {
     if(A2_OK != rom_init(&m->roms, ROM_NUM_ROMS)) {
         return A2_ERR;
     }
-    if(!m->model) {
+    if(m->model == MODEL_APPLE_II_PLUS) {
         rom_add(&m->roms, ROM_APPLE2, 0xD000, a2p_rom_size, a2p_rom);
         rom_add(&m->roms, ROM_APPLE2_CHARACTER, 0x0000, a2p_character_rom_size, a2p_character_rom);
     } else {
@@ -178,7 +178,7 @@ int apple2_init(APPLE2 *m, INI_STORE *ini_store) {
     // Map watch area checks - start with no watch
     // Add the IO ports by flagging them as 1 in the RAM watch (incl LC 0xc08x area)
     memset(&m->ram.RAM_WATCH[0xC000], WATCH_IO_PORT, 0x90);
-    if(m->model) {
+    if(m->model == MODEL_APPLE_IIEE) {
         // On a //e, also watch Slot 3
         memset(&m->ram.RAM_WATCH[0xC0B0], WATCH_IO_PORT, 0x0F);
         memset(&m->ram.RAM_WATCH[0xC300], WATCH_IO_PORT, 0xFF);
@@ -212,11 +212,11 @@ int apple2_init(APPLE2 *m, INI_STORE *ini_store) {
 void apple2_machine_reset(APPLE2 *m) {
     // A2 state_flags reset (keep model), setting text mode
     int model = m->model;
-    int f80 = m->franklin80installed;
+    int f80 = tst_flags(m->state_flags, A2S_FRANKLIN80INSTALLED);
     m->state_flags = 0;
     m->model = model;
-    m->franklin80installed = f80;
-    m->text = 1;
+    set_flags(m->state_flags, f80);
+    set_flags(m->state_flags, A2S_TEXT);
 
     // Reset LC
     language_card_init(m);
@@ -225,7 +225,7 @@ void apple2_machine_reset(APPLE2 *m) {
     memset(&m->ram.RAM_MAIN[0x0400], 0xA0, 0x400);
 
     //e - Set up soft-switches
-    if(m->model) {
+    if(m->model == MODEL_APPLE_IIEE) {
         // Re-select the IO handlers for this model (model may have changed)
         io_setup(m);
         // This is a noop on the ][+
@@ -245,7 +245,7 @@ void apple2_shutdown(APPLE2 *m) {
     // speaker_shutdown(&m->speaker);
     diskii_shutdown(m);
     sp_shutdown(m);
-    if(m->franklin80installed) {
+    if(tst_flags(m->state_flags, A2S_FRANKLIN80INSTALLED)) {
         franklin_display_shutdown(&m->franklin_display);
     }
     // pages

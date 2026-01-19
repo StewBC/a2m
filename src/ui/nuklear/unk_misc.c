@@ -475,29 +475,43 @@ void unk_misc_show(UNK *v) {
 
         // 3) The soft switches
         if(nk_tree_push(ctx, NK_TREE_TAB, "Soft Switches", NK_MAXIMIZED)) {
+            uint32_t newbit;
             nk_layout_row_dynamic(ctx, 13, 4);
             {
-                v->shadow_flags.b.store80set = nk_option_label_disabled(ctx, "C000-80STORE", v->shadow_flags.b.store80set, 1);
-                v->shadow_flags.b.ramrdset   = nk_option_label_disabled(ctx, "C003-RAMRD", v->shadow_flags.b.ramrdset, 1);
-                v->shadow_flags.b.ramwrtset  = nk_option_label_disabled(ctx, "C005-RAMWRT", v->shadow_flags.b.ramwrtset, 1);
-                v->shadow_flags.b.cxromset   = nk_option_label_disabled(ctx, "C007-CXROM", v->shadow_flags.b.cxromset, 1);
-                v->shadow_flags.b.altzpset   = nk_option_label_disabled(ctx, "C009-ALTZP", v->shadow_flags.b.altzpset, 1);
-                v->shadow_flags.b.c3slotrom  = nk_option_label_disabled(ctx, "C00B-C3ROM", v->shadow_flags.b.c3slotrom, 1);
+                newbit = nk_option_label_disabled(ctx, "C000-80STORE", (v->shadow_state & A2S_80STORE) != 0, 1 ) ? A2S_80STORE : 0;
+                v->shadow_state = (v->shadow_state & ~A2S_80STORE) | newbit;
+                newbit = nk_option_label_disabled(ctx, "C003-RAMRD", (v->shadow_state & A2S_RAMRD) != 0, 1 ) ? A2S_RAMRD : 0;
+                v->shadow_state = (v->shadow_state & ~A2S_RAMRD) | newbit;
+                newbit = nk_option_label_disabled(ctx, "C005-RAMWRT", (v->shadow_state & A2S_RAMWRT) != 0, 1 ) ? A2S_RAMWRT : 0;
+                v->shadow_state = (v->shadow_state & ~A2S_RAMWRT) | newbit;
+                newbit = nk_option_label_disabled(ctx, "C007-CXROM", (v->shadow_state & A2S_CXROM) != 0, 1 ) ? A2S_CXROM : 0;
+                v->shadow_state = (v->shadow_state & ~A2S_CXROM) | newbit;
+                newbit = nk_option_label_disabled(ctx, "C009-ALTZP", (v->shadow_state & A2S_ALTZP) != 0, 1 ) ? A2S_ALTZP : 0;
+                v->shadow_state = (v->shadow_state & ~A2S_ALTZP) | newbit;
+                newbit = nk_option_label_disabled(ctx, "C00B-C3ROM", (v->shadow_state & A2S_C3ROM) != 0, 1 ) ? A2S_C3ROM : 0;
+                v->shadow_state = (v->shadow_state & ~A2S_C3ROM) | newbit;
             }
             nk_layout_row_dynamic(ctx, 13, 1);
             {
                 nk_spacer(ctx);
-                v->display_override          = nk_option_label(ctx, "Display override", v->display_override);
+                v->display_override = nk_option_label(ctx, "Display override", v->display_override);
             }
             nk_layout_row_dynamic(ctx, 13, 4);
             {
-                v->shadow_flags.b.col80set   = nk_option_label_disabled(ctx, "C00D-80COL", v->shadow_flags.b.col80set, !v->display_override);
-                v->shadow_flags.b.altcharset = nk_option_label_disabled(ctx, "C00F-ALTCHAR", v->shadow_flags.b.altcharset, !v->display_override);
-                v->shadow_flags.b.text       = nk_option_label_disabled(ctx, "C051-TEXT", v->shadow_flags.b.text, !v->display_override);
-                v->shadow_flags.b.mixed      = nk_option_label_disabled(ctx, "C053-MIXED", v->shadow_flags.b.mixed, !v->display_override);
-                v->shadow_flags.b.page2set   = nk_option_label_disabled(ctx, "C055-PAGE2", v->shadow_flags.b.page2set, !v->display_override);
-                v->shadow_flags.b.hires      = nk_option_label_disabled(ctx, "C057-HIRES", v->shadow_flags.b.hires, !v->display_override);
-                v->shadow_flags.b.dhires     = nk_option_label_disabled(ctx, "C05E-DHGR", v->shadow_flags.b.dhires, !v->display_override);
+                newbit = nk_option_label_disabled(ctx, "C00D-80COL", (v->shadow_state & A2S_COL80) != 0, !v->display_override) ? A2S_COL80 : 0;
+                v->shadow_state = (v->shadow_state & ~A2S_COL80) | newbit;
+                newbit = nk_option_label_disabled(ctx, "C00F-ALTCHAR", (v->shadow_state & A2S_ALTCHARSET) != 0, !v->display_override) ? A2S_ALTCHARSET : 0;
+                v->shadow_state = (v->shadow_state & ~A2S_ALTCHARSET) | newbit;
+                newbit = nk_option_label_disabled(ctx, "C051-TEXT", (v->shadow_state & A2S_TEXT) != 0, !v->display_override) ? A2S_TEXT : 0;
+                v->shadow_state = (v->shadow_state & ~A2S_TEXT) | newbit;
+                newbit = nk_option_label_disabled(ctx, "C053-MIXED", (v->shadow_state & A2S_MIXED) != 0, !v->display_override) ? A2S_MIXED : 0;
+                v->shadow_state = (v->shadow_state & ~A2S_MIXED) | newbit;
+                newbit = nk_option_label_disabled(ctx, "C055-PAGE2", (v->shadow_state & A2S_PAGE2) != 0, !v->display_override) ? A2S_PAGE2 : 0;
+                v->shadow_state = (v->shadow_state & ~A2S_PAGE2) | newbit;
+                newbit = nk_option_label_disabled(ctx, "C057-HIRES", (v->shadow_state & A2S_HIRES) != 0, !v->display_override) ? A2S_HIRES : 0;
+                v->shadow_state = (v->shadow_state & ~A2S_HIRES) | newbit;
+                newbit = nk_option_label_disabled(ctx, "C05E-DHGR", (v->shadow_state & A2S_DHIRES) != 0, !v->display_override) ? A2S_DHIRES : 0;
+                v->shadow_state = (v->shadow_state & ~A2S_DHIRES) | newbit;
             }
             nk_layout_row_dynamic(ctx, 13, 1);
             {
@@ -506,10 +520,14 @@ void unk_misc_show(UNK *v) {
             }
             nk_layout_row_dynamic(ctx, 13, 4);
             {
-                v->shadow_flags.b.lc_bank2_enable     = nk_option_label_disabled(ctx, "LCBANK2", v->shadow_flags.b.lc_bank2_enable, 1);
-                v->shadow_flags.b.lc_read_ram_enable  = nk_option_label_disabled(ctx, "LCREAD", v->shadow_flags.b.lc_read_ram_enable, 1);
-                v->shadow_flags.b.lc_pre_write        = nk_option_label_disabled(ctx, "LCPREWRITE", v->shadow_flags.b.lc_pre_write, 1);
-                v->shadow_flags.b.lc_write_enable     = nk_option_label_disabled(ctx, "LCWRITE", v->shadow_flags.b.lc_write_enable, 1);
+                nk_option_label_disabled(ctx, "LCBANK2", (v->shadow_state & A2S_LC_BANK2) != 0, 1 ) ? A2S_LC_BANK2 : 0;
+                v->shadow_state = (v->shadow_state & ~A2S_LC_BANK2) | newbit;
+                nk_option_label_disabled(ctx, "LCREAD", (v->shadow_state & A2S_LC_READ) != 0, 1 ) ? A2S_LC_READ : 0;
+                v->shadow_state = (v->shadow_state & ~A2S_LC_READ) | newbit;
+                nk_option_label_disabled(ctx, "LCPREWRITE", (v->shadow_state & A2S_LC_PRE_WRITE) != 0, 1 ) ? A2S_LC_PRE_WRITE : 0;
+                v->shadow_state = (v->shadow_state & ~A2S_LC_PRE_WRITE) | newbit;
+                nk_option_label_disabled(ctx, "LCWRITE", (v->shadow_state & A2S_LC_WRITE) != 0, 1 ) ? A2S_LC_WRITE : 0;
+                v->shadow_state = (v->shadow_state & ~A2S_LC_WRITE) | newbit;
             }
             nk_tree_pop(ctx); // Soft Switches
         }

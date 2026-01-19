@@ -31,7 +31,7 @@ const UI_OPS unk_ops = {
     .speaker_on_cycles = unk_audio_speaker_on_cycles,
     .render            = unk_render_frame,
     .set_runtime       = unk_set_runtime,
-    .set_shadow_flags  = unk_set_shadow_flags,
+    .set_shadow_state  = unk_set_shadow_state,
 };
 
 static inline SDL_Rect nk_to_sdl_rect(struct nk_rect r) {
@@ -85,13 +85,13 @@ int nk_option_label_disabled(struct nk_context *ctx, const char *label, int stat
 
     if(disabled) {
         struct nk_style_toggle t = saved;
-        t.normal        = nk_style_item_color(nk_rgba(70, 70, 70, 255));
-        t.hover         = t.normal;
-        t.active        = t.normal;
-        t.cursor_normal = nk_style_item_color(nk_rgba(110, 110, 110, 255));
-        t.cursor_hover  = t.cursor_normal;
-        t.text_normal   = nk_rgba(150, 150, 150, 255);
-        ctx->style.option = t;
+        t.normal                 = nk_style_item_color(nk_rgba(70, 70, 70, 255));
+        t.hover                  = t.normal;
+        t.active                 = t.normal;
+        t.cursor_normal          = nk_style_item_color(nk_rgba(110, 110, 110, 255));
+        t.cursor_hover           = t.cursor_normal;
+        t.text_normal            = nk_rgba(150, 150, 150, 255);
+        ctx->style.option        = t;
     }
 
     // Draw and process
@@ -533,7 +533,8 @@ void unk_present(UNK *v) {
         v->clear_a2_view = 0;
     }
 
-    if(m->franklin80active || v->shadow_flags.b.col80set && (v->shadow_flags.b.dhires || v->shadow_flags.b.text)) {
+    if(tst_flags(m->state_flags, A2S_FRANKLIN80ACTIVE) || 
+    tst_flags(v->shadow_state, A2S_COL80) && (tst_flags(v->shadow_state, A2S_HIRES) || tst_flags(v->shadow_state, A2S_TEXT))) {
         SDL_UpdateTexture(v->texture_wide, NULL, v->surface_wide->pixels, v->surface_wide->pitch);
         SDL_RenderCopy(v->renderer, v->texture_wide, NULL, v->draw_rect);
     } else {
@@ -624,10 +625,10 @@ void unk_set_runtime(UI *ui, RUNTIME *rt) {
     v->rt = rt;
 }
 
-void unk_set_shadow_flags(UI *ui, uint32_t shadow_flags) {
+void unk_set_shadow_state(UI *ui, uint32_t shadow_state) {
     UNK *v = (UNK *)ui->user;
     if(!v->display_override) {
-        v->shadow_flags.u32 = shadow_flags;
+        v->shadow_state = shadow_state;
     }
 }
 

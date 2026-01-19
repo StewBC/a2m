@@ -135,7 +135,7 @@ void pages_map_rom_block(PAGES *pages, ROM_BLOCK *block, RAM *ram) {
 
 // Init the 6502
 void cpu_init(APPLE2 *m) {
-    if(!m->model) { // 6502
+    if(m->model == MODEL_APPLE_II_PLUS) { // 6502
         machine_run_opcode = machine_run_opcode_6502;
         opcode_text = opcode_text_6502;
         opcode_hex_params = opcode_hex_params_6502;

@@ -19,41 +19,43 @@ const char *rt_trace_u82binstr(uint8_t byte) {
 // SQW - This was useful but maybe needs a bit of thought...
 
 const char *rt_trace_state2str(uint32_t state_flags) {
-    A2FLAGSPACK state;
+    // SQW - Trace needs to be fixed
+    // A2FLAGSPACK state;
     static char buffer[128];
-    state.u32 = state_flags;
-    sprintf(buffer,
-            "s80 %d "\
-            "rd %d "\
-            "wr %d "\
-            "cx %d "\
-            "zp %d "\
-            "c3 %d "\
-            "c80 %d "\
-            "ac %d "\
-            "tx %d "\
-            "mx %d "\
-            "p2 %d "\
-            "hr %d "\
-            "dh %d "\
-            "st %d "\
-            "f80 %d ",
-            state.b.store80set,
-            state.b.ramrdset,
-            state.b.ramwrtset,
-            state.b.cxromset,
-            state.b.altzpset,
-            state.b.c3slotrom,
-            state.b.col80set,
-            state.b.altcharset,
-            state.b.text,
-            state.b.mixed,
-            state.b.page2set,
-            state.b.hires,
-            state.b.dhires,
-            state.b.strobed,
-            state.b.franklin80active
-           );
+    // state.u32 = state_flags;
+    buffer[0] = '\0';
+    // sprintf(buffer,
+    //         "s80 %d "\
+    //         "rd %d "\
+    //         "wr %d "\
+    //         "cx %d "\
+    //         "zp %d "\
+    //         "c3 %d "\
+    //         "c80 %d "\
+    //         "ac %d "\
+    //         "tx %d "\
+    //         "mx %d "\
+    //         "p2 %d "\
+    //         "hr %d "\
+    //         "dh %d "\
+    //         "st %d "\
+    //         "f80 %d ",
+    //         state.b.store80set,
+    //         state.b.ramrdset,
+    //         state.b.ramwrtset,
+    //         state.b.cxromset,
+    //         state.b.altzpset,
+    //         state.b.c3slotrom,
+    //         state.b.col80set,
+    //         state.b.altcharset,
+    //         state.b.text,
+    //         state.b.mixed,
+    //         state.b.page2set,
+    //         state.b.hires,
+    //         state.b.dhires,
+    //         state.b.strobed,
+    //         state.b.franklin80active
+    //        );
     return buffer;
 }
 
@@ -139,8 +141,8 @@ int trace_write(RUNTIME *rt, TRACE_DATA *trace_data) {
         memset(&trace_text[length], ' ', CODE_LINE_LENGTH - 1 - length);
         trace_text[CODE_LINE_LENGTH - 1] = '\0';
     }
-    return fprintf(trace_log->file.fp, "%s A:%02X X:%02X Y:%02X P:%s %s\n", trace_text, trace_data->cpu.A, trace_data->cpu.X, trace_data->cpu.Y, rt_trace_u82binstr(trace_data->cpu.flags), rt_trace_state2str(trace_data->state_flags));
-    return -1;
+    // return fprintf(trace_log->file.fp, "%s A:%02X X:%02X Y:%02X P:%s %s\n", trace_text, trace_data->cpu.A, trace_data->cpu.X, trace_data->cpu.Y, rt_trace_u82binstr(trace_data->cpu.flags), rt_trace_state2str(trace_data->state_flags));
+    return 0;
 }
 
 void rt_trace(RUNTIME *rt) {
@@ -151,7 +153,7 @@ void rt_trace(RUNTIME *rt) {
     }
     TRACE_DATA *td = &trace_log->trace_buffer[trace_log->trace_position];
     td->cpu = m->cpu;
-    td->state_flags = m->state_flags;
+    // td->state_flags = m->state_flags;
     td->b0 = read_from_memory_debug(m, m->cpu.pc);
     td->b1 = read_from_memory_debug(m, m->cpu.pc + 1);
     td->b2 = read_from_memory_debug(m, m->cpu.pc + 2);

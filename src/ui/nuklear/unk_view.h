@@ -58,7 +58,7 @@ typedef struct UNK {
     RUNTIME *rt;
 
     // Shadow of machine states
-    A2FLAGSPACK shadow_flags;
+    A2_STATE shadow_state;
 
     // Game controller values
     int8_t num_controllers;
@@ -117,6 +117,6 @@ void unk_toggle_debug(UNK *v);
 void unk_present(UNK *v);
 void unk_render_frame(UI *ui, APPLE2 *m, int dirty);
 void unk_set_runtime(UI *ui, RUNTIME *rt);
-void unk_set_shadow_flags(UI *ui, uint32_t shadow_flags);
+void unk_set_shadow_state(UI *ui, uint32_t shadow_state);
 void unk_disk_read(UI *ui);
 void unk_disk_write(UI *ui);

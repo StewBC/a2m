@@ -674,16 +674,16 @@ void unk_mem_show(UNK *v) {
                     if(nk_option_label(ctx, "64K", tst_flags(active_view->flags, MEM_MAIN)) && !tst_flags(active_view->flags, MEM_MAIN)) {
                         clr_flags(active_view->flags, MEM_AUX);
                         set_flags(active_view->flags, MEM_MAIN);
-                        if(m->lc_bank2_enable) {
+                        if(tst_flags(m->state_flags, A2S_LC_BANK2)) {
                             set_flags(active_view->flags, MEM_LC_BANK2);
                         } else {
                             clr_flags(active_view->flags, MEM_LC_BANK2);
                         }
                     }
-                    if(nk_option_label_disabled(ctx, "128K", tst_flags(active_view->flags, MEM_AUX), !m->model) && !tst_flags(active_view->flags, MEM_AUX)) {
+                    if(nk_option_label_disabled(ctx, "128K", tst_flags(active_view->flags, MEM_AUX), m->model == MODEL_APPLE_II_PLUS) && !tst_flags(active_view->flags, MEM_AUX)) {
                         clr_flags(active_view->flags, MEM_MAIN);
                         set_flags(active_view->flags, MEM_AUX);
-                        if(m->lc_bank2_enable) {
+                        if(tst_flags(m->state_flags, A2S_LC_BANK2)) {
                             set_flags(active_view->flags, MEM_LC_BANK2);
                         } else {
                             clr_flags(active_view->flags, MEM_LC_BANK2);

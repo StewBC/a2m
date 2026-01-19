@@ -5,15 +5,15 @@
 #include "ui_lib.h"
 
 const UI_OPS null_ops = {
-    .disk_read_led     = NULL,
-    .disk_write_led    = NULL,
-    .process_events    = NULL,
-    .speaker_toggle    = NULL,
-    .speaker_on_cycles = NULL,
-    .render            = NULL,
-    .set_runtime       = NULL,
-    .set_shadow_flags = NULL,
-    .shutdown          = NULL,
+    .disk_read_led      = NULL,
+    .disk_write_led     = NULL,
+    .process_events     = NULL,
+    .speaker_toggle     = NULL,
+    .speaker_on_cycles  = NULL,
+    .render             = NULL,
+    .set_runtime        = NULL,
+    .set_shadow_state   = NULL,
+    .shutdown           = NULL,
 };
 
 void ui_apply_ini(UI *ui, INI_STORE *ini_store) {

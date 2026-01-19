@@ -29,7 +29,7 @@ struct UI_OPS {
     uint8_t (*read_button)(UI *ui, int controller_id, int button_id);
     void (*render)(UI *ui, APPLE2 *m, int cursor_sync);
     void (*set_runtime)(UI *ui, RUNTIME *rt);
-    void (*set_shadow_flags)(UI *ui, uint32_t flags);
+    void (*set_shadow_state)(UI *ui, uint32_t flags);
     void (*shutdown)(UI *ui);
     void (*speaker_on_cycles)(UI *ui, uint32_t cycles_executed);
     void (*speaker_toggle)(UI *ui);

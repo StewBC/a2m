@@ -9,12 +9,6 @@ typedef struct TRACE_DATA {
     uint8_t b0;
     uint8_t b1;
     uint8_t b2;
-    union {
-        uint32_t state_flags;
-        struct {
-            a2_flags_def;
-        };
-    };
 } TRACE_DATA;
 
 typedef struct TRACE_LOG {

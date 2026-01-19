@@ -308,8 +308,8 @@ int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
         }
 
         quit = ui->ops->process_events(ui, m);
-        if(ui->ops->set_shadow_flags) {
-            ui->ops->set_shadow_flags(ui, m->state_flags);
+        if(ui->ops->set_shadow_state) {
+            ui->ops->set_shadow_state(ui, m->state_flags);
         }
         ui->ops->render(ui, m, dirty_view);
 
@@ -564,7 +564,7 @@ void rt_machine_stop(RUNTIME *rt) {
 
 void rt_machine_toggle_franklin80_active(RUNTIME *rt) {
     APPLE2 *m = rt->m;
-    m->franklin80active ^= 1;
+    m->state_flags ^= A2S_FRANKLIN80ACTIVE;
 }
 
 // Make a copy of the clipboard text

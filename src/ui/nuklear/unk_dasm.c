@@ -625,7 +625,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
 
         case SDLK_F12:
             if(mod & KMOD_SHIFT) {
-                if(m->franklin80installed) {
+                if(tst_flags(m->state_flags, A2S_FRANKLIN80INSTALLED)) {
                     rt_machine_toggle_franklin80_active(rt);
                 }
             } else {
@@ -791,16 +791,16 @@ void unk_dasm_show(UNK *v, int dirty) {
                     if(nk_option_label(ctx, "64K", tst_flags(dv->flags, MEM_MAIN)) && !tst_flags(dv->flags, MEM_MAIN)) {
                         clr_flags(dv->flags, MEM_AUX);
                         set_flags(dv->flags, MEM_MAIN);
-                        if(m->lc_bank2_enable) {
+                        if(tst_flags(m->state_flags, A2S_LC_BANK2)) {
                             set_flags(dv->flags, MEM_LC_BANK2);
                         } else {
                             clr_flags(dv->flags, MEM_LC_BANK2);
                         }
                     }
-                    if(nk_option_label_disabled(ctx, "128K", tst_flags(dv->flags, MEM_AUX), !m->model) && !tst_flags(dv->flags, MEM_AUX)) {
+                    if(nk_option_label_disabled(ctx, "128K", tst_flags(dv->flags, MEM_AUX), m->model == MODEL_APPLE_II_PLUS) && !tst_flags(dv->flags, MEM_AUX)) {
                         clr_flags(dv->flags, MEM_MAIN);
                         set_flags(dv->flags, MEM_AUX);
-                        if(m->lc_bank2_enable) {
+                        if(tst_flags(m->state_flags, A2S_LC_BANK2)) {                        
                             set_flags(dv->flags, MEM_LC_BANK2);
                         } else {
                             clr_flags(dv->flags, MEM_LC_BANK2);

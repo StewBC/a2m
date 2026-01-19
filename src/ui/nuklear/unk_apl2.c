@@ -257,10 +257,10 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
         SDL_Keymod mod = SDL_GetModState();
 
         if(e->key.keysym.sym == SDLK_LALT) {
-            m->open_apple = 1;
+            set_flags(m->state_flags, A2S_OPEN_APPLE);
         }
         if(e->key.keysym.sym == SDLK_RALT) {
-            m->closed_apple = 1;
+            set_flags(m->state_flags, A2S_CLOSED_APPLE);
         }
 
         if(mod & KMOD_CTRL) {
@@ -333,11 +333,11 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
     } else if(e->type == SDL_KEYUP) {
         switch(e->key.keysym.sym) {
             case SDLK_LALT:
-                m->open_apple = 0;
+                clr_flags(m->state_flags, A2S_OPEN_APPLE);
                 break;
 
             case SDLK_RALT:
-                m->closed_apple = 0;
+                clr_flags(m->state_flags, A2S_CLOSED_APPLE);
                 break;
         }
     }
@@ -346,16 +346,20 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
 // Select which screen to display based on what mode is active
 void unk_apl2_screen_apple2(UNK *v) {
     APPLE2 *m = v->m;
-    uint32_t mode = (v->shadow_flags.b.col80set << 4) |
-                    (v->shadow_flags.b.dhires << 3)   | (v->shadow_flags.b.hires << 2) |
-                    (v->shadow_flags.b.mixed << 1)    | (v->shadow_flags.b.text);
+    uint32_t s = v->shadow_state;
+    uint32_t mode =
+        (((s & A2S_COL80)  != 0) << 4) |
+        (((s & A2S_DHIRES) != 0) << 3) |
+        (((s & A2S_HIRES)  != 0) << 2) |
+        (((s & A2S_MIXED)  != 0) << 1) |
+        (((s & A2S_TEXT)   != 0) << 0);
     // The bits are col80, dhgr, hgr, mixed, text, (followed by bin, hex)
     switch(mode) {
         case 0x00: // 0 ,0 ,0 ,0 ,0 ,00000,00
             unk_apl2_screen_lores(v, 0, 24);
             break;
         case 0x01: // 0 ,0 ,0 ,0 ,1 ,00001,01
-            if(m->franklin80active) {
+            if(tst_flags(m->state_flags, A2S_FRANKLIN80ACTIVE)) {
                 unk_apl2_screen_franklin80col(v, 0, 24);
             } else {
                 unk_apl2_screen_txt40(v, 0, 24);
@@ -560,7 +564,7 @@ void unk_apl2_screen_lores(UNK *v, int start, int end) {
 
     SDL_Surface *surface = v->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    uint16_t page = v->shadow_flags.b.page2set ? 0x0800 : 0x0400;
+    uint16_t page = tst_flags(v->shadow_state, A2S_PAGE2) ? 0x0800 : 0x0400;
     int x, y;
 
     // Loop through each row
@@ -595,7 +599,7 @@ void unk_apl2_screen_lores_mono(UNK *v, int start, int end) {
     APPLE2 *m = v->m;
     SDL_Surface *surface = v->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    uint16_t page = v->shadow_flags.b.page2set ? 0x0800 : 0x0400;
+    uint16_t page = tst_flags(v->shadow_state, A2S_PAGE2) ? 0x0800 : 0x0400;
     int x, y;
 
     // Loop through each row
@@ -710,7 +714,7 @@ void unk_apl2_screen_dhgr(UNK *v, int start, int end) {
     uint32_t *pixels = (uint32_t *)surface->pixels;
     SDL_PixelFormat *format = surface->format;
 
-    uint16_t page = v->shadow_flags.b.page2set ? 0x4000 : 0x2000;
+    uint16_t page = tst_flags(v->shadow_state, A2S_PAGE2) ? 0x4000 : 0x2000;
 
     for(int y = start; y < end; y++) {
         uint32_t *p = &pixels[y * surface->w];
@@ -804,7 +808,7 @@ void unk_apl2_screen_hgr(UNK *v, int start, int end) {
 
     SDL_Surface *surface = v->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    uint16_t page = v->shadow_flags.b.page2set ? 0x4000 : 0x2000;
+    uint16_t page = tst_flags(v->shadow_state, A2S_PAGE2) ? 0x4000 : 0x2000;
     int surface_width = surface->w;
     int y;
 
@@ -847,7 +851,7 @@ void unk_apl2_screen_hgr_mono(UNK *v, int start, int end) {
     APPLE2 *m = v->m;
     SDL_Surface *surface = v->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    uint16_t page = v->shadow_flags.b.page2set ? 0x4000 : 0x2000;
+    uint16_t page = tst_flags(v->shadow_state, A2S_PAGE2) ? 0x4000 : 0x2000;
     uint32_t c[2] = { color_table[0][0][0], color_table[7][0][0] };
     int x, y;
 
@@ -878,12 +882,12 @@ void unk_apl2_screen_txt40(UNK *v, int start, int end) {
     APPLE2 *m = v->m;
     SDL_Surface *surface = v->surface;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    uint16_t page = v->shadow_flags.b.page2set ? 0x0800 : 0x0400;
+    uint16_t page = tst_flags(v->shadow_state, A2S_PAGE2) ? 0x0800 : 0x0400;
     uint64_t now = perf_counter();
     double freq = (double)perf_frequency();
     // I got 3.7 from recording a flash on my Platinum //e - 0.17 to 0.44 for a change so 0.27
     uint8_t time_inv = (((uint64_t)(now * 3.7 / freq)) & 1) ? 0xFF : 0x00;
-    int alt_charset = m->model ? m->altcharset : 0;
+    int alt_charset = tst_flags(m->state_flags, A2S_ALTCHARSET);
     int x, y;
 
     // Loop through each row
@@ -903,7 +907,7 @@ void unk_apl2_screen_txt40(UNK *v, int start, int end) {
                         character &= 0x3F;
                         inv = time_inv;
                     }
-                } else if(!m->model) {
+                } else if(m->model == MODEL_APPLE_II_PLUS) {
                     inv = 0xFF;
                 }
             }
@@ -932,7 +936,7 @@ void unk_apl2_screen_txt80(UNK *v, int start, int end) {
     double freq = (double)perf_frequency();
     // I got 3.7 from recording a flash on my Platinum //e - 0.17 to 0.44 for a change so 0.27
     uint8_t time_inv = (((uint64_t)(now * 3.7 / freq)) & 1) ? 0xFF : 0x00;
-    int alt_charset = m->model ? m->altcharset : 0;
+    int alt_charset = tst_flags(m->state_flags, A2S_ALTCHARSET);
     int x, y;
 
     // Loop through each row
@@ -953,7 +957,7 @@ void unk_apl2_screen_txt80(UNK *v, int start, int end) {
                         character &= 0x3F;
                         inv = time_inv;
                     }
-                } else if(!m->model) {
+                } else if(m->model == MODEL_APPLE_II_PLUS) {
                     inv = 0xFF;
                 }
             }

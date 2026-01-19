@@ -23,7 +23,7 @@ const UI_OPS utxt_ops = {
     .speaker_on_cycles = utxt_null,
     .render            = utxt_render_frame,
     .set_runtime       = utxt_set_runtime,
-    .set_shadow_flags  = NULL,
+    .set_shadow_state  = NULL,
 };
 
 static int curses_input_poll(rt_input_event *out) {
@@ -265,10 +265,10 @@ int utxt_process_events(UI *ui, APPLE2 *m) {
                     m->ram.RAM_MAIN[KBD] = 0x95;
                     break;
                 case RTK_PAGE_UP:
-                    m->open_apple ^= 1;
+                    v->m->state_flags ^= A2S_OPEN_APPLE;
                     break;
                 case RTK_PAGE_DOWN:
-                    m->closed_apple ^= 1;
+                    v->m->state_flags ^= A2S_CLOSED_APPLE;
                     break;
                 case RTK_END:
                     v->ctrl ^= 1;

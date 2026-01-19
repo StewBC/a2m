@@ -6,9 +6,14 @@
 
 void utxt_apl2_screen_apple2(UTXT *v) {
     APPLE2 *m = v->m;
-    uint32_t mode = (m->col80set << 4) |
-                    (m->dhires << 3)   | (m->hires << 2) |
-                    (m->mixed << 1)    | (m->text);
+    uint32_t s = m->state_flags;
+    uint32_t mode =
+        (((s & A2S_COL80)  != 0) << 4) |
+        (((s & A2S_DHIRES) != 0) << 3) |
+        (((s & A2S_HIRES)  != 0) << 2) |
+        (((s & A2S_MIXED)  != 0) << 1) |
+        (((s & A2S_TEXT)   != 0) << 0);
+
     // The bits are col80, dhgr, hgr, mixed, text, (followed by bin, hex)
     switch(mode) {
         case 0x00: // 0 ,0 ,0 ,0 ,0 ,00000,00
@@ -134,7 +139,7 @@ void utxt_apl2_screen_show_modifiers(UTXT *v) {
         addstr(" CTRL ");
     }
     addstr("  ");
-    if(v->m->open_apple) {
+    if(tst_flags(v->m->state_flags, A2S_OPEN_APPLE)) {
         attron(A_REVERSE);
         addstr(" OPEN-A ");
         attroff(A_REVERSE);
@@ -142,7 +147,7 @@ void utxt_apl2_screen_show_modifiers(UTXT *v) {
         addstr(" OPEN-A ");
     }
     addstr("  ");
-    if(v->m->closed_apple) {
+    if(tst_flags(v->m->state_flags, A2S_CLOSED_APPLE)) {
         attron(A_REVERSE);
         addstr(" CLOSE-A ");
         attroff(A_REVERSE);
@@ -174,10 +179,10 @@ void utxt_apl2_screen_txt(UTXT *v, int start, int end, int width) {
     double freq = (double)perf_frequency();
     // I got 3.7 from recording a flash on my Platinum //e - 0.17 to 0.44 for a change so 0.27
     uint8_t time_inv = (((uint64_t)(now * 3.7 / freq)) & 1) ? 0xFF : 0x00;
-    int alt_charset = m->model ? m->altcharset : 0;
+    int alt_charset = tst_flags(m->state_flags, A2S_ALTCHARSET);
     int x, y;
 
-    uint16_t page = width == 80 || !m->page2set ? 0x0400 : 0x0800;
+    uint16_t page = (width == 80 || !tst_flags(m->state_flags, A2S_PAGE2)) ? 0x0400 : 0x0800;
 
     // Loop through each row
     for(y = start; y < end; y++) {

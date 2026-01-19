@@ -18,6 +18,5 @@
 #include "smrtprt.h"
 
 // It all comes together
-#include "a2flags.h"
 #include "apple2.h"
 #include "6502_inln.h"
