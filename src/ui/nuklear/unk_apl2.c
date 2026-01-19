@@ -244,6 +244,81 @@ void unk_apl2_init_color_table(UNK *v) {
 
 }
 
+static int a2_ascii_from_keydown(const SDL_Keycode k, SDL_Keymod mod, uint8_t *out) {
+    int shift = (mod & KMOD_SHIFT) != 0;
+    int caps  = (mod & KMOD_CAPS)  != 0;
+
+    // Letters (SDLK_a..SDLK_z are lowercase keycodes)
+    if(k >= SDLK_a && k <= SDLK_z) {
+        int upper = shift ^ caps;
+        uint8_t c = ('a' + (k - SDLK_a));
+        if(upper) {
+            c = ('A' + (k - SDLK_a));
+        }
+        *out = c;
+        return 1;
+    }
+
+    // Digits row (US-style shifted symbols)
+    if(k >= SDLK_0 && k <= SDLK_9) {
+        static const char shifted_digits[] = {')', '!', '@', '#', '$', '%', '^', '&', '*', '('};
+        uint8_t c = shift ? shifted_digits[k - SDLK_0] : ('0' + (k - SDLK_0));
+        *out = c;
+        return 1;
+    }
+
+    // Common punctuation (US mapping)
+    switch(k) {
+        case SDLK_SPACE:
+            *out = ' ';
+            return 1;
+        case SDLK_RETURN:
+            *out = 0x0D;
+            return 1; // CR
+        case SDLK_BACKSPACE:
+            *out = 0x08;
+            return 1;
+        case SDLK_MINUS:
+            *out = (shift ? '_' : '-');
+            return 1;
+        case SDLK_EQUALS:
+            *out = (shift ? '+' : '=');
+            return 1;
+        case SDLK_LEFTBRACKET:
+            *out = (shift ? '{' : '[');
+            return 1;
+        case SDLK_RIGHTBRACKET:
+            *out = (shift ? '}' : ']');
+            return 1;
+        case SDLK_BACKSLASH:
+            *out = (shift ? '|' : '\\');
+            return 1;
+        case SDLK_SEMICOLON:
+            *out = (shift ? ':' : ';');
+            return 1;
+        case SDLK_QUOTE:
+            *out = (shift ? '"' : '\'');
+            return 1;
+        case SDLK_COMMA:
+            *out = (shift ? '<' : ',');
+            return 1;
+        case SDLK_PERIOD:
+            *out = (shift ? '>' : '.');
+            return 1;
+        case SDLK_SLASH:
+            *out = (shift ? '?' : '/');
+            return 1;
+
+        case SDLK_BACKQUOTE:
+            *out = (shift ? '~' : '`');
+            return 1;
+        default:
+            break;
+    }
+
+    return 0;
+}
+
 void unk_apl2_process_event(UNK *v, SDL_Event *e) {
     VIEWDASM *dv = &v->viewdasm;
     APPLE2 *m = v->m;
@@ -258,9 +333,11 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
 
         if(e->key.keysym.sym == SDLK_LALT) {
             set_flags(m->state_flags, A2S_OPEN_APPLE);
+            return;
         }
         if(e->key.keysym.sym == SDLK_RALT) {
             set_flags(m->state_flags, A2S_CLOSED_APPLE);
+            return;
         }
 
         if(mod & KMOD_CTRL) {
@@ -283,11 +360,17 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
         } else {
             // Handle special keys like ENTER, BACKSPACE, etc.
             switch(e->key.keysym.sym) {
+                case SDLK_DELETE:
+                    // This is the original_del on DEL key
+                    m->ram.RAM_MAIN[KBD] = 0x80 + 127;
+                    break;
+
                 case SDLK_BACKSPACE:
-                    // SQW
+                    // SQW - Add UI/INI toggle
                     if(v->original_del) {                       // Apple ][ key for del
                         m->ram.RAM_MAIN[KBD] = 0x80 + 127;
                     } else {                                    // CRSR left on del
+                        // This just works so much nicer normally
                         m->ram.RAM_MAIN[KBD] = 0x80 | e->key.keysym.sym;
                     }
                     break;
@@ -296,7 +379,6 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
                 case SDLK_ESCAPE:
                 case SDLK_TAB:
                     // SQW - Maybe reactivate?  Kill the paste from the clipboard
-
                     m->ram.RAM_MAIN[KBD] = 0x80 | e->key.keysym.sym;
                     break;
 
@@ -326,7 +408,16 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
                     }
                     break;
 
-                default:
+                default: {
+                        // When ALT is used SDL_TEXTINPUT doesn't work and
+                        // e->key.keysym is the key (like SHIFT+/ would just be /)
+                        // Figure out what to put through to the Apple II based on
+                        // mod and key - OA and CA are handled already
+                        uint8_t a2_key;
+                        if(a2_ascii_from_keydown(e->key.keysym.sym, mod, &a2_key)) {
+                            m->ram.RAM_MAIN[KBD] = 0x80 | a2_key;
+                        }
+                    }
                     break;
             }
         }
@@ -739,7 +830,7 @@ void unk_apl2_screen_dhgr(UNK *v, int start, int end) {
                     if(stream & 1) {
                         *p++ = SDL_MapRGB(format, 0xFF, 0xFF, 0xFF);
                     } else {
-                        *p++ = SDL_MapRGB(format, 0x00, 0x00, 0x00);                        
+                        *p++ = SDL_MapRGB(format, 0x00, 0x00, 0x00);
                     }
                     stream >>= 1;
                 }
