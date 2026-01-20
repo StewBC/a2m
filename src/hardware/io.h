@@ -105,7 +105,7 @@ typedef struct A2_C0_TABLE {
     ss_write w[256];
 } A2_C0_TABLE;
 
-extern A2_C0_TABLE *c0_machine_table;
+extern A2_C0_TABLE *io_c0_machine_table;
 
 void io_c0_table_init(void);
 uint8_t io_callback_r(APPLE2 *m, uint16_t address);

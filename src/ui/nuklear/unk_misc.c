@@ -484,12 +484,12 @@ void unk_misc_show(UNK *v) {
                 v->shadow_state = (v->shadow_state & ~A2S_RAMRD) | newbit;
                 newbit = nk_option_label_disabled(ctx, "C005-RAMWRT", (v->shadow_state & A2S_RAMWRT) != 0, 1 ) ? A2S_RAMWRT : 0;
                 v->shadow_state = (v->shadow_state & ~A2S_RAMWRT) | newbit;
-                newbit = nk_option_label_disabled(ctx, "C007-CXROM", (v->shadow_state & A2S_CXROM) != 0, 1 ) ? A2S_CXROM : 0;
-                v->shadow_state = (v->shadow_state & ~A2S_CXROM) | newbit;
+                newbit = nk_option_label_disabled(ctx, "C007-CXROM", (v->shadow_state & A2S_CXSLOTROM_MB_ENABLE) != 0, 1 ) ? A2S_CXSLOTROM_MB_ENABLE : 0;
+                v->shadow_state = (v->shadow_state & ~A2S_CXSLOTROM_MB_ENABLE) | newbit;
                 newbit = nk_option_label_disabled(ctx, "C009-ALTZP", (v->shadow_state & A2S_ALTZP) != 0, 1 ) ? A2S_ALTZP : 0;
                 v->shadow_state = (v->shadow_state & ~A2S_ALTZP) | newbit;
-                newbit = nk_option_label_disabled(ctx, "C00B-C3ROM", (v->shadow_state & A2S_C3ROM) != 0, 1 ) ? A2S_C3ROM : 0;
-                v->shadow_state = (v->shadow_state & ~A2S_C3ROM) | newbit;
+                newbit = nk_option_label_disabled(ctx, "C00B-C3ROM", (v->shadow_state & A2S_SLOT3ROM_MB_DISABLE) != 0, 1 ) ? A2S_SLOT3ROM_MB_DISABLE : 0;
+                v->shadow_state = (v->shadow_state & ~A2S_SLOT3ROM_MB_DISABLE) | newbit;
             }
             nk_layout_row_dynamic(ctx, 13, 1);
             {

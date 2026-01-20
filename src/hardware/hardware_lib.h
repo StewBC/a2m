@@ -12,7 +12,6 @@
 #include "io.h"
 #include "diskii.h"
 #include "frankdisp.h"
-#include "langcard.h"
 #include "roms.h"
 #include "slot.h"
 #include "smrtprt.h"

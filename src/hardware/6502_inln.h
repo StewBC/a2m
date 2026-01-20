@@ -21,10 +21,6 @@ static inline uint8_t read_from_memory(APPLE2 *m, uint16_t address) {
         if(cb_mask & WATCH_READ_BREAKPOINT) {
             m->a2out_cb.cb_breakpoint_ctx.cb_breakpoint(m->a2out_cb.cb_breakpoint_ctx.user, address, WATCH_READ_BREAKPOINT);
         }
-        // // If the read was done, return that value
-        // if(cb_mask & WATCH_WRITE_BREAKPOINT) {
-        //     return byte;
-        // }
     }
     return byte;
 }

@@ -25,7 +25,7 @@ int franklin_display_init(FRANKLIN_DISPLAY *fd80) {
     return A2_OK;
 }
 
-void franklin_display_map_cx_rom(APPLE2 *m, uint16_t address) {
+void franklin_display_map_cx_rom(APPLE2 *m) {
     pages_map_rom(&m->pages, 0xC800, 0x800, m->roms.blocks[ROM_FRANKLIN_ACE_DISPLAY].bytes, &m->ram);
 }
 

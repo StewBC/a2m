@@ -52,9 +52,9 @@ typedef enum {
     A2S_80STORE             = (1 << 0),
     A2S_RAMRD               = (1 << 1),
     A2S_RAMWRT              = (1 << 2),
-    A2S_CXROM               = (1 << 3),
+    A2S_CXSLOTROM_MB_ENABLE = (1 << 3), // These names confused me so I changed
     A2S_ALTZP               = (1 << 4),
-    A2S_C3ROM               = (1 << 5),
+    A2S_SLOT3ROM_MB_DISABLE = (1 << 5), // The MB says which ROM is being en-/dis-abled
     A2S_PAGE2               = (1 << 6),
     A2S_HIRES               = (1 << 7),
     A2S_LC_READ             = (1 << 8),
@@ -70,14 +70,15 @@ typedef enum {
     A2S_DHIRES              = (1 << 15),
 
     // Machine states that also don't directly affect banking
-    A2S_STROBED             = (1 << 16),
-    A2S_LC_PRE_WRITE        = (1 << 17),
+    A2S_LC_PRE_WRITE        = (1 << 16),
 
     // Additional machine states
-    A2S_OPEN_APPLE          = (1 << 18),
-    A2S_CLOSED_APPLE        = (1 << 19),
-    A2S_FRANKLIN80ACTIVE    = (1 << 20),
-    A2S_FRANKLIN80INSTALLED = (1 << 21),
+    A2S_OPEN_APPLE          = (1 << 17),
+    A2S_CLOSED_APPLE        = (1 << 18),
+    A2S_FRANKLIN80ACTIVE    = (1 << 19),
+    A2S_RESET_MASK          = (1 << 20) - 1,
+
+    A2S_FRANKLIN80INSTALLED = (1 << 20),
 } A2_STATE;
 
 // The mask for the bits in the RAM_WATCH array
@@ -186,7 +187,7 @@ typedef struct APPLE2 {
     RAM ram;                                                // Holds main, aux, lc and helper ram arrays
 
     uint8_t *rom_shadow_pages[(0xC800 - 0xC000) / PAGE_SIZE]; // Slot ram page mappings when SETC?ROM active
-    uint8_t mapped_slot;                                    // 0 = not mapped, 1-7 means that slot card is strobe mapped (to C800)
+    int strobed_slot;                                       // Contains the slot numbr for the card that is strobed
 
     // A2 Status
     A2_STATE state_flags;

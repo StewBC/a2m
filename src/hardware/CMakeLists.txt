@@ -13,7 +13,6 @@ add_library(hardware STATIC
     diskii.c
     frankdisp.c
     image.c
-    langcard.c
     roms.c
     slot.c
     smrtprt.c

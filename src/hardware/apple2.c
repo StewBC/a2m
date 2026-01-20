@@ -190,9 +190,6 @@ int apple2_init(APPLE2 *m, INI_STORE *ini_store) {
     // Select the io handlers for this model
     io_setup(m);
 
-    // Set up the Language Card
-    language_card_init(m);
-
     // Init the CPU to cold-start by jumping to ROM address at 0xfffc
     cpu_init(m);
 
@@ -210,27 +207,11 @@ int apple2_init(APPLE2 *m, INI_STORE *ini_store) {
 }
 
 void apple2_machine_reset(APPLE2 *m) {
-    // A2 state_flags reset (keep model), setting text mode
-    int model = m->model;
-    int f80 = tst_flags(m->state_flags, A2S_FRANKLIN80INSTALLED);
-    m->state_flags = 0;
-    m->model = model;
-    set_flags(m->state_flags, f80);
-    set_flags(m->state_flags, A2S_TEXT);
-
-    // Reset LC
-    language_card_init(m);
-
     // Clear the screen
     memset(&m->ram.RAM_MAIN[0x0400], 0xA0, 0x400);
 
-    //e - Set up soft-switches
-    if(m->model == MODEL_APPLE_IIEE) {
-        // Re-select the IO handlers for this model (model may have changed)
-        io_setup(m);
-        // This is a noop on the ][+
-        io_callback_w(m, CLRCXROM, 0);
-    }
+    // Select the io handlers for this model
+    io_setup(m);
 
     // Set up CPU
     cpu_init(m);
