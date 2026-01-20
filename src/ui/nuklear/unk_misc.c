@@ -520,13 +520,13 @@ void unk_misc_show(UNK *v) {
             }
             nk_layout_row_dynamic(ctx, 13, 4);
             {
-                nk_option_label_disabled(ctx, "LCBANK2", (v->shadow_state & A2S_LC_BANK2) != 0, 1 ) ? A2S_LC_BANK2 : 0;
+                newbit = nk_option_label_disabled(ctx, "LCBANK2", (v->shadow_state & A2S_LC_BANK2) != 0, 1 ) ? A2S_LC_BANK2 : 0;
                 v->shadow_state = (v->shadow_state & ~A2S_LC_BANK2) | newbit;
-                nk_option_label_disabled(ctx, "LCREAD", (v->shadow_state & A2S_LC_READ) != 0, 1 ) ? A2S_LC_READ : 0;
+                newbit = nk_option_label_disabled(ctx, "LCREAD", (v->shadow_state & A2S_LC_READ) != 0, 1 ) ? A2S_LC_READ : 0;
                 v->shadow_state = (v->shadow_state & ~A2S_LC_READ) | newbit;
-                nk_option_label_disabled(ctx, "LCPREWRITE", (v->shadow_state & A2S_LC_PRE_WRITE) != 0, 1 ) ? A2S_LC_PRE_WRITE : 0;
+                newbit = nk_option_label_disabled(ctx, "LCPREWRITE", (v->shadow_state & A2S_LC_PRE_WRITE) != 0, 1 ) ? A2S_LC_PRE_WRITE : 0;
                 v->shadow_state = (v->shadow_state & ~A2S_LC_PRE_WRITE) | newbit;
-                nk_option_label_disabled(ctx, "LCWRITE", (v->shadow_state & A2S_LC_WRITE) != 0, 1 ) ? A2S_LC_WRITE : 0;
+                newbit = nk_option_label_disabled(ctx, "LCWRITE", (v->shadow_state & A2S_LC_WRITE) != 0, 1 ) ? A2S_LC_WRITE : 0;
                 v->shadow_state = (v->shadow_state & ~A2S_LC_WRITE) | newbit;
             }
             nk_tree_pop(ctx); // Soft Switches
