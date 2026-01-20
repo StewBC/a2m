@@ -107,7 +107,6 @@ int apple2_init(APPLE2 *m, INI_STORE *ini_store) {
     m->model = MODEL_APPLE_IIEE;    //e
     m->cpu.class = CPU_65c02;       // with appropriate cpu
     m->ram_size = 128 * 1024;       // and 128k ram
-    m->state_flags = A2S_TEXT;      // starting in text mode
 
     // Now see if the config is overridden from the cli/ini file
     apple2_cofig_from_ini(m, ini_store);
@@ -210,7 +209,7 @@ void apple2_machine_reset(APPLE2 *m) {
     // Clear the screen
     memset(&m->ram.RAM_MAIN[0x0400], 0xA0, 0x400);
 
-    // Select the io handlers for this model
+    // Select the io handlers for this model - and config banks 
     io_setup(m);
 
     // Set up CPU

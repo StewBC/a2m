@@ -1031,15 +1031,22 @@ void io_callback_w(APPLE2 *m, uint16_t address, uint8_t value) {
 }
 
 void io_setup(APPLE2 *m) {
+    // Fix the memory map after a reset
+    io_mem_bank_state_clear(m, A2S_BANK_MASK);
+    // But also clear the screen modes, etc - keeping A2S_FRANKLIN80INSTALLED, for example
+    m->state_flags &= ~A2S_RESET_MASK;
+    // Start as ][+
     io_c0_machine_table = &io_c0_iiplus;
-    io_mem_bank_state_clear(m, A2S_RESET_MASK);
     if(m->model == MODEL_APPLE_IIEE) {
         io_c0_machine_table = &io_c0_iie;
     } else {
         // This allows the same io_slot handler for both models
         io_mem_bank_state_set(m, A2S_SLOT3ROM_MB_DISABLE);
     }
+    // Set up the LC
     io_mem_bank_state_set(m, A2S_LC_BANK2 | A2S_LC_WRITE | A2S_LC_PRE_WRITE);
+    // Nothing strobed after a reset
     m->strobed_slot = C800_NONE;
+    // The apple starts, and after reset is, in text mode
+    set_flags(m->state_flags, A2S_TEXT);
 }
-
