@@ -26,11 +26,17 @@ typedef struct UTIL_FILE {
     uint8_t is_file_loaded: 1;
 } UTIL_FILE;
 
+typedef enum {
+    CONSOLE_NONE,
+    CONSOLE_EXISTING,
+    CONSOLE_NEW
+} CONSOLE_MODE;
+
 // Prototype callback for ini file loading
 typedef int (*INI_PAIR_CALLBACK)(void *user_data, const char *section, const char *key, const char *value);
 
-int util_console_open_for_text_ui(void);
-void util_console_close_for_text_ui(void);
+int util_console_open(CONSOLE_MODE *console_mode);
+void util_console_close(CONSOLE_MODE console_mode);
 
 int util_dir_change(const char *path);
 int util_dir_get_current(char *buffer, size_t buffer_size);

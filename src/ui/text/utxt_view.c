@@ -185,10 +185,6 @@ int utxt_init(UTXT *v, int model, INI_STORE *ini_store) {
     UNUSED(model);
     UNUSED(ini_store);
 
-    if(A2_OK != util_console_open_for_text_ui()) {
-        return A2_ERR;
-    }
-
     setlocale(LC_ALL, "");
 
     initscr();
@@ -209,7 +205,6 @@ int utxt_init(UTXT *v, int model, INI_STORE *ini_store) {
 void utxt_shutdown(UTXT *v) {
     UNUSED(v);
     endwin();
-    util_console_close_for_text_ui();
 }
 
 void utxt_present(UTXT *v) {

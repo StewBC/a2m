@@ -64,11 +64,16 @@ static int fs_stat_utf8(const char *path, struct stat *st) {
 }
 #endif
 
-int util_console_open_for_text_ui(void) {
+int util_console_open(CONSOLE_MODE *console_mode) {
 #ifdef _WIN32
-    if (!AllocConsole()) {
+    if(*console_mode != CONSOLE_NONE) {
+        return A2_OK;
+    }
+
+    if(!AllocConsole()) {
         return A2_ERR;
     }
+    *console_mode = CONSOLE_NEW;
 
     // Route CRT stdio to the console
     FILE *f;
@@ -80,21 +85,21 @@ int util_console_open_for_text_ui(void) {
     HANDLE hIn  = CreateFileW(L"CONIN$",  GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
     HANDLE hOut = CreateFileW(L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
 
-    if (hIn  != INVALID_HANDLE_VALUE) {
+    if(hIn  != INVALID_HANDLE_VALUE) {
         SetStdHandle(STD_INPUT_HANDLE,  hIn);
     }
-    if (hOut != INVALID_HANDLE_VALUE) {
+    if(hOut != INVALID_HANDLE_VALUE) {
         SetStdHandle(STD_OUTPUT_HANDLE, hOut);
         SetStdHandle(STD_ERROR_HANDLE,  hOut);
     }
     Sleep(100);
-    #endif // _WIN32
+#endif // _WIN32
     return A2_OK;
 }
 
-void util_console_close_for_text_ui(void) {
+void util_console_close(CONSOLE_MODE console_mode) {
 #ifdef _WIN32
-    if (GetConsoleWindow() != NULL) {
+    if(console_mode == CONSOLE_NEW) {
         FreeConsole();
     }
 #endif // _WIN32

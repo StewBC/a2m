@@ -26,6 +26,7 @@ typedef struct ARGSPEC {
 
 typedef struct OPTS {
     ARGCTX ctx;
+    CONSOLE_MODE console_mode;
     const char *ini_file_name;
     INI_STORE ini_store;
     uint32_t defaults: 1;
@@ -168,6 +169,10 @@ void handle_help(int num_params, const char **params, OPTS *opts) {
     const char *name = util_strrtok(prog, "\\/");
     name = name ? (name + 1) : prog;
     opts->help = 1;
+
+    if(A2_OK != util_console_open(&opts->console_mode)) {
+        return;
+    }
 
     printf("%s V2.00.\n", name);
     printf("This is free and unencumbered software released into the public domain\n");
@@ -384,12 +389,15 @@ int main(int argc, char **argv) {
 
     // Deal with command line
     if(A2_OK != parse_args_all(g_specs, &opts)) {
+        if(A2_OK != util_console_open(&opts.console_mode)) {
+            return A2_ERR;
+        }
         printf("Command line parameter parsing failed at parameter %d\n", opts.ctx.index);
-        return A2_ERR;
+        goto console_exit;
     }
 
     if(opts.help) {
-        return A2_OK;
+        goto console_exit;
     }
 
     if(!opts.noini) {
@@ -411,6 +419,13 @@ int main(int argc, char **argv) {
     }
 
     main_ini_merge_to(&opts.ini_store, &ini_store);
+
+    const char *val = ini_get(&ini_store, "Config", "ui");
+    if(val && stricmp(val, "text") == 0) {
+        if(A2_OK != util_console_open(&opts.console_mode)) {
+            return A2_ERR;
+        }
+    }
 
     // One time softswitch dispatch table init
     io_c0_table_init();
@@ -454,6 +469,14 @@ rt_err:
         if(opts.saveini || ini_get(&ini_store, "Config", "Save")) {
             util_ini_save_file(opts.ini_file_name, &ini_store);
         }
+    }
+
+console_exit:
+    // if the console needs to be closed
+    if(opts.console_mode == CONSOLE_NEW) {
+        printf("\nPress any key to close the window\n");
+        getchar();
+        util_console_close(opts.console_mode);
     }
 
     // Shut the ini file down and then exit
