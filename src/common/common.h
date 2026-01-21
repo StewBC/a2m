@@ -39,13 +39,13 @@
 // values from banks other than whatever is mapped into the 6502 space (MEM_MAPPED_6502)
 typedef enum {
     MEM_MAPPED_6502     = 0,
-    MEM_MAIN            = (1 << 0),
-    MEM_AUX             = (1 << 1),
-    MEM_LC_BANK1        = (1 << 2),
-    MEM_LC_BANK2        = (1 << 3),
-    MEM_LC_E000_8K      = (1 << 4),  // LC fixed 8KB at $E000-$FFFF when LC RAM enabled
-    MEM_ROM             = (1 << 5),
-    MEM_IO              = (1 << 6),
+    MEM_MAIN            = (1u << 0),
+    MEM_AUX             = (1u << 1),
+    MEM_LC_BANK1        = (1u << 2),
+    MEM_LC_BANK2        = (1u << 3),
+    MEM_LC_E000_8K      = (1u << 4),  // LC fixed 8KB at $E000-$FFFF when LC RAM enabled
+    MEM_ROM             = (1u << 5),
+    MEM_IO              = (1u << 6),
     MEM_MASK_ANY        = MEM_MAIN | MEM_AUX |
                           MEM_LC_BANK1 | MEM_LC_BANK2 | MEM_LC_E000_8K |
                           MEM_ROM | MEM_IO

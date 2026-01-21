@@ -94,7 +94,7 @@ void unk_cpu_show(UNK *v, int dirty) {
                     ctx->current->edit.active = 0;
                     sscanf(vcpu->flags[i], "%d", &value);
                     uint8_t flags = m->cpu.flags;
-                    flags &= ~(1 << (7 - i));
+                    flags &= ~(1u << (7 - i));
                     flags |= (value << (7 - i));
                     rt_machine_set_flags(rt, flags);
                 }
@@ -115,6 +115,6 @@ void unk_cpu_update(UNK *v) {
     vcpu->register_lengths[3] = sprintf(vcpu->registers[3], "%02X", m->cpu.X);
     vcpu->register_lengths[4] = sprintf(vcpu->registers[4], "%02X", m->cpu.Y);
     for(int i = 0; i < 8; i++) {
-        vcpu->flag_lengths[i] = sprintf(vcpu->flags[i], "%d", (m->cpu.flags & (1 << (7 - i))) != 0);
+        vcpu->flag_lengths[i] = sprintf(vcpu->flags[i], "%d", (m->cpu.flags & (1u << (7 - i))) != 0);
     }
 }

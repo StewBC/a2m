@@ -392,7 +392,7 @@ int64_t parse_additive(ASSEMBLER *as) {
 }
 
 int64_t parse_shift(ASSEMBLER *as) {
-    int64_t value = parse_additive(as);
+    uint64_t value = (uint64_t)parse_additive(as);
     while(as->current_token.type == TOKEN_OP && (as->current_token.op == '<' || as->current_token.op == '>')) {
         char op = as->current_token.op;
         next_token(as);
@@ -404,7 +404,7 @@ int64_t parse_shift(ASSEMBLER *as) {
             value >>= right;
         }
     }
-    return value;
+    return (int64_t)value;
 }
 
 int64_t parse_relational(ASSEMBLER *as) {

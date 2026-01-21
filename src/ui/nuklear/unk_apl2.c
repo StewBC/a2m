@@ -819,7 +819,12 @@ void unk_apl2_screen_dhgr(UNK *v, int start, int end) {
             uint8_t b2 = (uint8_t)(AUX >> 8);
             uint8_t b3 = (uint8_t)(MAN >> 8);
 
-            uint32_t stream = ((b3 & 0x7f) << 21) | ((b2 & 0x7f) << 14) | ((b1 & 0x7f) << 7) | (b0 & 0x7f);
+            uint32_t stream =
+                (((uint32_t)b3 & 0x7F) << 21) |
+                (((uint32_t)b2 & 0x7F) << 14) |
+                (((uint32_t)b1 & 0x7F) <<  7) |
+                (((uint32_t)b0 & 0x7F));
+
             if(v->monitor_type & MONITOR_MONO) {
                 for(int bit = 0; bit < 28; bit++) {
                     if(stream & 1) {

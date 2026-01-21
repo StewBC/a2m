@@ -49,45 +49,45 @@ enum {
 // Track the state of banking in the A2
 typedef enum {
     // These affect the banking of the //e
-    A2S_80STORE             = (1 << 0),
-    A2S_RAMRD               = (1 << 1),
-    A2S_RAMWRT              = (1 << 2),
-    A2S_CXSLOTROM_MB_ENABLE = (1 << 3), // These names confused me so I changed
-    A2S_ALTZP               = (1 << 4),
-    A2S_SLOT3ROM_MB_DISABLE = (1 << 5), // The MB says which ROM is being en-/dis-abled
-    A2S_PAGE2               = (1 << 6),
-    A2S_HIRES               = (1 << 7),
-    A2S_LC_READ             = (1 << 8),
-    A2S_LC_WRITE            = (1 << 9),
-    A2S_LC_BANK2            = (1 << 10),
-    A2S_BANK_MASK           = (1 << 11) - 1,
+    A2S_80STORE             = (1u << 0),
+    A2S_RAMRD               = (1u << 1),
+    A2S_RAMWRT              = (1u << 2),
+    A2S_CXSLOTROM_MB_ENABLE = (1u << 3), // These names confused me so I changed
+    A2S_ALTZP               = (1u << 4),
+    A2S_SLOT3ROM_MB_DISABLE = (1u << 5), // The MB says which ROM is being en-/dis-abled
+    A2S_PAGE2               = (1u << 6),
+    A2S_HIRES               = (1u << 7),
+    A2S_LC_READ             = (1u << 8),
+    A2S_LC_WRITE            = (1u << 9),
+    A2S_LC_BANK2            = (1u << 10),
+    A2S_BANK_MASK           = (1u << 11) - 1,
 
     // These are machine view states that do not affect the memory banking
-    A2S_COL80               = (1 << 11),
-    A2S_ALTCHARSET          = (1 << 12),
-    A2S_TEXT                = (1 << 13),
-    A2S_MIXED               = (1 << 14),
-    A2S_DHIRES              = (1 << 15),
+    A2S_COL80               = (1u << 11),
+    A2S_ALTCHARSET          = (1u << 12),
+    A2S_TEXT                = (1u << 13),
+    A2S_MIXED               = (1u << 14),
+    A2S_DHIRES              = (1u << 15),
 
     // Machine states that also don't directly affect banking
-    A2S_LC_PRE_WRITE        = (1 << 16),
+    A2S_LC_PRE_WRITE        = (1u << 16),
 
     // Additional machine states
-    A2S_OPEN_APPLE          = (1 << 17),
-    A2S_CLOSED_APPLE        = (1 << 18),
-    A2S_FRANKLIN80ACTIVE    = (1 << 19),
-    A2S_RESET_MASK          = (1 << 20) - 1,
+    A2S_OPEN_APPLE          = (1u << 17),
+    A2S_CLOSED_APPLE        = (1u << 18),
+    A2S_FRANKLIN80ACTIVE    = (1u << 19),
+    A2S_RESET_MASK          = (1u << 20) - 1,
 
-    A2S_FRANKLIN80INSTALLED = (1 << 20),
+    A2S_FRANKLIN80INSTALLED = (1u << 20),
 } A2_STATE;
 
 // The mask for the bits in the RAM_WATCH array
 enum WATCH_MASK {
     WATCH_NONE             = 0,                     // Nothing to watch
-    WATCH_IO_PORT          = 1 << 0,                // Call an IO callback function
-    WATCH_EXEC_BREAKPOINT  = 1 << 1,                // break on execute
-    WATCH_READ_BREAKPOINT  = 1 << 2,                // break on read access
-    WATCH_WRITE_BREAKPOINT = 1 << 3,                // break on write access
+    WATCH_IO_PORT          = 1u << 0,                // Call an IO callback function
+    WATCH_EXEC_BREAKPOINT  = 1u << 1,                // break on execute
+    WATCH_READ_BREAKPOINT  = 1u << 2,                // break on read access
+    WATCH_WRITE_BREAKPOINT = 1u << 3,                // break on write access
 };
 
 // The joystick interface to runtime

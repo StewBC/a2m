@@ -197,7 +197,7 @@ void diskii_step_head(APPLE2 *m, int slot, int soft_switch) {
 
     diskii_timer_update(m->cpu.cycles, &d->head_event_cycles, &d->head_settle_cycles);
 
-    uint8_t phase_bit = (1 << ((soft_switch >> 1) & 3)); // PH0..PH3
+    uint8_t phase_bit = (1u << ((soft_switch >> 1) & 3)); // PH0..PH3
     uint8_t on = (soft_switch & 1);
 
     uint8_t prev_on = d->last_on_phase_mask;             // last non-zero on state

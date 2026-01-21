@@ -11,7 +11,7 @@
 const char *rt_trace_u82binstr(uint8_t byte) {
     static char buffer[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0};
     for(int i = 0; i < 8 ; i++) {
-        buffer[7 - i] = byte & (1 << i) ? '1' : '0';
+        buffer[7 - i] = byte & (1u << i) ? '1' : '0';
     }
     return buffer;
 }

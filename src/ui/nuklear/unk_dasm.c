@@ -375,7 +375,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
             key -= key >= SDLK_a ? SDLK_a - 10 : SDLK_0;
             uint8_t shift = (4 * (3 - dv->cursor_digit));
             uint16_t address = dv->cursor_address;
-            address &= ~(0x0f << shift);
+            address &= ~(0x0F << shift);
             address |= (key << shift);
             dv->cursor_address = address;
             if(dv->cursor_line < 0 || dv->cursor_line > dv->rows - 1) {
