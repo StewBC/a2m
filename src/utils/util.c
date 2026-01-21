@@ -81,17 +81,6 @@ int util_console_open(CONSOLE_MODE *console_mode) {
     freopen_s(&f, "CONOUT$", "w", stdout);
     freopen_s(&f, "CONOUT$", "w", stderr);
 
-    // Also ensure Win32 std handles are valid (helps some libs)
-    HANDLE hIn  = CreateFileW(L"CONIN$",  GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
-    HANDLE hOut = CreateFileW(L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
-
-    if(hIn  != INVALID_HANDLE_VALUE) {
-        SetStdHandle(STD_INPUT_HANDLE,  hIn);
-    }
-    if(hOut != INVALID_HANDLE_VALUE) {
-        SetStdHandle(STD_OUTPUT_HANDLE, hOut);
-        SetStdHandle(STD_ERROR_HANDLE,  hOut);
-    }
     Sleep(100);
 #endif // _WIN32
     return A2_OK;

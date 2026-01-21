@@ -420,19 +420,22 @@ int main(int argc, char **argv) {
 
     main_ini_merge_to(&opts.ini_store, &ini_store);
 
-    const char *val = ini_get(&ini_store, "Config", "ui");
-    if(val && stricmp(val, "text") == 0) {
-        if(A2_OK != util_console_open(&opts.console_mode)) {
-            return A2_ERR;
-        }
-    }
-
     // One time softswitch dispatch table init
     io_c0_table_init();
 
     // This avoids reading ui.reconfig which might give a possible use of uninit var warning
     int reconfig = 0;
     do {
+        // If text mode is needed, maybe after a reconfig, make sure there's a console
+        // This is a windows only thing.  On Linux/macOS there either is, or is not, a console
+        // So on all but windows, reconfig from GUI to text has to be disallowed.
+        const char *val = ini_get(&ini_store, "Config", "ui");
+        if(val && stricmp(val, "text") == 0) {
+            if(A2_OK != util_console_open(&opts.console_mode)) {
+                return A2_ERR;
+            }
+        }
+
         // Config selves
         if(A2_OK != rt_init(&rt, &ini_store)) {
             goto rt_err;
@@ -474,7 +477,7 @@ rt_err:
 console_exit:
     // if the console needs to be closed
     if(opts.console_mode == CONSOLE_NEW) {
-        printf("\nPress any key to close the window\n");
+        printf("\nPress ENTER to close the window\n");
         getchar();
         util_console_close(opts.console_mode);
     }
