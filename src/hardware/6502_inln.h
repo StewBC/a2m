@@ -782,22 +782,22 @@ static inline void bvs(APPLE2 *m) {
 }
 
 static inline void a2_brk(APPLE2 *m) {
-    // m->cpu.pc = 0xFFFE;
-    // a(m);
-    // m->cpu.pc = m->cpu.address_16;
-    // if(m->cpu.class == CPU_6502) {
-    //     // Interrupt flag on at break
-    //     m->cpu.flags |= 0b00000100;
-    // } else {
-    //     m->cpu.flags &= ~0b00001000;
-    //     if(m->cpu.flags & 0b00100000) {
-    //         // Interrupt flag on at break, if '-' flag is set
-    //         m->cpu.flags |= 0b00000100;
-    //     }
-    // }
+    m->cpu.pc = 0xFFFE;
+    a(m);
+    m->cpu.pc = m->cpu.address_16;
+    if(m->cpu.class == CPU_6502) {
+        // Interrupt flag on at break
+        m->cpu.flags |= 0b00000100;
+    } else {
+        m->cpu.flags &= ~0b00001000;
+        if(m->cpu.flags & 0b00100000) {
+            // Interrupt flag on at break, if '-' flag is set
+            m->cpu.flags |= 0b00000100;
+        }
+    }
     // m->trace = 0;
     // m->run = 0;
-    m->a2out_cb.cb_brk_ctx.cb_breakpoint(m->a2out_cb.cb_brk_ctx.user, m->cpu.pc, 0);
+    // m->a2out_cb.cb_brk_ctx.cb_breakpoint(m->a2out_cb.cb_brk_ctx.user, m->cpu.pc, 0);
 }
 
 static inline void clc(APPLE2 *m) {
