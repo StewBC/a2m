@@ -23,16 +23,16 @@ a2m is designed for people who enjoy developing or exploring Apple 2 software.
 ## Quick Key Reference
 In both Normal and Debug Mode, these keys have the listed meanings:
 
-| Key           | Action                    | Key       | Action                             |
-|:--------------|:--------------------------|:----------|:-----------------------------------|
-| F1            | Show Help                 | F2        | Toggle Debug Mode View             |
-| F3            | Toggle Turbo Mode         | F4        |                                    |
-| F5            | Run                       | F6        | Run to cursor                      |
-| F7            |                           | F8        |                                    |
-| F9            | Toggle Breakpoint         | F10       | Step                               |
-| F11           | Break                     | F12       | Monitor Select                     |
-| CTRL+SHIFT+F4 | Configure Assembler       | CTRL+F4   | Run Assembler                      |
-| SHIFT+F11     | Step Out                  | SHIFT+F12 | Toggle Franklin Ace Diplay on `][+`|
+| Key           | Action                         | Key       | Action                              |
+|:--------------|:-------------------------------|:----------|:------------------------------------|
+| F1            | Show Help                      | F2        | Toggle Debug Mode View              |
+| F3            | Toggle Turbo Mode              | F4        |                                     |
+| F5            | Run                            | F6        | Run to cursor                       |
+| F7            |                                | F8        |                                     |
+| F9            | Toggle Breakpoint              | F10       | Step                                |
+| F11           | Break                          | F12       | Monitor Select                      |
+| CTRL+SHIFT+F4 | Configure Assembler            | CTRL+F4   | Run Assembler                       |
+| SHIFT+F11     | Step Out                       | SHIFT+F12 | Toggle Franklin Ace Diplay on `][+` |
 
 Debug Mode (`F2`) also reveals the Miscellaneous view, and it is here where disks can be inserted, making the Apple 2 really useful.
 
@@ -100,26 +100,26 @@ Although Debug Mode is often described as a separate mode, it is always active. 
 ***Keyboard controls***
 The following keys control the debugger regardless of whether the Debug Mode View is open (via F2):
 
-| Key       | Action                    | Key | Action                 |
-|:----------|:--------------------------|:----|:-----------------------|
-| F1        | Show Help                 | F2  | Toggle Debug Mode View |
-| F5        | Run                       | F6  | Run to cursor          |
-| F7        |                           | F8  |                        |
-| F9        | Toggle Breakpoint         | F10 | Step                   |
-| F11       | Break                     | F12 | Monitor Select         |
-| SHIFT+F11 | Step Out                  |     |                        |
+| Key       | Action                             | Key | Action                                    |
+|:----------|:-----------------------------------|:----|:------------------------------------------|
+| F1        | Show Help                          | F2  | Toggle Debug Mode View                    |
+| F5        | Run                                | F6  | Run to cursor                             |
+| F7        |                                    | F8  |                                           |
+| F9        | Toggle Breakpoint                  | F10 | Step                                      |
+| F11       | Break                              | F12 | Monitor Select                            |
+| SHIFT+F11 | Step Out                           |     |                                           |
 
 \Needspace{10\baselineskip}
 ## Opening the Debugger
 Press **F2** to open the Debug Mode View. Press **F2** again to hide it. The following table represents the layout of the Debugger Views, when opened. 
 
-| Position             | View |
-|:---------------------|:----------------------------------------------------------------------------|
-|Upper left: | Apple 2 display |
-|Upper right: | CPU view |
-|Right, below CPU: | Disassembly view |
-|Lower left: | Memory view (hex + text; any bank can be inspected) |
-|Lower right: | Miscellaneous view (slot configuration, disks, soft-switches, breakpoints, etc.) |
+| Position             | View                                                                      |
+|:---------------------|:--------------------------------------------------------------------------|
+|Upper left:           | Apple 2 display                                                           |
+|Upper right:          | CPU view                                                                  |
+|Right, below CPU:     | Disassembly view                                                          |
+|Lower left:           | Memory view (hex + text; any bank can be inspected)                       |
+|Lower right:          | Miscellaneous view (slot configuration, disks, soft-switches, breakpoints, etc.) |
 
 ## Basic UI Philosophy
 a2m uses the **Nuklear** immediate-mode GUI library. Nuklear uses a *hover-active* model: when the CPU is stopped, whichever view the mouse is over becomes active and receives input. Active views have a green header; inactive ones use grey.
@@ -178,12 +178,12 @@ Each line follows this general format:
 
 Broken down:
 
-| Element | Meaning |
-|:--------|:--------------------------------------------------------------------------|
-|C27D     | The hexadecimal address in RAM |
-|WAITKEY1 | A label for that address (if present) |
-|E6 4E    | The raw bytes at the address at the start of the line |
-|INC RNDL | The disassembled instruction (with symbols resolved when available) |
+| Element | Meaning                                                                                |
+|:--------|:---------------------------------------------------------------------------------------|
+|C27D     | The hexadecimal address in RAM                                                         |
+|WAITKEY1 | A label for that address (if present)                                                  |
+|E6 4E    | The raw bytes at the address at the start of the line                                  |
+|INC RNDL | The disassembled instruction (with symbols resolved when available)                    |
 
 See **Symbols Dialog** for more information.
 
@@ -191,27 +191,27 @@ See **Symbols Dialog** for more information.
 ### Keyboard controls
 These keys apply **when emulation is stopped**:
 
-| Key           | Action                                                             |
-|:--------------|:-------------------------------------------------------------------|
-| C+a           | Edit the memory address of the cursor line                         |
-| C+S+b         | Open the Assembler Configuration Dialog                            |
-| C+b           | Assemble the configured source file                                |
-| C+e           | Show the assembler errors dialog                                   |
-| C+p           | Set the PC to the cursor address                                   |
-| C+s           | Open the symbol lookup dialog                                      |
-| ENTER         | Finish "edit memory address" mode                                  |
-| TAB           | Cycle through lookup, syms & labels; syms & labels; labels; or raw |
-| HOME          | Move the cursor to the top of the view                             |
-| C+HOME        | Jump to address `$0000`                                            |
-| END           | Move the cursor to the last line of the view                       |
-| C+END         | Jump to address `$FFFF`                                            |
-| UP/DOWN       | Move the cursor, scrolling if needed                               |
-| LEFT          | Scroll to show the cursor                                          |
-| C+LEFT        | Set PC to cursor and scroll to it                                  |
-| RIGHT         | Scroll to show the PC                                              |
-| C+RIGHT       | Set cursor to PC and scroll to it                                  |
-| PAGE UP       | Page up by one full view                                           |
-| PAGE DOWN     | Page down by one full view                                         |
+| Key           | Action                                                                           |
+|:--------------|:---------------------------------------------------------------------------------|
+| C+a           | Edit the memory address of the cursor line                                       |
+| C+S+b         | Open the Assembler Configuration Dialog                                          |
+| C+b           | Assemble the configured source file                                              |
+| C+e           | Show the assembler errors dialog                                                 |
+| C+p           | Set the PC to the cursor address                                                 |
+| C+s           | Open the symbol lookup dialog                                                    |
+| ENTER         | Finish "edit memory address" mode                                                |
+| TAB           | Cycle through lookup, syms & labels; syms & labels; labels; or raw               |
+| HOME          | Move the cursor to the top of the view                                           |
+| C+HOME        | Jump to address `$0000`                                                          |
+| END           | Move the cursor to the last line of the view                                     |
+| C+END         | Jump to address `$FFFF`                                                          |
+| UP/DOWN       | Move the cursor, scrolling if needed                                             |
+| LEFT          | Scroll to show the cursor                                                        |
+| C+LEFT        | Set PC to cursor and scroll to it                                                |
+| RIGHT         | Scroll to show the PC                                                            |
+| C+RIGHT       | Set cursor to PC and scroll to it                                                |
+| PAGE UP       | Page up by one full view                                                         |
+| PAGE DOWN     | Page down by one full view                                                       |
 
 **C+ and S+ mean CONTROL+ and SHIFT+, respectively.**
 
@@ -220,12 +220,12 @@ These keys apply **when emulation is stopped**:
 At the bottom of the view are **selector buttons** that choose which memory bank to display.  
 On the Apple ][+ model, the 128 K option is disabled.
 
-| Label  | Action
-|:-------|:---------------------------------------------------------------|
-|6502    | Shows the CPU's current live memory map |
-|64K     | Shows the first 64 K regardless of soft-switch configuration |
-|128K    | On the //e, shows the auxiliary bank |
-|LC Bank | Toggles between the two language-card banks |
+| Label  | Action                                                                                  |
+|:-------|:----------------------------------------------------------------------------------------|
+|6502    | Shows the CPU's current live memory map                                                 |
+|64K     | Shows the first 64 K regardless of soft-switch configuration                            |
+|128K    | On the //e, shows the auxiliary bank                                                    |
+|LC Bank | Toggles between the two language-card banks                                             |
 
 The **scrollbar** on the right scrolls from address `$0000` to `$FFFF`.  
 A mouse **scroll wheel** scrolls by 4 lines. Scroll sensitivity can be configured (see **INI Files in Depth - Config**).
@@ -240,41 +240,41 @@ The memory view is a way of inspecting larger areas of the Apple 2 RAM. The disp
 
 Broken down:
 
-| Element    | Meaning |
-|:-----------|:---------------------------------------------------------------------|
-| 0000       | The hexadecimal address in RAM |
-| 54 68 ..   | The bytes starting at the address at the start of the line |
-| This is .. | The ASCII representation of the bytes (`54` is `T`, `68` is `h`, etc.) |
+| Element    | Meaning                                                                             |
+|:-----------|:------------------------------------------------------------------------------------|
+| 0000       | The hexadecimal address in RAM                                                      |
+| 54 68 ..   | The bytes starting at the address at the start of the line                          |
+| This is .. | The ASCII representation of the bytes (`54` is `T`, `68` is `h`, etc.)              |
 
 \Needspace{29\baselineskip}
 ### Keyboard controls
 These keys apply **when emulation is stopped**:
 
-| Key           | Action |
-|:--------------|:------------------------------------------------------------------------|
-| 0..9, a..f    | In the HEX portion, type hexadecimal characters to edit the memory |
-| ASCII         | In the ASCII portion, type ASCII letters to set the memory |
-| C+a           | Edit the memory address of the cursor line |
-| C+f           | Open the find dialog box |
-| C+n           | Search forward for the find string (find next) |
-| C+S+n         | Search backward for the find string (find previous) |
-| C+s           | Open the symbol lookup dialog |
-| C+t           | Switch between Hex and ASCII editing |
-| C+v           | Split the view, up to 16 times, into independent sub-views |
-| C+j           | Join the sub-view with its neighbouring sub-view |
-| A+UP          | Switch to the sub-view above the current sub-view |
-| A+DOWN        | Switch to the sub-view below the current sub-view |
-| ENTER         | Finish "edit memory address" mode |
-| HOME          | Move the cursor to the start of the current line |
-| C+HOME        | Move the cursor to the top of the view |
-| END           | Move the cursor to the end of the current line |
-| C+END         | Move the cursor to the end of the last line of the view |
-| UP/DOWN       | Move the cursor up or down, scrolling if needed |
-| C+UP/DOWN     | Scroll the view one line up or down |
-| LEFT/RIGHT    | Move the cursor left or right, wrapping to previous/next row if needed |
-| PAGE UP       | Page up by one full view |
-| PAGE DOWN     | Page down by one full view |
-| S+INSERT      | Paste from the OS clipboard (HEX into address and HEX, ASCII into ASCII) |
+| Key           | Action                                                                           |
+|:--------------|:---------------------------------------------------------------------------------|
+| 0..9, a..f    | In the HEX portion, type hexadecimal characters to edit the memory               |
+| ASCII         | In the ASCII portion, type ASCII letters to set the memory                       |
+| C+a           | Edit the memory address of the cursor line                                       |
+| C+f           | Open the find dialog box                                                         |
+| C+n           | Search forward for the find string (find next)                                   |
+| C+S+n         | Search backward for the find string (find previous)                              |
+| C+s           | Open the symbol lookup dialog                                                    |
+| C+t           | Switch between Hex and ASCII editing                                             |
+| C+v           | Split the view, up to 16 times, into independent sub-views                       |
+| C+j           | Join the sub-view with its neighbouring sub-view                                 |
+| A+UP          | Switch to the sub-view above the current sub-view                                |
+| A+DOWN        | Switch to the sub-view below the current sub-view                                |
+| ENTER         | Finish "edit memory address" mode                                                |
+| HOME          | Move the cursor to the start of the current line                                 |
+| C+HOME        | Move the cursor to the top of the view                                           |
+| END           | Move the cursor to the end of the current line                                   |
+| C+END         | Move the cursor to the end of the last line of the view                          |
+| UP/DOWN       | Move the cursor up or down, scrolling if needed                                  |
+| C+UP/DOWN     | Scroll the view one line up or down                                              |
+| LEFT/RIGHT    | Move the cursor left or right, wrapping to previous/next row if needed           |
+| PAGE UP       | Page up by one full view                                                         |
+| PAGE DOWN     | Page down by one full view                                                       |
+| S+INSERT      | Paste from the OS clipboard (HEX into address and HEX, ASCII into ASCII)         |
 
 **A+, C+ and S+ mean ALT+, CONTROL+ and SHIFT+, respectively.**
 
@@ -292,11 +292,11 @@ The Miscellaneous View consists of sub-views that can be opened and closed at wi
 \Needspace{6\baselineskip}
 The sub-views are:
 
-| View Name     | Contents |
-|:--------------|:--------------------------------------------------------------------------|
-| Slots         | Devices inside the Apple 2 slots, such as Disk II or SmartPort cards |
-| Debugger      | Cycle counters, call stack, breakpoints, etc. |
-| Soft Switches | Memory locations in the $C000–$C0FF range that affect Apple 2 operations |
+| View Name     | Contents                                                                         |
+|:--------------|:---------------------------------------------------------------------------------|
+| Slots         | Devices inside the Apple 2 slots, such as Disk II or SmartPort cards             |
+| Debugger      | Cycle counters, call stack, breakpoints, etc.                                    |
+| Soft Switches | Memory locations in the $C000–$C0FF range that affect Apple 2 operations         |
 
 Each of these is discussed in more detail below.
 
@@ -330,18 +330,18 @@ Clicking the button labelled `[Slot.0]` boots the disk in drive/device 0 of that
 ### Debugger Misc View
 By default, the Debugger View shows status information under the heading **Debug Status**. This information is:
 
-| Name           | Description |
-|:---------------|:--------------------------------------------------------------------------|
-| Run to PC nnnn | The button is selected when stepping over a JSR or using F6, and the       |
-|                | destination address is in nnnn. Otherwise, the button is unselected and   |
-|                | nnnn contains 0000                                                        |
-| Step Out       | The button is selected when F11 is used to step out of the current        |
-|                | subroutine                                                                |
-| Step Cycles    | The number of cycles between stops of the emulator. For example,          |
-|                | stepping over an INC of ZP will show 5 cycles, but stepping over a JSR    |
-|                | will show however many cycles the subroutine cost, plus the 6 JSR cycles  |
-| Total Cycles   | Shows the total cycles since the emulator started running the             |
-|                | Apple 2 ROM code                                                         |
+| Name           | Description                                                                     |
+|:---------------|:--------------------------------------------------------------------------------|
+| Run to PC nnnn | The button is selected when stepping over a JSR or using F6, and the            |
+|                | destination address is in nnnn. Otherwise, the button is unselected and         |
+|                | nnnn contains 0000                                                              |
+| Step Out       | The button is selected when F11 is used to step out of the current              |
+|                | subroutine                                                                      |
+| Step Cycles    | The number of cycles between stops of the emulator. For example,                |
+|                | stepping over an INC of ZP will show 5 cycles, but stepping over a JSR          |
+|                | will show however many cycles the subroutine cost, plus the 6 JSR cycles        |
+| Total Cycles   | Shows the total cycles since the emulator started running the                   |
+|                | Apple 2 ROM code                                                                |
 
 \Needspace{11\baselineskip}
 There is also a **Call Stack** display. This is a window with its own scrollbar if the entries exceed what the window can show. The call stack entries have the form:
@@ -350,12 +350,12 @@ There is also a **Call Stack** display. This is a window with its own scrollbar 
 
 Broken down:
 
-| Element | Meaning |
-|:--------|:--------------------------------------------------------------------------|
-| E69E    | The hexadecimal address where the JSR resides                              |
-| JSR     | The instruction that caused the push onto the stack                        |
-| FF59    | The destination address of the JSR—the address of the subroutine called   |
-| OLDRST  | The symbol name for $FF59, from the loaded symbol files                    |
+| Element | Meaning                                                                                |
+|:--------|:---------------------------------------------------------------------------------------|
+| E69E    | The hexadecimal address where the JSR resides                                          |
+| JSR     | The instruction that caused the push onto the stack                                    |
+| FF59    | The destination address of the JSR—the address of the subroutine called                |
+| OLDRST  | The symbol name for $FF59, from the loaded symbol files                                |
 
 Note that clicking the address (`E69E` in this case) will set the disassembly view cursor to that address and show it in the disassembly view. The same is true for `FF59`; clicking it, or clicking to the right of the JSR, will place the disassembly cursor on that address and show it in the disassembly view.
 
@@ -367,34 +367,34 @@ The Debugger View has a breakpoints view that is only visible when at least one 
 
 The label describes the breakpoint. These are all possible label values, where nnnn is the address of the breakpoint:
 
-| Label                | Meaning                                                                 |
-|:---------------------|:------------------------------------------------------------------------|
-| nnnn (counters)      | Uses a counter                                                          |
-| nnnn Fast            | Sets the Turbo Mode to Fast                                             |
-| nnnn Restore         | Restores the Turbo Mode to the value before it was set to Fast          |
-| nnnn Slow            | Sets the Turbo Mode to Slow                                             |
-| nnnn Swap sxdy       | Swaps the Disk II disk in Slot x Drive y to the next disk in the queue  |
-| nnnn Troff           | Turns file trace logging off                                            |
-| nnnn Tron            | Turns file trace logging on, to the file ./trace.txt                    |
+| Label                | Meaning                                                                   |
+|:---------------------|:--------------------------------------------------------------------------|
+| nnnn (counters)      | Uses a counter                                                            |
+| nnnn Fast            | Sets the Turbo Mode to Fast                                               |
+| nnnn Restore         | Restores the Turbo Mode to the value before it was set to Fast            |
+| nnnn Slow            | Sets the Turbo Mode to Slow                                               |
+| nnnn Swap sxdy       | Swaps the Disk II disk in Slot x Drive y to the next disk in the queue    |
+| nnnn Troff           | Turns file trace logging off                                              |
+| nnnn Tron            | Turns file trace logging on, to the file ./trace.txt                      |
 | nnnn Type            | Types keys on the Apple II keyboard (`\r`, `123`, or `\x0a`, for example) |
-| z[Range]             | Stop on specified access to an address in the range                     |
-| z[Range] (counters)  | Stop on specified access to an address in the range, subject to counters |
-| z[nnnn]              | Stop on specified access to an address                                  |
-| z[nnnn] (counters)   | Stop on specified access to an address, subject to counters             |
+| z[Range]             | Stop on specified access to an address in the range                       |
+| z[Range] (counters)  | Stop on specified access to an address in the range, subject to counters  |
+| z[nnnn]              | Stop on specified access to an address                                    |
+| z[nnnn] (counters)   | Stop on specified access to an address, subject to counters               |
 
 For type keys, the mechanism is similar to how paste works. When address `$C010` is accessed, another key is inserted into the `$C000` keyboard address for the Apple 2 to read. This is useful for pressing a key when, for example, there is a prompt that says "Insert disk 2 and press enter". Type can be used in conjunction with Swap to swap disk 2 in, press enter, and continue execution without user intervention.
 
 \Needspace{10\baselineskip}
 In the above table, these symbols mean:
 
-| Symbol     | Meaning                                                                          |
-|:-----------|:---------------------------------------------------------------------------------|
-| nnnn       | Hexadecimal memory location                                                      |
-| (counters) | Takes the form (x/y), where x means the address has been accessed x times and    |
-|            | the stop will occur when x equals y                                              |
-| [Range]    | Takes the form [xxxx-yyyy], where x and y are the start and end addresses of an  |
-|            | address range in which any access will count                                    |
-| z          | Represents R for read access, W for write access, and RW for read or write access |
+| Symbol     | Meaning                                                                             |
+|:-----------|:------------------------------------------------------------------------------------|
+| nnnn       | Hexadecimal memory location                                                         |
+| (counters) | Takes the form (x/y), where x means the address has been accessed x times and       |
+|            | the stop will occur when x equals y                                                 |
+| [Range]    | Takes the form [xxxx-yyyy], where x and y are the start and end addresses of an     |
+|            | address range in which any access will count                                        |
+| z          | Represents R for read access, W for write access, and RW for read or write access   |
 
 * The `[Edit]` button opens the edit breakpoints dialog.
 * The `[Disable]` button leaves the breakpoint in the list but ignores it. This is useful for leaving bookmarks in memory, as the `[View PC]` button will still jump to the location of that disabled breakpoint.
@@ -410,25 +410,25 @@ For example, setting Mixed to ON will draw the Apple 2 screen as though Mixed is
 Note that the addresses work in pairs, and only the first address is shown in the table. The odd address turns the setting on, and the even address turns the setting off. For example, `$C000` sets `80STORE` and `$C001` clears `80STORE`.
 
 \Needspace{18\baselineskip}
-| Address | Meaning                                                                             |
-|:-------:|:------------------------------------------------------------------------------------|
-| C001    | 80STORE - ($C054/$C055) selects main vs aux independently of RAMRD/WRT for disp mem |
-| C003    | RAMRD   - CPU reads aux $0200-$BFFF and LC $D000-$FFFF, see 80STORE               |
-| C005    | RAMWRT  - CPU writes aux $0200-$BFFF and LC $D000-$FFFF, see 80STORE               |
-| C007    | CXROM   - C100-CFFF //e ROM (overrides C3ROM and CFFF)                              |
-| C009    | ALTZP   - ZP/stack are in aux bank                                                  |
-| C00B    | C3ROM   - Turn internal ROM off, turn Slot ROM on                                   |
-| C00D    | 80COL   - 80-column display (turn 80-col display on)                                |
-| C00F    | ALTCHAR - alternate character set                                                   |
-| C051    | TEXT    - Enable text mode                                                          |
-| C053    | MIXED   - Graphics modes have 4 lines of text at the bottom                         |
-| C055    | PAGE2   - Display from $800/$4000 instead of  $400/$2000                            |
-| C057    | HIRES   - Enable high resolution graphics mode                                      |
-| C05E    | DHGR    - Enable double resolution graphics mode                                    |
-| C08X    | LCBANK  - Bank1 vs Bank2                                                            |
-| C08X    | LCREAD  - Show RAM vs ROM at $D000-$FFFF                                            |
-| C08X    | LCPREWRITE                                                                          |
-| C08X    | LCWRITE - Write to RAM at $D000-$FFFF                                              |
+| Address | Meaning                                                                                |
+|:-------:|:---------------------------------------------------------------------------------------|
+| C001    | 80STORE - ($C054/$C055) selects main vs aux independently of RAMRD/WRT for disp mem    |
+| C003    | RAMRD   - CPU reads aux $0200-$BFFF and LC $D000-$FFFF, see 80STORE                    |
+| C005    | RAMWRT  - CPU writes aux $0200-$BFFF and LC $D000-$FFFF, see 80STORE                   |
+| C007    | CXROM   - C100-CFFF //e ROM (overrides C3ROM and CFFF)                                 |
+| C009    | ALTZP   - ZP/stack are in aux bank                                                     |
+| C00B    | C3ROM   - Turn internal ROM off, turn Slot ROM on                                      |
+| C00D    | 80COL   - 80-column display (turn 80-col display on)                                   |
+| C00F    | ALTCHAR - alternate character set                                                      |
+| C051    | TEXT    - Enable text mode                                                             |
+| C053    | MIXED   - Graphics modes have 4 lines of text at the bottom                            |
+| C055    | PAGE2   - Display from $800/$4000 instead of  $400/$2000                               |
+| C057    | HIRES   - Enable high resolution graphics mode                                         |
+| C05E    | DHGR    - Enable double resolution graphics mode                                       |
+| C08X    | LCBANK  - Bank1 vs Bank2                                                               |
+| C08X    | LCREAD  - Show RAM vs ROM at $D000-$FFFF                                               |
+| C08X    | LCPREWRITE                                                                             |
+| C08X    | LCWRITE - Write to RAM at $D000-$FFFF                                                  |
 
 The descriptions of the above are very loose. See a credible source for proper explanations.
 
@@ -448,16 +448,16 @@ The dialog has `Break At [nnnn] on [] PC [] Address Access`. In this, `nnnn` is 
 \Needspace{11\baselineskip}
 The `Actions`:
 
-| Action  | Meaning                                                                  |
-|:--------|:-------------------------------------------------------------------------|
-| Break   | Default action. Puts the emulator in a stopped state.                    |
-| Fast    | Switches the Turbo Mode to `max`.                                        |
-| Restore | Switches the Turbo Mode to the last mode active through the `F3` setting |
-| Slow    | Switches the Turbo Mode to 1 MHz.                                        |
-| Swap    | Enter the slot and drive, and a swap is done on that floppy.             |
-| Troff   | Turns off trace file logging.                                            |
-| Tron    | Turns on trace logging to a file called `./trace.txt`.                   |
-| Type    | Enter text to be "typed" into the Apple 2 when the breakpoint is hit    |
+| Action  | Meaning                                                                                |
+|:--------|:---------------------------------------------------------------------------------------|
+| Break   | Default action. Puts the emulator in a stopped state.                                  |
+| Fast    | Switches the Turbo Mode to `max`.                                                      |
+| Restore | Switches the Turbo Mode to the last mode active through the `F3` setting               |
+| Slow    | Switches the Turbo Mode to 1 MHz.                                                      |
+| Swap    | Enter the slot and drive, and a swap is done on that floppy.                           |
+| Troff   | Turns off trace file logging.                                                          |
+| Tron    | Turns on trace logging to a file called `./trace.txt`.                                 |
+| Type    | Enter text to be "typed" into the Apple 2 when the breakpoint is hit                   |
 
 Lastly, there is the `[] use Counter` setting. Select this option to enter two counter values. The first value is how many times the breakpoint must be hit before it causes its action, and the second value specifies what value to install as the counter once the breakpoint has been hit. As an example, setting `Counter` to 10 and `Reset Counter` to 2 means that the breakpoint must be hit 10 times before its action is executed, and after that it will only execute the action every second time the breakpoint is hit.
 
@@ -502,101 +502,103 @@ Where: infile is a 6502 assembly language file
 ## Assembler Features and Syntax
 The assembler supports these features:
 
-| Feature        | Description                                                                        |
-|:-----------------|:-----------------------------------------------------------------------------------|
-| 65x02 mnemonics  | All standard opcodes and addressing modes                                          |
-| labels           | Labels start with `a-z` or `_` and can contain numbers. A label ends with `:`       |
-| variables        | Values can be assigned and used in expressions                                     |
-| .commands        | Dot commands are described below                                                   |
-| comments         | The comment character is `;` and everything after `;` on a line is ignored            |
-| address          | The address character is `*` and it can be assigned and read                          |
-| expressions      | The assembler has a full expression parser                                         |
+| Feature          | Description                                                                   |
+|:-----------------|:------------------------------------------------------------------------------|
+| 65x02 mnemonics  | All standard opcodes and addressing modes                                     |
+| labels           | Labels start with `a-z` or `_` and can contain numbers. A label ends with `:` |
+| variables        | Values can be assigned and used in expressions                                |
+| .commands        | Dot commands are described below                                              |
+| comments         | The comment character is `;` and everything after `;` on a line is ignored    |
+| address          | The address character is `*` and it can be assigned and read                  |
+| expressions      | The assembler has a full expression parser                                    |
 
-\Needspace{27\baselineskip}
+\Needspace{28\baselineskip}
 There is a set of directives that control how a 6502 source file is assembled. These are referred to as `dot commands`, since each keyword starts with a `.`. The available `dot commands` are:
 
-| Command        | Meaning                                                                             |
-|:---------------|:------------------------------------------------------------------------------------|
-| .6502          | Only 6502 opcodes are valid. 65C02 opcodes are not valid and will cause errors      |
-| .65c02         | Both 6502 and 65C02 opcodes are valid                                               |
-| .org n         | Set the assembly location to address n. Another way to specify `* =`               |
-| .align v       | Align to v bytes, inserting up to v-1 zeroes into the output                        |
-| .byte b        | Insert b as a byte into the output                                                 |
-| .word w        | Insert the word bytes w into the output                                            |
-| .dword dw      | Insert the double-word bytes dw into the output (low byte first)                   |
-| .qword qw      | Insert the quad-word bytes qw into the output                                      |
-| .drow w        | Insert the word bytes w into the output in reverse order                           |
-| .drowd dw      | Insert the double-word bytes dw into the output in reverse order                   |
-| .drowq qw      | Insert the quad-word bytes qw into the output in reverse order                     |
-| .if p          | Conditional assembly where p is a condition such as `.if c .eq 1`                  |
-| .else          | The else part of a conditional `.if` directive                                     |
-| .endif         | Ends a `.if` conditional assembler directive                                       |
-| .for p         | Start a loop where p has the form `<initializer>, <condition>, <iteration>`        |
-| .endfor        | Ends a `.for` loop assembler directive                                             |
-| .macro n p     | Start a macro procedure with name n and parameters p                               |
-| .endmacro      | Ends a `.macro` assembler definition                                               |
-| .incbin "f"    | Include the contents of file f verbatim in the output                              |
-| .include "f"   | Include a 6502 assembler file for assembly at this point                           |
-| .string "s"    | Insert the string s into the output                                                |
-| .strcode       | Set a string character parser; an expression is applied to each character          |
+| Command         | Meaning                                                                        |
+|:----------------|:-------------------------------------------------------------------------------|
+| .6502           | Only 6502 opcodes are valid. 65C02 opcodes are not valid and will cause errors |
+| .65c02          | Both 6502 and 65C02 opcodes are valid                                          |
+| .org n          | Set the assembly location to address n. Another way to specify `* =`           |
+| .align v        | Align to v bytes, inserting up to v-1 zeroes into the output                   |
+| .res l[,b]      | Insert l bytes into the output, value `0` or the value of the optional `b`     |
+| .byte b`[,b]*`    | Insert b as a byte or bytes into the output                                  |
+| .word w`[,w]*`    | Insert the word bytes w into the output                                      |
+| .dword dw`[,dw]*` | Insert the double-word bytes dw into the output (low byte first)             |
+| .qword qw`[,qw]*` | Insert the quad-word bytes qw into the output                                |
+| .drow w`[,w]*`    | Insert the word bytes w into the output in reverse order                     |
+| .drowd dw`[,dw]*` | Insert the double-word bytes dw into the output in reverse order             |
+| .drowq qw`[,qw]*` | Insert the quad-word bytes qw into the output in reverse order               |
+| .if p           | Conditional assembly where p is a condition such as `.if c .eq 1`              |
+| .else           | The else part of a conditional `.if` directive                                 |
+| .endif          | Ends a `.if` conditional assembler directive                                   |
+| .for p          | Start a loop where p has the form `<initializer>, <condition>, <iteration>`    |
+| .endfor         | Ends a `.for` loop assembler directive                                         |
+| .macro n p      | Start a macro procedure with name n and parameters p                           |
+| .endmacro       | Ends a `.macro` assembler definition                                           |
+| .incbin "f"     | Include the contents of file f verbatim in the output                          |
+| .include "f"    | Include a 6502 assembler file for assembly at this point                       |
+| .string "s"     | Insert the string s into the output                                            |
+| .strcode e      | Set a string character parser; the expression `e` is applied to each character |
 
-Note:
+Notes:
 
+* `[,x]*` means followed by more comma-seperated values.
 * The assembler runs in the folder of the input file, so includes must be relative to that folder.
 
 \Needspace{11\baselineskip}
 The following dot directives work with dot commands:
 
-| Directive   | Meaning                                                                             |
-|:------------|:------------------------------------------------------------------------------------|
-| .defined    | Used with `.if` to test whether a macro parameter was specified                     |
-| .lt         | Less than (`<`)                                                                     |
-| .le         | Less than or equal (`<=`)                                                           |
-| .gt         | Greater than (`>`)                                                                  |
-| .ge         | Greater than or equal (`>=`)                                                        |
-| .eq         | Equal (`=` or `==`)                                                                 |
-| .ne         | Not equal (`!=` or `<>`)                                                            |
+| Directive   | Meaning                                                                            |
+|:------------|:-----------------------------------------------------------------------------------|
+| .defined    | Used with `.if` to test whether a macro parameter was specified                    |
+| .lt         | Less than (`<`)                                                                    |
+| .le         | Less than or equal (`<=`)                                                          |
+| .gt         | Greater than (`>`)                                                                 |
+| .ge         | Greater than or equal (`>=`)                                                       |
+| .eq         | Equal (`=` or `==`)                                                                |
+| .ne         | Not equal (`!=` or `<>`)                                                           |
 
 \Needspace{19\baselineskip}
 #### Assembler Expressions
 The assembler has a full expression parser. The following table lists valid tokens and illustrates their order of precedence:
 
-| Token                             | Description                                                 |
-|:----------------------------------|:------------------------------------------------------------|
-| `*`, `:`, `Num`, `variables`, `(` | Address, anonymous labels, numbers, variables, and brackets |
-| `+`, `-`, `<`, `>`, `~`           | Unary plus, minus, low byte, high byte, and bitwise not     |
-| `**`                              | Exponentiation                                              |
-| `*`, `/`, `%`                     | Multiply, divide, and modulus                               |
-| `+`, `-`                          | Addition and subtraction                                    |
-| `<<`, `>>`                        | Shift left and shift right                                  |
-| relational                        | `.lt .le .gt .ge` for `<, <=, >, >=`                        |
-| equality                          | `.ne .eq` for `!=, ==`                                      |
-| `&`                               | Bitwise AND                                                 |
-| `^`                               | Bitwise exclusive OR                                        |
-| `|`                              | Bitwise OR                                                  |
-| `&&`, `||`                      | Logical AND and OR                                          |
-| `?`, `:`                          | Ternary conditional                                         |
+| Token                             | Description                                                  |
+|:----------------------------------|:-------------------------------------------------------------|
+| `*`, `:`, `Num`, `variables`, `(` | Address, anonymous labels, numbers, variables, and brackets  |
+| `+`, `-`, `<`, `>`, `~`           | Unary plus, minus, low byte, high byte, and bitwise not      |
+| `**`                              | Exponentiation                                               |
+| `*`, `/`, `%`                     | Multiply, divide, and modulus                                |
+| `+`, `-`                          | Addition and subtraction                                     |
+| `<<`, `>>`                        | Shift left and shift right                                   |
+| relational                        | `.lt .le .gt .ge` for `<, <=, >, >=`                         |
+| equality                          | `.ne .eq` for `!=, ==`                                       |
+| `&`                               | Bitwise AND                                                  |
+| `^`                               | Bitwise exclusive OR                                         |
+| `|`                               | Bitwise OR                                                   |
+| `&&`, `||`                        | Logical AND and OR                                           |
+| `?`, `:`                          | Ternary conditional                                          |
 
 \Needspace{9\baselineskip}
 #### Assembler Numbers
 Numbers can be written in the following formats:
 
-| Prefix  | Base                                                                              |
-|:--------|:----------------------------------------------------------------------------------|
-| `$`     | Hexadecimal number. $ followed by 1 to 4 digits                                   |
-| `0`     | Octal number. 0 followed by digits in the range 0..7                              |
-| `%`     | Binary number. % followed by digits 0 or 1 only                                   |
-| `1`–`9` | Decimal number.                                                                   |
+| Prefix  | Base                                                                                   |
+|:--------|:---------------------------------------------------------------------------------------|
+| `$`     | Hexadecimal number. $ followed by 1 to 4 digits                                        |
+| `0`     | Octal number. 0 followed by digits in the range 0..7                                   |
+| `%`     | Binary number. % followed by digits 0 or 1 only                                        |
+| `1`–`9` | Decimal number.                                                                        |
 
 \Needspace{8\baselineskip}
 Inside strings, numbers can also be quoted. In that case, the formats are:
 
-| Prefix      | Base                                                                        |
-|:------------|:----------------------------------------------------------------------------|
-| `\x[N]+`    | Hexadecimal number. The same rules apply as in the previous table          |
-| `\0[N]+`    | Octal                                                                       |
-| `\%[1|0]+`  | Binary                                                                      |
-| `\[0-9]+`   | Decimal                                                                     |
+| Prefix      | Base                                                                               |
+|:------------|:-----------------------------------------------------------------------------------|
+| `\x[N]+`    | Hexadecimal number. The same rules apply as in the previous table                  |
+| `\0[N]+`    | Octal                                                                              |
+| `\%[1|0]+`  | Binary                                                                             |
+| `\[0-9]+`   | Decimal                                                                            |
 
 \Needspace{6\baselineskip}
 #### Assembler Variables
@@ -729,10 +731,10 @@ Comments can be used in INI files, but note that if a2m saves out an INI file, t
 ## Machine Section
 The Machine section is used to configure the Apple 2 machine that is being emulated. Variables are:
 
-| Variable | Value                                                                 |
-|:---------|:----------------------------------------------------------------------|
-| Model    | `plus` or `enh`. `plus` emulates a ][+, and `enh` emulates a //e Enhanced |
-| Turbo    | Comma-separated values as 1 MHz multipliers. `max` for as fast as possible |
+| Variable | Value                                                                                 |
+|:---------|:--------------------------------------------------------------------------------------|
+| Model    | `plus` or `enh`. `plus` emulates a ][+, and `enh` emulates a //e Enhanced             |
+| Turbo    | Comma-separated values as 1 MHz multipliers. `max` for as fast as possible            |
 
 An example Turbo setting might be `Turbo = 1, 8, max ; This means 1 MHz, 8 MHz, or as fast as possible at 60 FPS`.
 
@@ -740,30 +742,30 @@ An example Turbo setting might be `Turbo = 1, 8, max ; This means 1 MHz, 8 MHz, 
 ## Config Section
 The Config section is mostly UI configuration. Variables are:
 
-| Variable     | Value                                                                   |
-|:-------------|:------------------------------------------------------------------------|
-| disk_leds    | Value `on` or `1` shows disk activity LEDs in the lower right of the UI |
-| save         | `yes` means save the INI file on exit                                   |
-| symbols      | Comma-separated files that contain symbol information                   |
+| Variable     | Value                                                                             |
+|:-------------|:----------------------------------------------------------------------------------|
+| disk_leds    | Value `on` or `1` shows disk activity LEDs in the lower right of the UI           |
+| save         | `yes` means save the INI file on exit                                             |
+| symbols      | Comma-separated files that contain symbol information                             |
 | symbol_view  | In disassembler `0`: lookup, syms & labels, `1`: syms & labels, `2`: labels, `3`: raw   |
-| ui           | `text` for text based UI.  Anything else means GUI based UI             |
-| wheel_speed  | Number of lines to scroll when using the mouse scroll wheel             |
+| ui           | `text` for text based UI.  Anything else means GUI based UI                       |
+| wheel_speed  | Number of lines to scroll when using the mouse scroll wheel                       |
 
 \Needspace{7\baselineskip}
 ## Video Section
 The Video section has only one valid variable, and it is only used to configure the 80-column card on the Apple ][+ model. Using this will install the Franklin Ace Display card into a slot on an Apple ][+ machine.
 
-| Variable | Value                                                                 |
-|:---------|:----------------------------------------------------------------------|
-| sNdev    | Franklin Ace Display. The `N` in `sNdev` is a slot number, usually 3  |
+| Variable | Value                                                                                 |
+|:---------|:--------------------------------------------------------------------------------------|
+| sNdev    | Franklin Ace Display. The `N` in `sNdev` is a slot number, usually 3                  |
 
 \Needspace{6\baselineskip}
 ## DiskII Section
 The Disk II section configures an Apple Disk II floppy drive.
 
-| Variable | Value                                       |
-|:---------|:--------------------------------------------|
-| sNdX     | Comma-separated paths to floppy disk images |
+| Variable | Value                                                                                 |
+|:---------|:--------------------------------------------------------------------------------------|
+| sNdX     | Comma-separated paths to floppy disk images                                           |
 
 The `N` and `X` in `sNdX` are slot and drive numbers. The slot is usually 6, and the drive number can be `0` or `1`.
 
@@ -776,10 +778,10 @@ In the example, both floppy disk images are configured for a Disk II in slot 6, 
 ## SmartPort Section
 The SmartPort section configures a slot for use as a SmartPort block device. These contain block device images, usually 32 MB images (often 33,553,920 bytes) or smaller.
 
-| Variable | Value                                      |
-|:---------|:-------------------------------------------|
-| sNdX     | Path to a disk image                       |
-| bs       | A value of `1` will force-boot that device |
+| Variable | Value                                                                                 |
+|:---------|:--------------------------------------------------------------------------------------|
+| sNdX     | Path to a disk image                                                                  |
+| bs       | A value of `1` will force-boot that device                                            |
 
 As with the Disk II section, the values for `N` and `X` are a valid, unused slot number and device number, where device numbers are `0` or `1`. Usually the slot numbers are `5` or `7`. The Apple //e will try to boot from a SmartPort device `0` in slot `7`. The `bs` setting can be used to force an Apple 2 to boot a SmartPort device `0` in a slot other than slot `7`, or to boot an Apple ][+ from a SmartPort device instead of the Disk II device.
 
@@ -827,13 +829,13 @@ Here are a few examples:
 The assembler section sets up a root file to assemble using the built-in assembler.
 
 \Needspace{7\baselineskip}
-| Variable    | Value                                                     |
-|:------------|:----------------------------------------------------------|
-| source      | Fully qualified path to the file                          |
-| dest        | `6502`, `64K`, `128K` or `LC Bank`. `6502` is the default |
-| auto_run    | `yes` or `1` to auto run after successful assembly        |
-| address     | Address at which to start auto-run (example: `0x6000`)    |
-| reset_stack | `yes` or `1` to reset/clear the stack when auto-running   |
+| Variable    | Value                                                                              |
+|:------------|:-----------------------------------------------------------------------------------|
+| source      | Fully qualified path to the file                                                   |
+| dest        | `6502`, `64K`, `128K` or `LC Bank`. `6502` is the default                          |
+| auto_run    | `yes` or `1` to auto run after successful assembly                                 |
+| address     | Address at which to start auto-run (example: `0x6000`)                             |
+| reset_stack | `yes` or `1` to reset/clear the stack when auto-running                            |
 
 Since the assembler is mapped to `CTRL+F4`, configuring the assembler settings in an `.ini` file makes it possible to assemble and run a program under development by pressing `CTRL+F4` after editing the assembly source, without having to restart or stop the emulator.
 
