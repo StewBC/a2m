@@ -73,10 +73,10 @@ typedef enum {
     A2S_LC_PRE_WRITE        = (1u << 16),
 
     // Additional machine states
-    A2S_OPEN_APPLE          = (1u << 17),
-    A2S_CLOSED_APPLE        = (1u << 18),
-    A2S_FRANKLIN80ACTIVE    = (1u << 19),
-    A2S_RESET_MASK          = (1u << 20) - 1,
+    A2S_FRANKLIN80ACTIVE    = (1u << 17),
+    A2S_RESET_MASK          = (1u << 18) - 1,
+    A2S_OPEN_APPLE          = (1u << 18),
+    A2S_CLOSED_APPLE        = (1u << 19),
 
     A2S_FRANKLIN80INSTALLED = (1u << 20),
 } A2_STATE;
