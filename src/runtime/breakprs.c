@@ -150,8 +150,7 @@ static int parse_u32_auto(const char *s, char **end, uint32_t *out) {
     if(errno == ERANGE || *end == s) {
         return A2_ERR;
     }
-    // SQW was going to use 64K but maybe setting breakpoints in aux could be done this way?
-    if(v > 0xFFFFFFFFul) {
+    if(v > 0xFFFF) {
         return A2_ERR;
     }
     *out = v;

@@ -104,7 +104,8 @@ int nk_option_label_disabled(struct nk_context *ctx, const char *label, int stat
     return disabled ? state : new_state;
 }
 
-void nk_custom_scrollbarv(struct nk_context *ctx, struct nk_rect sbar, int total_rows, int rows_visible, int *top_row, int *dragging, float *grab_offset) {
+void nk_custom_scrollbarv(struct nk_context *ctx, struct nk_rect sbar, int total_rows,
+                          int rows_visible, int *top_row, int *dragging, float *grab_offset) {
     // Visuals
     struct nk_command_buffer *out = nk_window_get_canvas(ctx);
     float pad = 2.0f;
@@ -167,6 +168,145 @@ void nk_custom_scrollbarv(struct nk_context *ctx, struct nk_rect sbar, int total
     }
 }
 
+// Nuklear helper: selectable_label that supports disabled
+static int nk_selectable_label_disabled(struct nk_context *ctx, const char *label,
+                                        int *active, int disabled, nk_flags align) {
+    struct nk_style_selectable saved = ctx->style.selectable;
+    int old_active = *active;
+    int clicked;
+
+    if(disabled) {
+        struct nk_style_selectable s = saved;
+        s.normal = nk_style_item_color(nk_rgba(70, 70, 70, 255));
+        s.hover = s.normal;
+        s.pressed = s.normal;
+        s.normal_active = nk_style_item_color(nk_rgba(90, 90, 90, 255));
+        s.hover_active = s.normal_active;
+        s.pressed_active = s.normal_active;
+        s.text_normal = nk_rgba(150, 150, 150, 255);
+        s.text_hover = s.text_normal;
+        s.text_pressed = s.text_normal;
+        s.text_normal_active = nk_rgba(185, 185, 185, 255);
+        s.text_hover_active = s.text_normal_active;
+        s.text_pressed_active = s.text_normal_active;
+        ctx->style.selectable = s;
+    }
+    clicked = nk_selectable_label(ctx, label, align, active);
+    ctx->style.selectable = saved;
+
+    if(disabled) {
+        *active = old_active;
+        return 0;
+    }
+
+    return clicked;
+}
+
+// Draw the segment selectors
+static int nk_segmented_cells(struct nk_context *ctx, const char **labels, int count,
+                              uint32_t enabled_mask, int *active_index, float w_each) {
+    int changed = 0;
+
+    for(int i = 0; i < count; i++) {
+        int enabled = ((enabled_mask >> i) & 1) ? 1 : 0;
+        nk_layout_row_push(ctx, w_each);
+        int active = (*active_index == i) ? 1 : 0;
+        int was_active = active;
+        int clicked = nk_selectable_label_disabled(ctx, labels[i], &active, !enabled, NK_TEXT_CENTERED);
+
+        if(!enabled) {
+            continue;
+        }
+
+        if(clicked && active && !was_active) {
+            *active_index = i;
+            changed = 1;
+        }
+    }
+
+    return changed;
+}
+
+// Show the banking selector in 2 rows with an optional initial label (for mem view)
+void unk_bank_view_selector(struct nk_context *ctx, int model, VIEW_FLAGS *vf, const char *row_label) {
+    const char *labels_ram[]  = {"Map", "Main", "Aux"};
+    const char *labels_c100[] = {"Map", "ROM"};
+    const char *labels_d000[] = {"Map", "LC1", "LC2", "ROM"};
+
+    // Current selections
+    int sel_ram  = (int)vf_get_ram(*vf);
+    int sel_c100 = (int)vf_get_c100(*vf);
+    int sel_d000 = (int)vf_get_d000(*vf);
+
+    // Availability masks (per model)
+    uint32_t en_ram  = 0x7; // Map/Main/Aux
+    uint32_t en_c100 = 0x3; // Map/ROM
+    uint32_t en_d000 = 0xF; // Map/LC1/LC2/ROM
+
+    if(model == MODEL_APPLE_II_PLUS) {
+        // ][+: RAM is mapped or MAIN; C100 is mapped; D000 selectable if RAM is MAIN
+        en_ram  = 0x3; // Map  or MAIN
+        en_c100 = 0x1; // Map only
+    }
+
+    // If RAM == MAPPED, force D000 == MAPPED and disable D000 selector
+    int ram_is_mapped = (sel_ram == A2SEL48K_MAPPED) ? 1 : 0;
+    if(ram_is_mapped) {
+        sel_d000 = A2SELD000_MAPPED;
+        vf_set_d000(vf, (A2SEL_D000)sel_d000);
+        en_d000 = 0x1; // only Map enabled
+    } 
+
+    // row 1: row_label + "RAM:" + 3 segments = 5 cols
+    nk_layout_row_begin(ctx, NK_STATIC, 18, 5);
+    {
+        nk_layout_row_push(ctx, 3 * 40.0f);
+        if(row_label) {
+            nk_label(ctx, row_label, NK_TEXT_LEFT);
+        } else {
+            nk_spacer(ctx);
+        }
+        nk_layout_row_push(ctx, 40.0f);
+        nk_label(ctx, "RAM:", NK_TEXT_RIGHT);
+        if(nk_segmented_cells(ctx, labels_ram, 3, en_ram, &sel_ram, 40.0f)) {
+            vf_set_ram(vf, (A2SEL_48K)sel_ram);
+
+            // If user just switched RAM to mapped, immediately apply D000 rule
+            ram_is_mapped = (sel_ram == A2SEL48K_MAPPED) ? 1 : 0;
+            if(ram_is_mapped) {
+                sel_d000 = A2SELD000_MAPPED;
+                vf_set_d000(vf, (A2SEL_D000)sel_d000);
+                en_d000 = 0x1;
+            } else {
+                // RAM leaving mapped, set D000 to LC2 if it is set to mapped
+                if(sel_d000 == A2SELD000_MAPPED) {
+                    sel_d000 = A2SELD000_LC_B2;
+                    vf_set_d000(vf, (A2SEL_D000)sel_d000);
+                }
+                en_d000 = 0xF;
+            }
+        }
+    }
+    nk_layout_row_end(ctx);
+
+    // row 2: "C100:" + 2 segments + "D000:" + 4 segments = 8 cols
+    nk_layout_row_begin(ctx, NK_STATIC, 18, 8);
+    {
+        nk_layout_row_push(ctx, 40.0f);
+        nk_label(ctx, "C100:", NK_TEXT_LEFT);
+        if(nk_segmented_cells(ctx, labels_c100, 2, en_c100, &sel_c100, 40.0f)) {
+            vf_set_c100(vf, (A2SEL_C100)sel_c100);
+        }
+
+        nk_layout_row_push(ctx, 40.0f);
+        nk_label(ctx, "D000:", NK_TEXT_RIGHT);
+        if(nk_segmented_cells(ctx, labels_d000, 4, en_d000, &sel_d000, 40.0f)) {
+            vf_set_d000(vf, (A2SEL_D000)sel_d000);
+        }
+    }
+    nk_layout_row_end(ctx);
+}
+
 static SDL_Texture *load_png_texture_from_ram(SDL_Renderer *r, uint8_t *image, int image_size) {
     SDL_RWops *rw = SDL_RWFromConstMem(image, image_size);
     if(!rw) {
@@ -219,15 +359,15 @@ void unk_config_ui(UNK *v, INI_STORE *ini_store) {
     }
     val = ini_get(ini_store, "Assembler", "dest");
     if(val) {
-        RAMVIEW_FLAGS flags = MEM_MAPPED_6502;
-        if (0 == stricmp(val, "64K")) {
-            flags = MEM_MAIN;
-        } else if (0 == stricmp(val, "128K")) {
-            flags = MEM_AUX;
-        } else if (0 == stricmp(val, "LC Bank")) {
-            flags = MEM_LC_BANK2;
-        }
-        v->viewdasm.assembler_config.flags = flags;
+        // VIEW_FLAGS flags = MEM_MAPPED_6502;
+        // if (0 == stricmp(val, "64K")) {
+        //     flags = MEM_MAIN;
+        // } else if (0 == stricmp(val, "128K")) {
+        //     flags = MEM_AUX;
+        // } else if (0 == stricmp(val, "LC Bank")) {
+        //     flags = MEM_LC_BANK2;
+        // }
+        // v->viewdasm.assembler_config.flags = flags;
     }
     val = ini_get(ini_store, "Assembler", "reset_stack");
     if(val) {
@@ -383,7 +523,7 @@ int unk_process_events(UI *ui, APPLE2 *m) {
     if(v->dlg_modal_mouse_down && !v->ctx->input.mouse.buttons[NK_BUTTON_LEFT].down) {
         v->dlg_modal_mouse_down = 0;
     }
-    
+
     nk_input_begin(v->ctx);
 
     while(SDL_PollEvent(&e) != 0) {
@@ -533,8 +673,8 @@ void unk_present(UNK *v) {
         v->clear_a2_view = 0;
     }
 
-    if(tst_flags(m->state_flags, A2S_FRANKLIN80ACTIVE) || 
-    tst_flags(v->shadow_state, A2S_COL80) && (tst_flags(v->shadow_state, A2S_HIRES) || tst_flags(v->shadow_state, A2S_TEXT))) {
+    if(tst_flags(m->state_flags, A2S_FRANKLIN80ACTIVE) ||
+            tst_flags(v->shadow_state, A2S_COL80) && (tst_flags(v->shadow_state, A2S_HIRES) || tst_flags(v->shadow_state, A2S_TEXT))) {
         SDL_UpdateTexture(v->texture_wide, NULL, v->surface_wide->pixels, v->surface_wide->pitch);
         SDL_RenderCopy(v->renderer, v->texture_wide, NULL, v->draw_rect);
     } else {

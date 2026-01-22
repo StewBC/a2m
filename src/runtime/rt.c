@@ -190,7 +190,7 @@ void rt_apply_ini(RUNTIME *rt, INI_STORE *ini_store) {
                         bp.type_text = parsed_line.type_text;
                         bp.slot = parsed_line.slot;
                         bp.device = parsed_line.device;
-                        bp.selected_bank = MEM_MAPPED_6502;
+                        // bp.selected_bank = MEM_MAPPED_6502;
                         ARRAY_ADD(&rt->breakpoints, bp);
                         // SQW temp solution
                         if(parsed_line.action == ACTION_TRON) {
@@ -365,13 +365,13 @@ void rt_brk_callback(RUNTIME *rt, uint16_t address, uint8_t mask) {
     rt->run = 0;
 }
 
-int rt_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, int force_byte, char symbol_view, char *str_buf, int str_buf_len) {
+int rt_disassemble_line(RUNTIME *rt, uint16_t *address, VIEW_FLAGS vf, int force_byte, char symbol_view, char *str_buf, int str_buf_len) {
     APPLE2 *m = rt->m;
     char address_symbol[11];
     uint16_t pc = *address;
     char *text = str_buf;
     int remain = str_buf_len;
-    uint8_t instruction = read_from_memory_selected(m, pc, selected);
+    uint8_t instruction = read_from_memory_in_view(m, vf, pc);
     int length = force_byte ? 1 : opcode_lengths[instruction];
     *address += length;
     int prt_len;
@@ -401,7 +401,7 @@ int rt_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, int force_
             adjust(text, remain, prt_len);
             break;
         case 2:
-            operands = read_from_memory_selected(m, pc + 1, selected);
+            operands = read_from_memory_in_view(m, vf, pc + 1);
             prt_len = snprintf(text, remain, "%02X %02X     %s", instruction, operands, opcode_text[instruction]);
             adjust(text, remain, prt_len);
             if(mode == AM_REL) {
@@ -411,8 +411,8 @@ int rt_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, int force_
             }
             break;
         case 3: {
-                uint8_t al = read_from_memory_selected(m, pc + 1, selected);
-                uint8_t ah = read_from_memory_selected(m, pc + 2, selected);
+                uint8_t al = read_from_memory_in_view(m, vf, pc + 1);
+                uint8_t ah = read_from_memory_in_view(m, vf, pc + 2);
                 operands = ((ah << 8) | al);
                 prt_len = snprintf(text, remain, "%02X %02X %02X  %s", instruction, al, ah, opcode_text[instruction]);
                 adjust(text, remain, prt_len);
@@ -450,31 +450,31 @@ int rt_disassemble_line(RUNTIME *rt, uint16_t *address, int selected, int force_
             case AM_ABS:
             case AM_ZPG:
                 if(instruction != OPCODE_JMP_ABS && instruction != OPCODE_JMP_IND && instruction != OPCODE_JSR) {
-                    snprintf(text, remain, " [%02X]", read_from_memory_selected(m, operands, selected));
+                    snprintf(text, remain, " [%02X]", read_from_memory_in_view(m, vf, operands));
                 }
                 break;
             case AM_ABSX:
             case AM_ZPGX:
-                snprintf(text, remain, " [%02X]", read_from_memory_selected(m, operands + m->cpu.X, selected));
+                snprintf(text, remain, " [%02X]", read_from_memory_in_view(m, vf, operands + m->cpu.X));
                 break;
             case AM_ABSY:
             case AM_ZPGY:
-                snprintf(text, remain, " [%02X]", read_from_memory_selected(m, operands + m->cpu.Y, selected));
+                snprintf(text, remain, " [%02X]", read_from_memory_in_view(m, vf, operands + m->cpu.Y));
                 break;
             case AM_IND: {
-                uint8_t al = read_from_memory_selected(m, operands, selected);
-                uint8_t ah = read_from_memory_selected(m, operands + 1, selected);
+                uint8_t al = read_from_memory_in_view(m, vf, operands);
+                uint8_t ah = read_from_memory_in_view(m, vf, operands + 1);
                 operands = ((ah << 8) | al);
-                snprintf(text, remain, " [%02X]", read_from_memory_selected(m, operands, selected));
+                snprintf(text, remain, " [%02X]", read_from_memory_in_view(m, vf, operands));
                 }
                 break;
             case AM_XIND:
                 break;
             case AM_INDY: {
-                uint8_t al = read_from_memory_selected(m, operands, selected);
-                uint8_t ah = read_from_memory_selected(m, operands + 1, selected);
+                uint8_t al = read_from_memory_in_view(m, vf, operands);
+                uint8_t ah = read_from_memory_in_view(m, vf, operands + 1);
                 operands = ((ah << 8) | al);
-                snprintf(text, remain, " [%02X]", read_from_memory_selected(m, operands + m->cpu.Y, selected));
+                snprintf(text, remain, " [%02X]", read_from_memory_in_view(m, vf, operands + m->cpu.Y));
                 }
                 break;
             case AM_REL:

@@ -18,7 +18,7 @@ typedef struct DECODE_ENTRY {
 typedef struct VIEWDASM {
     int cols;                       // how many cols each line shows
     int dragging;                   // scrollbar
-    int header_height;              // height of the window header portion
+    int non_client_height;          // height of the window header/footer portion
     int symbol_view;                // What type of symbols to show
     size_t rows;                    // how many code lines this view shows
     float grab_offset;              // scrollbar
@@ -26,7 +26,7 @@ typedef struct VIEWDASM {
     uint32_t str_buf_len;           // the length of the str_buf char array
     uint16_t cursor_address;        // where cursor is - might be off-screen
     uint16_t cursor_line;           // where cursor is - might be off-screen
-    RAMVIEW_FLAGS flags;            // memory to consider when decoding
+    VIEW_FLAGS flags;               // memory to consider when decoding
     CURSOR_FIELD cursor_field;      // ASCII or ADDRESS mode
     CURSOR_DIGIT cursor_digit;      // ADDRESS mode only
     ASSEMBLER_CONFIG assembler_config;

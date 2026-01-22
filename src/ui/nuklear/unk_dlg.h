@@ -35,7 +35,7 @@ typedef struct ASSEMBLER_CONFIG {
     int start_address_text_len;
     uint16_t start_address;
     int dlg_asm_filebrowser;
-    RAMVIEW_FLAGS flags;
+    VIEW_FLAGS flags;
     int model;
 } ASSEMBLER_CONFIG;
 

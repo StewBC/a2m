@@ -65,7 +65,7 @@ static void unk_mem_find_string(UNK *v, VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     uint16_t index = 0;
     for(size_t i = ms->last_found_address + 1; i < ms->last_found_address + 65537; i++) {
         uint16_t pc = i;
-        uint8_t c = read_from_memory_selected(m, pc + index, flags);
+        uint8_t c = read_from_memory_in_view(m, flags, pc + index);
         if(ms->find_case_insensitive) {
             c = tolower(c);
         }
@@ -74,7 +74,7 @@ static void unk_mem_find_string(UNK *v, VIEWMEM *ms, VIEWMEM_VIEW *mv) {
                 mv->cursor_address = mv->view_address = ms->last_found_address = pc;
                 return;
             }
-            c = read_from_memory_selected(m, pc + index, flags);
+            c = read_from_memory_in_view(m, flags, pc + index);
             if(ms->find_case_insensitive) {
                 c = tolower(c);
             }
@@ -89,7 +89,7 @@ static void unk_mem_find_string_reverse(UNK *v, VIEWMEM *ms, VIEWMEM_VIEW *mv) {
     uint16_t index = ms->find_string_len - 1;
     for(int i = ms->last_found_address - 1; i > ms->last_found_address - 65537; i--) {
         uint16_t pc = i;
-        uint8_t c = read_from_memory_selected(m, pc + index, flags);
+        uint8_t c = read_from_memory_in_view(m, flags, pc + index);
         if(ms->find_case_insensitive) {
             c = tolower(c);
         }
@@ -100,7 +100,7 @@ static void unk_mem_find_string_reverse(UNK *v, VIEWMEM *ms, VIEWMEM_VIEW *mv) {
                 return;
             }
             --index;
-            c = read_from_memory_selected(m, pc + index, flags);
+            c = read_from_memory_in_view(m, flags, pc + index);
             if(ms->find_case_insensitive) {
                 c = tolower(c);
             }
@@ -247,7 +247,7 @@ static int unk_mem_hex_key(UNK *v, int key) {
         key -= key >= SDLK_a ? SDLK_a - 10 : SDLK_0;
         if(mv->cursor_field == CURSOR_HEX) {
             // This is HEX mode only as ascii mode was handled at the start
-            uint8_t byte = read_from_memory_selected(m, mv->cursor_address, mv->flags);
+            uint8_t byte = read_from_memory_in_view(m, mv->flags, mv->cursor_address);
             if(mv->cursor_digit == CURSOR_DIGIT1) {
                 byte &= 0xf0;
                 byte |= key;
@@ -255,7 +255,7 @@ static int unk_mem_hex_key(UNK *v, int key) {
                 byte &= 0x0F;
                 byte |= (key << 4);
             }
-            write_to_memory_selected(m, mv->flags, mv->cursor_address, byte);
+            write_to_memory_in_view(m, mv->flags, mv->cursor_address, byte);
         } else {
             // This is address mode
             int delta = unk_mem_circular_delta(mv->cursor_address, mv->view_address);
@@ -297,7 +297,7 @@ int unk_mem_process_event(UNK *v, SDL_Event *e) {
 
     if(mv->cursor_field == CURSOR_ASCII) {
         if(e->type == SDL_TEXTINPUT) {
-            write_to_memory_selected(m, mv->flags, mv->cursor_address, e->text.text[0]);
+            write_to_memory_in_view(m, mv->flags, mv->cursor_address, e->text.text[0]);
             unk_mem_cursor_right(ms, mv);
         } else if(!(mod & (KMOD_CTRL | KMOD_ALT)) && e->key.keysym.sym >= 32 && e->key.keysym.sym < 127) {
             // SDL_TEXTINPUT also has SDL_KEYDOWN for same key, so filter out keys that were already
@@ -406,7 +406,7 @@ int unk_mem_process_event(UNK *v, SDL_Event *e) {
                 while(*clipboard_text) {
                     uint8_t key = *clipboard_text++;
                     if(mv->cursor_field == CURSOR_ASCII) {
-                        write_to_memory_selected(m, mv->flags, mv->cursor_address, key);
+                        write_to_memory_in_view(m, mv->flags, mv->cursor_address, key);
                         unk_mem_cursor_right(ms, mv);
                     } else {
                         key = tolower(key);
@@ -480,13 +480,13 @@ void unk_mem_resize_view(UNK *v) {
     struct nk_context *ctx = v->ctx;
     struct nk_style *style = &ctx->style;
     // calc is from nk_begin_titled
-    ms->header_height = 2.0f * style->window.header.padding.y + 2.0f * style->window.header.label_padding.y + v->font_height;
+    ms->non_client_height = 2.0f * style->window.header.padding.y + 2.0f * style->window.header.label_padding.y + 2 * v->font_height;
     struct nk_rect parent = v->layout.mem;
 
     float view_width = parent.w - 3.0f * ctx->style.window.border - SCROLLBAR_W;
     int visible_cols = view_width / v->font_width;
 
-    int view_total_rows = (parent.h - (ADDRESS_LABEL_H + ms->header_height)) / ROW_H;
+    int view_total_rows = ((parent.h - (ADDRESS_LABEL_H + ms->non_client_height)) / ROW_H) - 1;
     int view_rows = view_total_rows / ms->memviews.items;
     int view_height_overflow = view_total_rows - (view_rows * ms->memviews.items);
 
@@ -565,7 +565,7 @@ void unk_mem_show(UNK *v) {
                                     memset(ms->str_buf, 0x20, ms->str_buf_len);
                                     snprintf(ms->str_buf, ms->str_buf_len, "%04X:", view_address);
                                     for(int col = 0; col < ms->cols; col++) {
-                                        uint8_t c = ms->u8_buf[col] = read_from_memory_selected(m, view_address + col, mv->flags);
+                                        uint8_t c = ms->u8_buf[col] = read_from_memory_in_view(m, mv->flags, view_address + col);
                                         snprintf(&ms->str_buf[5 + col * 3], ms->str_buf_len - 5 - (ms->cols * 3), "%02X ", c);
                                     }
                                     for(int col = 0; col < ms->cols; col++) {
@@ -631,7 +631,7 @@ void unk_mem_show(UNK *v) {
                         r.h = ROW_H;
                         r.w = v->font_width;
                         r.y += (active_top_row + row) * ROW_H;
-                        uint8_t dc, c = read_from_memory_selected(m, mv->cursor_address, mv->flags);
+                        uint8_t dc, c = read_from_memory_in_view(m, mv->flags, mv->cursor_address);
                         switch(mv->cursor_field) {
                             case CURSOR_ADDRESS: {
                                     r.x = ctx->current->layout->at_x + v->font_width * mv->cursor_digit;
@@ -661,44 +661,9 @@ void unk_mem_show(UNK *v) {
                 ctx->style.window.background = active_background;
 
                 // B) Draw the memory bank access buttons
-                nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 4);
-                {
-                    nk_layout_row_push(ctx, 0.4);
-                    nk_labelf(ctx, NK_TEXT_ALIGN_LEFT, "Address: %04X", active_view->cursor_address);
-                    nk_layout_row_push(ctx, 0.14);
-                    if(nk_option_label(ctx, "6502", !tst_flags(active_view->flags, MEM_MAIN | MEM_AUX)) && tst_flags(active_view->flags, MEM_MAIN | MEM_AUX)) {
-                        clr_flags(active_view->flags, MEM_MAIN);
-                        clr_flags(active_view->flags, MEM_AUX);
-                        clr_flags(active_view->flags, MEM_LC_BANK2);
-                    }
-                    if(nk_option_label(ctx, "64K", tst_flags(active_view->flags, MEM_MAIN)) && !tst_flags(active_view->flags, MEM_MAIN)) {
-                        clr_flags(active_view->flags, MEM_AUX);
-                        set_flags(active_view->flags, MEM_MAIN);
-                        if(tst_flags(m->state_flags, A2S_LC_BANK2)) {
-                            set_flags(active_view->flags, MEM_LC_BANK2);
-                        } else {
-                            clr_flags(active_view->flags, MEM_LC_BANK2);
-                        }
-                    }
-                    if(nk_option_label_disabled(ctx, "128K", tst_flags(active_view->flags, MEM_AUX), m->model == MODEL_APPLE_II_PLUS) && !tst_flags(active_view->flags, MEM_AUX)) {
-                        clr_flags(active_view->flags, MEM_MAIN);
-                        set_flags(active_view->flags, MEM_AUX);
-                        if(tst_flags(m->state_flags, A2S_LC_BANK2)) {
-                            set_flags(active_view->flags, MEM_LC_BANK2);
-                        } else {
-                            clr_flags(active_view->flags, MEM_LC_BANK2);
-                        }
-                    }
-                    int before = tst_flags(active_view->flags, MEM_LC_BANK2);
-                    int after = nk_option_label_disabled(ctx, "LC Bank2", before, !tst_flags(active_view->flags, MEM_MAIN | MEM_AUX));
-                    if(after != before) {
-                        if(after) {
-                            set_flags(active_view->flags, MEM_LC_BANK2);
-                        } else {
-                            clr_flags(active_view->flags, MEM_LC_BANK2);
-                        }
-                    }
-                }
+                char address_str[14];
+                sprintf(address_str, "Address: %04X", active_view->cursor_address);
+                unk_bank_view_selector(ctx, m->model, &active_view->flags, address_str);
                 nk_group_end(ctx);
             }
         }
@@ -713,8 +678,8 @@ void unk_mem_show(UNK *v) {
             struct nk_rect sbar_bounds = v->layout.mem;
             sbar_bounds.x += sbar_bounds.w - SCROLLBAR_W;
             sbar_bounds.w = SCROLLBAR_W;
-            sbar_bounds.h -= (ms->header_height + ADDRESS_LABEL_H);
-            sbar_bounds.y += ms->header_height;
+            sbar_bounds.h -= (ms->non_client_height + ADDRESS_LABEL_H);
+            sbar_bounds.y += ms->non_client_height;
             int address = mv->view_address;
             if(nk_input_is_mouse_hovering_rect(&ctx->input, v->layout.mem)) {
                 int wheel = (int)ctx->input.mouse.scroll_delta.y;
@@ -786,7 +751,7 @@ void unk_mem_show(UNK *v) {
 
         if(v->right_click_menu_open) {
             if(nk_contextual_begin(ctx, NK_WINDOW_NO_SCROLLBAR, nk_vec2(160, 180), nk_rect(v->right_click_menu_pos.x, v->right_click_menu_pos.y, 1, 1))) {
-                uint64_t last_write = read_last_write_from_selected(m, v->right_click_address, mv->flags);
+                uint64_t last_write = read_last_write_from_selected(m, mv->flags, v->right_click_address);
                 char options_text[6];
                 nk_layout_row_dynamic(ctx, 22, 1);
                 {

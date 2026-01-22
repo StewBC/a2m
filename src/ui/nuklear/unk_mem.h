@@ -13,7 +13,7 @@ typedef struct VIEWMEM_VIEW {
     CURSOR_FIELD prev_field;            // when swtched to address - where from
     CURSOR_DIGIT cursor_digit;          // 01 for hex, 0123 for address
     CURSOR_DIGIT cursor_prev_digit;     // when switched to address - digit cursor was at
-    RAMVIEW_FLAGS flags;                // what memory to show
+    VIEW_FLAGS flags;                   // what memory to show to user
 } VIEWMEM_VIEW;
 
 // This is the mem view window
@@ -22,7 +22,7 @@ typedef struct VIEWMEM {
     uint32_t str_buf_len;               // the length of the str_buf char array
     uint32_t find_string_cap;           // the size of the find_string array
     int find_string_len;                // the length of this search term
-    int header_height;                  // height of the memory window header portion
+    int non_client_height;              // height of the memory window header/footer portion
     int cols;                           // how many cols each view shows
     int dragging;                       // scrollbar
     uint16_t last_found_address;        // used for find nex/prev

@@ -25,97 +25,6 @@ static inline uint8_t read_from_memory(APPLE2 *m, uint16_t address) {
     return byte;
 }
 
-static inline uint8_t read_from_memory_debug(APPLE2 *m, uint16_t address) {
-    assert(address / PAGE_SIZE < m->pages.num_pages);
-    return m->pages.read_pages[address / PAGE_SIZE][address % PAGE_SIZE];
-}
-
-static inline uint16_t read_from_memory_debug_16(APPLE2 *m, uint16_t address) {
-    uint8_t lo = read_from_memory_debug(m, address);
-    uint8_t hi = read_from_memory_debug(m, (uint16_t)(address + 1));
-    return (uint16_t)(lo | ((uint16_t)hi << 8));
-}
-
-static inline uint8_t read_from_memory_selected(APPLE2 *m, uint16_t address, int selected) {
-    switch(tst_flags(selected, (MEM_MAIN | MEM_AUX))) {
-        case MEM_MAPPED_6502:
-            return m->pages.read_pages[address / PAGE_SIZE][address % PAGE_SIZE];
-        case MEM_MAIN:
-            if(address < 0xD000) {
-                return m->ram.RAM_MAIN[address];
-            }
-            if(address < 0xE000) {
-                if(!(selected & MEM_LC_BANK2)) {
-                    // D123 + 1000 = e123 & 1fff =  123 (bank1)
-                    // d123               & 1fff = 1123 (bank2)
-                    // So set bank 1 address to exxx.
-                    address += 0x1000;
-                }
-                return m->ram.RAM_LC[(address & 0x1fff)];
-            }
-            // LC 0x2000+
-            return m->ram.RAM_LC[(address & 0x3fff)];
-        case MEM_AUX:
-            if(address < 0xD000) {
-                return m->ram.RAM_MAIN[address + 0x10000];
-            }
-            if(address < 0xE000) {
-                if(!(selected & MEM_LC_BANK2)) {
-                    // D123 + 1000 = e123 & 5fff = 4123 (aux bank1)
-                    // d123               & 5fff = 5123 (aux bank2)
-                    // So set bank 1 address to exxx.
-                    address += 0x1000;
-                }
-                return m->ram.RAM_LC[(address & 0x5fff)];
-            }
-            // exxx-ffff & 7fggg = aux lc ram
-            return m->ram.RAM_LC[(address & 0x7fff)];
-        default:
-            assert(0);
-            return 0;
-    }
-}
-
-static inline uint64_t read_last_write_from_selected(APPLE2 *m, uint16_t address, int selected) {
-    switch(tst_flags(selected, (MEM_MAIN | MEM_AUX))) {
-        case MEM_MAPPED_6502:
-            return m->pages.last_write_pages[address / PAGE_SIZE][address % PAGE_SIZE];
-        case MEM_MAIN:
-            if(address < 0xD000) {
-                return m->ram.RAM_LAST_WRITE[address];
-            }
-            if(address < 0xE000) {
-                if(!(selected & MEM_LC_BANK2)) {
-                    // D123 + 1000 = e123 & 1fff =  123 (bank1)
-                    // d123               & 1fff = 1123 (bank2)
-                    // So set bank 1 address to exxx.
-                    address += 0x1000;
-                }
-                return m->ram.RAM_LC_LAST_WRITE[(address & 0x1fff)];
-            }
-            // LC 0x2000+
-            return m->ram.RAM_LC_LAST_WRITE[(address & 0x3fff)];
-        case MEM_AUX:
-            if(address < 0xD000) {
-                return m->ram.RAM_LAST_WRITE[address + 0x10000];
-            }
-            if(address < 0xE000) {
-                if(!(selected & MEM_LC_BANK2)) {
-                    // D123 + 1000 = e123 & 5fff = 4123 (aux bank1)
-                    // d123               & 5fff = 5123 (aux bank2)
-                    // So set bank 1 address to exxx.
-                    address += 0x1000;
-                }
-                return m->ram.RAM_LC_LAST_WRITE[(address & 0x5fff)];
-            }
-            // exxx-ffff & 7fggg = aux lc ram
-            return m->ram.RAM_LC_LAST_WRITE[(address & 0x7fff)];
-        default:
-            assert(0);
-            return 0;
-    }
-}
-
 static inline void write_to_memory(APPLE2 *m, uint16_t address, uint8_t value) {
     size_t page = address / PAGE_SIZE;
     size_t offset = address % PAGE_SIZE;
@@ -138,50 +47,221 @@ static inline void write_to_memory(APPLE2 *m, uint16_t address, uint8_t value) {
     }
 }
 
-static inline void write_to_memory_selected(APPLE2 *m, RAMVIEW_FLAGS selected, uint16_t address, uint8_t value) {
-    switch(tst_flags(selected, (MEM_MAIN | MEM_AUX))) {
-        case MEM_MAPPED_6502:
-            m->pages.write_pages[address / PAGE_SIZE][address % PAGE_SIZE] = value;
-            break;
-        case MEM_MAIN:
-            if(address < 0xD000) {
-                m->ram.RAM_MAIN[address] = value;
-                break;
-            }
-            if(address < 0xE000) {
-                if(!(selected & MEM_LC_BANK2)) {
-                    // D123 + 1000 = e123 & 1fff =  123 (bank1)
-                    // d123               & 1fff = 1123 (bank2)
-                    // So set bank 1 address to exxx.
-                    address += 0x1000;
-                }
-                m->ram.RAM_LC[(address & 0x1fff)] = value;
-                break;
-            }
-            // LC 0x2000+
-            m->ram.RAM_LC[(address & 0x3fff)] = value;
-            break;
-        case MEM_AUX:
-            if(address < 0xD000) {
-                m->ram.RAM_MAIN[address + 0x10000] = value;
-                break;
-            }
-            if(address < 0xE000) {
-                if(!(selected & MEM_LC_BANK2)) {
-                    // D123 + 1000 = e123 & 5fff = 4123 (aux bank1)
-                    // d123               & 5fff = 5123 (aux bank2)
-                    // So set bank 1 address to exxx.
-                    address += 0x1000;
-                }
-                m->ram.RAM_LC[(address & 0x5fff)] = value;
-                break;
-            }
-            // exxx-ffff & 7fggg = aux lc ram
-            m->ram.RAM_LC[(address & 0x7fff)] = value;
-            break;
-        default:
-            assert(0);
+static inline uint8_t read_from_memory_debug(APPLE2 *m, uint16_t address) {
+    assert(address / PAGE_SIZE < m->pages.num_pages);
+    return m->pages.read_pages[address / PAGE_SIZE][address % PAGE_SIZE];
+}
+
+static inline uint16_t read_from_memory_debug_16(APPLE2 *m, uint16_t address) {
+    uint8_t lo = read_from_memory_debug(m, address);
+    uint8_t hi = read_from_memory_debug(m, (uint16_t)(address + 1));
+    return (uint16_t)(lo | ((uint16_t)hi << 8));
+}
+
+static inline uint8_t read_from_rom_forced(APPLE2 *m, uint16_t address) {
+    UNUSED(m);
+    if(address >= 0xC100 && address < 0xD000) {
+        // The slots rom starts at C000 even though c000-c100 is never used
+        return m->roms.blocks[ROM_APPLE2_SLOTS].bytes[address - 0xC000];
     }
+    return m->roms.blocks[ROM_APPLE2].bytes[address - 0xD000];
+}
+
+static inline uint8_t read_from_memory_in_view(APPLE2 *m, VIEW_FLAGS vf, uint16_t address) {
+    A2SEL_48K ram = vf_get_ram(vf);
+
+    // I/O page - doesn't make much sense except for KBD
+    if(address >= 0xC000 && address <= 0xC0FF) {
+        return m->ram.RAM_MAIN[address];
+    }
+
+    // C100-CFFF
+    if(address >= 0xC100 && address < 0xD000) {
+        if(vf_get_c100(vf) == A2SELC100_ROM) {
+            return read_from_rom_forced(m, address);
+        }
+
+        // If not ROM it is mapped RAM
+        return m->pages.read_pages[address / PAGE_SIZE][address % PAGE_SIZE];
+    }
+
+    // D000-FFFF
+    if(address >= 0xD000) {
+        if(ram == A2SEL48K_MAPPED) {
+            // Mapped
+            return m->pages.read_pages[address / PAGE_SIZE][address % PAGE_SIZE];
+        }
+
+        // Forced MAIN/AUX context
+        switch(vf_get_d000(vf)) {
+            case A2SELD000_ROM:
+                return read_from_rom_forced(m, address);
+
+            case A2SELD000_MAPPED:
+                return m->pages.read_pages[address / PAGE_SIZE][address % PAGE_SIZE];
+
+            case A2SELD000_LC_B1:
+            case A2SELD000_LC_B2: {
+                uint32_t bank_base = (vf_get_d000(vf) == A2SELD000_LC_B2) ? 0x1000 : 0x0000;
+                uint32_t lc_base = (ram == A2SEL48K_AUX) ? 0x4000 : 0x0000;
+
+                if(address < 0xE000) {
+                    // D000-DFFF: banked 4K in MAIN or AUX
+                    return m->ram.RAM_LC[lc_base + bank_base + (uint32_t)(address - 0xD000)];
+                }
+
+                // E000-FFFF: 8K in MAIN or AUX
+                return m->ram.RAM_LC[lc_base + 0x2000 + (uint32_t)(address - 0xE000)];
+            }
+        }
+    }
+
+    // 0000-BFFF
+    if(ram == A2SEL48K_MAPPED) {
+        return m->pages.read_pages[address / PAGE_SIZE][address % PAGE_SIZE];
+    }
+    // MAIN
+    if(ram == A2SEL48K_MAIN) {
+        return m->ram.RAM_MAIN[address];
+    }
+    // AUX
+    return m->ram.RAM_MAIN[(uint32_t)address + 0x10000];
+}
+
+static inline void write_to_memory_in_view(APPLE2 *m, VIEW_FLAGS vf, uint16_t address, uint8_t value) {
+    A2SEL_48K ram = vf_get_ram(vf);
+
+    // I/O page
+    if(address >= 0xC000 && address <= 0xC0FF) {
+        // Only allow a write to KBD
+        if(address == 0xC000) {
+            m->ram.RAM_MAIN[address] = value;
+        }
+        return;
+    }
+
+    // C100-CFFF
+    if(address >= 0xC100 && address < 0xD000) {
+        if(vf_get_c100(vf) == A2SELC100_ROM) {
+            // ignore rom writes
+            return;
+        }
+
+        // If not ROM it is mapped RAM
+        m->pages.write_pages[address / PAGE_SIZE][address % PAGE_SIZE] = value;
+        return;
+    }
+
+    // D000-FFFF
+    if(address >= 0xD000) {
+        if(ram == A2SEL48K_MAPPED) {
+            // Mapped
+            m->pages.write_pages[address / PAGE_SIZE][address % PAGE_SIZE] = value;
+            return;
+        }
+
+        // Forced MAIN/AUX context
+        switch(vf_get_d000(vf)) {
+            case A2SELD000_MAPPED:
+                m->pages.write_pages[address / PAGE_SIZE][address % PAGE_SIZE] = value;
+                break;
+
+            case A2SELD000_ROM:
+                // ignore rom writes
+                return;
+
+            case A2SELD000_LC_B1:
+            case A2SELD000_LC_B2: {
+                uint32_t bank_base = (vf_get_d000(vf) == A2SELD000_LC_B2) ? 0x1000 : 0x0000;
+                uint32_t lc_base = (ram == A2SEL48K_AUX) ? 0x4000 : 0x0000;
+
+                if(address < 0xE000) {
+                    // D000-DFFF: banked 4K in MAIN or AUX
+                    m->ram.RAM_LC[lc_base + bank_base + (uint32_t)(address - 0xD000)] = value;
+                    return;
+                }
+
+                // E000-FFFF: 8K in MAIN or AUX
+                m->ram.RAM_LC[lc_base + 0x2000 + (uint32_t)(address - 0xE000)] = value;
+                break;
+            }
+        }
+        return;
+    }
+
+    // 0000-C0FF
+    if(ram == A2SEL48K_MAPPED) {
+        m->pages.write_pages[address / PAGE_SIZE][address % PAGE_SIZE] = value;
+        return;
+    }
+    // MAIN
+    if(ram == A2SEL48K_MAIN) {
+        m->ram.RAM_MAIN[address] = value;
+        return;
+    }
+    // AUX
+    m->ram.RAM_MAIN[(uint32_t)address + 0x10000] = value;
+}
+
+static inline uint64_t read_last_write_from_selected(APPLE2 *m, VIEW_FLAGS vf, uint16_t address) {
+    A2SEL_48K ram = vf_get_ram(vf);
+
+    // I/O page
+    if(address >= 0xC000 && address <= 0xC0FF) {
+        return m->ram.RAM_LAST_WRITE[address];
+    }
+
+    // C100-CFFF
+    if(address >= 0xC100 && address < 0xD000) {
+        if(vf_get_c100(vf) == A2SELC100_ROM) {
+            return 0;
+        }
+
+        // If not ROM it is mapped RAM
+        return m->pages.last_write_pages[address / PAGE_SIZE][address % PAGE_SIZE];
+    }
+
+    // D000-FFFF
+    if(address >= 0xD000) {
+        if(ram == A2SEL48K_MAPPED) {
+            // Mapped
+            return m->pages.last_write_pages[address / PAGE_SIZE][address % PAGE_SIZE];
+        }
+
+        // Forced MAIN/AUX context
+        switch(vf_get_d000(vf)) {
+            case A2SELD000_ROM:
+                return 0;
+
+            case A2SELD000_MAPPED:
+                return m->pages.last_write_pages[address / PAGE_SIZE][address % PAGE_SIZE];
+
+            case A2SELD000_LC_B1:
+            case A2SELD000_LC_B2: {
+                uint32_t bank_base = (vf_get_d000(vf) == A2SELD000_LC_B2) ? 0x1000 : 0x0000;
+                uint32_t lc_base = (ram == A2SEL48K_AUX) ? 0x4000 : 0x0000;
+
+                if(address < 0xE000) {
+                    // D000-DFFF: banked 4K in MAIN or AUX
+                    return m->ram.RAM_LC_LAST_WRITE[lc_base + bank_base + (uint32_t)(address - 0xD000)];
+                }
+
+                // E000-FFFF: 8K in MAIN or AUX
+                return m->ram.RAM_LC_LAST_WRITE[lc_base + 0x2000 + (uint32_t)(address - 0xE000)];
+            }
+        }
+    }
+
+    // 0000-BFFF
+    if(ram == A2SEL48K_MAPPED) {
+        return m->pages.last_write_pages[address / PAGE_SIZE][address % PAGE_SIZE];
+    }
+    // MAIN
+    if(ram == A2SEL48K_MAIN) {
+        return m->ram.RAM_LAST_WRITE[address];
+    }
+    // AUX
+    return m->ram.RAM_LAST_WRITE[(uint32_t)address + 0x10000];
 }
 
 // Setters

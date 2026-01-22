@@ -34,22 +34,72 @@
 #define set_flags(status, flag_mask)        ((status) |= (flag_mask))
 #define clr_flags(status, flag_mask)        ((status) &= ~(flag_mask))
 
-// The flags that tell memory functions where to read/write
-// These are not used by hardware, but exist so external friends can ask hardware for
-// values from banks other than whatever is mapped into the 6502 space (MEM_MAPPED_6502)
-typedef enum {
-    MEM_MAPPED_6502     = 0,
-    MEM_MAIN            = (1u << 0),
-    MEM_AUX             = (1u << 1),
-    MEM_LC_BANK1        = (1u << 2),
-    MEM_LC_BANK2        = (1u << 3),
-    MEM_LC_E000_8K      = (1u << 4),  // LC fixed 8KB at $E000-$FFFF when LC RAM enabled
-    MEM_ROM             = (1u << 5),
-    MEM_IO              = (1u << 6),
-    MEM_MASK_ANY        = MEM_MAIN | MEM_AUX |
-                          MEM_LC_BANK1 | MEM_LC_BANK2 | MEM_LC_E000_8K |
-                          MEM_ROM | MEM_IO
-} RAMVIEW_FLAGS;
-
 // The UIs use this so a2m links in common.c, where it lives
 extern int apl2_txt_row_start[];
+
+// The view flags describe what memory is visible to the user, based on user selection
+// in the views of the emulator
+enum{
+    A2SEL_48K_SHIFT  = 0,
+    A2SEL_48K_BITS   = 2,
+    A2SEL_C100_SHIFT = (A2SEL_48K_SHIFT + A2SEL_48K_BITS),
+    A2SEL_C100_BITS  = 1,
+    A2SEL_D000_SHIFT = (A2SEL_C100_SHIFT + A2SEL_C100_BITS),
+    A2SEL_D000_BITS  = 2,
+
+    A2SEL_48K_MASK   = ((1u << A2SEL_48K_BITS) - 1u) << A2SEL_48K_SHIFT,
+    A2SEL_C100_MASK  = ((1u << A2SEL_C100_BITS) - 1u) << A2SEL_C100_SHIFT,
+    A2SEL_D000_MASK  = ((1u << A2SEL_D000_BITS) - 1u) << A2SEL_D000_SHIFT,
+};
+
+typedef enum A2SEL_48K {
+    A2SEL48K_MAPPED = 0,
+    A2SEL48K_MAIN   = 1,
+    A2SEL48K_AUX    = 2,
+} A2SEL_48K;
+
+typedef enum A2SEL_C100 {
+    A2SELC100_MAPPED = 0,
+    A2SELC100_ROM    = 1,
+} A2SEL_C100;
+
+typedef enum A2SEL_D000 {
+    A2SELD000_MAPPED = 0,
+    A2SELD000_LC_B1  = 1,
+    A2SELD000_LC_B2  = 2,
+    A2SELD000_ROM    = 3,
+} A2SEL_D000;
+
+typedef uint32_t VIEW_FLAGS;
+
+static inline uint32_t vf_get_field(VIEW_FLAGS f, uint32_t mask, uint32_t shift) {
+    return (f & mask) >> shift;
+}
+
+static inline void vf_set_field(VIEW_FLAGS *f, uint32_t mask, uint32_t shift, uint32_t v) {
+    *f = (*f & ~mask) | ((v << shift) & mask);
+}
+
+static inline A2SEL_48K vf_get_ram(VIEW_FLAGS f) {
+    return (A2SEL_48K)vf_get_field(f, A2SEL_48K_MASK, A2SEL_48K_SHIFT);
+}
+
+static inline void vf_set_ram(VIEW_FLAGS *f, A2SEL_48K v) {
+    vf_set_field(f, A2SEL_48K_MASK, A2SEL_48K_SHIFT, (uint32_t)v);
+}
+
+static inline A2SEL_C100 vf_get_c100(VIEW_FLAGS f) {
+    return (A2SEL_C100)vf_get_field(f, A2SEL_C100_MASK, A2SEL_C100_SHIFT);
+}
+
+static inline void vf_set_c100(VIEW_FLAGS *f, A2SEL_C100 v) {
+    vf_set_field(f, A2SEL_C100_MASK, A2SEL_C100_SHIFT, (uint32_t)v);
+}
+
+static inline A2SEL_D000 vf_get_d000(VIEW_FLAGS f) {
+    return (A2SEL_D000)vf_get_field(f, A2SEL_D000_MASK, A2SEL_D000_SHIFT);
+}
+
+static inline void vf_set_d000(VIEW_FLAGS *f, A2SEL_D000 v) {
+    vf_set_field(f, A2SEL_D000_MASK, A2SEL_D000_SHIFT, (uint32_t)v);
+}

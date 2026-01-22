@@ -9,7 +9,7 @@ typedef struct RUNTIME RUNTIME;
 typedef struct BREAKPOINT {
     uint16_t address;               // BP/watch address
     uint16_t address_range_end;     // if use_range, end of range value
-    RAMVIEW_FLAGS selected_bank;    // One of mapped (6502), 64K, 128K and bank
+    VIEW_FLAGS selected_bank;       // Memory in view for user, not 65x02
     int counter_count;              // Active count value
     int counter_stop_value;         // Where to fire
     int counter_reset;              // On fitst fire, set stop_value to this

@@ -321,13 +321,13 @@ void unk_dasm_resize_view(UNK *v) {
     struct nk_context *ctx = v->ctx;
     struct nk_style *style = &ctx->style;
     // calc is from nk_begin_titled
-    dv->header_height = 2.0f * style->window.header.padding.y + 2.0f * style->window.header.label_padding.y + v->font_height;
+    dv->non_client_height = 2.0f * style->window.header.padding.y + 2.0f * style->window.header.label_padding.y + 2 * v->font_height;
     struct nk_rect parent = v->layout.dasm;
 
     float view_width = parent.w - 3.0f * ctx->style.window.border - SCROLLBAR_W;
     int cols = view_width / v->font_width;
     dv->cols = cols;
-    int rows = (parent.h - (ADDRESS_LABEL_H + dv->header_height)) / ROW_H;
+    int rows = (parent.h - (ADDRESS_LABEL_H + dv->non_client_height)) / ROW_H;
     dv->rows = rows;
     // 52 is more or less what rt_disassemble_line uses to place a line
     int cvt_size = cols > 60 ? cols : 60;
@@ -415,9 +415,9 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
 
                         // Creat the assembler and init clears it to all 0's
                         ASSEMBLER as;
-                        assembler_init(&as, &dv->errorlog, v->m, (output_byte)write_to_memory_selected);
+                        assembler_init(&as, &dv->errorlog, v->m, (output_byte)write_to_memory_in_view);
                         // so set any state after init
-                        as.selected = ac->flags;
+                        as.vf = ac->flags;
                         // The assembler valid opcodes are 0 = 65c02, so opposite to this
                         as.valid_opcodes = MODEL_APPLE_IIEE - m->model;
                         if(A2_OK != assembler_assemble(&as, ac->file_browser.dir_selected.name, 0)) {
@@ -777,46 +777,9 @@ void unk_dasm_show(UNK *v, int dirty) {
                     }
                 }
 
-                // b) The row with the memory bank access buttons
-                nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 4);
-                {
-                    nk_layout_row_push(ctx, 0.35);
-                    nk_spacer(ctx);
-                    nk_layout_row_push(ctx, 0.15);
-                    if(nk_option_label(ctx, "6502", !tst_flags(dv->flags, MEM_MAIN | MEM_AUX)) && tst_flags(dv->flags, MEM_MAIN | MEM_AUX)) {
-                        clr_flags(dv->flags, MEM_MAIN);
-                        clr_flags(dv->flags, MEM_AUX);
-                        clr_flags(dv->flags, MEM_LC_BANK2);
-                    }
-                    if(nk_option_label(ctx, "64K", tst_flags(dv->flags, MEM_MAIN)) && !tst_flags(dv->flags, MEM_MAIN)) {
-                        clr_flags(dv->flags, MEM_AUX);
-                        set_flags(dv->flags, MEM_MAIN);
-                        if(tst_flags(m->state_flags, A2S_LC_BANK2)) {
-                            set_flags(dv->flags, MEM_LC_BANK2);
-                        } else {
-                            clr_flags(dv->flags, MEM_LC_BANK2);
-                        }
-                    }
-                    if(nk_option_label_disabled(ctx, "128K", tst_flags(dv->flags, MEM_AUX), m->model == MODEL_APPLE_II_PLUS) && !tst_flags(dv->flags, MEM_AUX)) {
-                        clr_flags(dv->flags, MEM_MAIN);
-                        set_flags(dv->flags, MEM_AUX);
-                        if(tst_flags(m->state_flags, A2S_LC_BANK2)) {                        
-                            set_flags(dv->flags, MEM_LC_BANK2);
-                        } else {
-                            clr_flags(dv->flags, MEM_LC_BANK2);
-                        }
-                    }
-                    int before = tst_flags(dv->flags, MEM_LC_BANK2);
-                    int after = nk_option_label_disabled(ctx, "LC Bank2", before, !tst_flags(dv->flags, MEM_MAIN | MEM_AUX));
-                    if(after != before) {
-                        if(after) {
-                            set_flags(dv->flags, MEM_LC_BANK2);
-                        } else {
-                            clr_flags(dv->flags, MEM_LC_BANK2);
-                        }
-                    }
-                }
-                nk_layout_row_end(ctx); // memory bank windows
+                // b) The rows with the memory view selector
+                unk_bank_view_selector(ctx, m->model, &dv->flags, NULL);
+
                 nk_group_end(ctx);
             }
 
@@ -825,8 +788,8 @@ void unk_dasm_show(UNK *v, int dirty) {
             struct nk_rect sbar_bounds = v->layout.dasm;
             sbar_bounds.x += sbar_bounds.w - SCROLLBAR_W;
             sbar_bounds.w = SCROLLBAR_W;
-            sbar_bounds.h -= (dv->header_height + ADDRESS_LABEL_H);
-            sbar_bounds.y += dv->header_height;
+            sbar_bounds.h -= (dv->non_client_height + ADDRESS_LABEL_H);
+            sbar_bounds.y += dv->non_client_height;
             if(nk_input_is_mouse_hovering_rect(&ctx->input, v->layout.dasm)) {
                 int wheel = (int)ctx->input.mouse.scroll_delta.y;
                 if(wheel) {

@@ -210,7 +210,7 @@ typedef struct MACRO {
 
 typedef struct ASSEMBLER ASSEMBLER;
 
-typedef void (*output_byte)(void *user, RAMVIEW_FLAGS selected, uint16_t address, uint8_t byte_value);
+typedef void (*output_byte)(void *user, VIEW_FLAGS vf, uint16_t address, uint8_t byte_value);
 
 typedef struct CB_ASSEMBLER_CTX {
     void *user;
@@ -226,7 +226,7 @@ typedef struct ASSEMBLER {
     DYNARRAY macro_buffers;                                 // Array of all buffers that macros expand into
     INCLUDE_FILES include_files;                            // The arrays for files and stack for .include
     OPCODEINFO opcode_info;                                 // State of what is to be emitted in terms of 6502 opcodes
-    RAMVIEW_FLAGS selected;                                 // default is MEM_MAPPED_6502
+    VIEW_FLAGS vf;                                          // default is MEM_MAPPED_6502
     TOKEN current_token;                                    // What is being parsed
     int error_log_level;                                    // logging level (0 - filter duplicates; 1 - all to limit)
     int expression_size;                                    // Forward defs can't change size (16 bit can't become 8 later)

@@ -56,29 +56,29 @@ int unk_dlg_assembler_config(struct nk_context *ctx, struct nk_rect r, ASSEMBLER
         // 2) Memory bank access row
         nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 4);
         {
-            nk_layout_row_push(ctx, 0.25);
-            if(nk_option_label(ctx, "6502", !tst_flags(ac->flags, (MEM_MAIN | MEM_AUX))) && tst_flags(ac->flags, (MEM_MAIN | MEM_AUX))) {
-                clr_flags(ac->flags, MEM_MAIN);
-                clr_flags(ac->flags, MEM_AUX);
-                clr_flags(ac->flags, MEM_LC_BANK2);
-            }
-            if(nk_option_label(ctx, "64K", tst_flags(ac->flags, MEM_MAIN)) && !tst_flags(ac->flags, MEM_MAIN)) {
-                clr_flags(ac->flags, MEM_AUX);
-                set_flags(ac->flags, MEM_MAIN);
-            }
-            if(nk_option_label_disabled(ctx, "128K", tst_flags(ac->flags, MEM_AUX), !ac->model) && !tst_flags(ac->flags, MEM_AUX)) {
-                clr_flags(ac->flags, MEM_MAIN);
-                set_flags(ac->flags, MEM_AUX);
-            }
-            int before = tst_flags(ac->flags, MEM_LC_BANK2);
-            int after = nk_option_label_disabled(ctx, "LC Bank2", before, !tst_flags(ac->flags, MEM_MAIN | MEM_AUX));
-            if(after != before) {
-                if(after) {
-                    set_flags(ac->flags, MEM_LC_BANK2);
-                } else {
-                    clr_flags(ac->flags, MEM_LC_BANK2);
-                }
-            }
+            // nk_layout_row_push(ctx, 0.25);
+            // if(nk_option_label(ctx, "6502", !tst_flags(ac->flags, (MEM_MAIN | MEM_AUX))) && tst_flags(ac->flags, (MEM_MAIN | MEM_AUX))) {
+            //     clr_flags(ac->flags, MEM_MAIN);
+            //     clr_flags(ac->flags, MEM_AUX);
+            //     clr_flags(ac->flags, MEM_LC_BANK2);
+            // }
+            // if(nk_option_label(ctx, "64K", tst_flags(ac->flags, MEM_MAIN)) && !tst_flags(ac->flags, MEM_MAIN)) {
+            //     clr_flags(ac->flags, MEM_AUX);
+            //     set_flags(ac->flags, MEM_MAIN);
+            // }
+            // if(nk_option_label_disabled(ctx, "128K", tst_flags(ac->flags, MEM_AUX), !ac->model) && !tst_flags(ac->flags, MEM_AUX)) {
+            //     clr_flags(ac->flags, MEM_MAIN);
+            //     set_flags(ac->flags, MEM_AUX);
+            // }
+            // int before = tst_flags(ac->flags, MEM_LC_BANK2);
+            // int after = nk_option_label_disabled(ctx, "LC Bank2", before, !tst_flags(ac->flags, MEM_MAIN | MEM_AUX));
+            // if(after != before) {
+            //     if(after) {
+            //         set_flags(ac->flags, MEM_LC_BANK2);
+            //     } else {
+            //         clr_flags(ac->flags, MEM_LC_BANK2);
+            //     }
+            // }
         }
         nk_layout_row_end(ctx);
 
@@ -214,39 +214,39 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
         // C) Memory bank access
         nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 5);
         {
-            // 1)
-            nk_layout_row_push(ctx, 0.25f);
-            nk_label(ctx, "In Bank", NK_TEXT_LEFT);
-            // 2)
-            nk_layout_row_push(ctx, 0.17f);
-            if(nk_option_label(ctx, "6502", !tst_flags(bpe->bp_under_edit.selected_bank, (MEM_MAIN | MEM_AUX))) && tst_flags(bpe->bp_under_edit.selected_bank, (MEM_MAIN | MEM_AUX))) {
-                clr_flags(bpe->bp_under_edit.selected_bank, MEM_MAIN);
-                clr_flags(bpe->bp_under_edit.selected_bank, MEM_AUX);
-                clr_flags(bpe->bp_under_edit.selected_bank, MEM_LC_BANK2);
-            }
-            // 3)
-            nk_layout_row_push(ctx, 0.17f);
-            if(nk_option_label(ctx, "64K", tst_flags(bpe->bp_under_edit.selected_bank, MEM_MAIN)) && !tst_flags(bpe->bp_under_edit.selected_bank, MEM_MAIN)) {
-                clr_flags(bpe->bp_under_edit.selected_bank, MEM_AUX);
-                set_flags(bpe->bp_under_edit.selected_bank, MEM_MAIN);
-            }
-            // 4)
-            nk_layout_row_push(ctx, 0.16f);
-            if(nk_option_label_disabled(ctx, "128K", tst_flags(bpe->bp_under_edit.selected_bank, MEM_AUX), !bpe->bp_under_edit.model) && !tst_flags(bpe->bp_under_edit.selected_bank, MEM_AUX)) {
-                clr_flags(bpe->bp_under_edit.selected_bank, MEM_MAIN);
-                set_flags(bpe->bp_under_edit.selected_bank, MEM_AUX);
-            }
-            // 5)
-            nk_layout_row_push(ctx, 0.25f);
-            int before = tst_flags(bpe->bp_under_edit.selected_bank, MEM_LC_BANK2);
-            int after = nk_option_label_disabled(ctx, "LC Bank2", before, !tst_flags(bpe->bp_under_edit.selected_bank, MEM_MAIN | MEM_AUX));
-            if(after != before) {
-                if(after) {
-                    set_flags(bpe->bp_under_edit.selected_bank, MEM_LC_BANK2);
-                } else {
-                    clr_flags(bpe->bp_under_edit.selected_bank, MEM_LC_BANK2);
-                }
-            }
+            // // 1)
+            // nk_layout_row_push(ctx, 0.25f);
+            // nk_label(ctx, "In Bank", NK_TEXT_LEFT);
+            // // 2)
+            // nk_layout_row_push(ctx, 0.17f);
+            // if(nk_option_label(ctx, "6502", !tst_flags(bpe->bp_under_edit.selected_bank, (MEM_MAIN | MEM_AUX))) && tst_flags(bpe->bp_under_edit.selected_bank, (MEM_MAIN | MEM_AUX))) {
+            //     clr_flags(bpe->bp_under_edit.selected_bank, MEM_MAIN);
+            //     clr_flags(bpe->bp_under_edit.selected_bank, MEM_AUX);
+            //     clr_flags(bpe->bp_under_edit.selected_bank, MEM_LC_BANK2);
+            // }
+            // // 3)
+            // nk_layout_row_push(ctx, 0.17f);
+            // if(nk_option_label(ctx, "64K", tst_flags(bpe->bp_under_edit.selected_bank, MEM_MAIN)) && !tst_flags(bpe->bp_under_edit.selected_bank, MEM_MAIN)) {
+            //     clr_flags(bpe->bp_under_edit.selected_bank, MEM_AUX);
+            //     set_flags(bpe->bp_under_edit.selected_bank, MEM_MAIN);
+            // }
+            // // 4)
+            // nk_layout_row_push(ctx, 0.16f);
+            // if(nk_option_label_disabled(ctx, "128K", tst_flags(bpe->bp_under_edit.selected_bank, MEM_AUX), !bpe->bp_under_edit.model) && !tst_flags(bpe->bp_under_edit.selected_bank, MEM_AUX)) {
+            //     clr_flags(bpe->bp_under_edit.selected_bank, MEM_MAIN);
+            //     set_flags(bpe->bp_under_edit.selected_bank, MEM_AUX);
+            // }
+            // // 5)
+            // nk_layout_row_push(ctx, 0.25f);
+            // int before = tst_flags(bpe->bp_under_edit.selected_bank, MEM_LC_BANK2);
+            // int after = nk_option_label_disabled(ctx, "LC Bank2", before, !tst_flags(bpe->bp_under_edit.selected_bank, MEM_MAIN | MEM_AUX));
+            // if(after != before) {
+            //     if(after) {
+            //         set_flags(bpe->bp_under_edit.selected_bank, MEM_LC_BANK2);
+            //     } else {
+            //         clr_flags(bpe->bp_under_edit.selected_bank, MEM_LC_BANK2);
+            //     }
+            // }
         }
 
         // D) Counters

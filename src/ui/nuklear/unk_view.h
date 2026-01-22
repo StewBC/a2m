@@ -108,6 +108,7 @@ int nk_option_label_disabled(struct nk_context *ctx, const char *label, int stat
 
 // a helper to do a custom vertical scrollbar (I can't seem to just get a scrollbar v from nuklear but this is better anyway)
 void nk_custom_scrollbarv(struct nk_context *ctx, struct nk_rect sbar, int total_rows, int rows_visible, int *top_row, int *dragging, float *grab_offset);
+void unk_bank_view_selector(struct nk_context *ctx, int model, VIEW_FLAGS *flags, const char *row_label);
 
 void unk_config_ui(UNK *v, INI_STORE *ini_store);
 int unk_init(UNK *v, int model, INI_STORE *ini_store);
