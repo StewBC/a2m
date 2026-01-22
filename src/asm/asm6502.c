@@ -366,7 +366,7 @@ void flush_macros(ASSEMBLER *as) {
 // Output
 void emit(ASSEMBLER *as, uint8_t byte_value) {
     if(as->pass == 2) {
-        as->cb_assembler_ctx.output_byte(as->cb_assembler_ctx.user, as->vf, as->current_address, byte_value);
+        as->cb_assembler_ctx.output_byte(as->cb_assembler_ctx.user, as->current_address, byte_value);
         as->last_address = ++as->current_address;
     } else {
         as->current_address++;

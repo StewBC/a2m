@@ -54,33 +54,7 @@ int unk_dlg_assembler_config(struct nk_context *ctx, struct nk_rect r, ASSEMBLER
         nk_layout_row_end(ctx);
 
         // 2) Memory bank access row
-        nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 4);
-        {
-            // nk_layout_row_push(ctx, 0.25);
-            // if(nk_option_label(ctx, "6502", !tst_flags(ac->flags, (MEM_MAIN | MEM_AUX))) && tst_flags(ac->flags, (MEM_MAIN | MEM_AUX))) {
-            //     clr_flags(ac->flags, MEM_MAIN);
-            //     clr_flags(ac->flags, MEM_AUX);
-            //     clr_flags(ac->flags, MEM_LC_BANK2);
-            // }
-            // if(nk_option_label(ctx, "64K", tst_flags(ac->flags, MEM_MAIN)) && !tst_flags(ac->flags, MEM_MAIN)) {
-            //     clr_flags(ac->flags, MEM_AUX);
-            //     set_flags(ac->flags, MEM_MAIN);
-            // }
-            // if(nk_option_label_disabled(ctx, "128K", tst_flags(ac->flags, MEM_AUX), !ac->model) && !tst_flags(ac->flags, MEM_AUX)) {
-            //     clr_flags(ac->flags, MEM_MAIN);
-            //     set_flags(ac->flags, MEM_AUX);
-            // }
-            // int before = tst_flags(ac->flags, MEM_LC_BANK2);
-            // int after = nk_option_label_disabled(ctx, "LC Bank2", before, !tst_flags(ac->flags, MEM_MAIN | MEM_AUX));
-            // if(after != before) {
-            //     if(after) {
-            //         set_flags(ac->flags, MEM_LC_BANK2);
-            //     } else {
-            //         clr_flags(ac->flags, MEM_LC_BANK2);
-            //     }
-            // }
-        }
-        nk_layout_row_end(ctx);
+        unk_bank_view_selector(ctx, ac->model, &ac->flags, NULL);
 
         // 3)  Toggles and address
         nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 3);

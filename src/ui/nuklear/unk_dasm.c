@@ -60,6 +60,12 @@ static const uint8_t valid_dasm_opcodes_65c02[256] = {
     1 , 1 , 1 , 0 , 0 , 1 , 1 , 0 , 1 , 1 , 1 , 0 , 0 , 1 , 1 , 0, // F
 } ;
 
+// This is a user context for the in-memory assembler - contains flags for where to assemble to
+typedef struct {
+    APPLE2 *m;
+    VIEW_FLAGS asm_dst_flags;
+} MEM_ASM_CTX;
+
 static inline struct nk_color unk_dasm_blend(struct nk_color a, struct nk_color b, float t) {
     return nk_rgb(a.r * (1.0f - t) + b.r * t, a.g * (1.0f - t) + b.g * t, a.b * (1.0f - t) + b.b * t);
 }
@@ -351,6 +357,14 @@ void unk_dasm_resize_view(UNK *v) {
     }
 }
 
+// This is an in-memory version - it writes to the selected banks based on the flags
+void output_byte_at_address(void *user, uint16_t address, uint8_t byte_value) {
+    MEM_ASM_CTX *asx = (MEM_ASM_CTX*)user;
+    APPLE2 *m = asx->m;
+    VIEW_FLAGS dest_flags = asx->asm_dst_flags;
+    write_to_memory_in_view(m, dest_flags, address, byte_value);
+}
+
 void unk_dasm_process_event(UNK *v, SDL_Event *e) {
     RUNTIME *rt = v->rt;
     APPLE2 *m = v->m;
@@ -415,9 +429,8 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
 
                         // Creat the assembler and init clears it to all 0's
                         ASSEMBLER as;
-                        assembler_init(&as, &dv->errorlog, v->m, (output_byte)write_to_memory_in_view);
-                        // so set any state after init
-                        as.vf = ac->flags;
+                        MEM_ASM_CTX asx = {m, ac->flags};
+                        assembler_init(&as, &dv->errorlog, &asx, (output_byte)output_byte_at_address);
                         // The assembler valid opcodes are 0 = 65c02, so opposite to this
                         as.valid_opcodes = MODEL_APPLE_IIEE - m->model;
                         if(A2_OK != assembler_assemble(&as, ac->file_browser.dir_selected.name, 0)) {
@@ -705,7 +718,10 @@ void unk_dasm_show(UNK *v, int dirty) {
                             pc = control_pc;
                         }
                         current_pc = pc;
-                        rt_disassemble_line(rt, &pc, dv->flags, li->force_byte, dv->symbol_view, dv->str_buf, dv->str_buf_len);
+                        int used = rt_disassemble_line(rt, &pc, dv->flags, li->force_byte, dv->symbol_view, dv->str_buf, dv->str_buf_len);
+                        if(dv->str_buf_len - used < 0) {
+                            assert(0);
+                        }
                         control_pc = pc;
                         struct nk_color bg = ob;
                         struct nk_color fg = ctx->style.text.color;
@@ -829,7 +845,7 @@ void unk_dasm_show(UNK *v, int dirty) {
         // Dialogs
         if(v->dlg_assembler_config) {
             dv->temp_assembler_config.model = m->model;
-            if((ret = unk_dlg_assembler_config(ctx, nk_rect(0, 0, 360, 140), &dv->temp_assembler_config))) {
+            if((ret = unk_dlg_assembler_config(ctx, nk_rect(0, 0, 370, 160), &dv->temp_assembler_config))) {
                 dv->temp_assembler_config.dlg_asm_filebrowser = 0;
                 if(ret == 1) {
                     dv->assembler_config = dv->temp_assembler_config;

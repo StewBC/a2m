@@ -16,13 +16,8 @@ typedef struct MACHINE {
     RAM ram;
 } MACHINE;
 
-
-void write_to_memory_in_view(MACHINE *m, VIEW_FLAGS vf, uint16_t address, uint8_t value) {
-    UNUSED(vf);
-    m->ram.RAM_MAIN[address] = value;
-}
-
-void output_byte_at_address(void *user, VIEW_FLAGS vf, uint16_t address, uint8_t byte_value) {
+// This is the command line assembler version - it just uses a flat 64K buffer
+void output_byte_at_address(void *user, uint16_t address, uint8_t byte_value) {
     MACHINE *m = (MACHINE *)user;
     if(m->as.verbose) {
         if(!(address % 16) || address != m->as.last_address) {
@@ -30,7 +25,7 @@ void output_byte_at_address(void *user, VIEW_FLAGS vf, uint16_t address, uint8_t
         }
         printf("%02X ", byte_value);
     }
-    write_to_memory_in_view(m, vf, address, byte_value);
+    m->ram.RAM_MAIN[address] = byte_value;
 }
 
 int get_argument(int argc, char *argv[], const char *key, const char **value) {
