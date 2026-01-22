@@ -375,15 +375,15 @@ int rt_disassemble_line(RUNTIME *rt, uint16_t *address, VIEW_FLAGS vf, int force
     int length = force_byte ? 1 : opcode_lengths[instruction];
     *address += length;
     int prt_len;
-    uint16_t operands;
+    uint16_t operands = 0;
     char *symbol = symbol_view == SYMBOL_VIEW_NONE ? 0 : rt_sym_find_symbols(rt, pc);
     if(!symbol) {
         symbol = "                                ";
     }
     prt_len = snprintf(text, remain, "%04X: ", pc);
-    adjust(text, remain, prt_len);
+    adjust(&text, &remain, prt_len);
     prt_len = snprintf(text, remain, "%-*.*s ", SYMBOL_COL_LEN - 1, SYMBOL_COL_LEN - 1, symbol);
-    adjust(text, remain, prt_len);
+    adjust(&text, &remain, prt_len);
 
     uint8_t mode = addr_mode[instruction];
     if(force_byte) {
@@ -394,16 +394,16 @@ int rt_disassemble_line(RUNTIME *rt, uint16_t *address, VIEW_FLAGS vf, int force
     switch(length) {
         case 0:
             prt_len = snprintf(text, remain, "%02X", instruction);
-            adjust(text, remain, prt_len);
+            adjust(&text, &remain, prt_len);
             break;
         case 1:
             prt_len = snprintf(text, remain, "%02X        %s", instruction, opcode_text[instruction]);
-            adjust(text, remain, prt_len);
+            adjust(&text, &remain, prt_len);
             break;
         case 2:
             operands = read_from_memory_in_view(m, vf, pc + 1);
             prt_len = snprintf(text, remain, "%02X %02X     %s", instruction, operands, opcode_text[instruction]);
-            adjust(text, remain, prt_len);
+            adjust(&text, &remain, prt_len);
             if(mode == AM_REL) {
                 symbol = rt_sym_find_symbols(rt, pc + 2 + (int8_t) operands);
             } else {
@@ -415,7 +415,7 @@ int rt_disassemble_line(RUNTIME *rt, uint16_t *address, VIEW_FLAGS vf, int force
                 uint8_t ah = read_from_memory_in_view(m, vf, pc + 2);
                 operands = ((ah << 8) | al);
                 prt_len = snprintf(text, remain, "%02X %02X %02X  %s", instruction, al, ah, opcode_text[instruction]);
-                adjust(text, remain, prt_len);
+                adjust(&text, &remain, prt_len);
                 symbol = symbol_view & SYMBOL_VIEW_MARGIN ? 0 : rt_sym_find_symbols(rt, operands);
             }
             break;
@@ -426,17 +426,25 @@ int rt_disassemble_line(RUNTIME *rt, uint16_t *address, VIEW_FLAGS vf, int force
     } else {
         prt_len = snprintf(text, remain, opcode_symbol_params[instruction], symbol);
     }
-    adjust(text, remain, prt_len);
+    adjust(&text, &remain, prt_len);
 
     if(!symbol_view && length > 1) {
         // Align the '['s for the lookup
         int len = text - str_buf;
         if(str_buf_len > 55 && len < 51) {
-            memset(text, 0x20, 51 - len);
-            text = &str_buf[51];
-            *text = '\0';
+            int need = 51 - len;
+            if(need > 0){
+                int can = remain > 0 ? (remain - 1) : 0; // leave room for NUL
+                if(need > can) {
+					need = can;
+				}
+                memset(text, ' ', need);
+                text += need;
+                remain -= need;
+                *text = '\0';
+            }
         }
-        
+       
         switch(mode) {
             case AM_NONE:
             case AM_A:

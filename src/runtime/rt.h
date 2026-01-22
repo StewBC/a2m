@@ -90,8 +90,6 @@ typedef struct RUNTIME {
     DYNARRAY *symbols;                                      // PTR to [256] buckets of symbols
 } RUNTIME;
 
-#define adjust(a,b,c)           do { a += c; b -= c; } while (0)
-
 void rt_bind(RUNTIME *rt, APPLE2 *m, UI *ui);
 int rt_init(RUNTIME *rt, INI_STORE *ini_store);
 int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui);
@@ -119,3 +117,21 @@ void rt_machine_stop(RUNTIME *rt);
 void rt_paste_clipboard(RUNTIME *rt, char *clipboard_text);
 void rt_machine_toggle_franklin80_active(RUNTIME *rt);
 int rt_feed_clipboard_key(RUNTIME *rt);
+
+// Adjust snprintf buffer pointer (p) by how much it (actually) wrote (prt_len), and
+// Track how much buffer is left (remain) to print into
+static inline void adjust(char **p, int *remain, int prt_len){
+    if(*remain <= 0){
+        return;
+    }
+    // snprintf writes at most *remain - 1 chars, then '\0'
+    int adv = prt_len;
+    if(adv < 0){
+        adv = 0;
+    }
+    if(adv >= *remain){
+        adv = *remain - 1;   // Truncation - stop at end
+    }
+    *p += adv;
+    *remain -= adv;
+}

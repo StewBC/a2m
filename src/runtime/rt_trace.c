@@ -73,18 +73,18 @@ int rt_trace_decode(RUNTIME *rt, TRACE_DATA *t, char *trace_str, size_t trace_st
         symbol = "                                ";
     }
     prt_len = snprintf(text, remain, "%04X: ", pc);
-    adjust(text, remain, prt_len);
+    adjust(&text, &remain, prt_len);
     prt_len = snprintf(text, remain, "%-*.*s ", SYMBOL_COL_LEN - 1, SYMBOL_COL_LEN - 1, symbol);
-    adjust(text, remain, prt_len);
+    adjust(&text, &remain, prt_len);
     switch(length) {
         case 1:
             prt_len = snprintf(text, remain, "%02X        %s", instruction, opcode_text[instruction]);
-            adjust(text, remain, prt_len);
+            adjust(&text, &remain, prt_len);
             break;
         case 2:
             operands = t->b1;
             prt_len = snprintf(text, remain, "%02X %02X     %s", instruction, operands, opcode_text[instruction]);
-            adjust(text, remain, prt_len);
+            adjust(&text, &remain, prt_len);
             // Decode the class to decide if a symbol lookup is needed
             // SQW 65c02 probably needs something here...
             switch(instruction & 0x0f) {
@@ -112,21 +112,21 @@ int rt_trace_decode(RUNTIME *rt, TRACE_DATA *t, char *trace_str, size_t trace_st
             } else {
                 prt_len = snprintf(text, remain, opcode_symbol_params[instruction], symbol);
             }
-            adjust(text, remain, prt_len);
+            adjust(&text, &remain, prt_len);
             break;
         case 3: {
                 uint8_t al = t->b1;
                 uint8_t ah = t->b2;
                 operands = ((ah << 8) | al);
                 prt_len = snprintf(text, remain, "%02X %02X %02X  %s", instruction, al, ah, opcode_text[instruction]);
-                adjust(text, remain, prt_len);
+                adjust(&text, &remain, prt_len);
                 symbol = rt_sym_find_symbols(rt, operands);
                 if(!symbol) {
                     prt_len = snprintf(text, remain, opcode_hex_params[instruction], operands);
                 } else {
                     prt_len = snprintf(text, remain, opcode_symbol_params[instruction], symbol);
                 }
-                adjust(text, remain, prt_len);
+                adjust(&text, &remain, prt_len);
                 break;
             }
     }
