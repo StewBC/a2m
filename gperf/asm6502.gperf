@@ -26,6 +26,7 @@ struct OPCODEINFO
 .macro,    GPERF_DOT_MACRO   , 0, 0, 0
 .org,      GPERF_DOT_ORG     , 0, 0, 0
 .qword,    GPERF_DOT_QWORD   , 0, 0, 0
+.res,      GPERF_DOT_RES     , 0, 0, 0
 .strcode,  GPERF_DOT_STRCODE , 0, 0, 0
 .string,   GPERF_DOT_STRING  , 0, 0, 0
 .word,     GPERF_DOT_WORD    , 0, 0, 0

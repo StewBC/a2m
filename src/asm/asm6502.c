@@ -1284,11 +1284,31 @@ void process_dot_macro(ASSEMBLER *as) {
 void process_dot_org(ASSEMBLER *as) {
     uint64_t value = evaluate_expression(as);
     if(as->current_address > value) {
-        asm_err(as, "Assigning address %04X when address is already %04X error", value, as->current_address);
+        asm_err(as, "Assigning address %"PRIx64" when address is already %04X error", value, as->current_address);
     } else {
         as->current_address = value;
         if(value < as->start_address) {
             as->start_address = value;
+        }
+    }
+}
+
+void process_dot_res(ASSEMBLER *as) {
+    uint64_t length = evaluate_expression(as);
+    if(length > 0x10000 - as->current_address) {
+        asm_err(as, "Reserving %"PRIx64" bytes when only %04X remain in 64K", length, 0x10000 - as->current_address);
+    } else {
+        uint64_t value = 0;
+        if(as->current_token.op == ',') {
+            value = evaluate_expression(as);
+            if(value > 0xFF) {
+                asm_err(as, ".res cannot fill with %"PRIx64".  Only 0x00 - 0xFF allowed", value);
+                return;
+            }
+        }
+        uint8_t b = (uint8_t)value;
+        while(length-- > 0) {
+            emit(as, b);
         }
     }
 }
@@ -1499,6 +1519,9 @@ void parse_dot_command(ASSEMBLER *as) {
             break;
         case GPERF_DOT_QWORD:
             write_values(as, 64, BYTE_ORDER_LO);
+            break;
+        case GPERF_DOT_RES:
+            process_dot_res(as);
             break;
         case GPERF_DOT_STRCODE:
             process_dot_strcode(as);
