@@ -104,6 +104,10 @@ enum {
     GPERF_OPCODE_TYA,
 };
 
+// Hash buckets are a power of two
+#define HASH_BUCKETS    64
+#define HASH_MASK       (HASH_BUCKETS - 1)
+
 // Define token types
 typedef enum {
     TOKEN_NUM,
@@ -175,11 +179,17 @@ typedef struct INPUT_STACK {
     const char *line_start;
 } INPUT_STACK;
 
+typedef struct {
+    char *name;
+    int length;
+} POOL_STRING;
+
 typedef struct SCOPE SCOPE;
 typedef struct SCOPE {
-    char *scope_name;
     int scope_name_length;
     int scope_type;
+    DYNARRAY child_scopes;
+    char *scope_name;
     SCOPE *parent_scope;
     DYNARRAY *symbol_table;
 } SCOPE;
@@ -238,6 +248,7 @@ typedef struct ASSEMBLER {
     DYNARRAY loop_stack;                                    // Array of for loops
     DYNARRAY macros;                                        // Array of all macros
     DYNARRAY macro_buffers;                                 // Array of all buffers that macros expand into
+    DYNARRAY pool_strings;
     INCLUDE_FILES include_files;                            // The arrays for files and stack for .include
     OPCODEINFO opcode_info;                                 // State of what is to be emitted in terms of 6502 opcodes
     TOKEN current_token;                                    // What is being parsed
@@ -259,7 +270,7 @@ typedef struct ASSEMBLER {
     const char *next_line_start;                            // So errors get reported on line of last token
     const char *strcode;                                    // Active .strcode expression
     const char *token_start;                                // Points at the start of a token (and input the end)
-    DYNARRAY scopes;
+    SCOPE root_scope;
     SCOPE *active_scope;
     DYNARRAY *symbol_table;                                 // Array of arrays of symbols
     ERRORLOG *errorlog;                                     // ptr to log that tracks errors

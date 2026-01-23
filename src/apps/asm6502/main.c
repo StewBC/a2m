@@ -122,9 +122,9 @@ int main(int argc, char **argv) {
         } else {
             size_t bucket, i;
             // Accumulate all symbols in hash bucket 0
-            DYNARRAY *b0 = &m.as.symbol_table[0];
-            for(bucket = 1; bucket < 256; bucket++) {
-                DYNARRAY *b = &m.as.symbol_table[bucket];
+            DYNARRAY *b0 = &m.as.root_scope.symbol_table[0];
+            for(bucket = 1; bucket < HASH_BUCKETS; bucket++) {
+                DYNARRAY *b = &m.as.root_scope.symbol_table[bucket];
                 for(i = 0; i < b->items; i++) {
                     SYMBOL_LABEL *sl = ARRAY_GET(b, SYMBOL_LABEL, i);
                     ARRAY_ADD(b0, *sl);
