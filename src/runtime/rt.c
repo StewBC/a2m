@@ -436,8 +436,8 @@ int rt_disassemble_line(RUNTIME *rt, uint16_t *address, VIEW_FLAGS vf, int force
             if(need > 0){
                 int can = remain > 0 ? (remain - 1) : 0; // leave room for NUL
                 if(need > can) {
-					need = can;
-				}
+                    need = can;
+                }
                 memset(text, ' ', need);
                 text += need;
                 remain -= need;

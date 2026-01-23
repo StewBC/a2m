@@ -544,26 +544,21 @@ int anonymous_symbol_lookup(ASSEMBLER *as, uint16_t *address, int direction) {
     return 1;
 }
 
-void symbol_clear(ASSEMBLER *as, const char *symbol_name, uint32_t symbol_name_length) {
-    uint32_t name_hash = util_fnv_1a_hash(symbol_name, symbol_name_length);
-    uint8_t bucket = name_hash & 0xff;
-    DYNARRAY *bucket_array = &as->symbol_table[bucket];
-    SYMBOL_LABEL *sl = symbol_lookup(as, name_hash, symbol_name, symbol_name_length);
-    if(sl) {
-        array_remove(bucket_array, sl);
-    }
-}
-
 SYMBOL_LABEL *symbol_lookup(ASSEMBLER *as, uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length) {
+    SCOPE *active_scope = as->active_scope;
     uint8_t bucket = name_hash & 0xff;
-    DYNARRAY *bucket_array = &as->symbol_table[bucket];
-    for(size_t i = 0; i < bucket_array->items; i++) {
-        SYMBOL_LABEL *sl = ARRAY_GET(bucket_array, SYMBOL_LABEL, i);
-        if(sl->symbol_hash == name_hash && !strnicmp(symbol_name, sl->symbol_name, symbol_name_length)) {
-            return sl;
+    do {
+        DYNARRAY *bucket_array = &active_scope->symbol_table[bucket];
+        for(size_t i = 0; i < bucket_array->items; i++) {
+            SYMBOL_LABEL *sl = ARRAY_GET(bucket_array, SYMBOL_LABEL, i);
+            if(sl->symbol_hash == name_hash && !strnicmp(symbol_name, sl->symbol_name, symbol_name_length)) {
+                return sl;
+            }
         }
-    }
-    return 0;
+        active_scope = active_scope->parent_scope;
+    } while(active_scope);
+
+    return NULL;
 }
 
 int symbol_sort(const void *lhs, const void *rhs) {
@@ -605,6 +600,96 @@ SYMBOL_LABEL *symbol_store(ASSEMBLER *as, const char *symbol_name, uint32_t symb
         sl = ARRAY_GET(bucket_array, SYMBOL_LABEL, bucket_array->items - 1);
     }
     return sl;
+}
+
+SYMBOL_LABEL *symbol_store_to_root(ASSEMBLER *as, const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TYPE symbol_type, uint64_t value) {
+    uint32_t name_hash = util_fnv_1a_hash(symbol_name, symbol_name_length);
+    SYMBOL_LABEL *sl = symbol_lookup(as, name_hash, symbol_name, symbol_name_length);
+    if(sl) {
+        if(sl->symbol_type == SYMBOL_UNKNOWN) {
+            sl->symbol_type = symbol_type;
+            sl->symbol_value = value;
+        } else {
+            if(sl->symbol_type != symbol_type) {
+                // Symbol changing type error
+                asm_err(as, "Symbol %.*s can't be address and variable type", symbol_name_length, symbol_name);
+            }
+            if(sl->symbol_type == SYMBOL_VARIABLE) {
+                // Variables can change value along the way
+                sl->symbol_value = value;
+            } else if(sl->symbol_value != value) {
+                // Addresses may not change value
+                asm_err(as, "Multiple address labels have name %.*s", symbol_name_length, symbol_name);
+            }
+        }
+    } else {
+        // Create a new entry for a previously unknown symbol
+        SYMBOL_LABEL new_sl;
+        new_sl.symbol_type = symbol_type;
+        new_sl.symbol_hash = name_hash;
+        new_sl.symbol_length = symbol_name_length;
+        new_sl.symbol_name = symbol_name;
+        new_sl.symbol_value = value;
+        new_sl.symbol_width = 0;
+        uint8_t bucket = name_hash & 0xff;
+        DYNARRAY *bucket_array = &ARRAY_GET(&as->scopes, SCOPE, 0)->symbol_table[bucket];
+        ARRAY_ADD(bucket_array, new_sl);
+        sl = ARRAY_GET(bucket_array, SYMBOL_LABEL, bucket_array->items - 1);
+    }
+    return sl;
+}
+
+SCOPE *scope_find(ASSEMBLER *as, const char *name, int name_length) {
+    for(int si = as->scopes.items - 1; si >= 0 ; si--) {
+        SCOPE *s = ARRAY_GET(&as->scopes, SCOPE, si);
+        if(s->scope_name_length == name_length && 0 == strnicmp(name, s->scope_name, name_length)) {
+            return s;
+        }
+    }
+    return NULL;
+}
+
+static inline const char *set_name(char **new_name, const char *name) {
+    if(name) {
+        *new_name = strdup(name);
+    } else {
+        *new_name = NULL;
+    }
+    return *new_name;
+}
+
+int scope_add(ASSEMBLER *as, const char *name, const int name_length, SCOPE *parent, int type) {
+    int r, bucket;
+    SCOPE s;
+    memset(&s, 0, sizeof(SCOPE));
+
+    if(name && name_length) {
+        s.scope_name = (char *)malloc(name_length);
+        if(!s.scope_name) {
+            return A2_ERR;
+        }
+        memcpy(s.scope_name, name, name_length);
+        s.scope_name_length = name_length;
+    }
+    s.parent_scope = parent;
+
+    DYNARRAY *symbol_table = (DYNARRAY *)malloc(sizeof(DYNARRAY) * 256);
+    if(!symbol_table) {
+        free(s.scope_name);
+        return A2_ERR;
+    }
+
+    for(bucket = 0; bucket < 256; bucket++) {
+        ARRAY_INIT(&symbol_table[bucket], SYMBOL_LABEL);
+    }
+
+    s.symbol_table = as->symbol_table = symbol_table;
+    s.scope_type = type;
+    if(A2_OK != ARRAY_ADD(&as->scopes, s)) {
+        return A2_ERR;
+    }
+    as->active_scope = ARRAY_GET(&as->scopes, SCOPE, as->scopes.items -1);
+    return A2_OK;
 }
 
 //----------------------------------------------------------------------------
@@ -1126,6 +1211,24 @@ void parse_dot_endmacro(ASSEMBLER *as) {
     }
 }
 
+void parse_dot_endproc(ASSEMBLER *as) {
+    if(as->active_scope->parent_scope && as->active_scope->scope_type == GPERF_DOT_PROC) {
+        as->active_scope = as->active_scope->parent_scope;
+        as->symbol_table = as->active_scope->symbol_table;
+    } else {
+        asm_err(as, ".endproc without a matching .proc");
+    }
+}
+
+void parse_dot_endscope(ASSEMBLER *as) {
+    if(as->active_scope->parent_scope && as->active_scope->scope_type == GPERF_DOT_SCOPE) {
+        as->active_scope = as->active_scope->parent_scope;
+        as->symbol_table = as->active_scope->symbol_table;
+    } else {
+        asm_err(as, ".endscope without a matching .scope");
+    }
+}
+
 void parse_dot_for(ASSEMBLER *as) {
     FOR_LOOP for_loop;
     evaluate_expression(as);                                  // assignment
@@ -1293,6 +1396,24 @@ void process_dot_org(ASSEMBLER *as) {
     }
 }
 
+void process_dot_proc(ASSEMBLER *as) {
+    next_token(as);
+    if(as->current_token.type != TOKEN_VAR) {
+        asm_err(as, ".proc must be followed by a name");
+        return;
+    }
+    const char *name = as->current_token.name;
+    const int name_length = as->current_token.name_length;
+    SCOPE *s = scope_find(as, name, name_length);
+    if(s) {
+        as->active_scope = s;
+        as->symbol_table = s->symbol_table;
+    } else {
+        scope_add(as, name, name_length, as->active_scope, GPERF_DOT_PROC);
+        symbol_store_to_root(as, name, name_length, SYMBOL_ADDRESS, as->current_address);
+    }
+}
+
 void process_dot_res(ASSEMBLER *as) {
     uint64_t length = evaluate_expression(as);
     if(length > 0x10000 - as->current_address) {
@@ -1312,6 +1433,28 @@ void process_dot_res(ASSEMBLER *as) {
         }
     }
 }
+
+void parse_dot_scope(ASSEMBLER *as) {
+    const char *name;
+    int name_length;
+    char anon_name[11];
+    next_token(as);
+    if(as->current_token.type == TOKEN_END) {
+        name_length = snprintf(anon_name, 11, "@anon%04X", as->anon_scope_id++);
+        name = anon_name;
+    } else {
+        name = as->current_token.name;
+        name_length = as->current_token.name_length;
+    }
+    SCOPE *s = scope_find(as, name, name_length);
+    if(s) {
+        as->active_scope = s;
+        as->symbol_table = s->symbol_table;
+    } else {
+        scope_add(as, name, name_length, as->active_scope, GPERF_DOT_SCOPE);
+    }
+}
+
 
 void process_dot_strcode(ASSEMBLER *as) {
     // Encoding doesn't matter till 2nd pass
@@ -1499,6 +1642,12 @@ void parse_dot_command(ASSEMBLER *as) {
         case GPERF_DOT_ENDMACRO:
             parse_dot_endmacro(as);
             break;
+        case GPERF_DOT_ENDPROC:
+            parse_dot_endproc(as);
+            break;
+        case GPERF_DOT_ENDSCOPE:
+            parse_dot_endscope(as);
+            break;
         case GPERF_DOT_FOR:
             parse_dot_for(as);
             break;
@@ -1517,11 +1666,17 @@ void parse_dot_command(ASSEMBLER *as) {
         case GPERF_DOT_ORG:
             process_dot_org(as);
             break;
+        case GPERF_DOT_PROC:
+            process_dot_proc(as);
+            break;
         case GPERF_DOT_QWORD:
             write_values(as, 64, BYTE_ORDER_LO);
             break;
         case GPERF_DOT_RES:
             process_dot_res(as);
+            break;
+        case GPERF_DOT_SCOPE:
+            parse_dot_scope(as);
             break;
         case GPERF_DOT_STRCODE:
             process_dot_strcode(as);
@@ -1637,11 +1792,10 @@ int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, void *user, output_byte ob
     ARRAY_INIT(&as->macros, MACRO);
     ARRAY_INIT(&as->macro_buffers, char *);
     ARRAY_INIT(&as->input_stack, INPUT_STACK);
+    ARRAY_INIT(&as->scopes, SCOPE);
 
-    int bucket;
-    as->symbol_table = (DYNARRAY *)malloc(sizeof(DYNARRAY) * 256);
-    for(bucket = 0; bucket < 256; bucket++) {
-        ARRAY_INIT(&as->symbol_table[bucket], SYMBOL_LABEL);
+    if(A2_OK != scope_add(as, "@Root", 5, NULL, GPERF_DOT_SCOPE)) {
+        return A2_ERR;
     }
 
     include_files_init(as);
@@ -1674,6 +1828,7 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
         as->current_file = ARRAY_GET(&as->include_files.included_files, UTIL_FILE, 0)->file_display_name;
         as->current_address = address;
         as->pass++;
+        as->anon_scope_id = 0;  // Reset the anon id
         while(as->pass < 3) {
             do {
                 // a newline returns an empty token so keep
@@ -1733,10 +1888,18 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
 
 void assembler_shutdown(ASSEMBLER *as) {
     include_files_cleanup(as);
-    for(int i = 0; i < 256; i++) {
-        array_free(&as->symbol_table[i]);
+
+    // Remove all of the scopes and symbol tables
+    for(int si = as->scopes.items - 1; si >= 0; si --) {
+        SCOPE *s = ARRAY_GET(&as->scopes, SCOPE, si);
+        for(int i = 0; i < 256; i++) {
+            array_free(&s->symbol_table[i]);
+        }
+        free(s->scope_name);
+        free(s->symbol_table);
     }
-    free(as->symbol_table);
+    array_free(&as->scopes);
+
     // free active macro buffer (if any)
     while(as->macro_buffers.items) {
         char *buf = *ARRAY_GET(&as->macro_buffers, char*, as->macro_buffers.items - 1);

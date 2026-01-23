@@ -18,14 +18,18 @@ enum {
     GPERF_DOT_ENDFOR,
     GPERF_DOT_ENDIF,
     GPERF_DOT_ENDMACRO,
+    GPERF_DOT_ENDPROC,
+    GPERF_DOT_ENDSCOPE,
     GPERF_DOT_FOR,
     GPERF_DOT_IF,
     GPERF_DOT_INCBIN,
     GPERF_DOT_INCLUDE,
     GPERF_DOT_MACRO,
     GPERF_DOT_ORG,
+    GPERF_DOT_PROC,
     GPERF_DOT_QWORD,
     GPERF_DOT_RES,
+    GPERF_DOT_SCOPE,
     GPERF_DOT_STRCODE,
     GPERF_DOT_STRING,
     GPERF_DOT_WORD,
@@ -171,6 +175,15 @@ typedef struct INPUT_STACK {
     const char *line_start;
 } INPUT_STACK;
 
+typedef struct SCOPE SCOPE;
+typedef struct SCOPE {
+    char *scope_name;
+    int scope_name_length;
+    int scope_type;
+    SCOPE *parent_scope;
+    DYNARRAY *symbol_table;
+} SCOPE;
+
 typedef struct PARSE_DATA {
     const char *file_name;                                  // Name of the file in which .include encountered
     const char *input;                                      // Input token position when .include encountered
@@ -233,6 +246,7 @@ typedef struct ASSEMBLER {
     int pass;                                               // 1 or 2 for 2 pass assembler
     int valid_opcodes;                                      // 0 = 65c02 (default), 1 = 6502
     int verbose;                                            // cmd-line; 0 supress duplicates, 1 show all (up to 100)
+    int anon_scope_id;                                      // Anon scope gets this incremented as a name
     size_t current_line;                                    // for error reporting, line being processed
     size_t next_line_count;                                 // count of lines past last token
     uint16_t current_address;                               // Address where next byte will be emitted
@@ -245,6 +259,8 @@ typedef struct ASSEMBLER {
     const char *next_line_start;                            // So errors get reported on line of last token
     const char *strcode;                                    // Active .strcode expression
     const char *token_start;                                // Points at the start of a token (and input the end)
+    DYNARRAY scopes;
+    SCOPE *active_scope;
     DYNARRAY *symbol_table;                                 // Array of arrays of symbols
     ERRORLOG *errorlog;                                     // ptr to log that tracks errors
 } ASSEMBLER;

@@ -19,14 +19,18 @@ struct OPCODEINFO
 .endfor,   GPERF_DOT_ENDFOR  , 0, 0, 0
 .endif,    GPERF_DOT_ENDIF   , 0, 0, 0
 .endmacro, GPERF_DOT_ENDMACRO, 0, 0, 0
+.endproc,  GPERF_DOT_ENDPROC , 0, 0, 0
+.endscope, GPERF_DOT_ENDSCOPE, 0, 0, 0
 .for,      GPERF_DOT_FOR     , 0, 0, 0
 .if,       GPERF_DOT_IF      , 0, 0, 0
 .incbin,   GPERF_DOT_INCBIN  , 0, 0, 0
 .include,  GPERF_DOT_INCLUDE , 0, 0, 0
 .macro,    GPERF_DOT_MACRO   , 0, 0, 0
 .org,      GPERF_DOT_ORG     , 0, 0, 0
+.proc,     GPERF_DOT_PROC    , 0, 0, 0
 .qword,    GPERF_DOT_QWORD   , 0, 0, 0
 .res,      GPERF_DOT_RES     , 0, 0, 0
+.scope,    GPERF_DOT_SCOPE   , 0, 0, 0
 .strcode,  GPERF_DOT_STRCODE , 0, 0, 0
 .string,   GPERF_DOT_STRING  , 0, 0, 0
 .word,     GPERF_DOT_WORD    , 0, 0, 0
