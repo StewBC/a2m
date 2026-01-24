@@ -14,7 +14,7 @@ int rt_sym_add_symbol(RUNTIME *rt, const char *symbol_source, const char *symbol
         SYMBOL *symbol = ARRAY_GET(bucket, SYMBOL, symbol_index);
         if(address <= symbol->pc) {
             // If the address already has a name, maybe skip it
-            action = 2;
+            action = ACTION_UPDATE;
             if(address == symbol->pc) {
                 if(overwrite) {
                     free(symbol->symbol_name);

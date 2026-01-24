@@ -321,6 +321,22 @@ int unk_dasm_init(VIEWDASM *dv, int model) {
     return A2_OK;
 }
 
+void unk_dasm_populate_syms(RUNTIME *rt, ASSEMBLER *as, SCOPE *s) {
+    size_t bucket, i;
+    // Iterate all scope symols, adding them to RT
+    for(bucket = 0; bucket < HASH_BUCKETS; bucket++) {
+        DYNARRAY *b = &s->symbol_table[bucket];
+        for(i = 0; i < b->items; i++) {
+            SYMBOL_LABEL *sl = ARRAY_GET(b, SYMBOL_LABEL, i);
+            rt_sym_add_symbol(rt, "assembler", sl->symbol_name, sl->symbol_length, sl->symbol_value, 1);
+        }
+    }
+    // Iterate child scopes, adding them all
+    for(int csi = 0; csi < s->child_scopes.items; csi++) {
+        unk_dasm_populate_syms(rt, as, ARRAY_GET(&s->child_scopes, SCOPE, csi));
+    }
+}
+
 void unk_dasm_resize_view(UNK *v) {
     VIEWDASM *dv = &v->viewdasm;
 
@@ -437,16 +453,10 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                             as.pass = 2;
                             asm_err(&as, "Could not open file for assembly.");
                         }
+                        // Remove all symbols from the assembler from the runtime
                         rt_sym_remove_symbols(rt, "assembler");
-                        size_t bucket_index;
-                        for(bucket_index = 0; bucket_index < 256; bucket_index++) {
-                            size_t symbol_index;
-                            DYNARRAY *bucket = &as.symbol_table[bucket_index];
-                            for(symbol_index = 0; symbol_index < bucket->items; symbol_index++) {
-                                SYMBOL_LABEL *sl = ARRAY_GET(bucket, SYMBOL_LABEL, symbol_index);
-                                rt_sym_add_symbol(rt, "assembler", sl->symbol_name, sl->symbol_length, sl->symbol_value, 1);
-                            }
-                        }
+                        // Populate runtime with symbols from this pass
+                        unk_dasm_populate_syms(rt, &as, &as.root_scope);
                         assembler_shutdown(&as);
                         rt_sym_search_update(rt);
                         // Force a rethink of the display, since the contents changed

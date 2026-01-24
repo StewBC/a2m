@@ -57,6 +57,38 @@ void usage(char *program_name) {
     fprintf(stderr, "       -v turns on verbose and will dump the hex 6502 as it is assembled\n");
 }
 
+static void save_symbols(UTIL_FILE *sf, SCOPE *s, int level) {
+    size_t bucket, i;
+    // Accumulate all symbols
+    DYNARRAY symbols;
+    ARRAY_INIT(&symbols, SYMBOL_LABEL*);
+    for(bucket = 0; bucket < HASH_BUCKETS; bucket++) {
+        DYNARRAY *b = &s->symbol_table[bucket];
+        for(i = 0; i < b->items; i++) {
+            SYMBOL_LABEL *sl = ARRAY_GET(b, SYMBOL_LABEL, i);
+            ARRAY_ADD(&symbols, sl);
+        }
+    }
+
+    // Sort the symbols
+    qsort(symbols.data, symbols.items, sizeof(SYMBOL_LABEL*), symbol_sort);
+    
+    // Write the sorted symbols to a file
+    fprintf(sf->fp, "%*s%s: %.*s {\n", level * 2, "", s->scope_type == GPERF_DOT_SCOPE ? "Scope" : "Proc", s->scope_name_length, s->scope_name);
+    level++;
+    for(i = 0; i < symbols.items; i++) {
+        SYMBOL_LABEL **sl = ARRAY_GET(&symbols, SYMBOL_LABEL*, i);
+        fprintf(sf->fp, "%*s%04X %.*s \n", level * 2, "", (uint16_t)(*sl)->symbol_value, (int)(*sl)->symbol_length, (*sl)->symbol_name);
+    }
+    level--;
+    array_free(&symbols);
+    for(int csi = 0; csi < s->child_scopes.items; csi++) {
+        fprintf(sf->fp, "\n");
+        save_symbols(sf, ARRAY_GET(&s->child_scopes, SCOPE, csi), level + 1);
+    }
+    fprintf(sf->fp, "%*s}\n", level * 2, "");
+}
+
 int main(int argc, char **argv) {
     const char *output_file_name = 0;
     const char *symbol_file_name = 0;
@@ -120,23 +152,7 @@ int main(int argc, char **argv) {
         if(A2_OK != util_file_open(&symbol_file, symbol_file_name, "w")) {
             fprintf(stderr, "Could not open output file %s for writing\n", symbol_file_name);
         } else {
-            size_t bucket, i;
-            // Accumulate all symbols in hash bucket 0
-            DYNARRAY *b0 = &m.as.root_scope.symbol_table[0];
-            for(bucket = 1; bucket < HASH_BUCKETS; bucket++) {
-                DYNARRAY *b = &m.as.root_scope.symbol_table[bucket];
-                for(i = 0; i < b->items; i++) {
-                    SYMBOL_LABEL *sl = ARRAY_GET(b, SYMBOL_LABEL, i);
-                    ARRAY_ADD(b0, *sl);
-                }
-            }
-            // Sort hash bucket 0
-            qsort(b0->data, b0->items, sizeof(SYMBOL_LABEL), symbol_sort);
-            // Write the sorted symbols to a file
-            for(i = 0; i < b0->items; i++) {
-                SYMBOL_LABEL *sl = ARRAY_GET(b0, SYMBOL_LABEL, i);
-                fprintf(symbol_file.fp, "%04X %.*s\n", (uint16_t) sl->symbol_value, (int) sl->symbol_length, sl->symbol_name);
-            }
+            save_symbols(&symbol_file, &m.as.root_scope, 0);
         }
         util_file_discard(&symbol_file);
     }

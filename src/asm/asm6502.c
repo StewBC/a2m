@@ -586,7 +586,7 @@ SYMBOL_LABEL *symbol_lookup_local(ASSEMBLER *as, uint32_t name_hash, const char 
 }
 
 int symbol_sort(const void *lhs, const void *rhs) {
-    return (uint16_t)(((SYMBOL_LABEL *) lhs)->symbol_value) - (uint16_t)(((SYMBOL_LABEL *) rhs)->symbol_value);
+    return (uint16_t)((*(SYMBOL_LABEL**)lhs)->symbol_value) - (uint16_t)((*(SYMBOL_LABEL**)rhs)->symbol_value);
 }
 
 SYMBOL_LABEL *symbol_store(ASSEMBLER *as, const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TYPE symbol_type, uint64_t value) {
