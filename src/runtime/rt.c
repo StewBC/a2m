@@ -433,7 +433,7 @@ int rt_disassemble_line(RUNTIME *rt, uint16_t *address, VIEW_FLAGS vf, int force
         int len = text - str_buf;
         if(str_buf_len > 55 && len < 51) {
             int need = 51 - len;
-            if(need > 0){
+            if(need > 0) {
                 int can = remain > 0 ? (remain - 1) : 0; // leave room for NUL
                 if(need > can) {
                     need = can;

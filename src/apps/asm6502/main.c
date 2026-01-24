@@ -57,9 +57,14 @@ void usage(char *program_name) {
     fprintf(stderr, "       -v turns on verbose and will dump the hex 6502 as it is assembled\n");
 }
 
+// Sort by value
+int symbol_sort(const void *lhs, const void *rhs) {
+    return (uint16_t)((*(SYMBOL_LABEL**)lhs)->symbol_value) - (uint16_t)((*(SYMBOL_LABEL**)rhs)->symbol_value);
+}
+
 static void save_symbols(UTIL_FILE *sf, SCOPE *s, int level) {
     size_t bucket, i;
-    // Accumulate all symbols
+    // Accumulate all symbols - add ptrs to the symbols array
     DYNARRAY symbols;
     ARRAY_INIT(&symbols, SYMBOL_LABEL*);
     for(bucket = 0; bucket < HASH_BUCKETS; bucket++) {
@@ -70,7 +75,7 @@ static void save_symbols(UTIL_FILE *sf, SCOPE *s, int level) {
         }
     }
 
-    // Sort the symbols
+    // Sort the symbols array (ptrs to symbols)
     qsort(symbols.data, symbols.items, sizeof(SYMBOL_LABEL*), symbol_sort);
     
     // Write the sorted symbols to a file

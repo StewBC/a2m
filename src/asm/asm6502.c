@@ -497,6 +497,215 @@ char *set_name(char **s, const char *name, const int name_length) {
 }
 
 //----------------------------------------------------------------------------
+// SCOPE helpers
+typedef enum {
+    QRES_OK = 0,
+    QRES_NO_SUCH_SCOPE,
+    QRES_MALFORMED
+} QRES;
+
+typedef struct {
+    SCOPE *scope;          // scope to search for the final symbol
+    const char *name;      // final symbol name ptr (slice into token)
+    int name_length;       // final symbol name length
+} QUALIFIED_REF;
+
+static int token_has_scope_path(const char *p, int len) {
+    for(int i = 0; i + 1 < len; i++) {
+        if(p[i] == ':' && p[i + 1] == ':') {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+SCOPE *scope_find_child(SCOPE *parent, const char *name, int name_length) {
+    for(int si = 0; si < parent->child_scopes.items; si++) {
+        SCOPE *s = ARRAY_GET(&parent->child_scopes, SCOPE, si);
+        if(name_length == s->scope_name_length && 0 == strnicmp(name, s->scope_name, name_length)) {
+            return s;
+        }
+    }
+    return NULL;
+}
+
+static QRES scope_resolve_qualified_name(ASSEMBLER *as, const char *sym, int sym_len, QUALIFIED_REF *out) {
+    // sym is not null-terminated
+    int i = 0;
+
+    // Reject empty
+    if(sym_len <= 0) {
+        return QRES_MALFORMED;
+    }
+
+    // Determine anchor
+    SCOPE *anchor = NULL;
+    if(sym_len >= 2 && sym[0] == ':' && sym[1] == ':') {
+        // Root anchored
+        anchor = &as->root_scope;
+        i = 2;
+        if(i >= sym_len) {
+            return QRES_MALFORMED;        // "::" alone is not a valid symbol
+        }
+    } else {
+        // Lexical anchor (first segment can be found up the parent chain)
+        anchor = as->active_scope;
+    }
+
+    // Parse segments separated by "::".
+    // The last segment is the symbol name. Everything before it is a scope path
+
+    // Helper to find next "::" starting at i
+    int seg_start = i;
+    int next_sep = -1;
+    for(int j = i; j + 1 < sym_len; j++) {
+        if(sym[j] == ':' && sym[j + 1] == ':') {
+            next_sep = j;
+            break;
+        }
+    }
+
+    // No separator - treat as simple 
+    // This should not happen since caller (symbol lookup) should have checked
+    if(next_sep < 0) {
+        out->scope = anchor;
+        out->name = sym + i;
+        out->name_length = sym_len - i;
+        return QRES_OK;
+    }
+
+    // First segment is now sym[seg_start..next_sep)
+    const char *first = sym + seg_start;
+    int first_len = next_sep - seg_start;
+    if(first_len <= 0) {
+        return QRES_MALFORMED;
+    }
+
+    // Resolve first scope name
+    SCOPE *cur = NULL;
+
+    if(anchor == &as->root_scope) {
+        // root-anchored: first must be child of root
+        cur = scope_find_child(anchor, first, first_len);
+    } else {
+        // lexical - walk up parents looking for child named first
+        SCOPE *s = anchor;
+        while(s) {
+            cur = scope_find_child(s, first, first_len);
+            if(cur) {
+                break;
+            }
+            s = s->parent_scope;
+        }
+    }
+
+    if(!cur) {
+        return QRES_NO_SUCH_SCOPE;
+    }
+
+    // Now descend for remaining scope segments, leaving last as symbol name.
+    i = next_sep + 2;
+
+    while(1) {
+        // Find next sep
+        next_sep = -1;
+        for(int j = i; j + 1 < sym_len; j++) {
+            if(sym[j] == ':' && sym[j + 1] == ':') {
+                next_sep = j;
+                break;
+            }
+        }
+
+        if(next_sep < 0) {
+            // No more seps: remainder is final symbol name
+            int name_len = sym_len - i;
+            if(name_len <= 0) {
+                return QRES_MALFORMED;
+            }
+            out->scope = cur;
+            out->name = sym + i;
+            out->name_length = name_len;
+            return QRES_OK;
+        }
+
+        // There is another "::" - that segment is another scope name
+        int seg_len = next_sep - i;
+        if(seg_len <= 0) {
+            return QRES_MALFORMED;
+        }
+
+        SCOPE *child = scope_find_child(cur, sym + i, seg_len);
+        if(!child) {
+            return QRES_NO_SUCH_SCOPE;
+        }
+
+        cur = child;
+        i = next_sep + 2;
+        if(i >= sym_len) {
+            return QRES_MALFORMED;
+        }
+    }
+}
+
+int scope_init(SCOPE *s, int type) {
+    memset(s, 0, sizeof(SCOPE));
+    ARRAY_INIT(&s->child_scopes, SCOPE);
+    s->symbol_table = (DYNARRAY*)malloc(sizeof(DYNARRAY) * HASH_BUCKETS);
+    if(!s->symbol_table) {
+        return A2_ERR;
+    }
+
+    for(int bucket = 0; bucket < HASH_BUCKETS; bucket++) {
+        ARRAY_INIT(&s->symbol_table[bucket], SYMBOL_LABEL);
+    }
+
+    s->scope_type = type;
+
+    return A2_OK;
+}
+
+// Recursively destroys a scope and it's children
+void scope_destroy(SCOPE *s) {
+    if(s->symbol_table) {
+        for(int bucket = 0; bucket < HASH_BUCKETS; bucket++) {
+            array_free(&s->symbol_table[bucket]);
+        }
+    }
+    free(s->symbol_table);
+    while(s->child_scopes.items) {
+        scope_destroy(ARRAY_GET(&s->child_scopes, SCOPE, s->child_scopes.items - 1));
+        s->child_scopes.items--;
+    }
+    array_free(&s->child_scopes);
+    free(s->scope_name);
+}
+
+// Add a scope to the passed in parent scope, returning a pointer to the added scope
+SCOPE *scope_add(ASSEMBLER *as, const char *name, const int name_length, SCOPE *parent, int type) {
+    SCOPE s;
+    if(A2_OK != scope_init(&s, type)) {
+        return NULL;
+    }
+    if(!set_name(&s.scope_name, name, name_length)) {
+        scope_destroy(&s);
+        return NULL;
+    }
+    s.scope_name_length = name_length;
+    s.parent_scope = parent;
+    s.scope_type = type;
+    if(A2_OK != ARRAY_ADD(&parent->child_scopes, s)) {
+        scope_destroy(&s);
+        return NULL;
+    }
+    return ARRAY_GET(&parent->child_scopes, SCOPE, parent->child_scopes.items - 1);
+}
+
+void scope_to_scope(ASSEMBLER *as, SCOPE *s) {
+    as->active_scope = s;
+    as->symbol_table = s->symbol_table;
+}
+
+//----------------------------------------------------------------------------
 // Symbol storage / lookup
 int anonymous_symbol_lookup(ASSEMBLER *as, uint16_t *address, int direction) {
     // Ensure the array has items
@@ -554,22 +763,62 @@ int anonymous_symbol_lookup(ASSEMBLER *as, uint16_t *address, int direction) {
     return 1;
 }
 
-SYMBOL_LABEL *symbol_lookup(ASSEMBLER *as, uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length) {
-    SCOPE *active_scope = as->active_scope;
+static SYMBOL_LABEL *symbol_lookup_in_scope(SCOPE *scope, uint32_t name_hash, const char *name, uint32_t len) {
     uint8_t bucket = name_hash & HASH_MASK;
-    do {
+    DYNARRAY *bucket_array = &scope->symbol_table[bucket];
+    for(size_t i = 0; i < bucket_array->items; i++) {
+        SYMBOL_LABEL *sl = ARRAY_GET(bucket_array, SYMBOL_LABEL, i);
+        if(sl->symbol_hash == name_hash && sl->symbol_length == len && !strnicmp(name, sl->symbol_name, len)) {
+            return sl;
+        }
+    }
+    return NULL;
+}
+
+SYMBOL_LABEL *symbol_lookup(ASSEMBLER *as, uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length) {
+    if(!token_has_scope_path(symbol_name, symbol_name_length)) {
+        SCOPE *active_scope = as->active_scope;
+        uint8_t bucket = name_hash & HASH_MASK;
+        do {
+            DYNARRAY *bucket_array = &active_scope->symbol_table[bucket];
+            for(size_t i = 0; i < bucket_array->items; i++) {
+                SYMBOL_LABEL *sl = ARRAY_GET(bucket_array, SYMBOL_LABEL, i);
+                if(sl->symbol_hash == name_hash && sl->symbol_length == symbol_name_length && !strnicmp(symbol_name, sl->symbol_name, symbol_name_length)) {
+                    return sl;
+                }
+            }
+            active_scope = active_scope->parent_scope;
+        } while(active_scope);
+
+        return NULL;
+    } 
+    QUALIFIED_REF qr;
+    QRES r = scope_resolve_qualified_name(as, symbol_name, (int)symbol_name_length, &qr);
+    if(r != QRES_OK){
+        return NULL; // treat as unresolved (pass2 error still happens)
+    }
+
+    name_hash = util_fnv_1a_hash(qr.name, (uint32_t)qr.name_length);
+    return symbol_lookup_in_scope(qr.scope, name_hash, qr.name, (uint32_t)qr.name_length);
+}
+
+SYMBOL_LABEL *symbol_lookup_parent_chain(ASSEMBLER *as, uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length) {
+    SCOPE *active_scope = as->active_scope ? as->active_scope->parent_scope : NULL;
+    uint8_t bucket = name_hash & HASH_MASK;
+
+    while(active_scope) {
         DYNARRAY *bucket_array = &active_scope->symbol_table[bucket];
         for(size_t i = 0; i < bucket_array->items; i++) {
             SYMBOL_LABEL *sl = ARRAY_GET(bucket_array, SYMBOL_LABEL, i);
-            if(sl->symbol_hash == name_hash && !strnicmp(symbol_name, sl->symbol_name, symbol_name_length)) {
+            if(sl->symbol_hash == name_hash && sl->symbol_length == symbol_name_length && !strnicmp(symbol_name, sl->symbol_name, symbol_name_length)) {
                 return sl;
             }
         }
         active_scope = active_scope->parent_scope;
-    } while(active_scope);
-
+    }
     return NULL;
 }
+
 
 SYMBOL_LABEL *symbol_lookup_local(ASSEMBLER *as, uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length) {
     SCOPE *active_scope = as->active_scope;
@@ -577,7 +826,7 @@ SYMBOL_LABEL *symbol_lookup_local(ASSEMBLER *as, uint32_t name_hash, const char 
     DYNARRAY *bucket_array = &active_scope->symbol_table[bucket];
     for(size_t i = 0; i < bucket_array->items; i++) {
         SYMBOL_LABEL *sl = ARRAY_GET(bucket_array, SYMBOL_LABEL, i);
-        if(sl->symbol_hash == name_hash && !strnicmp(symbol_name, sl->symbol_name, symbol_name_length)) {
+        if(sl->symbol_hash == name_hash && sl->symbol_length == symbol_name_length && !strnicmp(symbol_name, sl->symbol_name, symbol_name_length)) {
             return sl;
         }
     }
@@ -585,11 +834,30 @@ SYMBOL_LABEL *symbol_lookup_local(ASSEMBLER *as, uint32_t name_hash, const char 
     return NULL;
 }
 
-int symbol_sort(const void *lhs, const void *rhs) {
-    return (uint16_t)((*(SYMBOL_LABEL**)lhs)->symbol_value) - (uint16_t)((*(SYMBOL_LABEL**)rhs)->symbol_value);
+int symbol_delete_local(ASSEMBLER *as, uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length) {
+    SCOPE *active_scope = as->active_scope;
+    uint8_t bucket = name_hash & HASH_MASK;
+    DYNARRAY *bucket_array = &active_scope->symbol_table[bucket];
+
+    for(size_t i = 0; i < bucket_array->items; i++) {
+        SYMBOL_LABEL *sl = ARRAY_GET(bucket_array, SYMBOL_LABEL, i);
+        if(sl->symbol_hash == name_hash && sl->symbol_length == symbol_name_length && !strnicmp(symbol_name, sl->symbol_name, symbol_name_length)) {
+            size_t last = bucket_array->items - 1;
+            if(i != last) {
+                // If the symbol to delete is in the middle, put the last symbol in the list
+                // over the one to delete
+                SYMBOL_LABEL *dst = ARRAY_GET(bucket_array, SYMBOL_LABEL, i);
+                SYMBOL_LABEL *src = ARRAY_GET(bucket_array, SYMBOL_LABEL, last);
+                *dst = *src;
+            }
+            bucket_array->items--;
+            return 1;
+        }
+    }
+    return 0;
 }
 
-SYMBOL_LABEL *symbol_store(ASSEMBLER *as, const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TYPE symbol_type, uint64_t value) {
+SYMBOL_LABEL *symbol_store_in_scope(ASSEMBLER *as, SCOPE *scope, const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TYPE symbol_type, uint64_t value) {
     uint32_t name_hash = util_fnv_1a_hash(symbol_name, symbol_name_length);
     SYMBOL_LABEL *sl = symbol_lookup_local(as, name_hash, symbol_name, symbol_name_length);
     if(sl) {
@@ -624,74 +892,6 @@ SYMBOL_LABEL *symbol_store(ASSEMBLER *as, const char *symbol_name, uint32_t symb
         sl = ARRAY_GET(bucket_array, SYMBOL_LABEL, bucket_array->items - 1);
     }
     return sl;
-}
-
-SCOPE *scope_find(ASSEMBLER *as, const char *name, int name_length) {
-    for(int si = 0; si < as->active_scope->child_scopes.items; si++) {
-        SCOPE *s = ARRAY_GET(&as->active_scope->child_scopes, SCOPE, si);
-        if(name_length == s->scope_name_length && 0 == strnicmp(name, s->scope_name, name_length)) {
-            return s;
-        }
-    }
-    return NULL;
-}
-
-//----------------------------------------------------------------------------
-// SCOPE helpers
-int scope_init(SCOPE *s, int type) {
-    memset(s, 0, sizeof(SCOPE));
-    ARRAY_INIT(&s->child_scopes, SCOPE);
-    s->symbol_table = (DYNARRAY*)malloc(sizeof(DYNARRAY) * HASH_BUCKETS);
-    if(!s->symbol_table) {
-        return A2_ERR;
-    }
-
-    for(int bucket = 0; bucket < HASH_BUCKETS; bucket++) {
-        ARRAY_INIT(&s->symbol_table[bucket], SYMBOL_LABEL);
-    }
-
-    s->scope_type = type;
-
-    return A2_OK;
-}
-
-void scope_destroy(SCOPE *s) {
-    if(s->symbol_table) {
-        for(int bucket = 0; bucket < HASH_BUCKETS; bucket++) {
-            array_free(&s->symbol_table[bucket]);
-        }
-    }
-    free(s->symbol_table);
-    while(s->child_scopes.items) {
-        scope_destroy(ARRAY_GET(&s->child_scopes, SCOPE, s->child_scopes.items - 1));
-        s->child_scopes.items--;
-    }
-    array_free(&s->child_scopes);
-    free(s->scope_name);
-}
-
-SCOPE *scope_add(ASSEMBLER *as, const char *name, const int name_length, SCOPE *parent, int type) {
-    SCOPE s;
-    if(A2_OK != scope_init(&s, type)) {
-        return NULL;
-    }
-    if(!set_name(&s.scope_name, name, name_length)) {
-        scope_destroy(&s);
-        return NULL;
-    }
-    s.scope_name_length = name_length;
-    s.parent_scope = parent;
-    s.scope_type = type;
-    if(A2_OK != ARRAY_ADD(&parent->child_scopes, s)) {
-        scope_destroy(&s);
-        return NULL;
-    }
-    return ARRAY_GET(&parent->child_scopes, SCOPE, parent->child_scopes.items - 1);
-}
-
-void scope_scope_to(ASSEMBLER *as, SCOPE *s) {
-    as->active_scope = s;
-    as->symbol_table = s->symbol_table;
 }
 
 //----------------------------------------------------------------------------
@@ -1215,7 +1415,7 @@ void parse_dot_endmacro(ASSEMBLER *as) {
 
 void parse_dot_endproc(ASSEMBLER *as) {
     if(as->active_scope->parent_scope && as->active_scope->scope_type == GPERF_DOT_PROC) {
-        scope_scope_to(as, as->active_scope->parent_scope);
+        scope_to_scope(as, as->active_scope->parent_scope);
     } else {
         asm_err(as, ".endproc without a matching .proc");
     }
@@ -1223,7 +1423,7 @@ void parse_dot_endproc(ASSEMBLER *as) {
 
 void parse_dot_endscope(ASSEMBLER *as) {
     if(as->active_scope->parent_scope && as->active_scope->scope_type == GPERF_DOT_SCOPE) {
-        scope_scope_to(as, as->active_scope->parent_scope);
+        scope_to_scope(as, as->active_scope->parent_scope);
     } else {
         asm_err(as, ".endscope without a matching .scope");
     }
@@ -1404,15 +1604,14 @@ void parse_dot_proc(ASSEMBLER *as) {
     }
     const char *name = as->current_token.name;
     const int name_length = as->current_token.name_length;
-    SCOPE *s = scope_find(as, name, name_length);
+    SCOPE *s = scope_find_child(as->active_scope, name, name_length);
     if(s) {
-        as->active_scope = s;
-        as->symbol_table = s->symbol_table;
+        scope_to_scope(as, s);
     } else {
-        symbol_store(as, name, name_length, SYMBOL_ADDRESS, as->current_address);
+        symbol_store_in_scope(as, as->active_scope, name, name_length, SYMBOL_ADDRESS, as->current_address);
         SCOPE *s = scope_add(as, name, name_length, as->active_scope, GPERF_DOT_PROC);
         if(s) {
-            scope_scope_to(as, s);
+            scope_to_scope(as, s);
         }
     }
 }
@@ -1449,13 +1648,13 @@ void parse_dot_scope(ASSEMBLER *as) {
         name = as->current_token.name;
         name_length = as->current_token.name_length;
     }
-    SCOPE *s = scope_find(as, name, name_length);
+    SCOPE *s = scope_find_child(as->active_scope, name, name_length);
     if(s) {
-        scope_scope_to(as, s);
+        scope_to_scope(as, s);
     } else {
         SCOPE *s = scope_add(as, name, name_length, as->active_scope, GPERF_DOT_SCOPE);
         if(s) {
-            scope_scope_to(as, s);
+            scope_to_scope(as, s);
         }
     }
 }
@@ -1479,7 +1678,7 @@ void parse_dot_string(ASSEMBLER *as) {
     SYMBOL_LABEL *sl;
     if(as->strcode) {
         // Add the _ variable if it doesn't yet exist and get a handle to the storage
-        sl = symbol_store(as, "_", 1, SYMBOL_VARIABLE, 0);
+        sl = symbol_store_in_scope(as, as->active_scope, "_", 1, SYMBOL_VARIABLE, 0);
     }
     do {
         // Get to a token to process
@@ -1707,7 +1906,7 @@ void parse_label(ASSEMBLER *as) {
             ARRAY_ADD(&as->anon_symbols, as->current_address);
         }
     } else {
-        symbol_store(as, symbol_name, name_length, SYMBOL_ADDRESS, as->current_address);
+        symbol_store_in_scope(as, as->active_scope, symbol_name, name_length, SYMBOL_ADDRESS, as->current_address);
     }
 }
 
@@ -1780,7 +1979,7 @@ void parse_variable(ASSEMBLER *as) {
     uint32_t name_length = as->input - as->token_start;
     next_token(as);
     expect(as, '=');
-    symbol_store(as, symbol_name, name_length, SYMBOL_VARIABLE, parse_expression(as));
+    symbol_store_in_scope(as, as->active_scope, symbol_name, name_length, SYMBOL_VARIABLE, parse_expression(as));
 }
 
 //----------------------------------------------------------------------------
@@ -1806,7 +2005,7 @@ int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, void *user, output_byte ob
         return A2_ERR;
     }
     as->root_scope.scope_name_length = 4;
-    scope_scope_to(as, &as->root_scope);
+    scope_to_scope(as, &as->root_scope);
 
     include_files_init(as);
 

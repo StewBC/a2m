@@ -120,16 +120,16 @@ int rt_feed_clipboard_key(RUNTIME *rt);
 
 // Adjust snprintf buffer pointer (p) by how much it (actually) wrote (prt_len), and
 // Track how much buffer is left (remain) to print into
-static inline void adjust(char **p, int *remain, int prt_len){
-    if(*remain <= 0){
+static inline void adjust(char **p, int *remain, int prt_len) {
+    if(*remain <= 0) {
         return;
     }
     // snprintf writes at most *remain - 1 chars, then '\0'
     int adv = prt_len;
-    if(adv < 0){
+    if(adv < 0) {
         adv = 0;
     }
-    if(adv >= *remain){
+    if(adv >= *remain) {
         adv = *remain - 1;   // Truncation - stop at end
     }
     *p += adv;

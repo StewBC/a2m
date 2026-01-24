@@ -66,10 +66,12 @@ void get_token(ASSEMBLER *as) {
                     as->input++;
                 }
             } else if(c == ':') {
-                // A label ends with a : so include in token - This does mean that
-                // conditional expressions need a space or bracket before the ':' in
-                // calls to evaluate_expression
-                as->input++;
+                // A label ends with a : so include in token and be done.
+                // A scope contains :: so include that in a token and keep going
+                if(':' == *(++as->input)) {
+                    as->input++;
+                    continue;
+                }
             }
             as->current_token.op = '\0';
             break;
@@ -248,6 +250,13 @@ int64_t parse_primary(ASSEMBLER *as) {
         next_token(as);
     } else if(as->current_token.type == TOKEN_VAR) {
         SYMBOL_LABEL *sl = symbol_lookup(as, as->current_token.name_hash, as->current_token.name, as->current_token.name_length);
+        if(as->pass == 2 && sl && sl->symbol_type == SYMBOL_UNKNOWN) {
+            SYMBOL_LABEL *resolved = symbol_lookup_parent_chain(as, as->current_token.name_hash, as->current_token.name, as->current_token.name_length);
+            if(resolved) {
+                symbol_delete_local(as, as->current_token.name_hash, as->current_token.name, as->current_token.name_length);
+                sl = resolved;
+            }
+        }
         if(!sl || (as->pass == 2 && sl && sl->symbol_type == SYMBOL_UNKNOWN)) {
             // All tokens must have resolved by pass 2
             if(as->pass == 2) {
@@ -255,7 +264,7 @@ int64_t parse_primary(ASSEMBLER *as) {
             }
             // In pass 1 tokens not found have placeholders (SYMBOL_UNKNOWN) created
             value = 0xFFFF;
-            sl = symbol_store(as, as->current_token.name, as->current_token.name_length, SYMBOL_UNKNOWN, value);
+            sl = symbol_store_in_scope(as, as->active_scope, as->current_token.name, as->current_token.name_length, SYMBOL_UNKNOWN, value);
         } else {
             value = sl->symbol_value;
         }

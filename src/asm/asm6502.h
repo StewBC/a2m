@@ -279,8 +279,8 @@ typedef struct ASSEMBLER {
 // extern ASSEMBLER *as;
 
 SYMBOL_LABEL *symbol_lookup(ASSEMBLER *as, uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length);
-int symbol_sort(const void *lhs, const void *rhs);
-SYMBOL_LABEL *symbol_store(ASSEMBLER *as, const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TYPE symbol_type, uint64_t value);
+SYMBOL_LABEL *symbol_lookup_parent_chain(ASSEMBLER *as, uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length);
+SYMBOL_LABEL *symbol_store_in_scope(ASSEMBLER *as, SCOPE *scope, const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TYPE symbol_type, uint64_t value);
 int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, void *user, output_byte ob);
 int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address);
 void assembler_shutdown(ASSEMBLER *as);
