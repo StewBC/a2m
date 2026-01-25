@@ -6,105 +6,84 @@
 ; This is free and unencumbered software released into the public domain.
 
 ;-----------------------------------------------------------------------------
-ZEROPAGE    = $50
-LOWMEM      = $0800
-HGR         = $4000
-SETAN3      = $C05F
-CLR80STORE  = $C000
-
-.include "apple2.inc"
-.include "defs.inc"
-.include "macros.inc"
-
-.include "zeropage.inc"
-.include "lowmem.inc"
-
-.org HGR
-.incbin "logo.hgr"
+.segment "CODE"
 
 ;-----------------------------------------------------------------------------
-: CODE = :-                                      ; Current address, also CODE = * - 1
+.proc main
 
-main:
+    jsr mainInit                                ; do some one-time global init
+    jsr uiWaitForIntroEnter                     ; color cycle ENTER and wait for key
 
-    jsr mainInit                                 ; do some one-time global init
-    jsr uiWaitForIntroEnter                      ; color cycle ENTER and wait for key
+loop:
+    jsr uiTitleScreen                           ; go to the ui
+    and #EVENT_EXIT_GAME                        ; see if event to exit game is set
+    bne quit
+    jsr gameLoop                                ; not quit, so run the gameplay (or demo)
+    jmp loop                                    ; go back to the ui
 
-main_loop:
-    jsr uiTitleScreen                            ; go to the ui
-    and #EVENT_EXIT_GAME                         ; see if event to exit game is set
-    bne main_quit
-    jsr gameLoop                                 ; not main_quit, so run the gameplay (or demo)
-    jmp main_loop                                ; go back to the ui
+quit:
+    jsr MLI                                     ; quit using the prodos mli
 
-main_quit:
-    jsr MLI                                      ; main_quit using the prodos mli
-
-    .byte   $65                                  ; ProDOS Quit request
-    .word   *+ 1
+    .byte   $65                                 ; ProDOS Quit request
+    .word   * + 2
     .byte   4
     .byte   0
     .word   0000
     .byte   0
     .word   0000
 
+.endproc
 
 ;-----------------------------------------------------------------------------
-.include "audio.inc"
-.include "game.inc"
-.include "input.inc"
-.include "level.inc"
-.include "screen.inc"
-.include "sprite.inc"
-.include "text.inc"
-.include "tiles.inc"
-.include "ui.inc"
-.include "willy.inc"
+.include "apple2.inc"                           ; cc65 include file for LOWSCR, etc
+.include "logo.inc"                             ; loading bitmap, manic miner bouncy text
+.include "defs.inc"                             ; globally used defines
+.include "variables.inc"                        ; all game variables and buffers
+.include "roaudio.inc"                          ; all ro files read only.  This music and sfx
+.include "rofont.inc"                           ; ZX Spectrum font
+.include "rolevels.inc"                         ; level layout, sprite positions, colors, etc.
+.include "rosprites.inc"                        ; sprite definitions
+.include "rosystem.inc"                         ; useful tables for mult, color masks, etc.
+.include "rotext.inc"                           ; all in-game text (except scores in variables)
+.include "rotiles.inc"                          ; all tile (background) definitions
+.include "screen.inc"                           ; code to draw, clear, etc. the screen
+.include "text.inc"                             ; code to manipulate and show text
+.include "input.inc"                            ; keyboard handling
+.include "level.inc"                            ; unpack level and put keys in place
+.include "sprite.inc"                           ; instance and color sprites, etc.
+.include "tiles.inc"                            ; put right tiles in place and color, etc.
+.include "ui.inc"                               ; all pre-game screens
+.include "audio.inc"                            ; play the music and make tones
+.include "willy.inc"                            ; user controlled character logic
+.include "game.inc"                             ; game flow, ai, game over, etc.
 
 
 ;-----------------------------------------------------------------------------
-mainInit:
+.proc mainInit
 
-    lda #0                                       ; init some one-time globals
-    ldx #bit7Mask-ZEROPAGE
-:   sta ZEROPAGE,x
-    dex
-    bne :-
+    lda #0                                      ; init some one-time globals
+    sta backPage
+    sta leftEdge
+    sta cameraMode
+    sta uiComponent
+    sta cheatActive
+    sta cheatIndex
+    sta monochrome
 
-    lda #AUDIO_MUSIC | AUDIO_SOUND               ; turn the music and in-game sounds on
+    lda #AUDIO_MUSIC | AUDIO_SOUND              ; turn the music and in-game sounds on
     sta audioMask
-    lda #>HGRPage1                               ; set the current hidden (back) page to page 1
-    sta currPageH                                ; (page 2 was made visible by the loader)
 
-    sta SETAN3
-    sta CLR80STORE
-    sta CLR80COL
-    bit TXTCLR
-    bit MIXCLR
-    bit HISCR
-    bit HIRES
-    jsr screenSwap
-    jsr screenSwap
+    lda #>HGRPage1                              ; set the current hidden (back) page to page 1
+    sta currPageH                               ; (page 2 was made visible by the loader)
 
-    lda #$80                                     ; make a zero-page bit mask area for checking bits
-    ldx #7                                       ; from 1 to 128, set each bit (backwards)
+    lda #$80                                    ; make a zero-page bit mask area for checking bits
+    ldx #7                                      ; from 1 to 128, set each bit (backwards)
 :
-    sta bitMasks, x                              ; set the bits in the area called bitMasks
+    sta bitMasks, x                             ; set the bits in the area called bitMasks
     lsr
     dex
     bpl :-
 
     rts
 
-; RODATA
-.include "roaudio.inc"
-.include "rodata.inc"
-.include "rofont.inc"
-.include "rolevels.inc"
-.include "rosprites.inc"
-.include "rosystem.inc"
-.include "rotext.inc"
-.include "rotiles.inc"
-
-; DATA
-.include "variables.inc"
+.endproc

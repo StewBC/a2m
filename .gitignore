@@ -2,7 +2,6 @@
 .vscode/
 build/
 disks/
-samples/mm/
 *.ini
 *.txt
 symbols/USER.SYM

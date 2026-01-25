@@ -6,16 +6,19 @@
 ; This is free and unencumbered software released into the public domain.
 
 ;-----------------------------------------------------------------------------
+.segment "RODATA"
+
+;-----------------------------------------------------------------------------
 ; the lo byte for the memory at the start of every screen row
 rowL:
-    .for Row = 0, Row .lt $C0, Row++
+    .for Row=0, Row .lt $C0, Row++
         .byte   (Row & $08) << 4 | (Row & $C0) >> 1 | (Row & $C0) >> 3
     .endfor
 
 ;-----------------------------------------------------------------------------
 ; the hi byte for the memory at the start of every screen row
 rowH:
-    .for Row = 0, Row .lt $C0, Row++
+    .for Row=0, Row .lt $C0, Row++
         .byte   >$0000 | (Row & $07) << 2 | (Row & $30) >> 4
     .endfor
 
@@ -38,7 +41,7 @@ rowDrawL:
     .byte <tileDrawP0RD
     .byte <tileDrawP0RE
     .byte <tileDrawP0RF
-    .byte <tileDrawP1R0                          ; Page 1
+    .byte <tileDrawP1R0                         ; Page 1
     .byte <tileDrawP1R1
     .byte <tileDrawP1R2
     .byte <tileDrawP1R3
@@ -72,7 +75,7 @@ rowDrawH:
     .byte >tileDrawP0RD
     .byte >tileDrawP0RE
     .byte >tileDrawP0RF
-    .byte >tileDrawP1R0                          ; Page 1
+    .byte >tileDrawP1R0                         ; Page 1
     .byte >tileDrawP1R1
     .byte >tileDrawP1R2
     .byte >tileDrawP1R3
@@ -91,62 +94,62 @@ rowDrawH:
 
 ;-----------------------------------------------------------------------------
 mult64H:
-.for Row = 0, Row .lt MAX_SPRITE_IFRAMES, Row++
+.for Row=0, Row .lt MAX_SPRITE_IFRAMES, Row++
     .byte >(Row * 64)
 .endfor
 
 mult64L:
-.for Row = 0, Row .lt MAX_SPRITE_IFRAMES, Row++
+.for Row=0, Row .lt MAX_SPRITE_IFRAMES, Row++
     .byte <(Row * 64)
 .endfor
 
 mult32H:
-.for Row = 0, Row .lt 15, Row++
+.for Row=0, Row .lt 15, Row++
     .byte >(Row * 32)
 .endfor
 
 mult32L:
-.for Row = 0, Row .lt 15, Row++
+.for Row=0, Row .lt 15, Row++
     .byte <(Row * 32)
 .endfor
 
 mult16:
-.for Row = 0, Row .lt 9, Row++
+.for Row=0, Row .lt 9, Row++
     .byte Row * 16
 .endfor
 
 mult8:
-.for Row = 0, Row .lt 24, Row++
+.for Row=0, Row .lt 24, Row++
     .byte Row * 8
 .endfor
 
 ;-----------------------------------------------------------------------------
 ; color masks
 masksLeft:
-.byte %11111111                                  ; 00 MSB-BITS-11..1 White
-.byte %00101010                                  ; 01   0-BITS-01..0 Green
-.byte %10101010                                  ; 04   1-BITS-01..0 Orange
-.byte %01010101                                  ; 01   0-BITS-10..1 Purple
-.byte %11010101                                  ; 02   1-BITS-10..1 Blue
+.byte %11111111                                 ; 00 MSB-BITS-11..1 White
+.byte %00101010                                 ; 01   0-BITS-01..0 Green
+.byte %10101010                                 ; 04   1-BITS-01..0 Orange
+.byte %01010101                                 ; 01   0-BITS-10..1 Purple
+.byte %11010101                                 ; 02   1-BITS-10..1 Blue
 
 masksRight:
-.byte %11111111                                  ; 00  MSB-BITS-11 White
-.byte %01010101                                  ; 01    0-BITS-10..1 Green
-.byte %11010101                                  ; 04    1-BITS-10..1 Orange
-.byte %00101010                                  ; 01    0-BITS-01..0 Purple
-.byte %10101010                                  ; 02    1-BITS-01..0 Blue
+.byte %11111111                                 ; 00  MSB-BITS-11 White
+.byte %01010101                                 ; 01    0-BITS-10..1 Green
+.byte %11010101                                 ; 04    1-BITS-10..1 Orange
+.byte %00101010                                 ; 01    0-BITS-01..0 Purple
+.byte %10101010                                 ; 02    1-BITS-01..0 Blue
 
 maskGreen:
-.byte %00101010, %01010101                       ; Green
+.byte %00101010, %01010101                      ; Green
 
 maskOrange:
-.byte %10101010, %11010101                       ; Orange
+.byte %10101010, %11010101                      ; Orange
 
 maskGreenHi:
-.byte %00100000, %01000000                       ; Green
+.byte %00100000, %01000000                      ; Green
 
 maskNewTip:
-.byte %01011111, %00111111                       ; White air graph tip (reversed order)
+.byte %01011111, %00111111                      ; White air graph tip (reversed order)
 
 ;-----------------------------------------------------------------------------
 ; sprite 32 to 64 byte bit-double helper table

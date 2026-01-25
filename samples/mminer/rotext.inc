@@ -6,6 +6,8 @@
 ; This is free and unencumbered software released into the public domain.
 
 ;-----------------------------------------------------------------------------
+.segment "RODATA"
+
 roTextLevel:
 .string "         CENTRAL CAVERN         "
 .string "          THE COLD ROOM         "

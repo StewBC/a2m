@@ -1,9 +1,17 @@
 ;-----------------------------------------------------------------------------
-; rodata.inc
+; logo.inc
 ; Part of manic miner, the zx spectrum game, made for Apple II
 ;
 ; Stefan Wessels, 2020
 ; This is free and unencumbered software released into the public domain.
+
+;-----------------------------------------------------------------------------
+.segment "HGR"
+
+.incbin "logo.hgr"
+
+;-----------------------------------------------------------------------------
+.segment "RODATA"
 
 manicText:
 .byte $88, $D8, $A8, $88, $88, $00, $00

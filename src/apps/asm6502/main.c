@@ -53,8 +53,8 @@ void usage(char *program_name) {
     fprintf(stderr, "Usage: %s <-i infile> [-o outfile] [-s <symbolfile|->] [-v]\n", c);
     fprintf(stderr, "Where: infile is a 6502 assembly language file\n");
     fprintf(stderr, "       outfile will be a binary file containing the assembled 6502\n");
-    fprintf(stderr, "       symbolfile will be a list of the addresses of all variables and labels\n");
-    fprintf(stderr, "       symbolfile name as a '-' character then printing goes to stdout\n");
+    fprintf(stderr, "       symbolfile contains a list all variables, labels and segment addresses\n");
+    fprintf(stderr, "       symbolfile name as a '-' character sends output to stdout\n");
     fprintf(stderr, "       -v turns on verbose and will dump the hex 6502\n");
 }
 
