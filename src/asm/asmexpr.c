@@ -181,7 +181,6 @@ void next_token(ASSEMBLER *as) {
             as->current_token.op = first;
             as->current_token.type = TOKEN_OP;
         }
-
     } else if(isdigit(*as->token_start)) {
         as->current_token.type = TOKEN_NUM;                 // Decimal Number
         as->current_token.value = strtoll(as->token_start, (char **) &as->token_start, 10);
@@ -198,8 +197,20 @@ void next_token(ASSEMBLER *as) {
             asm_err(as, "Expected a closing '");
         }
         get_token(as);
-        // as->current_token.type = TOKEN_NUM;  // All other one char operators (+ - ? : etc.)
-        // get_token(as);
+    } else if(*as->token_start == '"'){
+        // token_start points at opening quote and as->input is after closing quote
+        int len = (int)(as->input - as->token_start);
+        if(len < 2 || as->token_start[len - 1] != '"'){
+            asm_err(as, "String missing a closing \"");
+        }
+        as->current_token.type = TOKEN_STR;
+        as->current_token.name = as->token_start + 1;
+        as->current_token.name_length = len - 2;
+        as->current_token.name_hash = util_fnv_1a_hash(as->current_token.name, as->current_token.name_length);
+    } else if(*as->token_start == ':' && *(as->token_start + 1) == '=') {
+        as->current_token.type = TOKEN_OP;
+        as->current_token.op = '=';                         // make := equivalent to =
+        as->input = as->token_start + 2;                    // consume both chars
     } else {
         as->current_token.type = TOKEN_OP;                  // All other one char operators (+ - ? : etc.)
         as->current_token.op = *as->token_start++;
@@ -228,7 +239,7 @@ int64_t parse_primary(ASSEMBLER *as) {
     // Expression starting with * is an address expression
     if(as->current_token.type == TOKEN_OP && as->current_token.op == '*') {
         next_token(as);
-        value = 1 + as->current_address;
+        value = 1 + current_output_address(as);
     } else if(as->current_token.type == TOKEN_OP && as->current_token.op == ':') {
         value = parse_anonymous_address(as);
     } else if(as->current_token.type == TOKEN_OP && as->current_token.op == 'D') {

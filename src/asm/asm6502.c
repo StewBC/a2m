@@ -220,6 +220,16 @@ const char *address_mode_txt[] = {
 };
 
 //----------------------------------------------------------------------------
+// Address helper
+static inline void set_current_output_address(ASSEMBLER *as, uint16_t address) {
+    if(as->active_segment) {
+        as->active_segment->segment_output_address = address;
+    } else {
+        as->current_address = address;
+    }
+}
+
+//----------------------------------------------------------------------------
 // Include file stack management
 void include_files_cleanup(ASSEMBLER *as) {
     size_t i;
@@ -366,10 +376,21 @@ void flush_macros(ASSEMBLER *as) {
 // Output
 void emit(ASSEMBLER *as, uint8_t byte_value) {
     if(as->pass == 2) {
-        as->cb_assembler_ctx.output_byte(as->cb_assembler_ctx.user, as->current_address, byte_value);
-        as->last_address = ++as->current_address;
+        if(as->active_segment) {
+            if(!as->active_segment->do_not_emit) {
+                as->cb_assembler_ctx.output_byte(as->cb_assembler_ctx.user, as->active_segment->segment_output_address, byte_value);
+            }
+            as->last_address = ++as->active_segment->segment_output_address;
+        } else {
+            as->cb_assembler_ctx.output_byte(as->cb_assembler_ctx.user, as->current_address, byte_value);
+            as->last_address = ++as->current_address;
+        }
     } else {
-        as->current_address++;
+        if(as->active_segment) {
+            as->active_segment->segment_output_address++;
+        } else {
+            as->current_address++;
+        }
     }
 }
 
@@ -387,7 +408,7 @@ void write_opcode(ASSEMBLER *as) {
     // Then the operand (0, ie implied, will do nothing more)
     switch(as->opcode_info.width) {
         case 1: {                                               // Relative - 1 byte
-                int32_t delta = as->opcode_info.value - 1 - as->current_address;
+                int32_t delta = as->opcode_info.value - 1 - current_output_address(as);
                 if(delta > 128 || delta < -128) {
                     asm_err(as, "Relative branch out of range $%X", delta);
                 }
@@ -703,6 +724,18 @@ SCOPE *scope_add(ASSEMBLER *as, const char *name, const int name_length, SCOPE *
 void scope_to_scope(ASSEMBLER *as, SCOPE *s) {
     as->active_scope = s;
     as->symbol_table = s->symbol_table;
+}
+
+//----------------------------------------------------------------------------
+// Segment helpers
+SEGMENT *segment_find(DYNARRAY *segments, const SEGMENT *seg) {
+    for(int si = 0; si < segments->items; si++) {
+        SEGMENT *s = ARRAY_GET(segments, SEGMENT, si);
+        if(s->segment_name_length == seg->segment_name_length && 0 == strnicmp(s->segment_name, seg->segment_name, seg->segment_name_length)) {
+            return s;
+        }
+    }
+    return NULL;
 }
 
 //----------------------------------------------------------------------------
@@ -1608,7 +1641,7 @@ void parse_dot_proc(ASSEMBLER *as) {
     if(s) {
         scope_to_scope(as, s);
     } else {
-        symbol_store_in_scope(as, as->active_scope, name, name_length, SYMBOL_ADDRESS, as->current_address);
+        symbol_store_in_scope(as, as->active_scope, name, name_length, SYMBOL_ADDRESS, current_output_address(as));
         SCOPE *s = scope_add(as, name, name_length, as->active_scope, GPERF_DOT_PROC);
         if(s) {
             scope_to_scope(as, s);
@@ -1618,8 +1651,8 @@ void parse_dot_proc(ASSEMBLER *as) {
 
 void parse_dot_res(ASSEMBLER *as) {
     uint64_t length = evaluate_expression(as);
-    if(length > 0x10000 - as->current_address) {
-        asm_err(as, "Reserving %"PRIx64" bytes when only %04X remain in 64K", length, 0x10000 - as->current_address);
+    if(length > 0x10000 - current_output_address(as)) {
+        asm_err(as, "Reserving %"PRIx64" bytes when only %04X remain in 64K", length, 0x10000 - current_output_address(as));
     } else {
         uint64_t value = 0;
         if(as->current_token.op == ',') {
@@ -1634,6 +1667,75 @@ void parse_dot_res(ASSEMBLER *as) {
             emit(as, b);
         }
     }
+}
+
+void parse_dot_segdef(ASSEMBLER *as) {
+    SEGMENT seg;
+    int err = 0;
+    memset(&seg, 0, sizeof(SEGMENT));
+
+    next_token(as);
+    if(as->current_token.type != TOKEN_STR) {
+        asm_err(as, ".segdef expects a quoted segment name");
+        return;
+    }
+    seg.segment_name = as->current_token.name;
+    seg.segment_name_length = as->current_token.name_length;
+    seg.segment_name_hash = as->current_token.name_hash;
+    if(segment_find(&as->segments, &seg)) {
+        asm_err(as, "Segment %.*s has already been defined", seg.segment_name_length, seg.segment_name);
+        return;
+    }
+    next_token(as);
+    if(as->current_token.type != TOKEN_END || as->current_token.op != ',') {
+        asm_err(as, ".segdef expects a comma then a start address after the name");
+        return;
+    }
+    seg.segment_start_address = evaluate_expression(as);
+    seg.segment_output_address = seg.segment_start_address;
+    if(as->current_token.type != TOKEN_END || as->current_token.op == ',') {
+        next_token(as);
+        if(as->current_token.type != TOKEN_VAR) {
+            err = 1;
+        }
+        if(!err) {
+            if(as->current_token.name_length == 4 && 0 == strnicmp(as->current_token.name, "emit", 4)) {
+                seg.do_not_emit = 0;
+            } else if(as->current_token.name_length == 6 && 0 == strnicmp(as->current_token.name, "noemit", 6)) {
+                seg.do_not_emit = 1;
+            } else {
+                err = 1;
+            }
+        }
+        if(err) {
+            asm_err(as, "The optional parameter to .segdef after the name and start is either emit or noemit");
+            return;
+        }
+    }
+    ARRAY_ADD(&as->segments, seg);
+}
+
+void parse_dot_segment(ASSEMBLER *as) {
+    SEGMENT seg, *s = NULL;
+
+    next_token(as);
+    if(as->current_token.type != TOKEN_STR) {
+        asm_err(as, ".segment expects a quoted segment name");
+        return;
+    }
+    seg.segment_name = as->current_token.name;
+    seg.segment_name_length = as->current_token.name_length;
+    seg.segment_name_hash = as->current_token.name_hash;
+    // Empty segment name "turns off" segments
+    if(seg.segment_name_length) {
+        s = segment_find(&as->segments, &seg);
+        if(!s) {
+            asm_err(as, "Segment %.*s was not defined", seg.segment_name_length, seg.segment_name);
+            return;
+        }
+    }
+    // Activate a segment
+    as->active_segment = s;
 }
 
 void parse_dot_scope(ASSEMBLER *as) {
@@ -1684,7 +1786,7 @@ void parse_dot_string(ASSEMBLER *as) {
         // Get to a token to process
         next_token(as);
         // String data
-        if(as->current_token.type == TOKEN_OP && as->current_token.op == '"') {
+        if(as->current_token.type == TOKEN_STR) {
             // Loop over the string but stop before the closing quote
             while(as->token_start < (as->input - 1)) {
                 // Handle quoted numbers (no \n or \t handling here)
@@ -1763,16 +1865,17 @@ void parse_address(ASSEMBLER *as) {
     switch(op) {
         case 0:
         case 1:
-            address = as->current_address + value;
+            address = current_output_address(as) + value;
             break;
         case 2:
             address = value;
             break;
     }
-    if(as->current_address > address) {
-        asm_err(as, "Assigning address %04X when address is already %04X error", address, as->current_address);
+    if(current_output_address(as) > address) {
+        asm_err(as, "Assigning address %04X when address is already %04X error", address, current_output_address(as));
     } else {
-        as->current_address = address;
+        set_current_output_address(as, address);
+        // as->current_address = address;
         if(address < as->start_address) {
             as->start_address = address;
         }
@@ -1799,7 +1902,7 @@ uint16_t parse_anonymous_address(ASSEMBLER *as) {
             break;
     }
     // The opcode has not been emitted so + 1
-    uint16_t address = as->current_address + 1;
+    uint16_t address = current_output_address(as) + 1;
     if(!anonymous_symbol_lookup(as, &address, direction)) {
         asm_err(as, "Invalid anonymous label address");
     }
@@ -1816,7 +1919,8 @@ void parse_dot_command(ASSEMBLER *as) {
             break;
         case GPERF_DOT_ALIGN: {
                 uint64_t value = evaluate_expression(as);
-                as->current_address = (as->current_address + (value - 1)) & ~(value - 1);
+                // as->current_address = (as->current_address + (value - 1)) & ~(value - 1);
+                set_current_output_address(as, (current_output_address(as) + (value - 1)) & ~(value - 1));
             }
             break;
         case GPERF_DOT_BYTE:
@@ -1879,6 +1983,12 @@ void parse_dot_command(ASSEMBLER *as) {
         case GPERF_DOT_RES:
             parse_dot_res(as);
             break;
+        case GPERF_DOT_SEGDEF:
+            parse_dot_segdef(as);
+            break;
+        case GPERF_DOT_SEGMENT:
+            parse_dot_segment(as);
+            break;
         case GPERF_DOT_SCOPE:
             parse_dot_scope(as);
             break;
@@ -1903,10 +2013,11 @@ void parse_label(ASSEMBLER *as) {
         // No name = anonymous label
         if(as->pass == 1) {
             // Only add anonymous labels in pass 1 (so there's no doubling up)
-            ARRAY_ADD(&as->anon_symbols, as->current_address);
+            uint16_t address = current_output_address(as);
+            ARRAY_ADD(&as->anon_symbols, address);
         }
     } else {
-        symbol_store_in_scope(as, as->active_scope, symbol_name, name_length, SYMBOL_ADDRESS, as->current_address);
+        symbol_store_in_scope(as, as->active_scope, symbol_name, name_length, SYMBOL_ADDRESS, current_output_address(as));
     }
 }
 
@@ -1995,7 +2106,7 @@ int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, void *user, output_byte ob
     ARRAY_INIT(&as->loop_stack, FOR_LOOP);
     ARRAY_INIT(&as->macros, MACRO);
     ARRAY_INIT(&as->macro_buffers, char *);
-    ARRAY_INIT(&as->pool_strings, POOL_STRING);
+    ARRAY_INIT(&as->segments, SEGMENT);
     ARRAY_INIT(&as->input_stack, INPUT_STACK);
 
     if(A2_OK != scope_init(&as->root_scope, GPERF_DOT_SCOPE)) {
@@ -2043,6 +2154,8 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
         // Reset scopes (solves open scope isues and repeatability, of course)
         as->active_scope = &as->root_scope;
         as->anon_scope_id = 0;
+        // Reset segment defenitions (for pass 2, really)
+        as->segments.items = 0;
         while(as->pass < 3) {
             do {
                 // a newline returns an empty token so keep
@@ -2113,6 +2226,7 @@ void assembler_shutdown(ASSEMBLER *as) {
         as->macro_buffers.items--;
     }
     array_free(&as->input_stack);
+    array_free(&as->segments);
     array_free(&as->macros);
     array_free(&as->macro_buffers);
     array_free(&as->loop_stack);

@@ -29,6 +29,8 @@ enum {
     GPERF_DOT_PROC,
     GPERF_DOT_QWORD,
     GPERF_DOT_RES,
+    GPERF_DOT_SEGDEF,
+    GPERF_DOT_SEGMENT,
     GPERF_DOT_SCOPE,
     GPERF_DOT_STRCODE,
     GPERF_DOT_STRING,
@@ -113,6 +115,7 @@ typedef enum {
     TOKEN_NUM,
     TOKEN_OP,
     TOKEN_VAR,
+    TOKEN_STR,
     TOKEN_END,
 } TOKENTYPE;
 
@@ -179,11 +182,6 @@ typedef struct INPUT_STACK {
     const char *line_start;
 } INPUT_STACK;
 
-typedef struct {
-    char *name;
-    int length;
-} POOL_STRING;
-
 typedef struct SCOPE SCOPE;
 typedef struct SCOPE {
     int scope_name_length;
@@ -191,8 +189,17 @@ typedef struct SCOPE {
     DYNARRAY child_scopes;
     char *scope_name;
     SCOPE *parent_scope;
-    DYNARRAY *symbol_table;
+    DYNARRAY *symbol_table;                                 // This is a malloc(256*SYMBOL_LABEL)
 } SCOPE;
+
+typedef struct {
+    const char *segment_name;
+    uint32_t segment_name_length;
+    uint64_t segment_name_hash;
+    uint16_t segment_start_address;
+    uint16_t segment_output_address;
+    int do_not_emit;
+} SEGMENT;
 
 typedef struct PARSE_DATA {
     const char *file_name;                                  // Name of the file in which .include encountered
@@ -248,7 +255,7 @@ typedef struct ASSEMBLER {
     DYNARRAY loop_stack;                                    // Array of for loops
     DYNARRAY macros;                                        // Array of all macros
     DYNARRAY macro_buffers;                                 // Array of all buffers that macros expand into
-    DYNARRAY pool_strings;
+    DYNARRAY segments;
     INCLUDE_FILES include_files;                            // The arrays for files and stack for .include
     OPCODEINFO opcode_info;                                 // State of what is to be emitted in terms of 6502 opcodes
     TOKEN current_token;                                    // What is being parsed
@@ -272,6 +279,7 @@ typedef struct ASSEMBLER {
     const char *token_start;                                // Points at the start of a token (and input the end)
     SCOPE root_scope;
     SCOPE *active_scope;
+    SEGMENT *active_segment;
     DYNARRAY *symbol_table;                                 // Array of arrays of symbols
     ERRORLOG *errorlog;                                     // ptr to log that tracks errors
 } ASSEMBLER;
@@ -286,3 +294,6 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address);
 void assembler_shutdown(ASSEMBLER *as);
 uint16_t parse_anonymous_address(ASSEMBLER *as);
 void expect(ASSEMBLER *as, char op);
+inline uint16_t current_output_address(ASSEMBLER *as) {
+        return as->active_segment ? as->active_segment->segment_output_address : as->current_address;
+}

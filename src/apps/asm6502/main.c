@@ -50,11 +50,12 @@ void usage(char *program_name) {
         c--;
     }
 
-    fprintf(stderr, "Usage: %s <-i infile> [-o outfile] [-s symbolfile] [-v]\n", c);
+    fprintf(stderr, "Usage: %s <-i infile> [-o outfile] [-s <symbolfile|->] [-v]\n", c);
     fprintf(stderr, "Where: infile is a 6502 assembly language file\n");
     fprintf(stderr, "       outfile will be a binary file containing the assembled 6502\n");
-    fprintf(stderr, "       symbolfile contains a list of the addresses of all the named variables and labels\n");
-    fprintf(stderr, "       -v turns on verbose and will dump the hex 6502 as it is assembled\n");
+    fprintf(stderr, "       symbolfile will be a list of the addresses of all variables and labels\n");
+    fprintf(stderr, "       symbolfile name as a '-' character then printing goes to stdout\n");
+    fprintf(stderr, "       -v turns on verbose and will dump the hex 6502\n");
 }
 
 // Sort by value
@@ -62,7 +63,7 @@ int symbol_sort(const void *lhs, const void *rhs) {
     return (uint16_t)((*(SYMBOL_LABEL**)lhs)->symbol_value) - (uint16_t)((*(SYMBOL_LABEL**)rhs)->symbol_value);
 }
 
-static void save_symbols(UTIL_FILE *sf, SCOPE *s, int level) {
+static void save_symbols(FILE *fp, SCOPE *s, int level) {
     size_t bucket, i;
     // Accumulate all symbols - add ptrs to the symbols array
     DYNARRAY symbols;
@@ -79,19 +80,31 @@ static void save_symbols(UTIL_FILE *sf, SCOPE *s, int level) {
     qsort(symbols.data, symbols.items, sizeof(SYMBOL_LABEL*), symbol_sort);
     
     // Write the sorted symbols to a file
-    fprintf(sf->fp, "%*s%s: %.*s {\n", level * 2, "", s->scope_type == GPERF_DOT_SCOPE ? "Scope" : "Proc", s->scope_name_length, s->scope_name);
+    fprintf(fp, "%*s%s: %.*s {\n", level * 2, "", s->scope_type == GPERF_DOT_SCOPE ? "Scope" : "Proc", s->scope_name_length, s->scope_name);
     level++;
     for(i = 0; i < symbols.items; i++) {
         SYMBOL_LABEL **sl = ARRAY_GET(&symbols, SYMBOL_LABEL*, i);
-        fprintf(sf->fp, "%*s%04X %.*s \n", level * 2, "", (uint16_t)(*sl)->symbol_value, (int)(*sl)->symbol_length, (*sl)->symbol_name);
+        fprintf(fp, "%*s%04X %.*s \n", level * 2, "", (uint16_t)(*sl)->symbol_value, (int)(*sl)->symbol_length, (*sl)->symbol_name);
     }
     level--;
     array_free(&symbols);
     for(int csi = 0; csi < s->child_scopes.items; csi++) {
-        fprintf(sf->fp, "\n");
-        save_symbols(sf, ARRAY_GET(&s->child_scopes, SCOPE, csi), level + 1);
+        fprintf(fp, "\n");
+        save_symbols(fp, ARRAY_GET(&s->child_scopes, SCOPE, csi), level + 1);
     }
-    fprintf(sf->fp, "%*s}\n", level * 2, "");
+    fprintf(fp, "%*s}\n", level * 2, "");
+}
+
+static void save_segments(FILE *fp, DYNARRAY *segments) {
+    if(!segments) {
+        return;
+    }
+    fprintf(fp, "\nSEGMENTS {");
+    for(int si = 0; si < segments->items; si++) {
+        SEGMENT *s = ARRAY_GET(segments, SEGMENT, si);
+        fprintf(fp, "\n  %.*s [%04X-%04X)", s->segment_name_length, s->segment_name, s->segment_start_address, s->segment_output_address);
+    }
+    fprintf(fp, "\n}\n");
 }
 
 int main(int argc, char **argv) {
@@ -125,19 +138,6 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    if(errorlog.log_array.items) {
-        // Second pass errors get reported
-        fprintf(stderr, "\nAssembly errors:\n");
-        for(size_t i = 0; i < errorlog.log_array.items; i++) {
-            ERROR_ENTRY *e = ARRAY_GET(&errorlog.log_array, ERROR_ENTRY, i);
-            if(e->supressed) {
-                fprintf(stderr, "%s [%zu supressed]\n", e->err_str, e->supressed);
-            } else {
-                fprintf(stderr, "%s\n", e->err_str);
-            }
-        }
-    }
-
     // Write the output to a file
     if(output_file_name && m.as.start_address < m.as.last_address) {
         UTIL_FILE output_file;
@@ -153,13 +153,34 @@ int main(int argc, char **argv) {
     // sort the symbol table by address and write to a file
     if(symbol_file_name) {
         UTIL_FILE symbol_file;
+        FILE *fp;
         memset(&symbol_file, 0, sizeof(UTIL_FILE));
-        if(A2_OK != util_file_open(&symbol_file, symbol_file_name, "w")) {
-            fprintf(stderr, "Could not open output file %s for writing\n", symbol_file_name);
+        if(0 == strcmp(symbol_file_name, "-")) {
+            fp = stdout;
         } else {
-            save_symbols(&symbol_file, &m.as.root_scope, 0);
+            if(A2_OK != util_file_open(&symbol_file, symbol_file_name, "w")) {
+                fprintf(stderr, "Could not open output file %s for writing\n", symbol_file_name);
+            }
+            fp = symbol_file.fp;
+        }
+        if(fp) {
+            save_symbols(fp, &m.as.root_scope, 0);
+            save_segments(fp, &m.as.segments);
         }
         util_file_discard(&symbol_file);
+    }
+
+    if(errorlog.log_array.items) {
+        // Second pass errors get reported
+        fprintf(stderr, "\nAssembly errors:\n");
+        for(size_t i = 0; i < errorlog.log_array.items; i++) {
+            ERROR_ENTRY *e = ARRAY_GET(&errorlog.log_array, ERROR_ENTRY, i);
+            if(e->supressed) {
+                fprintf(stderr, "%s [%zu supressed]\n", e->err_str, e->supressed);
+            } else {
+                fprintf(stderr, "%s\n", e->err_str);
+            }
+        }
     }
 
     assembler_shutdown(&m.as);
