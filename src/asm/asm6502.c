@@ -1788,7 +1788,7 @@ void parse_dot_string(ASSEMBLER *as) {
         // String data
         if(as->current_token.type == TOKEN_STR) {
             // Loop over the string but stop before the closing quote
-            while(as->token_start < (as->input - 1)) {
+            while(++as->token_start < (as->input - 1)) {
                 // Handle quoted numbers (no \n or \t handling here)
                 if(*as->token_start == '\\') {
                     as->token_start++;
@@ -1830,7 +1830,6 @@ void parse_dot_string(ASSEMBLER *as) {
                     }
                     // Write the resultant character out
                     emit(as, character);
-                    as->token_start++;
                 }
             }
             next_token(as);
