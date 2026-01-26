@@ -484,18 +484,19 @@ In the remainder of the assembler documentation, 6502 means 6502 or 65C02, unles
 
 Note:
 
-* There is a complete assembler sample in `./samples/mminer`.  The root file is `mminer.asm`.
+* There is a complete assembler sample in `./samples/mminer`.  The root file is `mminer-a2m.asm`.
 
 ## Invoking from the command line
 The assembler can also be used stand-alone using the program `asm6502`. This is the same assembler used in the emulator, but with a command-line interface.
 
 The `asm6502` executable, when used with no command-line arguments, displays this help message:
 ```
-Usage: asm6502 <-i infile> [-o outfile] [-s symbolfile] [-v]
+Usage: asm6502.exe <-i infile> [-o outfile] [-s <symbolfile|->] [-v]
 Where: infile is a 6502 assembly language file
        outfile will be a binary file containing the assembled 6502
-       symbolfile contains a list of the addresses of all the named variables and labels
-       -v turns on verbose and will dump the hex 6502 as it is assembled
+       symbolfile contains a list all variables, labels and segment addresses
+       symbolfile name as a '-' character sends output to stdout
+       -v turns on verbose and will dump the generated hex 6502
 ```
 
 \Needspace{12\baselineskip}
@@ -512,7 +513,7 @@ The assembler supports these features:
 | address          | The address character is `*` and it can be assigned and read                  |
 | expressions      | The assembler has a full expression parser                                    |
 
-\Needspace{28\baselineskip}
+\Needspace{38\baselineskip}
 There is a set of directives that control how a 6502 source file is assembled. These are referred to as `dot commands`, since each keyword starts with a `.`. The available `dot commands` are:
 
 | Command         | Meaning                                                                        |
@@ -538,12 +539,18 @@ There is a set of directives that control how a 6502 source file is assembled. T
 | .endmacro       | Ends a `.macro` assembler definition                                           |
 | .incbin "f"     | Include the contents of file f verbatim in the output                          |
 | .include "f"    | Include a 6502 assembler file for assembly at this point                       |
+| .proc n         | Open a procedure (which behaves the same as a named scope)                     |
+| .endproc        | Closes the most recently opened named procedure                                |
+| .scope [n]      | Open a named (n) scope, or an anonymous scope if no name (n) provided          |
+| .endscope       | Closes the most recently opened scope                                          |
+| .segdef  "n",s[,e] | Define a named segment n, starting at s, and emit (default) or noemit       |
+| .segment "n"    | Activate the segment named n                                                   |
 | .string "s"     | Insert the string s into the output                                            |
 | .strcode e      | Set a string character parser; the expression `e` is applied to each character |
 
 Notes:
 
-* `[,x]*` means followed by more comma-seperated values.
+* Text in `[]` means optional and `[]*` means none or more
 * The assembler runs in the folder of the input file, so includes must be relative to that folder.
 
 \Needspace{11\baselineskip}
@@ -713,10 +720,75 @@ As can be seen, the ASCII alphabet characters were remapped to the 0..25 range, 
 
 To disable processing, use `.strcode _`. Note that if you use `_` as a variable elsewhere, `.strcode` will overwrite it.
 
-### Assembler Sample
-The sample folder contains code for use with the assembler. The `Manic Miner` folder contains the full source code for the Manic Miner game, and most of the constructs discussed above are used there.
+\Needspace{14\baselineskip}
+#### Assembler Scope and proc
+The directives `.scope` and `.proc` define namespaces that allow the reuse of symbol names within a scope or procedure. For example:
+```
+.proc A
+start:
+    lda $ffff
+.endproc
 
-There is also a Python script to help de-scope ca65 assembler source files. This is how the Manic Miner sources were created.
+.proc B
+start:
+    sta A::start + 1
+.endproc
+```
+Here, `A::start` is distinct from `B::start`. The symbol name `start` may be reused freely within different scopes or procs without ambiguity. Note the syntax for accessing labels in other scopes: anchoring with `::` at the start of a name resolves the symbol from the root scope, while omitting the leading `::` resolves it relative to the current parent scope chain.
+
+\Needspace{12\baselineskip}
+Anonymous scopes are useful inside loops, for example:
+```
+.for i=0, i .lt 8, i++
+  .scope
+    address = $C000 + (i << 4)
+   start:
+    lda address
+  .endscope
+.endfor
+```
+In this example, anonymous scopes are generated with names `anon_0001` through `anon_0008`, assuming they are the first anonymous scopes declared within their parent scope.  Start has no name collision in the loop, as it is wrapped inside a scope.
+
+#### Assembler .segdef and .segment
+The `.segdef` and `.segment` directives exist primarily to improve compatibility with ca65, making it easier to port ca65-based code. ca65 code frequently switches segments within a single assembly source file, and support for segments avoids the need to split such code into multiple files for the a2m assembler. In addition, non-emitting segments are useful even in native mode.
+
+\Needspace{11\baselineskip}
+As an example, consider the file `samples/mminer/mminer-a2m.asm`:
+```
+.segdef "ZEROPAGE", $50, noemit
+.segdef "LOWMEM", $800, noemit
+.segdef "HGR", $4000
+.segdef "CODE", $6000
+.segdef "RODATA", $89DC
+.segdef "DATA", $BE40
+
+.include "mminer.asm"
+```
+Named segments are created by `.segdef`. When a segment is activated using, for example, `.segment "ZEROPAGE"`, the code emit location is set to `$50`. Each instruction that would normally emit code advances the location counter, but because `ZEROPAGE` is marked `noemit`, no bytes are written.
+
+This allows zero-page memory to be laid out using directives such as `.res`, without requiring explicit address assignments. The assembler computes locations automatically, avoiding manual constructs such as `= $50`, `= $51`, and so on.
+
+\Needspace{6\baselineskip}
+Notes:
+
+* The assembler allows segments to overflow. For segments that are marked as `emit`, the assembler will issue a warning when overflow occurs and will report the amount by which a segment size must be adjusted to allow segments to abut correctly.
+* Before the first `.segment` directive, native mode is active. In native mode, the address specified by `* =` or `.org` determines where code is emitted. After using `.segment`, native mode can be re-enabled with `.segment ""`.
+
+#### Assembler and ca65
+The assembler was not written to be compatible with ca65, but the inclusion of `.proc`, `.scope`, and `.segment` significantly increases compatibility. Most of the `Manic Miner` sample code assembles without modification from the ca65 version. The following differences should be noted:
+
+* Expression evaluation order differs. a2m uses C-style operator precedence, while ca65 does not. For example, the expression `counter << 2 & 0xFF` will not produce the same result.
+* a2m uses a `.for` loop construct and does not have a `.repeat` construct.
+* a2m does not support quoted strings in `.byte` directives.
+* In macros, a2m uses `.if .defined`, which is the inverse of ca65's `.ifblank`.
+* Macros are not scoped in a2m; therefore, `.local` is not supported.
+* In a2m, `:=` and `=` are equivalent.
+* In a2m, reading the current address using `*` yields the address at that point in emission, not the start of the line. As a result, ca65 evaluates `lda #*` as `lda #0`, while a2m evaluates it as `lda #1` if the emitter address was 0 when the line was encountered.
+
+a2m lacks many of the advanced features found in ca65, but with what is there, a lot of code ports fairly easily to a2m now.
+
+### Assembler Sample
+The sample folder contains code for use with the assembler. The `samples/mminer` folder contains the full source code for the `Manic Miner` game, and most of the constructs discussed above are used there.
 
 # INI Files in Depth
 a2m uses INI files to configure itself at startup. The sequence is to read the INI file specified on the command line, or, if none is specified, to read `a2m.ini` in the current folder. This is unless `--noini` was specified, in which case an INI file is not read. After reading the INI file, a2m will apply any command-line switches that affect configuration to the configuration loaded from the INI file.
