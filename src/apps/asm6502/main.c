@@ -18,6 +18,12 @@ typedef struct MACHINE {
     uint16_t emit_end;
 } MACHINE;
 
+static const char *type_str[] = {
+    "UNK",
+    "VAR",
+    "ADR"
+};
+
 // This is the command line assembler version - it just uses a flat 64K buffer
 void output_byte_at_address(void *user, uint16_t address, uint8_t byte_value) {
     MACHINE *m = (MACHINE *)user;
@@ -86,7 +92,7 @@ static void save_symbols(FILE *fp, SCOPE *s, int level) {
     level++;
     for(i = 0; i < symbols.items; i++) {
         SYMBOL_LABEL **sl = ARRAY_GET(&symbols, SYMBOL_LABEL*, i);
-        fprintf(fp, "%*s%04X %.*s \n", level * 2, "", (uint16_t)(*sl)->symbol_value, (int)(*sl)->symbol_length, (*sl)->symbol_name);
+        fprintf(fp, "%*s%04X %s %.*s\n", level * 2, "", (uint16_t)(*sl)->symbol_value, type_str[(*sl)->symbol_type], (int)(*sl)->symbol_length, (*sl)->symbol_name);
     }
     level--;
     array_free(&symbols);
@@ -143,13 +149,14 @@ int main(int argc, char **argv) {
 
     // Write output to stdout if requited
     if(m.as.verbose) {
-        for(int address = m.emit_start; address < m.emit_end; address++) {
+        for(int address = m.emit_start; address <= m.emit_end; address++) {
             uint8_t byte_value = m.ram.RAM_MAIN[address];
             if(0 == (address % 16)) {
                 printf("\n%04X: ", address);
             }
             printf("%02X ", byte_value);
         }
+        printf("\n\n");
     }
 
     // Write the output to a file
