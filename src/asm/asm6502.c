@@ -1538,7 +1538,8 @@ void parse_dot_incbin(ASSEMBLER *as) {
                 if(A2_OK != ARRAY_ADD(&as->include_files.included_files, new_file)) {
                     asm_err(as, "Out of memory");
                 }
-                f = &new_file;
+                // Get a handle to the file in the array (safer than going with f = &new_file)
+                f = ARRAY_GET(&as->include_files.included_files, UTIL_FILE, as->include_files.included_files.items - 1);
             } else {
                 asm_err(as, ".incbin could not load the file %s", file_name);
             }

@@ -369,6 +369,10 @@ int unk_mem_process_event(UNK *v, SDL_Event *e) {
                     nmv.flags = mv->flags;
                     ARRAY_ADD(&ms->memviews, nmv);
                     unk_mem_resize_view(v);
+                    // ARRAY_ADD can realloc so re-get the mv pointer as it may be invalid now
+                    mv = ARRAY_GET(&ms->memviews, VIEWMEM_VIEW, ms->active_view_index);
+                    mv->cursor_address = mv->view_address + ms->cols * (mv->rows - 1);
+                    ms->active_view_index = ms->memviews.items - 1; 
                 }
                 break;
 

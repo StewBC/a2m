@@ -877,7 +877,8 @@ void unk_dasm_show(UNK *v, int dirty) {
             static uint16_t pc = 0;
             if((ret = unk_dlg_symbol_lookup(ctx, nk_rect(0, 0, 360, 430), &rt->symbols_search, global_entry_buffer, &global_entry_length, &pc))) {
                 if(ret == 1) {
-                    unk_dasm_put_address_on_line(dv, m, pc, dv->rows / 2);
+                    dv->cursor_address = pc;
+                    unk_dasm_put_address_on_line(dv, m, dv->cursor_address, dv->rows / 2);
                 }
                 v->dlg_symbol_lookup_dbg = 0;
                 v->dlg_modal_active = 0;

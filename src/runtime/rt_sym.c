@@ -189,6 +189,9 @@ int rt_sym_search_update(RUNTIME *rt) {
     for(index = 0; index < 256; index++) {
         count += rt->symbols[index].items;
     }
+    if(!count) {
+        return A2_OK;
+    }
     // Make room for a list that size
     if(A2_OK != array_resize(search, count)) {
         return A2_ERR;
