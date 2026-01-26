@@ -110,6 +110,9 @@ int nk_option_label_disabled(struct nk_context *ctx, const char *label, int stat
 void nk_custom_scrollbarv(struct nk_context *ctx, struct nk_rect sbar, int total_rows, int rows_visible, int *top_row, int *dragging, float *grab_offset);
 void unk_bank_view_selector(struct nk_context *ctx, int model, VIEW_FLAGS *flags, const char *row_label);
 
+// helper to do modifiers on SDL keydown codes
+int unk_ascii_from_sdl_keydown(const SDL_Keycode k, SDL_Keymod mod, uint8_t *out);
+
 void unk_config_ui(UNK *v, INI_STORE *ini_store);
 int unk_init(UNK *v, int model, INI_STORE *ini_store);
 int unk_process_events(UI *ui, APPLE2 *m);

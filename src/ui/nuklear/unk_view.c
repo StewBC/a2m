@@ -324,6 +324,76 @@ static SDL_Texture *load_png_texture_from_ram(SDL_Renderer *r, uint8_t *image, i
     return tex;
 }
 
+// Map a keycode taking caps/shift into account and assuming a US style keyboard layout
+int unk_ascii_from_sdl_keydown(const SDL_Keycode k, SDL_Keymod mod, uint8_t *out) {
+    int shift = (mod & KMOD_SHIFT) != 0;
+    int caps  = (mod & KMOD_CAPS)  != 0;
+
+    // Letters (SDLK_a..SDLK_z are lowercase keycodes)
+    if(k >= SDLK_a && k <= SDLK_z) {
+        *out = (shift ^ caps ? 'A' : 'a') + (k - SDLK_a);
+        return 1;
+    }
+
+    // Digits row
+    if(k >= SDLK_0 && k <= SDLK_9) {
+        static const char shifted_digits[] = {')', '!', '@', '#', '$', '%', '^', '&', '*', '('};
+        *out = shift ? shifted_digits[k - SDLK_0] : ('0' + (k - SDLK_0));
+        return 1;
+    }
+
+    // Common punctuation
+    switch(k) {
+        case SDLK_SPACE:
+            *out = ' ';
+            return 1;
+        case SDLK_RETURN:
+            *out = 0x0D;
+            return 1; // CR
+        case SDLK_BACKSPACE:
+            *out = 0x08;
+            return 1;
+        case SDLK_MINUS:
+            *out = (shift ? '_' : '-');
+            return 1;
+        case SDLK_EQUALS:
+            *out = (shift ? '+' : '=');
+            return 1;
+        case SDLK_LEFTBRACKET:
+            *out = (shift ? '{' : '[');
+            return 1;
+        case SDLK_RIGHTBRACKET:
+            *out = (shift ? '}' : ']');
+            return 1;
+        case SDLK_BACKSLASH:
+            *out = (shift ? '|' : '\\');
+            return 1;
+        case SDLK_SEMICOLON:
+            *out = (shift ? ':' : ';');
+            return 1;
+        case SDLK_QUOTE:
+            *out = (shift ? '"' : '\'');
+            return 1;
+        case SDLK_COMMA:
+            *out = (shift ? '<' : ',');
+            return 1;
+        case SDLK_PERIOD:
+            *out = (shift ? '>' : '.');
+            return 1;
+        case SDLK_SLASH:
+            *out = (shift ? '?' : '/');
+            return 1;
+
+        case SDLK_BACKQUOTE:
+            *out = (shift ? '~' : '`');
+            return 1;
+        default:
+            break;
+    }
+
+    return 0;
+}
+
 void unk_config_ui(UNK *v, INI_STORE *ini_store) {
     // Display LEDs
     const char *val = ini_get(ini_store, "Config", "disk_leds");

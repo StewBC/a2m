@@ -244,81 +244,11 @@ void unk_apl2_init_color_table(UNK *v) {
 
 }
 
-// Map a keycode taking caps/shift into account and assuming a US style keyboard layout
-int a2_ascii_from_keydown(const SDL_Keycode k, SDL_Keymod mod, uint8_t *out) {
-    int shift = (mod & KMOD_SHIFT) != 0;
-    int caps  = (mod & KMOD_CAPS)  != 0;
-
-    // Letters (SDLK_a..SDLK_z are lowercase keycodes)
-    if(k >= SDLK_a && k <= SDLK_z) {
-        *out = (shift ^ caps ? 'A' : 'a') + (k - SDLK_a);
-        return 1;
-    }
-
-    // Digits row
-    if(k >= SDLK_0 && k <= SDLK_9) {
-        static const char shifted_digits[] = {')', '!', '@', '#', '$', '%', '^', '&', '*', '('};
-        *out = shift ? shifted_digits[k - SDLK_0] : ('0' + (k - SDLK_0));
-        return 1;
-    }
-
-    // Common punctuation
-    switch(k) {
-        case SDLK_SPACE:
-            *out = ' ';
-            return 1;
-        case SDLK_RETURN:
-            *out = 0x0D;
-            return 1; // CR
-        case SDLK_BACKSPACE:
-            *out = 0x08;
-            return 1;
-        case SDLK_MINUS:
-            *out = (shift ? '_' : '-');
-            return 1;
-        case SDLK_EQUALS:
-            *out = (shift ? '+' : '=');
-            return 1;
-        case SDLK_LEFTBRACKET:
-            *out = (shift ? '{' : '[');
-            return 1;
-        case SDLK_RIGHTBRACKET:
-            *out = (shift ? '}' : ']');
-            return 1;
-        case SDLK_BACKSLASH:
-            *out = (shift ? '|' : '\\');
-            return 1;
-        case SDLK_SEMICOLON:
-            *out = (shift ? ':' : ';');
-            return 1;
-        case SDLK_QUOTE:
-            *out = (shift ? '"' : '\'');
-            return 1;
-        case SDLK_COMMA:
-            *out = (shift ? '<' : ',');
-            return 1;
-        case SDLK_PERIOD:
-            *out = (shift ? '>' : '.');
-            return 1;
-        case SDLK_SLASH:
-            *out = (shift ? '?' : '/');
-            return 1;
-
-        case SDLK_BACKQUOTE:
-            *out = (shift ? '~' : '`');
-            return 1;
-        default:
-            break;
-    }
-
-    return 0;
-}
-
 void unk_apl2_process_event(UNK *v, SDL_Event *e) {
     VIEWDASM *dv = &v->viewdasm;
     APPLE2 *m = v->m;
     RUNTIME *rt = v->rt;
-    int8_t active_key = 0;
+    uint8_t active_key = 0;
     
     if(e->type == SDL_KEYDOWN) {
         SDL_Keymod mod = SDL_GetModState();
@@ -407,7 +337,7 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
                         // Figure out what to put through to the Apple II based on
                         // mod and key - OA and CA are handled already
                         uint8_t a2_key;
-                        if(a2_ascii_from_keydown(e->key.keysym.sym, mod, &a2_key)) {
+                        if(unk_ascii_from_sdl_keydown(e->key.keysym.sym, mod, &a2_key)) {
                             active_key = 0x80 | a2_key;
                         }
                     }

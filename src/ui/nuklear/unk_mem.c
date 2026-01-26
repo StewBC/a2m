@@ -451,7 +451,7 @@ int unk_mem_process_event(UNK *v, SDL_Event *e) {
             default:
                 if(mv->cursor_field == CURSOR_ASCII) {
                     uint8_t a2_key;
-                    if(a2_ascii_from_keydown(key, mod, &a2_key)) {
+                    if(unk_ascii_from_sdl_keydown(key, mod, &a2_key)) {
                         write_to_memory_in_view(m, mv->flags, mv->cursor_address, a2_key);
                         unk_mem_cursor_right(ms, mv);
                     }
