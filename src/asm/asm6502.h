@@ -186,6 +186,7 @@ typedef struct SCOPE SCOPE;
 typedef struct SCOPE {
     int scope_name_length;
     int scope_type;
+    int anon_scope_id;
     DYNARRAY child_scopes;
     char *scope_name;
     SCOPE *parent_scope;
@@ -264,7 +265,6 @@ typedef struct ASSEMBLER {
     int pass;                                               // 1 or 2 for 2 pass assembler
     int valid_opcodes;                                      // 0 = 65c02 (default), 1 = 6502
     int verbose;                                            // cmd-line; 0 supress duplicates, 1 show all (up to 100)
-    int anon_scope_id;                                      // Anon scope gets this incremented as a name
     size_t current_line;                                    // for error reporting, line being processed
     size_t next_line_count;                                 // count of lines past last token
     uint16_t current_address;                               // Address where next byte will be emitted

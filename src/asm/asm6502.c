@@ -721,6 +721,14 @@ SCOPE *scope_add(ASSEMBLER *as, const char *name, const int name_length, SCOPE *
     return ARRAY_GET(&parent->child_scopes, SCOPE, parent->child_scopes.items - 1);
 }
 
+void scope_reset_ids(SCOPE *s) {
+    uint32_t child_id = 0;
+    s->anon_scope_id = 0;
+    while(child_id < s->child_scopes.items) {
+        scope_reset_ids(ARRAY_GET(&s->child_scopes, SCOPE, child_id++));
+    }
+}
+
 void scope_to_scope(ASSEMBLER *as, SCOPE *s) {
     as->active_scope = s;
     as->symbol_table = s->symbol_table;
@@ -1744,7 +1752,7 @@ void parse_dot_scope(ASSEMBLER *as) {
     char anon_name[11];
     next_token(as);
     if(as->current_token.type == TOKEN_END) {
-        name_length = snprintf(anon_name, 11, "@anon%04X", as->anon_scope_id++);
+        name_length = snprintf(anon_name, 11, "anon_%04X", ++as->active_scope->anon_scope_id);
         name = anon_name;
     } else {
         name = as->current_token.name;
@@ -2125,6 +2133,10 @@ int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, void *user, output_byte ob
     return A2_OK;
 }
 
+static int assembler_segments_sort(const SEGMENT *lhs, const SEGMENT *rhs) {
+    return lhs->segment_start_address >= rhs->segment_start_address;
+}
+
 int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) {
     as->pass = 0;
     as->current_file = input_file;
@@ -2152,7 +2164,7 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
         }
         // Reset scopes (solves open scope isues and repeatability, of course)
         as->active_scope = &as->root_scope;
-        as->anon_scope_id = 0;
+        scope_reset_ids(as->active_scope);
         // Reset segment defenitions (for pass 2, really)
         as->segments.items = 0;
         while(as->pass < 3) {
@@ -2205,6 +2217,38 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
         // Flush the macros between passes so they can be re-parsed and
         // errors reported properly om the second pass
         flush_macros(as);
+    }
+    as->token_start = as->input = as->line_start = NULL;
+    if(as->segments.items) {
+        // Show all errors
+        as->error_log_level = 1;
+        // Sort in ouput order
+        qsort(as->segments.data, as->segments.items, as->segments.element_size, assembler_segments_sort);
+        uint32_t emit = 0, issue = 0;
+        uint16_t emit_end;
+        // show errors for overlapping segments
+        for(int si = 0; si < as->segments.items; si++) {
+            SEGMENT *s = ARRAY_GET(&as->segments, SEGMENT, si);
+            if(s->do_not_emit) {
+                continue;
+            }
+            if(!emit) {
+                emit_end = s->segment_output_address;
+                emit = 1;
+            } else {
+                // There is no warning mechanism and I don't want intentional "growth gaps"
+                // to stop the iteratioin process, so ignore gaps, just error overlaps
+                if(s->segment_start_address < emit_end) {
+                    asm_err(as, "Start Segment %.*s at $%04X*", s->segment_name_length, s->segment_name, emit_end);
+                    issue = 1;
+                }
+                uint16_t seg_size = s->segment_output_address - s->segment_start_address;
+                emit_end += seg_size;
+            }
+        }
+        if(issue) {
+            asm_err(as, "* Offsets may slightly off, based on .align statement changing output size");
+        }
     }
     if(name) {
         util_dir_change(start_path);

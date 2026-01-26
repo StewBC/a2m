@@ -14,16 +14,18 @@ typedef struct RAM {
 typedef struct MACHINE {
     ASSEMBLER as;
     RAM ram;
+    uint16_t emit_start;
+    uint16_t emit_end;
 } MACHINE;
 
 // This is the command line assembler version - it just uses a flat 64K buffer
 void output_byte_at_address(void *user, uint16_t address, uint8_t byte_value) {
     MACHINE *m = (MACHINE *)user;
-    if(m->as.verbose) {
-        if(!(address % 16) || address != m->as.last_address) {
-            printf("\n%04X: ", address);
-        }
-        printf("%02X ", byte_value);
+    if(address < m->emit_start) {
+        m->emit_start = address;
+    }
+    if(address > m->emit_end) {
+        m->emit_end = address;
     }
     m->ram.RAM_MAIN[address] = byte_value;
 }
@@ -96,7 +98,7 @@ static void save_symbols(FILE *fp, SCOPE *s, int level) {
 }
 
 static void save_segments(FILE *fp, DYNARRAY *segments) {
-    if(!segments) {
+    if(!segments->items) {
         return;
     }
     fprintf(fp, "\nSEGMENTS {");
@@ -116,7 +118,8 @@ int main(int argc, char **argv) {
     ERRORLOG errorlog;
 
     // Set the "machine" RAM to all 0's
-    memset(m.ram.RAM_MAIN, 0, 64 * 1024);
+    memset(&m, 0, sizeof(MACHINE));
+    m.emit_start = 0xFFFF;
     errlog_init(&errorlog);
 
     if(A2_OK != assembler_init(&m.as, &errorlog, &m, output_byte_at_address)) {
@@ -138,14 +141,25 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
+    // Write output to stdout if requited
+    if(m.as.verbose) {
+        for(int address = m.emit_start; address < m.emit_end; address++) {
+            uint8_t byte_value = m.ram.RAM_MAIN[address];
+            if(0 == (address % 16)) {
+                printf("\n%04X: ", address);
+            }
+            printf("%02X ", byte_value);
+        }
+    }
+
     // Write the output to a file
-    if(output_file_name && m.as.start_address < m.as.last_address) {
+    if(output_file_name && m.emit_start < m.emit_end) {
         UTIL_FILE output_file;
         memset(&output_file, 0, sizeof(UTIL_FILE));
         if(A2_OK != util_file_open(&output_file, output_file_name, "wb")) {
             fprintf(stderr, "Could not open output file %s for writing\n", output_file_name);
         } else {
-            fwrite(&m.ram.RAM_MAIN[m.as.start_address], 1, m.as.last_address - m.as.start_address, output_file.fp);
+            fwrite(&m.ram.RAM_MAIN[m.emit_start], 1, m.emit_end - m.emit_start, output_file.fp);
         }
         util_file_discard(&output_file);
     }
@@ -182,7 +196,32 @@ int main(int argc, char **argv) {
             }
         }
     }
-
+    
+    // If segments were used, show gaps
+    if(m.as.segments.items) {
+        uint32_t emit = 0, issue = 0;
+        uint32_t emit_end = 0;
+        for(int si = 0; si < m.as.segments.items; si++) {
+            SEGMENT *s = ARRAY_GET(&m.as.segments, SEGMENT, si);
+            if(s->do_not_emit) {
+                continue;
+            }
+            if(!emit) {
+                emit_end = s->segment_output_address;
+                emit = 1;
+            } else {
+                if(s->segment_start_address > emit_end) {
+                    fprintf(stderr, "\nSegment %.*s can start at $%04X*", s->segment_name_length, s->segment_name, emit_end);
+                    issue = 1;
+                }
+                uint16_t seg_size = s->segment_output_address - s->segment_start_address;
+                emit_end += seg_size;
+            }
+        }
+        if(issue) {
+            fprintf(stderr, "\n* Offsets may slightly off, based on .align statement changing output size\n");
+        }
+    }
     assembler_shutdown(&m.as);
     errlog_shutdown(&errorlog);
     puts("\nDone.\n");
