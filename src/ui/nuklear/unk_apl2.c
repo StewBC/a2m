@@ -245,7 +245,7 @@ void unk_apl2_init_color_table(UNK *v) {
 }
 
 // Map a keycode taking caps/shift into account and assuming a US style keyboard layout
-static int a2_ascii_from_keydown(const SDL_Keycode k, SDL_Keymod mod, uint8_t *out) {
+int a2_ascii_from_keydown(const SDL_Keycode k, SDL_Keymod mod, uint8_t *out) {
     int shift = (mod & KMOD_SHIFT) != 0;
     int caps  = (mod & KMOD_CAPS)  != 0;
 
@@ -318,12 +318,9 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
     VIEWDASM *dv = &v->viewdasm;
     APPLE2 *m = v->m;
     RUNTIME *rt = v->rt;
-
-    // Keyboard keys directly to emulator
-    if(e->type == SDL_TEXTINPUT) {
-        // Handle regular text input (letters, symbols, etc.)
-        m->ram.RAM_MAIN[KBD] = 0x80 | e->text.text[0];
-    } else if(e->type == SDL_KEYDOWN) {
+    int8_t active_key = 0;
+    
+    if(e->type == SDL_KEYDOWN) {
         SDL_Keymod mod = SDL_GetModState();
 
         if(e->key.keysym.sym == SDLK_LALT) {
@@ -344,11 +341,11 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
                         // Reset the machine
                         rt_machine_reset(rt);
                         v->prev_cycles = 0;                     // So MHz doesn't jump massively
-                        // diskii_reset(m);
-                        break;
+                        return;
+
                     default:
                         // CTRL+A = 1, etc.
-                        m->ram.RAM_MAIN[KBD] = 0x80 | (e->key.keysym.sym - 0x60);
+                        active_key = 0x80 | (e->key.keysym.sym - 0x60);
                         break;
                 }
             }
@@ -357,16 +354,16 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
             switch(e->key.keysym.sym) {
                 case SDLK_DELETE:
                     // This is the original_del on DEL key
-                    m->ram.RAM_MAIN[KBD] = 0x80 + 127;
+                    active_key = 0x80 + 127;
                     break;
 
                 case SDLK_BACKSPACE:
                     // SQW - Add UI/INI toggle
                     if(v->original_del) {                       // Apple ][ key for del
-                        m->ram.RAM_MAIN[KBD] = 0x80 + 127;
+                        active_key = 0x80 + 127;
                     } else {                                    // CRSR left on del
                         // This just works so much nicer normally
-                        m->ram.RAM_MAIN[KBD] = 0x80 | e->key.keysym.sym;
+                        active_key = 0x80 | e->key.keysym.sym;
                     }
                     break;
 
@@ -374,28 +371,29 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
                 case SDLK_ESCAPE:
                 case SDLK_TAB:
                     // SQW - Maybe reactivate?  Kill the paste from the clipboard
-                    m->ram.RAM_MAIN[KBD] = 0x80 | e->key.keysym.sym;
+                    active_key = 0x80 | e->key.keysym.sym;
                     break;
 
                 case SDLK_UP:
-                    m->ram.RAM_MAIN[KBD] = 0x8B;                    // UP arrow
+                    active_key = 0x8B;                    // UP arrow
                     break;
 
                 case SDLK_DOWN:
-                    m->ram.RAM_MAIN[KBD] = 0x8A;                    // DOWN arrow
+                    active_key = 0x8A;                    // DOWN arrow
                     break;
 
                 case SDLK_LEFT:
-                    m->ram.RAM_MAIN[KBD] = 0x88;                    // LEFT arrow
+                    active_key = 0x88;                    // LEFT arrow
                     break;
 
                 case SDLK_RIGHT:
-                    m->ram.RAM_MAIN[KBD] = 0x95;                    // RIGHT arrow
+                    active_key = 0x95;                    // RIGHT arrow
                     break;
 
                 case SDLK_INSERT:
                     if(mod & KMOD_SHIFT) {
                         if(SDL_HasClipboardText()) {
+                            active_key = 0;
                             char *clipboard_text = SDL_GetClipboardText();
                             rt_paste_clipboard(rt, clipboard_text);
                             SDL_free(clipboard_text);
@@ -410,7 +408,7 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
                         // mod and key - OA and CA are handled already
                         uint8_t a2_key;
                         if(a2_ascii_from_keydown(e->key.keysym.sym, mod, &a2_key)) {
-                            m->ram.RAM_MAIN[KBD] = 0x80 | a2_key;
+                            active_key = 0x80 | a2_key;
                         }
                     }
                     break;
@@ -425,7 +423,14 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
             case SDLK_RALT:
                 clr_flags(m->state_flags, A2S_CLOSED_APPLE);
                 break;
+            
+            default:
+                apple2_clear_key_held(m);
+                break;
         }
+    }
+    if(active_key) {
+        apple2_set_key_held(m, active_key);
     }
 }
 

@@ -295,16 +295,6 @@ int unk_mem_process_event(UNK *v, SDL_Event *e) {
     VIEWMEM *ms = &v->viewmem;
     VIEWMEM_VIEW *mv = ARRAY_GET(&ms->memviews, VIEWMEM_VIEW, ms->active_view_index);
 
-    if(mv->cursor_field == CURSOR_ASCII) {
-        if(e->type == SDL_TEXTINPUT) {
-            write_to_memory_in_view(m, mv->flags, mv->cursor_address, e->text.text[0]);
-            unk_mem_cursor_right(ms, mv);
-        } else if(!(mod & (KMOD_CTRL | KMOD_ALT)) && e->key.keysym.sym >= 32 && e->key.keysym.sym < 127) {
-            // SDL_TEXTINPUT also has SDL_KEYDOWN for same key, so filter out keys that were already
-            // processed, but keep keys that want/need processing - like ENTER or cursor, or CTRL/ALT mod, etc.
-            return 0;
-        }
-    }
     // Only key events, and not for a modifier key by itself
     if(e->type != SDL_KEYDOWN || e->key.keysym.scancode == SDL_SCANCODE_CAPSLOCK || e->key.keysym.scancode >= SDL_SCANCODE_LCTRL) {
         return 0;
@@ -418,9 +408,6 @@ int unk_mem_process_event(UNK *v, SDL_Event *e) {
     } else {
         // Regular, unmodified keys
         uint8_t key = e->key.keysym.sym;
-        if(unk_mem_hex_key(v, key)) {
-            return 0;
-        }
         // Unmodified special keys
         switch(e->key.keysym.sym) {
             case SDLK_HOME:
@@ -462,10 +449,14 @@ int unk_mem_process_event(UNK *v, SDL_Event *e) {
                 break;
 
             default:
-                // This is where ENTER will come, for example
                 if(mv->cursor_field == CURSOR_ASCII) {
-                    write_to_memory(m, mv->cursor_address, e->key.keysym.sym);
-                    unk_mem_cursor_right(ms, mv);
+                    uint8_t a2_key;
+                    if(a2_ascii_from_keydown(key, mod, &a2_key)) {
+                        write_to_memory_in_view(m, mv->flags, mv->cursor_address, a2_key);
+                        unk_mem_cursor_right(ms, mv);
+                    }
+                } else {
+                    unk_mem_hex_key(v, key);
                 }
                 break;
         }

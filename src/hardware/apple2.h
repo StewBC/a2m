@@ -77,8 +77,9 @@ typedef enum {
     A2S_RESET_MASK          = (1u << 18) - 1,
     A2S_OPEN_APPLE          = (1u << 18),
     A2S_CLOSED_APPLE        = (1u << 19),
+    A2S_KEY_HELD            = (1u << 20),
 
-    A2S_FRANKLIN80INSTALLED = (1u << 20),
+    A2S_FRANKLIN80INSTALLED = (1u << 21),
 } A2_STATE;
 
 // The mask for the bits in the RAM_WATCH array
@@ -190,6 +191,7 @@ typedef struct APPLE2 {
     int strobed_slot;                                       // Contains the slot numbr for the card that is strobed
 
     // A2 Status
+    uint8_t key_held;
     A2_STATE state_flags;
 
     // Trace
@@ -206,6 +208,13 @@ int apple2_init(APPLE2 *m, INI_STORE *ini_store);
 void apple2_machine_reset(APPLE2 *m);
 void apple2_set_callbacks(APPLE2 *m, A2OUT_CB *cbp);
 void apple2_shutdown(APPLE2 *m);
+static inline void apple2_set_key_held(APPLE2 *m, uint8_t key) {
+    m->ram.RAM_MAIN[KBD] = m->key_held = key;
+    m->state_flags |= A2S_KEY_HELD;
+}
+static inline void apple2_clear_key_held(APPLE2 *m) {
+    m->state_flags &= ~A2S_KEY_HELD;
+}
 
 // The view flags describe what memory is visible to the user, based on user selection
 // in the views of the emulator

@@ -616,7 +616,7 @@ int rt_feed_clipboard_key(RUNTIME *rt) {
                 byte = (uint8_t)toupper(byte); // BASIC-friendly
             }
             // Emit whatever we have (including other control chars unchanged)
-            m->ram.RAM_MAIN[KBD] = byte | 0x80;
+            apple2_set_key_held(m, byte | 0x80);
             return 1;
         }
 

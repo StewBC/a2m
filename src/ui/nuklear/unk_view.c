@@ -507,9 +507,6 @@ int unk_init(UNK *v, int model, INI_STORE *ini_store) {
     // Set up a table to speed up rendering HGR
     unk_apl2_init_color_table(v);
 
-    // Enable text input since it handles the keys better
-    SDL_StartTextInput();
-
     return A2_OK;
 }
 
@@ -577,7 +574,7 @@ int unk_process_events(UI *ui, APPLE2 *m) {
             unk_apl2_process_event(v, &e);
         } else {
             // Not running - goes to the active view
-            if(v->debug_view && e.type == SDL_KEYDOWN || e.type == SDL_TEXTINPUT) {
+            if(v->debug_view && e.type == SDL_KEYDOWN) {
                 // A view must be open to receive input, and no modal dialog open
                 if(!v->dlg_modal_active && v->ctx->active) {
                     // Active view is known by the name hash
