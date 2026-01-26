@@ -358,6 +358,9 @@ void rt_machine_reset(RUNTIME *rt) {
     rt->run = 1;
     rt->run_to_pc = 0;
     apple2_machine_reset(m);
+    free(rt->clipboard_text);
+    rt->clipboard_text = NULL;
+    rt->clipboard_index = 0;
     diskii_reset(m);
 }
 
@@ -585,10 +588,10 @@ void rt_paste_clipboard(RUNTIME *rt, char *clipboard_text) {
 
 // Put the next clipboard character into the KBD
 int rt_feed_clipboard_key(RUNTIME *rt) {
+    APPLE2 *m = rt->m;
     if(!rt->clipboard_text) {
         return 0;
     }
-    APPLE2 *m = rt->m;
     while(1) {
         uint8_t byte = rt->clipboard_text[rt->clipboard_index++];
 
