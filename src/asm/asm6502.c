@@ -2133,8 +2133,8 @@ int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, void *user, output_byte ob
     return A2_OK;
 }
 
-static int assembler_segments_sort(const SEGMENT *lhs, const SEGMENT *rhs) {
-    return lhs->segment_start_address >= rhs->segment_start_address;
+static int assembler_segments_sort(const void *lhs, const void *rhs) {
+    return ((SEGMENT*)lhs)->segment_start_address >= ((SEGMENT*)rhs)->segment_start_address;
 }
 
 int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) {
