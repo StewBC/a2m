@@ -585,18 +585,37 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
             break;
 
         case SDLK_F2:
-            unk_toggle_debug(v);                           // Open or close the debug window
+            if((mod & KMOD_CTRL) || (mod & KMOD_ALT)) {
+                rt_machine_reset(rt);
+                v->prev_cycles = 0;     // So MHz doesn't jump massively
+            } else {
+                unk_toggle_debug(v);    // Open or close the debug window
+            }
             break;
 
         case SDLK_F3:
-            if(++rt->turbo_index >= rt->turbo_count) {
-                rt->turbo_index = 0;
+            if(!(mod & KMOD_CTRL)) {
+                if(++rt->turbo_index >= rt->turbo_count) {
+                    rt->turbo_index = 0;
+                }
+                rt->turbo_active = rt->turbo[rt->turbo_index];
             }
-            rt->turbo_active = rt->turbo[rt->turbo_index];
             break;
 
+        // case SDLK_F4 is up above SDLK_b  so it can do the same thing with mods
+
         case SDLK_F5:
-            rt_machine_run(rt);                                     // Toggle run mode
+            if(mod & KMOD_CTRL) {
+                // CTRL+F5 starts a paste
+                if(SDL_HasClipboardText()) {
+                    char *clipboard_text = SDL_GetClipboardText();
+                    rt_paste_clipboard(rt, clipboard_text);
+                    SDL_free(clipboard_text);
+                }
+            } else {
+                // F5 without CTRL is run
+                rt_machine_run(rt);                                     // Toggle run mode
+            }
             break;
 
         case SDLK_F6:

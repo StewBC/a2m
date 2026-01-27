@@ -31,8 +31,10 @@ In both Normal and Debug Mode, these keys have the listed meanings:
 | F7            |                                | F8        |                                     |
 | F9            | Toggle Breakpoint              | F10       | Step                                |
 | F11           | Break                          | F12       | Monitor Select                      |
+| CTRL+F2       | CTRL+Reset                     | ALT+F2    | CTRL+OpenApple+Reset                |
 | CTRL+SHIFT+F4 | Configure Assembler            | CTRL+F4   | Run Assembler                       |
-| SHIFT+F11     | Step Out                       | SHIFT+F12 | Toggle Franklin Ace Diplay on `][+` |
+| CTRL+F5       | Insert from clipboard          | SHIFT+F11 | Step Out                            |
+|               |                                | SHIFT+F12 | Toggle Franklin Ace Diplay on `][+` |
 
 Debug Mode (`F2`) also reveals the Miscellaneous view, and it is here where disks can be inserted, making the Apple 2 really useful.
 
