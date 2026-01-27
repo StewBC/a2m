@@ -166,8 +166,8 @@ void unk_misc_show(UNK *v) {
                                     size_t items;
                                     index = d[i].diskii_drive[j].image_index + 1;
                                     items = d[i].diskii_drive[j].images.items;
-                                    snprintf(low, 3, "%02d", index);
-                                    snprintf(high, 3, "%02zd", items);
+                                    snprintf(low, sizeof(low), "%02u", (unsigned)(index % 100));
+                                    snprintf(high, sizeof(high), "%02u", (unsigned)(items % 100));
                                     sprintf(title, "Swap (%s/%s)", low, high);
                                     w -= 0.18f;
                                     nk_layout_row_push(ctx, 0.18f);
