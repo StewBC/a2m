@@ -740,8 +740,7 @@ void unk_present(UNK *v) {
         v->clear_a2_view = 0;
     }
 
-    if(tst_flags(m->state_flags, A2S_FRANKLIN80ACTIVE) ||
-            tst_flags(v->shadow_state, A2S_COL80) && (tst_flags(v->shadow_state, A2S_HIRES) || tst_flags(v->shadow_state, A2S_TEXT))) {
+    if(tst_flags(m->state_flags, A2S_FRANKLIN80ACTIVE) || tst_flags(v->shadow_state, A2S_COL80)) {
         SDL_UpdateTexture(v->texture_wide, NULL, v->surface_wide->pixels, v->surface_wide->pitch);
         SDL_RenderCopy(v->renderer, v->texture_wide, NULL, v->draw_rect);
     } else {

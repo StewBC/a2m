@@ -447,7 +447,7 @@ void unk_apl2_screen_apple2(UNK *v) {
             unk_apl2_screen_txt80(v, 0, 24);
             break;
         case 0x14: // 1 ,0 ,1 ,0 ,0 ,10100,14
-            unk_apl2_screen_hgr(v, 0, 192);
+            unk_apl2_screen_dhgr(v, 0, 192);
             break;
         case 0x15: // 1 ,0 ,1 ,0 ,1 ,10101,15
             unk_apl2_screen_txt80(v, 0, 24);
