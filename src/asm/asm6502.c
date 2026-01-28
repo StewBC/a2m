@@ -397,10 +397,10 @@ void emit(ASSEMBLER *as, uint8_t byte_value) {
 void write_opcode(ASSEMBLER *as) {
     int8_t opcode = asm_opcode[as->opcode_info.opcode_id][as->opcode_info.addressing_mode];
     if(opcode == -1) {
-        asm_err(as, ASM_ERR_DEFINE, "Invalid opcode %.3s with mode %s", as->opcode_info.mnemonic, address_mode_txt[as->opcode_info.addressing_mode]);
+        asm_err(as, ASM_ERR_RESOLVE, "Invalid opcode %.3s with mode %s", as->opcode_info.mnemonic, address_mode_txt[as->opcode_info.addressing_mode]);
     }
     if(as->valid_opcodes && !asm_opcode_type[as->opcode_info.opcode_id][as->opcode_info.addressing_mode]) {
-        asm_err(as, ASM_ERR_DEFINE, "Opcode %.3s with mode %s only valid in 65c02", as->opcode_info.mnemonic, address_mode_txt[as->opcode_info.addressing_mode]);
+        asm_err(as, ASM_ERR_RESOLVE, "Opcode %.3s with mode %s only valid in 65c02", as->opcode_info.mnemonic, address_mode_txt[as->opcode_info.addressing_mode]);
     }
 
     // First the opcode
@@ -499,6 +499,80 @@ void write_bytes(ASSEMBLER *as, uint64_t value, int width, int order) {
             }
         }
     }
+}
+
+void write_string_data(ASSEMBLER *as, SYMBOL_LABEL *sl) {
+    uint64_t value;
+    // Loop over the string but stop before the closing quote
+    while(++as->token_start < (as->input - 1)) {
+        // Handle quoted numbers (no \n or \t handling here)
+        if(*as->token_start == '\\') {
+            as->token_start++;
+            if(*as->token_start == '\\') {
+                value = '\\';
+                as->token_start++;
+            } else if(tolower(*as->token_start) == 'x') {
+                as->token_start++;
+                value = strtoll(as->token_start, (char **) &as->token_start, 16);
+            } else if(*as->token_start == '%') {
+                as->token_start++;
+                value = strtoll(as->token_start, (char **) &as->token_start, 2);
+            } else if(*as->token_start == '0') {
+                value = strtoll(as->token_start, (char **) &as->token_start, 8);
+            } else if(*as->token_start >= '1' && *as->token_start <= '9') {
+                value = strtoll(as->token_start, (char **) &as->token_start, 10);
+            } else {
+                switch(*as->token_start) {
+                    case 'n':
+                        value = '\n';
+                        break;
+                    case 'r':
+                        value = '\r';
+                        break;
+                    case 't':
+                        value = '\t';
+                        break;
+                    case '0':
+                        value = '\0';
+                        break;
+                    case '\\':
+                        value = '\\';
+                        break;
+                    case '"':
+                        value = '"';
+                        break;
+                    case '\'':
+                        value = '\'';
+                        break;
+                    default:
+                        value = *as->token_start;
+                        break;
+                }
+            }
+            if(value >= 256) {
+                asm_err(as, ASM_ERR_RESOLVE, "Escape value %ld not between 0 and 255", value);
+            }
+            emit(as, value);
+        } else {
+            // Regular characters can go through the strcode process
+            int character = *as->token_start;
+
+            if(sl && as->strcode) {
+                // Set the variable with the value of the string character
+                sl->symbol_value = character;
+                // Save the parse state to parse the expression
+                input_stack_push(as);
+                as->input = as->token_start = as->strcode;
+                // Evaluate the expression
+                character = evaluate_expression(as);
+                // Restore the parse state into the string
+                input_stack_pop(as);
+            }
+            // Write the resultant character out
+            emit(as, character);
+        }
+    }
+    next_token(as);
 }
 
 void write_values(ASSEMBLER *as, int width, int order) {
@@ -923,7 +997,7 @@ SYMBOL_LABEL *symbol_store_in_scope(ASSEMBLER *as, SCOPE *scope, const char *sym
         } else {
             if(sl->symbol_type != symbol_type) {
                 // Symbol changing type error
-                asm_err(as, ASM_ERR_DEFINE, "Symbol %.*s can't be address and variable type", symbol_name_length, symbol_name);
+                asm_err(as, ASM_ERR_RESOLVE, "Symbol %.*s can't be address and variable type", symbol_name_length, symbol_name);
             } else {
                 if(sl->symbol_type == SYMBOL_VARIABLE) {
                     // Variables can change value along the way
@@ -964,7 +1038,7 @@ SYMBOL_LABEL *symbol_store_qualified(ASSEMBLER *as, const char *symbol_name, uin
 // Token helpers
 void expect(ASSEMBLER *as, char op) {
     if(as->current_token.type != TOKEN_OP || as->current_token.op != op) {
-        asm_err(as, ASM_ERR_DEFINE, "Expected '%c'", op);
+        asm_err(as, ASM_ERR_RESOLVE, "Expected '%c'", op);
     }
     next_token(as);
 }
@@ -1156,7 +1230,7 @@ void decode_abs_rel_zp_opcode(ASSEMBLER *as) {
                     }
                     break;
                 default:
-                    asm_err(as, ASM_ERR_DEFINE, "Unexpected ,%c", *as->token_start);
+                    asm_err(as, ASM_ERR_RESOLVE, "Unexpected ,%c", *as->token_start);
                     break;
             }
         }
@@ -1276,7 +1350,7 @@ int is_macro_parse_macro(ASSEMBLER *as) {
 
             if(!body_start || !body_end || body_end < body_start) {
                 free(args);
-                asm_err(as, ASM_ERR_DEFINE, "Macro body end not set for %.*s", macro->macro_name_length, macro->macro_name);
+                asm_err(as, ASM_ERR_RESOLVE, "Macro body end not set for %.*s", macro->macro_name_length, macro->macro_name);
                 return 1;
             }
 
@@ -1421,15 +1495,35 @@ int is_valid_instruction_only(ASSEMBLER *as) {
 
 //----------------------------------------------------------------------------
 // Parse DOT commands
+void parse_dot_byte(ASSEMBLER *as) {
+    do {
+        // Get to a token to process
+        next_token(as);
+        // String data, no .strcode processing
+        if(as->current_token.type == TOKEN_STR) {
+            write_string_data(as, NULL);
+        } else {
+            // Non-string data must be byte expression (and 1st token already
+            // loaded so use parse_ not evaluate_)
+            // This includes variables, adresses, etc.
+            uint64_t value = parse_expression(as);
+            emit(as, value);
+            if(value >= 256) {
+                asm_err(as, ASM_ERR_RESOLVE, "Values %ld not between 0 and 255", value);
+            }
+        }
+    } while(as->current_token.op == ',');
+}
+
 void parse_dot_else(ASSEMBLER *as) {
     if(as->if_active) {
         as->if_active--;
     } else {
-        asm_err(as, ASM_ERR_DEFINE, ".else without .if");
+        asm_err(as, ASM_ERR_RESOLVE, ".else without .if");
     }
     find_ab_passing_over_c(as, ".endif", NULL, ".if");
     if(!*as->input) {
-        asm_err(as, ASM_ERR_DEFINE, ".else without .endif");
+        asm_err(as, ASM_ERR_RESOLVE, ".else without .endif");
     }
 }
 
@@ -1450,14 +1544,14 @@ void parse_dot_endfor(ASSEMBLER *as) {
             as->loop_stack.items--;
             as->token_start = as->input = post_loop;
             if(!same_file) {
-                asm_err(as, ASM_ERR_DEFINE, ".endfor matches .for in file %s, body at line %zd", for_loop->loop_start_file, for_loop->body_line);
+                asm_err(as, ASM_ERR_RESOLVE, ".endfor matches .for in file %s, body at line %zd", for_loop->loop_start_file, for_loop->body_line);
             } else if(loop_iterations >= 65536) {
-                asm_err(as, ASM_ERR_DEFINE, "Exiting .for loop with body at line %zd, which has iterated 64K times", for_loop->body_line);
+                asm_err(as, ASM_ERR_RESOLVE, "Exiting .for loop with body at line %zd, which has iterated 64K times", for_loop->body_line);
             }
             as->current_line--;
         }
     } else {
-        asm_err(as, ASM_ERR_DEFINE, ".endfor without a matching .for");
+        asm_err(as, ASM_ERR_RESOLVE, ".endfor without a matching .for");
     }
 }
 
@@ -1465,7 +1559,7 @@ void parse_dot_endif(ASSEMBLER *as) {
     if(as->if_active) {
         as->if_active--;
     } else {
-        asm_err(as, ASM_ERR_DEFINE, ".endif with no .if");
+        asm_err(as, ASM_ERR_RESOLVE, ".endif with no .if");
     }
 }
 
@@ -1475,19 +1569,19 @@ void parse_dot_endmacro(ASSEMBLER *as) {
         // Return to the parse point where the macro was called
         input_stack_pop(as);
     } else {
-        asm_err(as, ASM_ERR_DEFINE, ".endmacro but not running a macro");
+        asm_err(as, ASM_ERR_RESOLVE, ".endmacro but not running a macro");
     }
 }
 
 void parse_dot_endproc(ASSEMBLER *as) {
     if(as->active_scope->scope_type != GPERF_DOT_PROC || !scope_pop(as)) {
-        asm_err(as, ASM_ERR_DEFINE, ".endproc without a matching .proc");
+        asm_err(as, ASM_ERR_RESOLVE, ".endproc without a matching .proc");
     }    
 }
 
 void parse_dot_endscope(ASSEMBLER *as) {
     if(as->active_scope->scope_type != GPERF_DOT_SCOPE || !scope_pop(as)) {
-        asm_err(as, ASM_ERR_DEFINE, ".endscope without a matching .scope");
+        asm_err(as, ASM_ERR_RESOLVE, ".endscope without a matching .scope");
     }    
 }
 
@@ -1502,7 +1596,7 @@ void parse_dot_for(ASSEMBLER *as) {
         find_ab_passing_over_c(as, ".endfor", NULL, ".for");
         if(!*as->input) {
             // failed so find .endfor (must be in same file)
-            asm_err(as, ASM_ERR_DEFINE, ".for without .endfor");
+            asm_err(as, ASM_ERR_RESOLVE, ".for without .endfor");
         }
     } else {
         // condition success
@@ -1523,7 +1617,7 @@ void parse_dot_if(ASSEMBLER *as) {
         find_ab_passing_over_c(as, ".endif", ".else", ".if");
         if(!*as->input) {
             // failed so find .else or .endif (must be in same file)
-            asm_err(as, ASM_ERR_DEFINE, ".if without .endif");
+            asm_err(as, ASM_ERR_RESOLVE, ".if without .endif");
         } else {
             // If not endif, it's else and that needs an endif
             if(tolower(as->token_start[2]) != 'n') {
@@ -1540,7 +1634,7 @@ void parse_dot_if(ASSEMBLER *as) {
 void parse_dot_incbin(ASSEMBLER *as) {
     get_token(as);
     if(*as->token_start != '"') {
-        asm_err(as, ASM_ERR_DEFINE, "include expects a \" enclosed string as a parameter");
+        asm_err(as, ASM_ERR_RESOLVE, "include expects a \" enclosed string as a parameter");
     } else {
         UTIL_FILE new_file;
         char file_name[PATH_MAX];
@@ -1562,7 +1656,7 @@ void parse_dot_incbin(ASSEMBLER *as) {
                 // Get a handle to the file in the array (safer than going with f = &new_file)
                 f = ARRAY_GET(&as->include_files.included_files, UTIL_FILE, as->include_files.included_files.items - 1);
             } else {
-                asm_err(as, ASM_ERR_DEFINE, ".incbin could not load the file %s", file_name);
+                asm_err(as, ASM_ERR_RESOLVE, ".incbin could not load the file %s", file_name);
             }
         }
         if(f) {
@@ -1579,7 +1673,7 @@ void parse_dot_incbin(ASSEMBLER *as) {
 void parse_dot_include(ASSEMBLER *as) {
     get_token(as);
     if(*as->token_start != '"') {
-        asm_err(as, ASM_ERR_DEFINE, "include expects a \" enclosed string as a parameter");
+        asm_err(as, ASM_ERR_RESOLVE, "include expects a \" enclosed string as a parameter");
     } else {
         char file_name[PATH_MAX];
         size_t string_length = as->input - as->token_start - 2;
@@ -1598,7 +1692,7 @@ void parse_dot_macro(ASSEMBLER *as) {
         macro.macro_name = NULL;
         macro.macro_name_length = 0;
         macro_okay = 0;
-        asm_err(as, ASM_ERR_DEFINE, "Macro has no name");
+        asm_err(as, ASM_ERR_RESOLVE, "Macro has no name");
     } else {
         size_t i;
         macro.macro_name = as->token_start;
@@ -1684,7 +1778,7 @@ int contains_double_colon(const char *s, int len) {
 void parse_dot_proc(ASSEMBLER *as) {
     next_token(as);
     if(as->current_token.type != TOKEN_VAR) {
-        asm_err(as, ASM_ERR_DEFINE, ".proc must be followed by a name");
+        asm_err(as, ASM_ERR_RESOLVE, ".proc must be followed by a name");
         return;
     }
 
@@ -1744,7 +1838,7 @@ void parse_dot_segdef(ASSEMBLER *as) {
 
     next_token(as);
     if(as->current_token.type != TOKEN_STR) {
-        asm_err(as, ASM_ERR_DEFINE, ".segdef expects a quoted segment name");
+        asm_err(as, ASM_ERR_RESOLVE, ".segdef expects a quoted segment name");
         return;
     }
     seg.segment_name = as->current_token.name;
@@ -1756,7 +1850,7 @@ void parse_dot_segdef(ASSEMBLER *as) {
     }
     next_token(as);
     if(as->current_token.type != TOKEN_END || as->current_token.op != ',') {
-        asm_err(as, ASM_ERR_DEFINE, ".segdef expects a comma then a start address after the name");
+        asm_err(as, ASM_ERR_RESOLVE, ".segdef expects a comma then a start address after the name");
         return;
     }
     seg.segment_start_address = evaluate_expression(as);
@@ -1776,7 +1870,7 @@ void parse_dot_segdef(ASSEMBLER *as) {
             }
         }
         if(err) {
-            asm_err(as, ASM_ERR_DEFINE, "The optional parameter to .segdef after the name and start is either emit or noemit");
+            asm_err(as, ASM_ERR_RESOLVE, "The optional parameter to .segdef after the name and start is either emit or noemit");
             return;
         }
     }
@@ -1788,7 +1882,7 @@ void parse_dot_segment(ASSEMBLER *as) {
 
     next_token(as);
     if(as->current_token.type != TOKEN_STR) {
-        asm_err(as, ASM_ERR_DEFINE, ".segment expects a quoted segment name");
+        asm_err(as, ASM_ERR_RESOLVE, ".segment expects a quoted segment name");
         return;
     }
     seg.segment_name = as->current_token.name;
@@ -1798,7 +1892,7 @@ void parse_dot_segment(ASSEMBLER *as) {
     if(seg.segment_name_length) {
         s = segment_find(&as->segments, &seg);
         if(!s) {
-            asm_err(as, ASM_ERR_DEFINE, "Segment %.*s was not defined", seg.segment_name_length, seg.segment_name);
+            asm_err(as, ASM_ERR_DEFINE, "Segment %.*s not defined", seg.segment_name_length, seg.segment_name);
             return;
         }
     }
@@ -1850,8 +1944,7 @@ void parse_dot_strcode(ASSEMBLER *as) {
 }
 
 void parse_dot_string(ASSEMBLER *as) {
-    uint64_t value;
-    SYMBOL_LABEL *sl;
+    SYMBOL_LABEL *sl = NULL;
     if(as->strcode) {
         // Add the _ variable if it doesn't yet exist and get a handle to the storage
         sl = symbol_store_in_scope(as, as->active_scope, "_", 1, SYMBOL_VARIABLE, 0);
@@ -1861,56 +1954,11 @@ void parse_dot_string(ASSEMBLER *as) {
         next_token(as);
         // String data
         if(as->current_token.type == TOKEN_STR) {
-            // Loop over the string but stop before the closing quote
-            while(++as->token_start < (as->input - 1)) {
-                // Handle quoted numbers (no \n or \t handling here)
-                if(*as->token_start == '\\') {
-                    as->token_start++;
-                    if(*as->token_start == '\\') {
-                        value = '\\';
-                        as->token_start++;
-                    } else if(tolower(*as->token_start) == 'x') {
-                        as->token_start++;
-                        value = strtoll(as->token_start, (char **) &as->token_start, 16);
-                    } else if(*as->token_start == '%') {
-                        as->token_start++;
-                        value = strtoll(as->token_start, (char **) &as->token_start, 2);
-                    } else if(*as->token_start == '0') {
-                        value = strtoll(as->token_start, (char **) &as->token_start, 8);
-                    } else if(*as->token_start >= '1' && *as->token_start <= '9') {
-                        value = strtoll(as->token_start, (char **) &as->token_start, 10);
-                    } else {
-                        // Quote ascii to skip passing it through .strcode
-                        value = *as->token_start++;
-                    }
-                    if(value >= 256) {
-                        asm_err(as, ASM_ERR_DEFINE, "Escape value %ld not between 0 and 255", value);
-                    }
-                    emit(as, value);
-                } else {
-                    // Regular characters can go through the strcode process
-                    int character = *as->token_start;
-
-                    if(as->strcode) {
-                        // Set the variable with the value of the string character
-                        sl->symbol_value = character;
-                        // Save the parse state to parse the expression
-                        input_stack_push(as);
-                        as->input = as->token_start = as->strcode;
-                        // Evaluate the expression
-                        character = evaluate_expression(as);
-                        // Restore the parse state into the string
-                        input_stack_pop(as);
-                    }
-                    // Write the resultant character out
-                    emit(as, character);
-                }
-            }
-            next_token(as);
+            write_string_data(as, sl);
         } else {
             // Non-string data must be byte expression (and 1st token already
             // loaded so use parse_ not evaluate_)
-            value = parse_expression(as);
+            uint64_t value = parse_expression(as);
             emit(as, value);
             if(value >= 256) {
                 asm_err(as, ASM_ERR_RESOLVE, "Values %ld not between 0 and 255", value);
@@ -1927,7 +1975,7 @@ void parse_address(ASSEMBLER *as) {
     int op;
     get_token(as);
     if(-1 == (op = match(as, 3, "+=", "+", "="))) {
-        asm_err(as, ASM_ERR_DEFINE, "Address assign error");
+        asm_err(as, ASM_ERR_RESOLVE, "Address assign error");
         return;
     }
     if(0 == op) {
@@ -1971,7 +2019,7 @@ uint16_t parse_anonymous_address(ASSEMBLER *as) {
             direction = -direction;
             break;
         default:
-            asm_err(as, ASM_ERR_DEFINE, "Unexpected symbol after anonymous : (%c)", op);
+            asm_err(as, ASM_ERR_RESOLVE, "Unexpected symbol after anonymous : (%c)", op);
             break;
     }
     // The opcode has not been emitted so + 1
@@ -1997,7 +2045,7 @@ void parse_dot_command(ASSEMBLER *as) {
             }
             break;
         case GPERF_DOT_BYTE:
-            write_values(as, 8, BYTE_ORDER_LO);
+            parse_dot_byte(as);
             break;
         case GPERF_DOT_DROW:
             write_values(as, 16, BYTE_ORDER_HI);
@@ -2075,7 +2123,7 @@ void parse_dot_command(ASSEMBLER *as) {
             write_values(as, 16, BYTE_ORDER_LO);
             break;
         default:
-            asm_err(as, ASM_ERR_DEFINE, "opcode with id:%d not understood", as->opcode_info.opcode_id);
+            asm_err(as, ASM_ERR_RESOLVE, "opcode with id:%d not understood", as->opcode_info.opcode_id);
     }
 }
 
@@ -2099,7 +2147,7 @@ void parse_opcode(ASSEMBLER *as) {
     if(is_valid_instruction_only(as)) {
         // Implied
         if(as->valid_opcodes && !asm_opcode_type[as->opcode_info.opcode_id][as->opcode_info.addressing_mode]) {
-            asm_err(as, ASM_ERR_DEFINE, "Opcode %.3s with mode %s only valid in 65c02", as->opcode_info.mnemonic, address_mode_txt[as->opcode_info.addressing_mode]);
+            asm_err(as, ASM_ERR_RESOLVE, "Opcode %.3s with mode %s only valid in 65c02", as->opcode_info.mnemonic, address_mode_txt[as->opcode_info.addressing_mode]);
         }
         emit(as, asm_opcode[as->opcode_info.opcode_id][ADDRESS_MODE_ACCUMULATOR]);
     } else {
@@ -2131,7 +2179,7 @@ void parse_opcode(ASSEMBLER *as) {
                             next_token(as);
                             // Make sure it was ,x or ,y
                             if(tolower(*as->token_start) != reg) {
-                                asm_err(as, ASM_ERR_DEFINE, "Expected ,%c", reg);
+                                asm_err(as, ASM_ERR_RESOLVE, "Expected ,%c", reg);
                             }
                             next_token(as);
                             // If it was ,x go past the closing )
@@ -2147,7 +2195,7 @@ void parse_opcode(ASSEMBLER *as) {
         if(!processed) {
             // general case
             if(as->current_token.type == TOKEN_END) {
-                asm_err(as, ASM_ERR_DEFINE, "Opcode %.3s with mode %s expects an operand", as->opcode_info.mnemonic, address_mode_txt[as->opcode_info.addressing_mode]);
+                asm_err(as, ASM_ERR_RESOLVE, "Opcode %.3s with mode %s expects an operand", as->opcode_info.mnemonic, address_mode_txt[as->opcode_info.addressing_mode]);
             }
             as->opcode_info.value = parse_expression(as);
             if(as->opcode_info.width >= 8 && as->expression_size > 8) {
@@ -2250,10 +2298,10 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
                 // Make sure all opened constructs were closed as well
                 if(as->if_active) {
                     as->if_active = 0;
-                    asm_err(as, ASM_ERR_DEFINE, ".if without .endif");
+                    asm_err(as, ASM_ERR_RESOLVE, ".if without .endif");
                 }
                 if(as->loop_stack.items) {
-                    asm_err(as, ASM_ERR_DEFINE, ".for L:%05zu, without .endfor", ARRAY_GET(&as->loop_stack, FOR_LOOP, as->loop_stack.items - 1)->body_line - 1);
+                    asm_err(as, ASM_ERR_RESOLVE, ".for L:%05zu, without .endfor", ARRAY_GET(&as->loop_stack, FOR_LOOP, as->loop_stack.items - 1)->body_line - 1);
                     as->loop_stack.items = 0;
                 }
                 // The end of the file has been reached so if it was an included file
@@ -2282,7 +2330,7 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
                 as->current_token.name_hash = util_fnv_1a_hash(as->current_token.name, as->current_token.name_length);
                 parse_expression(as);
             } else {
-                asm_err(as, ASM_ERR_DEFINE, "Unknown token");
+                asm_err(as, ASM_ERR_RESOLVE, "Unknown token");
             }
         }
         // Flush the macros between passes so they can be re-parsed and

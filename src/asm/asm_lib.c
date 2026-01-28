@@ -54,10 +54,14 @@ void asm_err(ASSEMBLER *as, ASM_ERR_CLASS cls,const char *format, ...) {
     }
 
     memset(&e, 0, sizeof(ERROR_ENTRY));
+    // SQW -This can go wrong and needs to be looked at:
+    // If, for example, a .strcode is in effect, the line/col numbers will
+    // be wrong, making the error report wrong (inaccurate about where...)
     e.err_str = (char *)malloc(ASM_ERR_MAX_STR_LEN);
     e.line_number = as->current_line;
     e.file_name_hash = current_file_name_hash;
-    e.message_length = snprintf(e.err_str, ASM_ERR_MAX_STR_LEN, "File: %s L:%05zu C:%03zu: %s", as->current_file, as->current_line, as->token_start - as->line_start, temp_string);
+    size_t col = as->line_start < as->token_start ? as->token_start - as->line_start : 0;
+    e.message_length = snprintf(e.err_str, ASM_ERR_MAX_STR_LEN, "File: %s L:%05zu C:%03zu: %s", as->current_file, as->current_line, col, temp_string);
     errlog(as->errorlog, &e);
     as->error_log_level = active_log_level;
 }

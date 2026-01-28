@@ -48,20 +48,28 @@ void get_token(ASSEMBLER *as) {
         get_token(as);
         return;
     }
+
     // include valid token characters in token
     as->token_start = as->input;
     int instring = *as->token_start == '"';
     if(instring) {
         as->input++;
     }
+
     while(*as->input) {
         const char c = *as->input;
         if(isalnum(c) || c == '_' || (instring && !util_character_in_characters(c, "\"\n\r"))) {
             as->input++;
+            // In strings, '\' always quotes the next character
+            if(instring && c == '\\') {
+                if(*(as->input + 1)) {
+                    as->input++;
+                }
+            }
         } else {
             if(instring) {
                 if(c != '"') {
-                    asm_err(as, ASM_ERR_DEFINE, "String missing a closing \"");
+                    asm_err(as, ASM_ERR_RESOLVE, "String missing a closing \"");
                 } else {
                     as->input++;
                 }
@@ -160,21 +168,21 @@ void next_token(ASSEMBLER *as) {
                     if(second == 'E') {
                         as->current_token.op = tolower(first);
                     } else if(second != 'T') {
-                        asm_err(as, ASM_ERR_DEFINE, "Expected .%cT or %cE", first, first);
+                        asm_err(as, ASM_ERR_RESOLVE, "Expected .%cT or %cE", first, first);
                     }
                     break;
                 case 'E':
                     if(second != 'Q') {
-                        asm_err(as, ASM_ERR_DEFINE, "Expected .EQ");
+                        asm_err(as, ASM_ERR_RESOLVE, "Expected .EQ");
                     }
                     break;
                 case 'N':
                     if(second != 'E') {
-                        asm_err(as, ASM_ERR_DEFINE, "Expected .NE");
+                        asm_err(as, ASM_ERR_RESOLVE, "Expected .NE");
                     }
                     break;
                 default:
-                    asm_err(as, ASM_ERR_DEFINE, "Expected .LT, .LE, .GT, .GE, .EQ or .NE");
+                    asm_err(as, ASM_ERR_RESOLVE, "Expected .LT, .LE, .GT, .GE, .EQ or .NE");
             }
         } else {
             // 'D' is now the token for defined
@@ -194,14 +202,14 @@ void next_token(ASSEMBLER *as) {
         as->current_token.type = TOKEN_NUM;
         as->current_token.value = *as->token_start;
         if(*as->input != '\'') {
-            asm_err(as, ASM_ERR_DEFINE, "Expected a closing '");
+            asm_err(as, ASM_ERR_RESOLVE, "Expected a closing '");
         }
         get_token(as);
     } else if(*as->token_start == '"'){
         // token_start points at opening quote and as->input is after closing quote
         int len = (int)(as->input - as->token_start);
         if(len < 2 || as->token_start[len - 1] != '"'){
-            asm_err(as, ASM_ERR_DEFINE, "String missing a closing \"");
+            asm_err(as, ASM_ERR_RESOLVE, "String missing a closing \"");
         }
         as->current_token.type = TOKEN_STR;
         as->current_token.name = as->token_start + 1;
@@ -340,7 +348,7 @@ int64_t parse_primary(ASSEMBLER *as) {
                 }
             }
             if(!op) {
-                asm_err(as, ASM_ERR_DEFINE, "Cannot assign value to label %.*s", sl->symbol_length, sl->symbol_name);
+                asm_err(as, ASM_ERR_RESOLVE, "Cannot assign value to label %.*s", sl->symbol_length, sl->symbol_name);
             }
         }
         // If a lookup reads an unknown variable, it becomes a 2-byte variable
@@ -358,7 +366,7 @@ int64_t parse_primary(ASSEMBLER *as) {
         value = parse_expression(as);
         expect(as, ')');
     } else {
-        asm_err(as, ASM_ERR_DEFINE, "Unexpected primary token");
+        asm_err(as, ASM_ERR_RESOLVE, "Unexpected primary token");
         value = -1;
     }
     return value;
@@ -552,7 +560,7 @@ int64_t evaluate_expression(ASSEMBLER *as) {
     next_token(as);
     int64_t result = parse_expression(as);
     if(as->current_token.type != TOKEN_END) {
-        asm_err(as, ASM_ERR_DEFINE, "Unexpected token after expression");
+        asm_err(as, ASM_ERR_RESOLVE, "Unexpected token after expression");
     }
     return result;
 }
