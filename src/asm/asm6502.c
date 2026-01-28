@@ -508,46 +508,34 @@ void write_string_data(ASSEMBLER *as, SYMBOL_LABEL *sl) {
         // Handle quoted numbers (no \n or \t handling here)
         if(*as->token_start == '\\') {
             as->token_start++;
-            if(*as->token_start == '\\') {
-                value = '\\';
-                as->token_start++;
-            } else if(tolower(*as->token_start) == 'x') {
-                as->token_start++;
-                value = strtoll(as->token_start, (char **) &as->token_start, 16);
-            } else if(*as->token_start == '%') {
-                as->token_start++;
-                value = strtoll(as->token_start, (char **) &as->token_start, 2);
-            } else if(*as->token_start == '0') {
-                value = strtoll(as->token_start, (char **) &as->token_start, 8);
-            } else if(*as->token_start >= '1' && *as->token_start <= '9') {
-                value = strtoll(as->token_start, (char **) &as->token_start, 10);
-            } else {
-                switch(*as->token_start) {
-                    case 'n':
-                        value = '\n';
-                        break;
-                    case 'r':
-                        value = '\r';
-                        break;
-                    case 't':
-                        value = '\t';
-                        break;
-                    case '0':
-                        value = '\0';
-                        break;
-                    case '\\':
-                        value = '\\';
-                        break;
-                    case '"':
-                        value = '"';
-                        break;
-                    case '\'':
-                        value = '\'';
-                        break;
-                    default:
+            switch(*as->token_start) {
+                case 'x':
+                    as->token_start++;
+                    value = strtoll(as->token_start, (char **) &as->token_start, 16);
+                    as->token_start--;
+                    break;
+                case '%':
+                    as->token_start++;
+                    value = strtoll(as->token_start, (char **) &as->token_start, 2);
+                    as->token_start--;
+                    break;
+                case 'n':
+                    value = '\n';
+                    break;
+                case 'r':
+                    value = '\r';
+                    break;
+                case 't':
+                    value = '\t';
+                    break;
+                default:
+                    if(*as->token_start >= '0' && *as->token_start <= '9') {
+                        value = strtoll(as->token_start, (char **) &as->token_start, 10);                    
+                        as->token_start--;
+                    } else {
                         value = *as->token_start;
-                        break;
-                }
+                    }
+                    break;
             }
             if(value >= 256) {
                 asm_err(as, ASM_ERR_RESOLVE, "Escape value %ld not between 0 and 255", value);

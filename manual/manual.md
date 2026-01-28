@@ -525,7 +525,7 @@ There is a set of directives that control how a 6502 source file is assembled. T
 | .org n          | Set the assembly location to address n. Another way to specify `* =`           |
 | .align v        | Align to v bytes, inserting up to v-1 zeroes into the output                   |
 | .res l[,b]      | Insert l bytes into the output, value `0` or the value of the optional `b`     |
-| .byte b`[,b]*`    | Insert b as a byte or bytes into the output                                  |
+| .byte b`[,b]*`    | Insert b as a byte or bytes into the output - See Notes                      |
 | .word w`[,w]*`    | Insert the word bytes w into the output                                      |
 | .dword dw`[,dw]*` | Insert the double-word bytes dw into the output (low byte first)             |
 | .qword qw`[,qw]*` | Insert the quad-word bytes qw into the output                                |
@@ -554,6 +554,7 @@ Notes:
 
 * Text in `[]` means optional and `[]*` means none or more
 * The assembler runs in the folder of the input file, so includes must be relative to that folder.
+* .byte can take strings as well, but note that .strcode will not run on those strings.
 
 \Needspace{11\baselineskip}
 The following dot directives work with dot commands:
@@ -720,7 +721,9 @@ This emits:
 produces the output `00 0F 0F 0B 04 20 5D 5B 20 05 0E 11 04 15 04 11`.  
 As can be seen, the ASCII alphabet characters were remapped to the 0..25 range, but the spaces and `][` characters were left alone.
 
-To disable processing, use `.strcode _`. Note that if you use `_` as a variable elsewhere, `.strcode` will overwrite it.
+Note that quoted characters in strings do not have `.strcode` applied to them. In all strings, the escape sequences `\n\r\t\0` are interpreted as they are in C, and the backslash character itself must always be escaped as `\\`. The escape `\0` represents zero, while `\077` is an octal escape; consequently, `\0` serves both purposes.
+
+To disable processing, use `.strcode _`. Note that if you use `_` as a variable in the same scope, `.strcode` will overwrite it.
 
 \Needspace{14\baselineskip}
 #### Assembler Scope and proc
