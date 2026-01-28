@@ -109,6 +109,6 @@ levelNameGfx0:        .res PLAY_COLS * 2 * 8
 
 ; The scores are updated in these text strings directly
 highScore:
-.string "000000"
+.byte "000000"
 score:
-.string "000000"
+.byte "000000"

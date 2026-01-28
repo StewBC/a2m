@@ -9,52 +9,52 @@
 .segment "RODATA"
 
 roTextLevel:
-.string "         CENTRAL CAVERN         "
-.string "          THE COLD ROOM         "
-.string "          THE MENAGERIE         "
-.string "   ABANDONED URANIUM WORKINGS   "
-.string "         EUGENE+S LAIR          "
-.string "       PROCESSING PLANT         "
-.string "            THE VAT             "
-.string "MINER WILLY MEETS THE KONG BEAST"
-.string "        WACKY AMOEBATRONS       "
-.string "       THE ENDORIAN FOREST      "
-.string "ATTACK OF THE MUTANT TELEPHONES "
-.string " RETURN OF THE ALIEN KONG BEAST "
-.string "          ORE REFINERY          "
-.string "       SKYLAB LANDING BAY       "
-.string "            THE BANK            "
-.string "      THE SIXTEENTH CAVERN      "
-.string "         THE WAREHOUSE          "
-.string "      AMOEBATRONS+ REVENGE      "
-.string "     SOLAR POWER GENERATOR      "
-.string "        THE FINAL BARRIER       "
+.BYTE "         CENTRAL CAVERN         "
+.BYTE "          THE COLD ROOM         "
+.BYTE "          THE MENAGERIE         "
+.BYTE "   ABANDONED URANIUM WORKINGS   "
+.BYTE "         EUGENE+S LAIR          "
+.BYTE "       PROCESSING PLANT         "
+.BYTE "            THE VAT             "
+.BYTE "MINER WILLY MEETS THE KONG BEAST"
+.BYTE "        WACKY AMOEBATRONS       "
+.BYTE "       THE ENDORIAN FOREST      "
+.BYTE "ATTACK OF THE MUTANT TELEPHONES "
+.BYTE " RETURN OF THE ALIEN KONG BEAST "
+.BYTE "          ORE REFINERY          "
+.BYTE "       SKYLAB LANDING BAY       "
+.BYTE "            THE BANK            "
+.BYTE "      THE SIXTEENTH CAVERN      "
+.BYTE "         THE WAREHOUSE          "
+.BYTE "      AMOEBATRONS+ REVENGE      "
+.BYTE "     SOLAR POWER GENERATOR      "
+.BYTE "        THE FINAL BARRIER       "
 roTextAir:
-.string "AIR  "
+.byte "AIR  "
 roTextScore:
-.string "SCORE"
+.byte "SCORE"
 roTextHighScore:
-.string "HIGH"
+.byte "HIGH"
 roTextGame:
-.string "GAME"
+.byte "GAME"
 roTextOver:
-.string "OVER"
+.byte "OVER"
 roTextPressEnter:
-.string "PRESS ENTER TO START"
-roTextEnter = (roTextPressEnter + 6)
+.byte "PRESS ENTER TO START"
+roTextEnter := (roTextPressEnter + 6)
 roTextAppleIIVersion:
-.string " APPLE II  V1.1A BY "
+.BYTE " APPLE II  V1.1A BY "
 roTextStefan:
-.string "STEFAN WESSELS, 2020"
+.BYTE "STEFAN WESSELS, 2020"
 roTextIntro:
-.string ".  .  .  .  .  .  . MANIC MINER . . [ BUG-BYTE LTD.  1983 . . BY "
-.string "MATTHEW SMITH . . . Q, O * W, P = LEFT * RIGHT . . SPACE = JUMP . . M = MUSIC "
-.string "ON/OFF . . S = IN GAME SOUND ON/OFF . . B = MONOCHROME/COLOR . . "
-.string "C = LEVEL SCROLL MODE . . ESC = QUIT . . . GUIDE MINER WILLY THROUGH 20 LETHAL "
-.string "CAVERNS .  .  .  .  .  .  ", 0
+.BYTE ".  .  .  .  .  .  . MANIC MINER . . [ BUG-BYTE LTD.  1983 . . BY "
+.BYTE "MATTHEW SMITH . . . Q, O * W, P = LEFT * RIGHT . . SPACE = JUMP . . M = MUSIC "
+.BYTE "ON/OFF . . S = IN GAME SOUND ON/OFF . . B = MONOCHROME/COLOR . . "
+.BYTE "C = LEVEL SCROLL MODE . . ESC = QUIT . . . GUIDE MINER WILLY THROUGH 20 LETHAL "
+.BYTE "CAVERNS .  .  .  .  .  .  ", 0
 roTextMono:
-.string " MONO"
+.byte " MONO"
 roTextColor:
-.string "COLOR"
+.byte "COLOR"
 roTextCheatCode:
-.string "6031769"
+.byte "6031769"
