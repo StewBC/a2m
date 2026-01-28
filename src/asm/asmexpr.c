@@ -61,7 +61,7 @@ void get_token(ASSEMBLER *as) {
         } else {
             if(instring) {
                 if(c != '"') {
-                    asm_err(as, "String missing a closing \"");
+                    asm_err(as, ASM_ERR_DEFINE, "String missing a closing \"");
                 } else {
                     as->input++;
                 }
@@ -160,21 +160,21 @@ void next_token(ASSEMBLER *as) {
                     if(second == 'E') {
                         as->current_token.op = tolower(first);
                     } else if(second != 'T') {
-                        asm_err(as, "Expected .%cT or %cE", first, first);
+                        asm_err(as, ASM_ERR_DEFINE, "Expected .%cT or %cE", first, first);
                     }
                     break;
                 case 'E':
                     if(second != 'Q') {
-                        asm_err(as, "Expected .EQ");
+                        asm_err(as, ASM_ERR_DEFINE, "Expected .EQ");
                     }
                     break;
                 case 'N':
                     if(second != 'E') {
-                        asm_err(as, "Expected .NE");
+                        asm_err(as, ASM_ERR_DEFINE, "Expected .NE");
                     }
                     break;
                 default:
-                    asm_err(as, "Expected .LT, .LE, .GT, .GE, .EQ or .NE");
+                    asm_err(as, ASM_ERR_DEFINE, "Expected .LT, .LE, .GT, .GE, .EQ or .NE");
             }
         } else {
             // 'D' is now the token for defined
@@ -194,14 +194,14 @@ void next_token(ASSEMBLER *as) {
         as->current_token.type = TOKEN_NUM;
         as->current_token.value = *as->token_start;
         if(*as->input != '\'') {
-            asm_err(as, "Expected a closing '");
+            asm_err(as, ASM_ERR_DEFINE, "Expected a closing '");
         }
         get_token(as);
     } else if(*as->token_start == '"'){
         // token_start points at opening quote and as->input is after closing quote
         int len = (int)(as->input - as->token_start);
         if(len < 2 || as->token_start[len - 1] != '"'){
-            asm_err(as, "String missing a closing \"");
+            asm_err(as, ASM_ERR_DEFINE, "String missing a closing \"");
         }
         as->current_token.type = TOKEN_STR;
         as->current_token.name = as->token_start + 1;
@@ -273,6 +273,18 @@ int64_t parse_primary(ASSEMBLER *as) {
             sl = symbol_lookup_local(as, as->current_token.name_hash, as->current_token.name, as->current_token.name_length);
         } else {
             sl = symbol_lookup(as, as->current_token.name_hash, as->current_token.name, as->current_token.name_length);
+            // If not found and contains scope, don't pollute the local scope - must be a forward ref
+            if(!sl) {
+                if(as->pass == 1) {
+                    if(token_has_scope_path(as->current_token.name, as->current_token.name_length)) {
+                        return 0xFFFF;
+                    }
+                } else {
+                    asm_err(as, ASM_ERR_RESOLVE, "Scoped variable %.*s not found", as->current_token.name_length, as->current_token.name);
+                    // Return 0 as that surpresses any immidate adressing errors that would also log
+                    return 0x0;
+                }
+            }
         }
 
         if(as->pass == 2 && sl && sl->symbol_type == SYMBOL_UNKNOWN) {
@@ -285,7 +297,7 @@ int64_t parse_primary(ASSEMBLER *as) {
         if(!sl || (as->pass == 2 && sl && sl->symbol_type == SYMBOL_UNKNOWN)) {
             // All tokens must have resolved by pass 2
             if(as->pass == 2) {
-                asm_err(as, "Value for %.*s not found", as->current_token.name_length, as->current_token.name);
+                asm_err(as, ASM_ERR_RESOLVE, "Value for %.*s not found", as->current_token.name_length, as->current_token.name);
             }
             // In pass 1 tokens not found have placeholders (SYMBOL_UNKNOWN) created
             value = 0xFFFF;
@@ -328,7 +340,7 @@ int64_t parse_primary(ASSEMBLER *as) {
                 }
             }
             if(!op) {
-                asm_err(as, "Cannot assign value to label %.*s", sl->symbol_length, sl->symbol_name);
+                asm_err(as, ASM_ERR_DEFINE, "Cannot assign value to label %.*s", sl->symbol_length, sl->symbol_name);
             }
         }
         // If a lookup reads an unknown variable, it becomes a 2-byte variable
@@ -346,7 +358,7 @@ int64_t parse_primary(ASSEMBLER *as) {
         value = parse_expression(as);
         expect(as, ')');
     } else {
-        asm_err(as, "Unexpected primary token");
+        asm_err(as, ASM_ERR_DEFINE, "Unexpected primary token");
         value = -1;
     }
     return value;
@@ -540,7 +552,7 @@ int64_t evaluate_expression(ASSEMBLER *as) {
     next_token(as);
     int64_t result = parse_expression(as);
     if(as->current_token.type != TOKEN_END) {
-        asm_err(as, "Unexpected token after expression");
+        asm_err(as, ASM_ERR_DEFINE, "Unexpected token after expression");
     }
     return result;
 }

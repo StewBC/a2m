@@ -290,7 +290,7 @@ int include_files_push(ASSEMBLER *as, const char *file_name) {
         if(A2_OK == util_file_load(&new_file, file_name, "r")) {
             // Success, add to list of loaded files and assign it to f
             if(A2_OK != ARRAY_ADD(&as->include_files.included_files, new_file)) {
-                asm_err(as, "Out of memory");
+                asm_err(as, ASM_ERR_FATAL, "Out of memory");
             }
             f = &new_file;
         }
@@ -307,10 +307,10 @@ int include_files_push(ASSEMBLER *as, const char *file_name) {
     }
 
     if(!f) {
-        asm_err(as, "Error loading file %s", file_name);
+        asm_err(as, ASM_ERR_FATAL, "Error loading file %s", file_name);
         return A2_ERR;
     } else if(recursive_include) {
-        asm_err(as, "Recursive included of file %s ignored", file_name);
+        asm_err(as, ASM_ERR_DEFINE, "Recursive included of file %s ignored", file_name);
         return A2_ERR;
     }
     // Push the file onto the stack, documenting the current parse data
@@ -321,7 +321,7 @@ int include_files_push(ASSEMBLER *as, const char *file_name) {
     as->current_file = f->file_path;
 
     if(A2_OK != ARRAY_ADD(&as->include_files.stack, pd)) {
-        asm_err(as, "Out of memory");
+        asm_err(as, ASM_ERR_FATAL, "Out of memory");
     }
     // Prepare to parse the buffer that has now become active
     as->current_file = f->file_path;
@@ -397,10 +397,10 @@ void emit(ASSEMBLER *as, uint8_t byte_value) {
 void write_opcode(ASSEMBLER *as) {
     int8_t opcode = asm_opcode[as->opcode_info.opcode_id][as->opcode_info.addressing_mode];
     if(opcode == -1) {
-        asm_err(as, "Invalid opcode %.3s with mode %s", as->opcode_info.mnemonic, address_mode_txt[as->opcode_info.addressing_mode]);
+        asm_err(as, ASM_ERR_DEFINE, "Invalid opcode %.3s with mode %s", as->opcode_info.mnemonic, address_mode_txt[as->opcode_info.addressing_mode]);
     }
     if(as->valid_opcodes && !asm_opcode_type[as->opcode_info.opcode_id][as->opcode_info.addressing_mode]) {
-        asm_err(as, "Opcode %.3s with mode %s only valid in 65c02", as->opcode_info.mnemonic, address_mode_txt[as->opcode_info.addressing_mode]);
+        asm_err(as, ASM_ERR_DEFINE, "Opcode %.3s with mode %s only valid in 65c02", as->opcode_info.mnemonic, address_mode_txt[as->opcode_info.addressing_mode]);
     }
 
     // First the opcode
@@ -410,20 +410,20 @@ void write_opcode(ASSEMBLER *as) {
         case 1: {                                               // Relative - 1 byte
                 int32_t delta = as->opcode_info.value - 1 - current_output_address(as);
                 if(delta > 128 || delta < -128) {
-                    asm_err(as, "Relative branch out of range $%X", delta);
+                    asm_err(as, ASM_ERR_RESOLVE, "Relative branch out of range $%X", delta);
                 }
                 emit(as, delta);
             }
             break;
         case 8:                                                 // 1 byte
             if(as->opcode_info.value >= 256) {
-                asm_err(as, "8-bit value expected but value = $%X", as->opcode_info.value);
+                asm_err(as, ASM_ERR_RESOLVE, "8-bit value expected but value = $%X", as->opcode_info.value);
             }
             emit(as, as->opcode_info.value);
             break;
         case 16:                                                // 2 bytes
             if(as->opcode_info.value >= 65536) {
-                asm_err(as, "16-bit value expected but value = $%X", as->opcode_info.value);
+                asm_err(as, ASM_ERR_RESOLVE, "16-bit value expected but value = $%X", as->opcode_info.value);
             }
             emit(as, as->opcode_info.value);
             emit(as, as->opcode_info.value >> 8);
@@ -436,13 +436,13 @@ void write_bytes(ASSEMBLER *as, uint64_t value, int width, int order) {
         if(width == 8) {
             emit(as, value);
             if(value >= 256) {
-                asm_err(as, "Warning: value (%zd) > 255 output as byte value", value);
+                asm_err(as, ASM_ERR_RESOLVE, "Warning: value (%zd) > 255 output as byte value", value);
             }
         } else if(width == 16) {
             emit(as, value >> 8);
             emit(as, value);
             if(value >= 65536) {
-                asm_err(as, "Warning: value (%zd) > 65535 output as drow value", value);
+                asm_err(as, ASM_ERR_RESOLVE, "Warning: value (%zd) > 65535 output as drow value", value);
             }
         } else if(width == 32) {
             emit(as, value >> 24);
@@ -450,7 +450,7 @@ void write_bytes(ASSEMBLER *as, uint64_t value, int width, int order) {
             emit(as, value >> 8);
             emit(as, value);
             if(value >= 0X100000000) {
-                asm_err(as, "Warning: value ($%zx) > $FFFFFFFF output as drowd value", value);
+                asm_err(as, ASM_ERR_RESOLVE, "Warning: value ($%zx) > $FFFFFFFF output as drowd value", value);
             }
         } else if(width == 64) {
             emit(as, value >> 56);
@@ -462,20 +462,20 @@ void write_bytes(ASSEMBLER *as, uint64_t value, int width, int order) {
             emit(as, value >> 8);
             emit(as, value);
             if(value >= 0X8000000000000000) {
-                asm_err(as, "Warning: value ($%zx) > $7FFFFFFFFFFFFFFF output as drowq value", value);
+                asm_err(as, ASM_ERR_RESOLVE, "Warning: value ($%zx) > $7FFFFFFFFFFFFFFF output as drowq value", value);
             }
         }
     } else {
         if(width == 8) {
             emit(as, value);
             if(value >= 256) {
-                asm_err(as, "Warning: value (%zd) > 255 output as byte value", value);
+                asm_err(as, ASM_ERR_RESOLVE, "Warning: value (%zd) > 255 output as byte value", value);
             }
         } else if(width == 16) {
             emit(as, value);
             emit(as, value >> 8);
             if(value >= 65536) {
-                asm_err(as, "Warning: value (%zd) > 65535 output as word value", value);
+                asm_err(as, ASM_ERR_RESOLVE, "Warning: value (%zd) > 65535 output as word value", value);
             }
         } else if(width == 32) {
             emit(as, value);
@@ -483,7 +483,7 @@ void write_bytes(ASSEMBLER *as, uint64_t value, int width, int order) {
             emit(as, value >> 16);
             emit(as, value >> 24);
             if(value >= 0X100000000) {
-                asm_err(as, "Warning: value ($%zx) > $FFFFFFFF output as dword value", value);
+                asm_err(as, ASM_ERR_RESOLVE, "Warning: value ($%zx) > $FFFFFFFF output as dword value", value);
             }
         } else if(width == 64) {
             emit(as, value);
@@ -495,7 +495,7 @@ void write_bytes(ASSEMBLER *as, uint64_t value, int width, int order) {
             emit(as, value >> 48);
             emit(as, value >> 56);
             if(value >= 0X8000000000000000) {
-                asm_err(as, "Warning: value ($%zx) > $7FFFFFFFFFFFFFFF output as qword value", value);
+                asm_err(as, ASM_ERR_RESOLVE, "Warning: value ($%zx) > $7FFFFFFFFFFFFFFF output as qword value", value);
             }
         }
     }
@@ -551,7 +551,7 @@ int scope_pop(ASSEMBLER *as) {
     return 1;
 }
 
-static int token_has_scope_path(const char *p, int len) {
+int token_has_scope_path(const char *p, int len) {
     for(int i = 0; i + 1 < len; i++) {
         if(p[i] == ':' && p[i + 1] == ':') {
             return 1;
@@ -562,7 +562,7 @@ static int token_has_scope_path(const char *p, int len) {
 
 SCOPE *scope_find_child(SCOPE *parent, const char *name, int name_length) {
     for(int si = 0; si < parent->child_scopes.items; si++) {
-        SCOPE *s = ARRAY_GET(&parent->child_scopes, SCOPE, si);
+        SCOPE *s = *ARRAY_GET(&parent->child_scopes, SCOPE*, si);
         if(name_length == s->scope_name_length && 0 == strnicmp(name, s->scope_name, name_length)) {
             return s;
         }
@@ -583,7 +583,7 @@ static QRES scope_resolve_qualified_name(ASSEMBLER *as, const char *sym, int sym
     SCOPE *anchor = NULL;
     if(sym_len >= 2 && sym[0] == ':' && sym[1] == ':') {
         // Root anchored
-        anchor = &as->root_scope;
+        anchor = as->root_scope;
         i = 2;
         if(i >= sym_len) {
             return QRES_MALFORMED;        // "::" alone is not a valid symbol
@@ -625,7 +625,7 @@ static QRES scope_resolve_qualified_name(ASSEMBLER *as, const char *sym, int sym
     // Resolve first scope name
     SCOPE *cur = NULL;
 
-    if(anchor == &as->root_scope) {
+    if(anchor == as->root_scope) {
         // root-anchored: first must be child of root
         cur = scope_find_child(anchor, first, first_len);
     } else {
@@ -690,7 +690,7 @@ static QRES scope_resolve_qualified_name(ASSEMBLER *as, const char *sym, int sym
 
 int scope_init(SCOPE *s, int type) {
     memset(s, 0, sizeof(SCOPE));
-    ARRAY_INIT(&s->child_scopes, SCOPE);
+    ARRAY_INIT(&s->child_scopes, SCOPE*);
     s->symbol_table = (DYNARRAY*)malloc(sizeof(DYNARRAY) * HASH_BUCKETS);
     if(!s->symbol_table) {
         return A2_ERR;
@@ -707,45 +707,46 @@ int scope_init(SCOPE *s, int type) {
 
 // Recursively destroys a scope and it's children
 void scope_destroy(SCOPE *s) {
+    while(s->child_scopes.items) {
+        scope_destroy(*ARRAY_GET(&s->child_scopes, SCOPE*, s->child_scopes.items - 1));
+        s->child_scopes.items--;
+    }
+    array_free(&s->child_scopes);
+    free(s->scope_name);
     if(s->symbol_table) {
         for(int bucket = 0; bucket < HASH_BUCKETS; bucket++) {
             array_free(&s->symbol_table[bucket]);
         }
     }
     free(s->symbol_table);
-    while(s->child_scopes.items) {
-        scope_destroy(ARRAY_GET(&s->child_scopes, SCOPE, s->child_scopes.items - 1));
-        s->child_scopes.items--;
-    }
-    array_free(&s->child_scopes);
-    free(s->scope_name);
+    free(s);
 }
 
 // Add a scope to the passed in parent scope, returning a pointer to the added scope
 SCOPE *scope_add(ASSEMBLER *as, const char *name, const int name_length, SCOPE *parent, int type) {
-    SCOPE s;
-    if(A2_OK != scope_init(&s, type)) {
+    SCOPE *s = (SCOPE*)malloc(sizeof(SCOPE));
+    if(!s || A2_OK != scope_init(s, type)) {
         return NULL;
     }
-    if(!set_name(&s.scope_name, name, name_length)) {
-        scope_destroy(&s);
+    if(!set_name(&s->scope_name, name, name_length)) {
+        scope_destroy(s);
         return NULL;
     }
-    s.scope_name_length = name_length;
-    s.parent_scope = parent;
-    s.scope_type = type;
+    s->scope_name_length = name_length;
+    s->parent_scope = parent;
+    s->scope_type = type;
     if(A2_OK != ARRAY_ADD(&parent->child_scopes, s)) {
-        scope_destroy(&s);
+        scope_destroy(s);
         return NULL;
     }
-    return ARRAY_GET(&parent->child_scopes, SCOPE, parent->child_scopes.items - 1);
+    return *ARRAY_GET(&parent->child_scopes, SCOPE*, parent->child_scopes.items - 1);
 }
 
 void scope_reset_ids(SCOPE *s) {
     uint32_t child_id = 0;
     s->anon_scope_id = 0;
     while(child_id < s->child_scopes.items) {
-        scope_reset_ids(ARRAY_GET(&s->child_scopes, SCOPE, child_id++));
+        scope_reset_ids(*ARRAY_GET(&s->child_scopes, SCOPE*, child_id++));
     }
 }
 
@@ -922,14 +923,14 @@ SYMBOL_LABEL *symbol_store_in_scope(ASSEMBLER *as, SCOPE *scope, const char *sym
         } else {
             if(sl->symbol_type != symbol_type) {
                 // Symbol changing type error
-                asm_err(as, "Symbol %.*s can't be address and variable type", symbol_name_length, symbol_name);
+                asm_err(as, ASM_ERR_DEFINE, "Symbol %.*s can't be address and variable type", symbol_name_length, symbol_name);
             } else {
                 if(sl->symbol_type == SYMBOL_VARIABLE) {
                     // Variables can change value along the way
                     sl->symbol_value = value;
                 } else if(sl->symbol_value != value) {
                     // Addresses may not change value
-                    asm_err(as, "Multiple address labels have name %.*s", symbol_name_length, symbol_name);
+                    asm_err(as, ASM_ERR_RESOLVE, "Multiple address labels have name %.*s", symbol_name_length, symbol_name);
                 }
             }
         }
@@ -963,7 +964,7 @@ SYMBOL_LABEL *symbol_store_qualified(ASSEMBLER *as, const char *symbol_name, uin
 // Token helpers
 void expect(ASSEMBLER *as, char op) {
     if(as->current_token.type != TOKEN_OP || as->current_token.op != op) {
-        asm_err(as, "Expected '%c'", op);
+        asm_err(as, ASM_ERR_DEFINE, "Expected '%c'", op);
     }
     next_token(as);
 }
@@ -1155,7 +1156,7 @@ void decode_abs_rel_zp_opcode(ASSEMBLER *as) {
                     }
                     break;
                 default:
-                    asm_err(as, "Unexpected ,%c", *as->token_start);
+                    asm_err(as, ASM_ERR_DEFINE, "Unexpected ,%c", *as->token_start);
                     break;
             }
         }
@@ -1235,7 +1236,7 @@ int is_macro_parse_macro(ASSEMBLER *as) {
             if(argc) {
                 args = (MACRO_ARG *)calloc(argc, sizeof(MACRO_ARG));
                 if(!args) {
-                    asm_err(as, "Out of memory");
+                    asm_err(as, ASM_ERR_FATAL, "Out of memory");
                     return 1;
                 }
             }
@@ -1275,7 +1276,7 @@ int is_macro_parse_macro(ASSEMBLER *as) {
 
             if(!body_start || !body_end || body_end < body_start) {
                 free(args);
-                asm_err(as, "Macro body end not set for %.*s", macro->macro_name_length, macro->macro_name);
+                asm_err(as, ASM_ERR_DEFINE, "Macro body end not set for %.*s", macro->macro_name_length, macro->macro_name);
                 return 1;
             }
 
@@ -1349,7 +1350,7 @@ int is_macro_parse_macro(ASSEMBLER *as) {
             free(args);
 
             if(!out) {
-                asm_err(as, "Out of memory");
+                asm_err(as, ASM_ERR_FATAL, "Out of memory");
                 return 1;
             }
 
@@ -1424,11 +1425,11 @@ void parse_dot_else(ASSEMBLER *as) {
     if(as->if_active) {
         as->if_active--;
     } else {
-        asm_err(as, ".else without .if");
+        asm_err(as, ASM_ERR_DEFINE, ".else without .if");
     }
     find_ab_passing_over_c(as, ".endif", NULL, ".if");
     if(!*as->input) {
-        asm_err(as, ".else without .endif");
+        asm_err(as, ASM_ERR_DEFINE, ".else without .endif");
     }
 }
 
@@ -1449,14 +1450,14 @@ void parse_dot_endfor(ASSEMBLER *as) {
             as->loop_stack.items--;
             as->token_start = as->input = post_loop;
             if(!same_file) {
-                asm_err(as, ".endfor matches .for in file %s, body at line %zd", for_loop->loop_start_file, for_loop->body_line);
+                asm_err(as, ASM_ERR_DEFINE, ".endfor matches .for in file %s, body at line %zd", for_loop->loop_start_file, for_loop->body_line);
             } else if(loop_iterations >= 65536) {
-                asm_err(as, "Exiting .for loop with body at line %zd, which has iterated 64K times", for_loop->body_line);
+                asm_err(as, ASM_ERR_DEFINE, "Exiting .for loop with body at line %zd, which has iterated 64K times", for_loop->body_line);
             }
             as->current_line--;
         }
     } else {
-        asm_err(as, ".endfor without a matching .for");
+        asm_err(as, ASM_ERR_DEFINE, ".endfor without a matching .for");
     }
 }
 
@@ -1464,7 +1465,7 @@ void parse_dot_endif(ASSEMBLER *as) {
     if(as->if_active) {
         as->if_active--;
     } else {
-        asm_err(as, ".endif with no .if");
+        asm_err(as, ASM_ERR_DEFINE, ".endif with no .if");
     }
 }
 
@@ -1474,30 +1475,20 @@ void parse_dot_endmacro(ASSEMBLER *as) {
         // Return to the parse point where the macro was called
         input_stack_pop(as);
     } else {
-        asm_err(as, ".endmacro but not running a macro");
+        asm_err(as, ASM_ERR_DEFINE, ".endmacro but not running a macro");
     }
 }
 
 void parse_dot_endproc(ASSEMBLER *as) {
     if(as->active_scope->scope_type != GPERF_DOT_PROC || !scope_pop(as)) {
-        asm_err(as, ".endproc without a matching .proc");
+        asm_err(as, ASM_ERR_DEFINE, ".endproc without a matching .proc");
     }    
-    // if(as->active_scope->parent_scope && as->active_scope->scope_type == GPERF_DOT_PROC) {
-    //     scope_to_scope(as, as->active_scope->parent_scope);
-    // } else {
-    //     asm_err(as, ".endproc without a matching .proc");
-    // }
 }
 
 void parse_dot_endscope(ASSEMBLER *as) {
     if(as->active_scope->scope_type != GPERF_DOT_SCOPE || !scope_pop(as)) {
-        asm_err(as, ".endproc without a matching .proc");
+        asm_err(as, ASM_ERR_DEFINE, ".endscope without a matching .scope");
     }    
-    // if(as->active_scope->parent_scope && as->active_scope->scope_type == GPERF_DOT_SCOPE) {
-    //     scope_to_scope(as, as->active_scope->parent_scope);
-    // } else {
-    //     asm_err(as, ".endscope without a matching .scope");
-    // }
 }
 
 void parse_dot_for(ASSEMBLER *as) {
@@ -1511,7 +1502,7 @@ void parse_dot_for(ASSEMBLER *as) {
         find_ab_passing_over_c(as, ".endfor", NULL, ".for");
         if(!*as->input) {
             // failed so find .endfor (must be in same file)
-            asm_err(as, ".for without .endfor");
+            asm_err(as, ASM_ERR_DEFINE, ".for without .endfor");
         }
     } else {
         // condition success
@@ -1532,7 +1523,7 @@ void parse_dot_if(ASSEMBLER *as) {
         find_ab_passing_over_c(as, ".endif", ".else", ".if");
         if(!*as->input) {
             // failed so find .else or .endif (must be in same file)
-            asm_err(as, ".if without .endif");
+            asm_err(as, ASM_ERR_DEFINE, ".if without .endif");
         } else {
             // If not endif, it's else and that needs an endif
             if(tolower(as->token_start[2]) != 'n') {
@@ -1549,7 +1540,7 @@ void parse_dot_if(ASSEMBLER *as) {
 void parse_dot_incbin(ASSEMBLER *as) {
     get_token(as);
     if(*as->token_start != '"') {
-        asm_err(as, "include expects a \" enclosed string as a parameter");
+        asm_err(as, ASM_ERR_DEFINE, "include expects a \" enclosed string as a parameter");
     } else {
         UTIL_FILE new_file;
         char file_name[PATH_MAX];
@@ -1566,12 +1557,12 @@ void parse_dot_incbin(ASSEMBLER *as) {
             if(A2_OK == util_file_load(&new_file, file_name, "rb")) {
                 // Success, add to list of loaded files and assign it to f
                 if(A2_OK != ARRAY_ADD(&as->include_files.included_files, new_file)) {
-                    asm_err(as, "Out of memory");
+                    asm_err(as, ASM_ERR_FATAL, "Out of memory");
                 }
                 // Get a handle to the file in the array (safer than going with f = &new_file)
                 f = ARRAY_GET(&as->include_files.included_files, UTIL_FILE, as->include_files.included_files.items - 1);
             } else {
-                asm_err(as, ".incbin could not load the file %s", file_name);
+                asm_err(as, ASM_ERR_DEFINE, ".incbin could not load the file %s", file_name);
             }
         }
         if(f) {
@@ -1588,7 +1579,7 @@ void parse_dot_incbin(ASSEMBLER *as) {
 void parse_dot_include(ASSEMBLER *as) {
     get_token(as);
     if(*as->token_start != '"') {
-        asm_err(as, "include expects a \" enclosed string as a parameter");
+        asm_err(as, ASM_ERR_DEFINE, "include expects a \" enclosed string as a parameter");
     } else {
         char file_name[PATH_MAX];
         size_t string_length = as->input - as->token_start - 2;
@@ -1607,7 +1598,7 @@ void parse_dot_macro(ASSEMBLER *as) {
         macro.macro_name = NULL;
         macro.macro_name_length = 0;
         macro_okay = 0;
-        asm_err(as, "Macro has no name");
+        asm_err(as, ASM_ERR_DEFINE, "Macro has no name");
     } else {
         size_t i;
         macro.macro_name = as->token_start;
@@ -1617,7 +1608,7 @@ void parse_dot_macro(ASSEMBLER *as) {
             MACRO *existing_macro = ARRAY_GET(&as->macros, MACRO, i);
             if(existing_macro->macro_name_length == macro.macro_name_length && 0 == strnicmp(existing_macro->macro_name, macro.macro_name, macro.macro_name_length)) {
                 macro_okay = 0;
-                asm_err(as, "Macro with name %.*s has already been defined", macro.macro_name_length, macro.macro_name);
+                asm_err(as, ASM_ERR_DEFINE, "Macro with name %.*s has already been defined", macro.macro_name_length, macro.macro_name);
             }
         }
     }
@@ -1637,7 +1628,7 @@ void parse_dot_macro(ASSEMBLER *as) {
     // After parameters it must be the end of the line
     if(!(util_is_newline(as->current_token.op) || as->current_token.op == ';')) {
         macro_okay = 0;
-        asm_err(as, "Macro defenition error");
+        asm_err(as, ASM_ERR_DEFINE, "Macro defenition error");
     }
     // Save the parse point as the macro body start point
     input_stack_push(as);
@@ -1648,7 +1639,7 @@ void parse_dot_macro(ASSEMBLER *as) {
     macro.macro_body_end = as->input;
     if(!(*as->input)) {
         macro_okay = 0;
-        asm_err(as, ".macro %.*s L%05zu, with no .endmacro\n", macro.macro_name_length, macro.macro_name, macro.macro_body_input.current_line);
+        asm_err(as, ASM_ERR_RESOLVE, ".macro %.*s L%05zu, with no .endmacro\n", macro.macro_name_length, macro.macro_name, macro.macro_body_input.current_line);
     }
     // If there were no errors, add the macro to the list of macros
     if(macro_okay) {
@@ -1659,7 +1650,7 @@ void parse_dot_macro(ASSEMBLER *as) {
 void parse_dot_org(ASSEMBLER *as) {
     uint64_t value = evaluate_expression(as);
     if(as->current_address > value) {
-        asm_err(as, "Assigning address %"PRIx64" when address is already %04X error", value, as->current_address);
+        asm_err(as, ASM_ERR_RESOLVE, "Assigning address %"PRIx64" when address is already %04X error", value, as->current_address);
     } else {
         as->current_address = value;
         if(value < as->start_address) {
@@ -1668,29 +1659,9 @@ void parse_dot_org(ASSEMBLER *as) {
     }
 }
 
-// void parse_dot_proc(ASSEMBLER *as) {
-//     next_token(as);
-//     if(as->current_token.type != TOKEN_VAR) {
-//         asm_err(as, ".proc must be followed by a name");
-//         return;
-//     }
-//     const char *name = as->current_token.name;
-//     const int name_length = as->current_token.name_length;
-//     SCOPE *s = scope_find_child(as->active_scope, name, name_length);
-//     if(s) {
-//         scope_to_scope(as, s);
-//     } else {
-//         symbol_store_qualified(as, name, name_length, SYMBOL_ADDRESS, current_output_address(as));
-//         SCOPE *s = scope_add(as, name, name_length, as->active_scope, GPERF_DOT_PROC);
-//         if(s) {
-//             scope_to_scope(as, s);
-//         }
-//     }
-// }
-
 int resolve_def_target(ASSEMBLER *as, const char *name, int len, SCOPE **out_parent, const char **out_leaf, int *out_leaf_len) {
     if(len >= 2 && name[0] == ':' && name[1] == ':') {
-        *out_parent = &as->root_scope;
+        *out_parent = as->root_scope;
         *out_leaf = name + 2;
         *out_leaf_len = len - 2;
         return 1;
@@ -1701,29 +1672,47 @@ int resolve_def_target(ASSEMBLER *as, const char *name, int len, SCOPE **out_par
     return 1;
 }
 
+int contains_double_colon(const char *s, int len) {
+    for(int i = 0; i + 1 < len; i++) {
+        if(s[i] == ':' && s[i + 1] == ':') {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 void parse_dot_proc(ASSEMBLER *as) {
     next_token(as);
     if(as->current_token.type != TOKEN_VAR) {
-        asm_err(as, ".proc must be followed by a name");
+        asm_err(as, ASM_ERR_DEFINE, ".proc must be followed by a name");
         return;
     }
 
+    // See if the name is root anchored or not
     SCOPE *parent = NULL;
     const char *leaf = NULL;
     int leaf_len = 0;
     resolve_def_target(as, as->current_token.name, as->current_token.name_length, &parent, &leaf, &leaf_len);
+    
+    // The name may also not contain further scopes
+    if(contains_double_colon(leaf, leaf_len)) {
+        asm_err(as, ASM_ERR_DEFINE, "The name %.*s is scoped and not allowed", leaf_len, leaf);
+        return;
+    }
 
     SCOPE *s = scope_find_child(parent, leaf, leaf_len);
     if(s) {
-        // scope_to_scope(as, s);
-        scope_push(as, s);
+        if(as->pass == 1) {
+            asm_err(as, ASM_ERR_DEFINE, "In this scope a .proc has already been defined with the name %.*s", leaf_len, leaf);
+        } else {
+            scope_push(as, s);
+        }
         return;
     }
 
     symbol_store_in_scope(as, parent, leaf, leaf_len, SYMBOL_ADDRESS, current_output_address(as));
     s = scope_add(as, leaf, leaf_len, parent, GPERF_DOT_PROC);
     if(s) {
-        // scope_to_scope(as, s);
         scope_push(as, s);
     }
 }
@@ -1731,13 +1720,13 @@ void parse_dot_proc(ASSEMBLER *as) {
 void parse_dot_res(ASSEMBLER *as) {
     uint64_t length = evaluate_expression(as);
     if(length > 0x10000 - current_output_address(as)) {
-        asm_err(as, "Reserving %"PRIx64" bytes when only %04X remain in 64K", length, 0x10000 - current_output_address(as));
+        asm_err(as, ASM_ERR_RESOLVE, "Reserving %"PRIx64" bytes when only %04X remain in 64K", length, 0x10000 - current_output_address(as));
     } else {
         uint64_t value = 0;
         if(as->current_token.op == ',') {
             value = evaluate_expression(as);
             if(value > 0xFF) {
-                asm_err(as, ".res cannot fill with %"PRIx64".  Only 0x00 - 0xFF allowed", value);
+                asm_err(as, ASM_ERR_RESOLVE, ".res cannot fill with %"PRIx64".  Only 0x00 - 0xFF allowed", value);
                 return;
             }
         }
@@ -1755,19 +1744,19 @@ void parse_dot_segdef(ASSEMBLER *as) {
 
     next_token(as);
     if(as->current_token.type != TOKEN_STR) {
-        asm_err(as, ".segdef expects a quoted segment name");
+        asm_err(as, ASM_ERR_DEFINE, ".segdef expects a quoted segment name");
         return;
     }
     seg.segment_name = as->current_token.name;
     seg.segment_name_length = as->current_token.name_length;
     seg.segment_name_hash = as->current_token.name_hash;
     if(segment_find(&as->segments, &seg)) {
-        asm_err(as, "Segment %.*s has already been defined", seg.segment_name_length, seg.segment_name);
+        asm_err(as, ASM_ERR_DEFINE, "Segment %.*s has already been defined", seg.segment_name_length, seg.segment_name);
         return;
     }
     next_token(as);
     if(as->current_token.type != TOKEN_END || as->current_token.op != ',') {
-        asm_err(as, ".segdef expects a comma then a start address after the name");
+        asm_err(as, ASM_ERR_DEFINE, ".segdef expects a comma then a start address after the name");
         return;
     }
     seg.segment_start_address = evaluate_expression(as);
@@ -1787,7 +1776,7 @@ void parse_dot_segdef(ASSEMBLER *as) {
             }
         }
         if(err) {
-            asm_err(as, "The optional parameter to .segdef after the name and start is either emit or noemit");
+            asm_err(as, ASM_ERR_DEFINE, "The optional parameter to .segdef after the name and start is either emit or noemit");
             return;
         }
     }
@@ -1799,7 +1788,7 @@ void parse_dot_segment(ASSEMBLER *as) {
 
     next_token(as);
     if(as->current_token.type != TOKEN_STR) {
-        asm_err(as, ".segment expects a quoted segment name");
+        asm_err(as, ASM_ERR_DEFINE, ".segment expects a quoted segment name");
         return;
     }
     seg.segment_name = as->current_token.name;
@@ -1809,7 +1798,7 @@ void parse_dot_segment(ASSEMBLER *as) {
     if(seg.segment_name_length) {
         s = segment_find(&as->segments, &seg);
         if(!s) {
-            asm_err(as, "Segment %.*s was not defined", seg.segment_name_length, seg.segment_name);
+            asm_err(as, ASM_ERR_DEFINE, "Segment %.*s was not defined", seg.segment_name_length, seg.segment_name);
             return;
         }
     }
@@ -1828,15 +1817,19 @@ void parse_dot_scope(ASSEMBLER *as) {
     } else {
         name = as->current_token.name;
         name_length = as->current_token.name_length;
+
+        if(contains_double_colon(name, name_length)) {
+            asm_err(as, ASM_ERR_DEFINE, "The name %.*s is scoped and not allowed as a scope name", name_length, name);
+            return;
+        }
     }
+
     SCOPE *s = scope_find_child(as->active_scope, name, name_length);
     if(s) {
-        // scope_to_scope(as, s);
         scope_push(as, s);
     } else {
         SCOPE *s = scope_add(as, name, name_length, as->active_scope, GPERF_DOT_SCOPE);
         if(s) {
-            // scope_to_scope(as, s);
             scope_push(as, s);
         }
     }
@@ -1891,7 +1884,7 @@ void parse_dot_string(ASSEMBLER *as) {
                         value = *as->token_start++;
                     }
                     if(value >= 256) {
-                        asm_err(as, "Escape value %ld not between 0 and 255", value);
+                        asm_err(as, ASM_ERR_DEFINE, "Escape value %ld not between 0 and 255", value);
                     }
                     emit(as, value);
                 } else {
@@ -1920,7 +1913,7 @@ void parse_dot_string(ASSEMBLER *as) {
             value = parse_expression(as);
             emit(as, value);
             if(value >= 256) {
-                asm_err(as, "Values %ld not between 0 and 255", value);
+                asm_err(as, ASM_ERR_RESOLVE, "Values %ld not between 0 and 255", value);
             }
         }
     } while(as->current_token.op == ',');
@@ -1934,7 +1927,7 @@ void parse_address(ASSEMBLER *as) {
     int op;
     get_token(as);
     if(-1 == (op = match(as, 3, "+=", "+", "="))) {
-        asm_err(as, "Address assign error");
+        asm_err(as, ASM_ERR_DEFINE, "Address assign error");
         return;
     }
     if(0 == op) {
@@ -1952,7 +1945,7 @@ void parse_address(ASSEMBLER *as) {
             break;
     }
     if(current_output_address(as) > address) {
-        asm_err(as, "Assigning address %04X when address is already %04X error", address, current_output_address(as));
+        asm_err(as, ASM_ERR_RESOLVE, "Assigning address %04X when address is already %04X error", address, current_output_address(as));
     } else {
         set_current_output_address(as, address);
         // as->current_address = address;
@@ -1978,13 +1971,13 @@ uint16_t parse_anonymous_address(ASSEMBLER *as) {
             direction = -direction;
             break;
         default:
-            asm_err(as, "Unexpected symbol after anonymous : (%c)", op);
+            asm_err(as, ASM_ERR_DEFINE, "Unexpected symbol after anonymous : (%c)", op);
             break;
     }
     // The opcode has not been emitted so + 1
     uint16_t address = current_output_address(as) + 1;
     if(!anonymous_symbol_lookup(as, &address, direction)) {
-        asm_err(as, "Invalid anonymous label address");
+        asm_err(as, ASM_ERR_RESOLVE, "Invalid anonymous label address");
     }
     return address;
 }
@@ -2082,7 +2075,7 @@ void parse_dot_command(ASSEMBLER *as) {
             write_values(as, 16, BYTE_ORDER_LO);
             break;
         default:
-            asm_err(as, "opcode with id:%d not understood", as->opcode_info.opcode_id);
+            asm_err(as, ASM_ERR_DEFINE, "opcode with id:%d not understood", as->opcode_info.opcode_id);
     }
 }
 
@@ -2106,7 +2099,7 @@ void parse_opcode(ASSEMBLER *as) {
     if(is_valid_instruction_only(as)) {
         // Implied
         if(as->valid_opcodes && !asm_opcode_type[as->opcode_info.opcode_id][as->opcode_info.addressing_mode]) {
-            asm_err(as, "Opcode %.3s with mode %s only valid in 65c02", as->opcode_info.mnemonic, address_mode_txt[as->opcode_info.addressing_mode]);
+            asm_err(as, ASM_ERR_DEFINE, "Opcode %.3s with mode %s only valid in 65c02", as->opcode_info.mnemonic, address_mode_txt[as->opcode_info.addressing_mode]);
         }
         emit(as, asm_opcode[as->opcode_info.opcode_id][ADDRESS_MODE_ACCUMULATOR]);
     } else {
@@ -2138,7 +2131,7 @@ void parse_opcode(ASSEMBLER *as) {
                             next_token(as);
                             // Make sure it was ,x or ,y
                             if(tolower(*as->token_start) != reg) {
-                                asm_err(as, "Expected ,%c", reg);
+                                asm_err(as, ASM_ERR_DEFINE, "Expected ,%c", reg);
                             }
                             next_token(as);
                             // If it was ,x go past the closing )
@@ -2154,7 +2147,7 @@ void parse_opcode(ASSEMBLER *as) {
         if(!processed) {
             // general case
             if(as->current_token.type == TOKEN_END) {
-                asm_err(as, "Opcode %.3s with mode %s expects an operand", as->opcode_info.mnemonic, address_mode_txt[as->opcode_info.addressing_mode]);
+                asm_err(as, ASM_ERR_DEFINE, "Opcode %.3s with mode %s expects an operand", as->opcode_info.mnemonic, address_mode_txt[as->opcode_info.addressing_mode]);
             }
             as->opcode_info.value = parse_expression(as);
             if(as->opcode_info.width >= 8 && as->expression_size > 8) {
@@ -2190,14 +2183,15 @@ int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, void *user, output_byte ob
     ARRAY_INIT(&as->scope_stack, SCOPE*);
     ARRAY_INIT(&as->input_stack, INPUT_STACK);
 
-    if(A2_OK != scope_init(&as->root_scope, GPERF_DOT_SCOPE)) {
+    as->root_scope = (SCOPE*)malloc(sizeof(SCOPE));
+    if(!as->root_scope || A2_OK != scope_init(as->root_scope, GPERF_DOT_SCOPE)) {
         return A2_ERR;
     }
-    if(!set_name(&as->root_scope.scope_name, "root", 4)) {
+    if(!set_name(&as->root_scope->scope_name, "root", 4)) {
         return A2_ERR;
     }
-    as->root_scope.scope_name_length = 4;
-    scope_to_scope(as, &as->root_scope);
+    as->root_scope->scope_name_length = 4;
+    scope_push(as, as->root_scope);
 
     include_files_init(as);
 
@@ -2233,11 +2227,15 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
         as->current_file = ARRAY_GET(&as->include_files.included_files, UTIL_FILE, 0)->file_display_name;
         as->current_address = address;
         as->pass++;
-        if(as->active_scope != &as->root_scope) {
-            asm_err(as, "Scope error.  Open scope %.*s not closed", as->active_scope->scope_name_length, as->active_scope->scope_name);
+        if(as->active_scope != as->root_scope) {
+            asm_err(as, ASM_ERR_RESOLVE, "Scope error.  Open scope %.*s, or one of its children, was not closed", as->active_scope->scope_name_length, as->active_scope->scope_name);
+        }
+        while(as->scope_stack.items > 1) {
+            // Just to be safe...
+            scope_pop(as);
         }
         // Reset scopes (solves open scope isues and repeatability, of course)
-        as->active_scope = &as->root_scope;
+        as->active_scope = as->root_scope;
         scope_reset_ids(as->active_scope);
         // Reset segment defenitions (for pass 2, really)
         as->segments.items = 0;
@@ -2252,10 +2250,10 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
                 // Make sure all opened constructs were closed as well
                 if(as->if_active) {
                     as->if_active = 0;
-                    asm_err(as, ".if without .endif");
+                    asm_err(as, ASM_ERR_DEFINE, ".if without .endif");
                 }
                 if(as->loop_stack.items) {
-                    asm_err(as, ".for L:%05zu, without .endfor", ARRAY_GET(&as->loop_stack, FOR_LOOP, as->loop_stack.items - 1)->body_line - 1);
+                    asm_err(as, ASM_ERR_DEFINE, ".for L:%05zu, without .endfor", ARRAY_GET(&as->loop_stack, FOR_LOOP, as->loop_stack.items - 1)->body_line - 1);
                     as->loop_stack.items = 0;
                 }
                 // The end of the file has been reached so if it was an included file
@@ -2278,14 +2276,13 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
             } else if(is_macro_parse_macro(as)) {             // Macros are like variables but can be found
                 continue;
             } else if(is_variable(as)) {                      // Variables are last (followed by "=")
-                // parse_variable(as);
                 as->current_token.type = TOKEN_VAR;           // Variable Name
                 as->current_token.name = as->token_start;
                 as->current_token.name_length = as->input - as->token_start;
                 as->current_token.name_hash = util_fnv_1a_hash(as->current_token.name, as->current_token.name_length);
                 parse_expression(as);
             } else {
-                asm_err(as, "Unknown token");
+                asm_err(as, ASM_ERR_DEFINE, "Unknown token");
             }
         }
         // Flush the macros between passes so they can be re-parsed and
@@ -2313,7 +2310,7 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
                 // There is no warning mechanism and I don't want intentional "growth gaps"
                 // to stop the iteratioin process, so ignore gaps, just error overlaps
                 if(s->segment_start_address < emit_end) {
-                    asm_err(as, "Start Segment %.*s at $%04X*", s->segment_name_length, s->segment_name, emit_end);
+                    asm_err(as, ASM_ERR_RESOLVE, "Start Segment %.*s at $%04X*", s->segment_name_length, s->segment_name, emit_end);
                     issue = 1;
                 }
                 uint16_t seg_size = s->segment_output_address - s->segment_start_address;
@@ -2321,7 +2318,7 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
             }
         }
         if(issue) {
-            asm_err(as, "* Offsets may slightly off, based on .align statement changing output size");
+            asm_err(as, ASM_ERR_RESOLVE, "* Offsets may slightly off, based on .align statement changing output size");
         }
     }
     if(name) {
@@ -2334,7 +2331,7 @@ void assembler_shutdown(ASSEMBLER *as) {
     include_files_cleanup(as);
 
     // Remove all of the scopes and symbol tables
-    scope_destroy(&as->root_scope);
+    scope_destroy(as->root_scope);
 
     // free active macro buffer (if any)
     while(as->macro_buffers.items) {

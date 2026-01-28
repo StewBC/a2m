@@ -10,5 +10,11 @@
 
 #define ASM_ERR_MAX_STR_LEN 256
 
-void asm_err(ASSEMBLER *as, const char *format, ...);
+typedef enum{
+    ASM_ERR_DEFINE,     // show only on pass 1
+    ASM_ERR_RESOLVE,    // show only on pass 2
+    ASM_ERR_FATAL       // show always
+} ASM_ERR_CLASS;
+
+void asm_err(ASSEMBLER *as, ASM_ERR_CLASS cls, const char *format, ...);
 OPCODEINFO *in_word_set(register const char *str, register size_t len);

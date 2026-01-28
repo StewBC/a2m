@@ -278,15 +278,14 @@ typedef struct ASSEMBLER {
     const char *next_line_start;                            // So errors get reported on line of last token
     const char *strcode;                                    // Active .strcode expression
     const char *token_start;                                // Points at the start of a token (and input the end)
-    SCOPE root_scope;
+    SCOPE *root_scope;
     SCOPE *active_scope;
     SEGMENT *active_segment;
     DYNARRAY *symbol_table;                                 // Array of arrays of symbols
     ERRORLOG *errorlog;                                     // ptr to log that tracks errors
 } ASSEMBLER;
 
-// extern ASSEMBLER *as;
-
+int token_has_scope_path(const char *p, int len);
 SYMBOL_LABEL *symbol_lookup(ASSEMBLER *as, uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length);
 SYMBOL_LABEL *symbol_lookup_parent_chain(ASSEMBLER *as, uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length);
 SYMBOL_LABEL *symbol_lookup_local(ASSEMBLER *as, uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length);

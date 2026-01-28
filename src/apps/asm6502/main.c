@@ -98,7 +98,7 @@ static void save_symbols(FILE *fp, SCOPE *s, int level) {
     array_free(&symbols);
     for(int csi = 0; csi < s->child_scopes.items; csi++) {
         fprintf(fp, "\n");
-        save_symbols(fp, ARRAY_GET(&s->child_scopes, SCOPE, csi), level + 1);
+        save_symbols(fp, *ARRAY_GET(&s->child_scopes, SCOPE*, csi), level + 1);
     }
     fprintf(fp, "%*s}\n", level * 2, "");
 }
@@ -185,7 +185,7 @@ int main(int argc, char **argv) {
             fp = symbol_file.fp;
         }
         if(fp) {
-            save_symbols(fp, &m.as.root_scope, 0);
+            save_symbols(fp, m.as.root_scope, 0);
             save_segments(fp, &m.as.segments);
         }
         util_file_discard(&symbol_file);

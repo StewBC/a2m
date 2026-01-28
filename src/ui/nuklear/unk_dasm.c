@@ -333,7 +333,7 @@ void unk_dasm_populate_syms(RUNTIME *rt, ASSEMBLER *as, SCOPE *s) {
     }
     // Iterate child scopes, adding them all
     for(int csi = 0; csi < s->child_scopes.items; csi++) {
-        unk_dasm_populate_syms(rt, as, ARRAY_GET(&s->child_scopes, SCOPE, csi));
+        unk_dasm_populate_syms(rt, as, *ARRAY_GET(&s->child_scopes, SCOPE*, csi));
     }
 }
 
@@ -451,12 +451,12 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                         as.valid_opcodes = MODEL_APPLE_IIEE - m->model;
                         if(A2_OK != assembler_assemble(&as, ac->file_browser.dir_selected.name, 0)) {
                             as.pass = 2;
-                            asm_err(&as, "Could not open file for assembly.");
+                            asm_err(&as, ASM_ERR_DEFINE, "Could not open file for assembly.");
                         }
                         // Remove all symbols from the assembler from the runtime
                         rt_sym_remove_symbols(rt, "assembler");
                         // Populate runtime with symbols from this pass
-                        unk_dasm_populate_syms(rt, &as, &as.root_scope);
+                        unk_dasm_populate_syms(rt, &as, as.root_scope);
                         assembler_shutdown(&as);
                         rt_sym_search_update(rt);
                         // Force a rethink of the display, since the contents changed
