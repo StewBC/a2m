@@ -256,7 +256,8 @@ typedef struct ASSEMBLER {
     DYNARRAY loop_stack;                                    // Array of for loops
     DYNARRAY macros;                                        // Array of all macros
     DYNARRAY macro_buffers;                                 // Array of all buffers that macros expand into
-    DYNARRAY segments;
+    DYNARRAY segments;                                      // .segdef creates segment defenitions
+    DYNARRAY scope_stack;                                   // Needed since scopes can be created outside parent
     INCLUDE_FILES include_files;                            // The arrays for files and stack for .include
     OPCODEINFO opcode_info;                                 // State of what is to be emitted in terms of 6502 opcodes
     TOKEN current_token;                                    // What is being parsed
@@ -288,8 +289,10 @@ typedef struct ASSEMBLER {
 
 SYMBOL_LABEL *symbol_lookup(ASSEMBLER *as, uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length);
 SYMBOL_LABEL *symbol_lookup_parent_chain(ASSEMBLER *as, uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length);
+SYMBOL_LABEL *symbol_lookup_local(ASSEMBLER *as, uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length);
 int symbol_delete_local(ASSEMBLER *as, uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length);
 SYMBOL_LABEL *symbol_store_in_scope(ASSEMBLER *as, SCOPE *scope, const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TYPE symbol_type, uint64_t value);
+SYMBOL_LABEL *symbol_store_qualified(ASSEMBLER *as, const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TYPE symbol_type, uint64_t value);
 int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, void *user, output_byte ob);
 int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address);
 void assembler_shutdown(ASSEMBLER *as);

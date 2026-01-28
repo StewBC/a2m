@@ -531,6 +531,26 @@ typedef struct {
     int name_length;       // final symbol name length
 } QUALIFIED_REF;
 
+void scope_to_scope(ASSEMBLER *as, SCOPE *s) {
+    as->active_scope = s;
+    as->symbol_table = s->symbol_table;
+}
+
+void scope_push(ASSEMBLER *as, SCOPE *next) {
+    ARRAY_ADD(&as->scope_stack, as->active_scope);
+    scope_to_scope(as, next);
+}
+
+int scope_pop(ASSEMBLER *as) {
+    if(as->scope_stack.items == 0) {
+        return 0;
+    }
+    SCOPE *prev = *ARRAY_GET(&as->scope_stack, SCOPE*, as->scope_stack.items - 1);
+    as->scope_stack.items--;
+    scope_to_scope(as, prev);
+    return 1;
+}
+
 static int token_has_scope_path(const char *p, int len) {
     for(int i = 0; i + 1 < len; i++) {
         if(p[i] == ':' && p[i + 1] == ':') {
@@ -729,11 +749,6 @@ void scope_reset_ids(SCOPE *s) {
     }
 }
 
-void scope_to_scope(ASSEMBLER *as, SCOPE *s) {
-    as->active_scope = s;
-    as->symbol_table = s->symbol_table;
-}
-
 //----------------------------------------------------------------------------
 // Segment helpers
 SEGMENT *segment_find(DYNARRAY *segments, const SEGMENT *seg) {
@@ -860,7 +875,6 @@ SYMBOL_LABEL *symbol_lookup_parent_chain(ASSEMBLER *as, uint32_t name_hash, cons
     return NULL;
 }
 
-
 SYMBOL_LABEL *symbol_lookup_local(ASSEMBLER *as, uint32_t name_hash, const char *symbol_name, uint32_t symbol_name_length) {
     SCOPE *active_scope = as->active_scope;
     uint8_t bucket = name_hash & HASH_MASK;
@@ -900,7 +914,7 @@ int symbol_delete_local(ASSEMBLER *as, uint32_t name_hash, const char *symbol_na
 
 SYMBOL_LABEL *symbol_store_in_scope(ASSEMBLER *as, SCOPE *scope, const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TYPE symbol_type, uint64_t value) {
     uint32_t name_hash = util_fnv_1a_hash(symbol_name, symbol_name_length);
-    SYMBOL_LABEL *sl = symbol_lookup_local(as, name_hash, symbol_name, symbol_name_length);
+    SYMBOL_LABEL *sl = symbol_lookup_in_scope(scope, name_hash, symbol_name, symbol_name_length);
     if(sl) {
         if(sl->symbol_type == SYMBOL_UNKNOWN) {
             sl->symbol_type = symbol_type;
@@ -909,13 +923,14 @@ SYMBOL_LABEL *symbol_store_in_scope(ASSEMBLER *as, SCOPE *scope, const char *sym
             if(sl->symbol_type != symbol_type) {
                 // Symbol changing type error
                 asm_err(as, "Symbol %.*s can't be address and variable type", symbol_name_length, symbol_name);
-            }
-            if(sl->symbol_type == SYMBOL_VARIABLE) {
-                // Variables can change value along the way
-                sl->symbol_value = value;
-            } else if(sl->symbol_value != value) {
-                // Addresses may not change value
-                asm_err(as, "Multiple address labels have name %.*s", symbol_name_length, symbol_name);
+            } else {
+                if(sl->symbol_type == SYMBOL_VARIABLE) {
+                    // Variables can change value along the way
+                    sl->symbol_value = value;
+                } else if(sl->symbol_value != value) {
+                    // Addresses may not change value
+                    asm_err(as, "Multiple address labels have name %.*s", symbol_name_length, symbol_name);
+                }
             }
         }
     } else {
@@ -928,11 +943,20 @@ SYMBOL_LABEL *symbol_store_in_scope(ASSEMBLER *as, SCOPE *scope, const char *sym
         new_sl.symbol_value = value;
         new_sl.symbol_width = 0;
         uint8_t bucket = name_hash & HASH_MASK;
-        DYNARRAY *bucket_array = &as->symbol_table[bucket];
+        DYNARRAY *bucket_array = &scope->symbol_table[bucket];
         ARRAY_ADD(bucket_array, new_sl);
         sl = ARRAY_GET(bucket_array, SYMBOL_LABEL, bucket_array->items - 1);
     }
     return sl;
+}
+
+SYMBOL_LABEL *symbol_store_qualified(ASSEMBLER *as, const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TYPE symbol_type, uint64_t value) {
+    QUALIFIED_REF qr;
+    QRES r = scope_resolve_qualified_name(as, symbol_name, symbol_name_length, &qr);
+    if(r != QRES_OK){
+        return NULL; // treat as unresolved (pass2 error still happens)
+    }
+    return symbol_store_in_scope(as, qr.scope, qr.name, (uint32_t)qr.name_length, symbol_type, value);
 }
 
 //----------------------------------------------------------------------------
@@ -1455,19 +1479,25 @@ void parse_dot_endmacro(ASSEMBLER *as) {
 }
 
 void parse_dot_endproc(ASSEMBLER *as) {
-    if(as->active_scope->parent_scope && as->active_scope->scope_type == GPERF_DOT_PROC) {
-        scope_to_scope(as, as->active_scope->parent_scope);
-    } else {
+    if(as->active_scope->scope_type != GPERF_DOT_PROC || !scope_pop(as)) {
         asm_err(as, ".endproc without a matching .proc");
-    }
+    }    
+    // if(as->active_scope->parent_scope && as->active_scope->scope_type == GPERF_DOT_PROC) {
+    //     scope_to_scope(as, as->active_scope->parent_scope);
+    // } else {
+    //     asm_err(as, ".endproc without a matching .proc");
+    // }
 }
 
 void parse_dot_endscope(ASSEMBLER *as) {
-    if(as->active_scope->parent_scope && as->active_scope->scope_type == GPERF_DOT_SCOPE) {
-        scope_to_scope(as, as->active_scope->parent_scope);
-    } else {
-        asm_err(as, ".endscope without a matching .scope");
-    }
+    if(as->active_scope->scope_type != GPERF_DOT_SCOPE || !scope_pop(as)) {
+        asm_err(as, ".endproc without a matching .proc");
+    }    
+    // if(as->active_scope->parent_scope && as->active_scope->scope_type == GPERF_DOT_SCOPE) {
+    //     scope_to_scope(as, as->active_scope->parent_scope);
+    // } else {
+    //     asm_err(as, ".endscope without a matching .scope");
+    // }
 }
 
 void parse_dot_for(ASSEMBLER *as) {
@@ -1638,23 +1668,63 @@ void parse_dot_org(ASSEMBLER *as) {
     }
 }
 
+// void parse_dot_proc(ASSEMBLER *as) {
+//     next_token(as);
+//     if(as->current_token.type != TOKEN_VAR) {
+//         asm_err(as, ".proc must be followed by a name");
+//         return;
+//     }
+//     const char *name = as->current_token.name;
+//     const int name_length = as->current_token.name_length;
+//     SCOPE *s = scope_find_child(as->active_scope, name, name_length);
+//     if(s) {
+//         scope_to_scope(as, s);
+//     } else {
+//         symbol_store_qualified(as, name, name_length, SYMBOL_ADDRESS, current_output_address(as));
+//         SCOPE *s = scope_add(as, name, name_length, as->active_scope, GPERF_DOT_PROC);
+//         if(s) {
+//             scope_to_scope(as, s);
+//         }
+//     }
+// }
+
+int resolve_def_target(ASSEMBLER *as, const char *name, int len, SCOPE **out_parent, const char **out_leaf, int *out_leaf_len) {
+    if(len >= 2 && name[0] == ':' && name[1] == ':') {
+        *out_parent = &as->root_scope;
+        *out_leaf = name + 2;
+        *out_leaf_len = len - 2;
+        return 1;
+    }
+    *out_parent = as->active_scope;
+    *out_leaf = name;
+    *out_leaf_len = len;
+    return 1;
+}
+
 void parse_dot_proc(ASSEMBLER *as) {
     next_token(as);
     if(as->current_token.type != TOKEN_VAR) {
         asm_err(as, ".proc must be followed by a name");
         return;
     }
-    const char *name = as->current_token.name;
-    const int name_length = as->current_token.name_length;
-    SCOPE *s = scope_find_child(as->active_scope, name, name_length);
+
+    SCOPE *parent = NULL;
+    const char *leaf = NULL;
+    int leaf_len = 0;
+    resolve_def_target(as, as->current_token.name, as->current_token.name_length, &parent, &leaf, &leaf_len);
+
+    SCOPE *s = scope_find_child(parent, leaf, leaf_len);
     if(s) {
-        scope_to_scope(as, s);
-    } else {
-        symbol_store_in_scope(as, as->active_scope, name, name_length, SYMBOL_ADDRESS, current_output_address(as));
-        SCOPE *s = scope_add(as, name, name_length, as->active_scope, GPERF_DOT_PROC);
-        if(s) {
-            scope_to_scope(as, s);
-        }
+        // scope_to_scope(as, s);
+        scope_push(as, s);
+        return;
+    }
+
+    symbol_store_in_scope(as, parent, leaf, leaf_len, SYMBOL_ADDRESS, current_output_address(as));
+    s = scope_add(as, leaf, leaf_len, parent, GPERF_DOT_PROC);
+    if(s) {
+        // scope_to_scope(as, s);
+        scope_push(as, s);
     }
 }
 
@@ -1761,11 +1831,13 @@ void parse_dot_scope(ASSEMBLER *as) {
     }
     SCOPE *s = scope_find_child(as->active_scope, name, name_length);
     if(s) {
-        scope_to_scope(as, s);
+        // scope_to_scope(as, s);
+        scope_push(as, s);
     } else {
         SCOPE *s = scope_add(as, name, name_length, as->active_scope, GPERF_DOT_SCOPE);
         if(s) {
-            scope_to_scope(as, s);
+            // scope_to_scope(as, s);
+            scope_push(as, s);
         }
     }
 }
@@ -2025,7 +2097,7 @@ void parse_label(ASSEMBLER *as) {
             ARRAY_ADD(&as->anon_symbols, address);
         }
     } else {
-        symbol_store_in_scope(as, as->active_scope, symbol_name, name_length, SYMBOL_ADDRESS, current_output_address(as));
+        symbol_store_qualified(as, symbol_name, name_length, SYMBOL_ADDRESS, current_output_address(as));
     }
 }
 
@@ -2115,6 +2187,7 @@ int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, void *user, output_byte ob
     ARRAY_INIT(&as->macros, MACRO);
     ARRAY_INIT(&as->macro_buffers, char *);
     ARRAY_INIT(&as->segments, SEGMENT);
+    ARRAY_INIT(&as->scope_stack, SCOPE*);
     ARRAY_INIT(&as->input_stack, INPUT_STACK);
 
     if(A2_OK != scope_init(&as->root_scope, GPERF_DOT_SCOPE)) {
@@ -2206,7 +2279,7 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
                 continue;
             } else if(is_variable(as)) {                      // Variables are last (followed by "=")
                 // parse_variable(as);
-                as->current_token.type = TOKEN_VAR;         // Variable Name
+                as->current_token.type = TOKEN_VAR;           // Variable Name
                 as->current_token.name = as->token_start;
                 as->current_token.name_length = as->input - as->token_start;
                 as->current_token.name_hash = util_fnv_1a_hash(as->current_token.name, as->current_token.name_length);
@@ -2274,6 +2347,7 @@ void assembler_shutdown(ASSEMBLER *as) {
     array_free(&as->macros);
     array_free(&as->macro_buffers);
     array_free(&as->loop_stack);
+    array_free(&as->scope_stack);
     array_free(&as->anon_symbols);
 }
 

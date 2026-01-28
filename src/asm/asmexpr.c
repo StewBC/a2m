@@ -207,6 +207,12 @@ void next_token(ASSEMBLER *as) {
         as->current_token.name = as->token_start + 1;
         as->current_token.name_length = len - 2;
         as->current_token.name_hash = util_fnv_1a_hash(as->current_token.name, as->current_token.name_length);
+    } else if(*as->token_start == ':' && *(as->token_start + 1) == ':') {
+        // Scoped/root-qualified identifier like ::a or ::A::B::x
+        as->current_token.type = TOKEN_VAR;
+        as->current_token.name = as->token_start;
+        as->current_token.name_length = as->input - as->token_start;
+        as->current_token.name_hash = util_fnv_1a_hash(as->current_token.name, as->current_token.name_length);        
     } else if(*as->token_start == ':' && *(as->token_start + 1) == '=') {
         as->current_token.type = TOKEN_OP;
         as->current_token.op = '=';                         // make := equivalent to =
@@ -260,7 +266,15 @@ int64_t parse_primary(ASSEMBLER *as) {
         value = as->current_token.value;
         next_token(as);
     } else if(as->current_token.type == TOKEN_VAR) {
-        SYMBOL_LABEL *sl = symbol_lookup(as, as->current_token.name_hash, as->current_token.name, as->current_token.name_length);
+        SYMBOL_LABEL *sl;
+        // Peek to see if this is an assignment.  Assignments only look in local scope next
+        next_token(as);
+        if(as->current_token.type == TOKEN_OP && as->current_token.op == '=') {
+            sl = symbol_lookup_local(as, as->current_token.name_hash, as->current_token.name, as->current_token.name_length);
+        } else {
+            sl = symbol_lookup(as, as->current_token.name_hash, as->current_token.name, as->current_token.name_length);
+        }
+
         if(as->pass == 2 && sl && sl->symbol_type == SYMBOL_UNKNOWN) {
             SYMBOL_LABEL *resolved = symbol_lookup_parent_chain(as, as->current_token.name_hash, as->current_token.name, as->current_token.name_length);
             if(resolved) {
@@ -280,13 +294,12 @@ int64_t parse_primary(ASSEMBLER *as) {
             value = sl->symbol_value;
         }
 
-        next_token(as);
         if(as->current_token.type == TOKEN_OP) {
             char op = as->current_token.op;
             if(op == '=') {
                 next_token(as);
                 if(sl->symbol_type != SYMBOL_ADDRESS) {
-                    sl->symbol_value = parse_expression(as);
+                    value = sl->symbol_value = parse_expression(as);
                     sl->symbol_type = SYMBOL_VARIABLE;
                     // if it was used unknown or is assigned from an unknown it becomes 2 byte
                     sl->symbol_width |= as->expression_size;
