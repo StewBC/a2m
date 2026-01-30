@@ -644,7 +644,7 @@ void dot_segdef(ASSEMBLER *as) {
             err = 1;
         }
         if(!err) {
-            if(as->current_token.name_length == 4 && 0 == strnicmp(as->current_token.name, "emit_byte", 4)) {
+            if(as->current_token.name_length == 4 && 0 == strnicmp(as->current_token.name, "emit", 4)) {
                 seg.do_not_emit = 0;
             } else if(as->current_token.name_length == 6 && 0 == strnicmp(as->current_token.name, "noemit", 6)) {
                 seg.do_not_emit = 1;
@@ -653,7 +653,7 @@ void dot_segdef(ASSEMBLER *as) {
             }
         }
         if(err) {
-            asm_err(as, ASM_ERR_RESOLVE, "The optional parameter to .segdef after the name and start is either emit_byte or noemit");
+            asm_err(as, ASM_ERR_RESOLVE, "The optional parameter to .segdef after the name and start is either emit or noemit");
             return;
         }
     }

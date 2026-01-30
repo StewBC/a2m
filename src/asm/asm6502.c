@@ -194,7 +194,7 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
         as->error_log_level = 1;
         // Sort in ouput order
         qsort(as->segments.data, as->segments.items, as->segments.element_size, assembler_segments_sort);
-        uint32_t emit_byte = 0, issue = 0;
+        uint32_t emit = 0, issue = 0;
         uint16_t emit_end;
         // show errors for overlapping segments
         for(int si = 0; si < as->segments.items; si++) {
@@ -202,9 +202,9 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
             if(s->do_not_emit) {
                 continue;
             }
-            if(!emit_byte) {
+            if(!emit) {
                 emit_end = s->segment_output_address;
-                emit_byte = 1;
+                emit = 1;
             } else {
                 // There is no warning mechanism and I don't want intentional "growth gaps"
                 // to stop the iteratioin process, so ignore gaps, just error overlaps

@@ -377,7 +377,7 @@ static void unk_help_render_text(struct nk_context *ctx, const char *help_text, 
             }
         }
 
-        // If remainder is empty, still emit_byte a blank line.
+        // If remainder is empty, still emit a blank line.
         char visible[HELP_MAX_LINE];
         size_t ind_len = (size_t)(indent_end - s);
         if(ind_len >= sizeof(visible)) {

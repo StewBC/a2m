@@ -206,16 +206,16 @@ int main(int argc, char **argv) {
     
     // If segments were used, show gaps
     if(m.as.segments.items) {
-        uint32_t emit_byte = 0, issue = 0;
+        uint32_t emit = 0, issue = 0;
         uint32_t emit_end = 0;
         for(int si = 0; si < m.as.segments.items; si++) {
             SEGMENT *s = ARRAY_GET(&m.as.segments, SEGMENT, si);
             if(s->do_not_emit) {
                 continue;
             }
-            if(!emit_byte) {
+            if(!emit) {
                 emit_end = s->segment_output_address;
-                emit_byte = 1;
+                emit = 1;
             } else {
                 if(s->segment_start_address > emit_end) {
                     fprintf(stderr, "\nSegment %.*s can start at $%04X*", s->segment_name_length, s->segment_name, emit_end);
