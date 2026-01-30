@@ -33,3 +33,8 @@ char *set_name(char **s, const char *name, const int name_length);
 int token_has_scope_path(const char *p, int len);
 SCOPE *scope_add(ASSEMBLER *as, const char *name, const int name_length, SCOPE *parent, int type);
 SCOPE *scope_find_child(SCOPE *parent, const char *name, int name_length);
+int scope_init(SCOPE *s, int type);
+void scope_push(ASSEMBLER *as, SCOPE *next);
+int scope_pop(ASSEMBLER *as);
+void scope_reset_ids(SCOPE *s);
+void scope_destroy(SCOPE *s);

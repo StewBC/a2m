@@ -17,14 +17,14 @@ static void flush_macros(ASSEMBLER *as) {
 
 //----------------------------------------------------------------------------
 // Token identification
-inline int is_address(ASSEMBLER *as) {
+int is_address(ASSEMBLER *as) {
     if(*as->token_start != '*') {
         return 0;
     }
     return 1;
 }
 
-inline int is_parse_dot_command(ASSEMBLER *as) {
+int is_parse_dot_command(ASSEMBLER *as) {
     OPCODEINFO *oi;
     if(*as->token_start != '.' || !(oi = in_word_set(as->token_start, as->input - as->token_start))) {
         return 0;
@@ -33,14 +33,14 @@ inline int is_parse_dot_command(ASSEMBLER *as) {
     return 1;
 }
 
-inline int is_label(ASSEMBLER *as) {
+int is_label(ASSEMBLER *as) {
     if(*(as->input - 1) != ':') {
         return 0;
     }
     return 1;
 }
 
-inline int is_opcode(ASSEMBLER *as) {
+int is_opcode(ASSEMBLER *as) {
     OPCODEINFO *oi;
     if(as->input - as->token_start != 3 || *as->token_start == '.' || !(oi = in_word_set(as->token_start, 3))) {
         return 0;
@@ -49,7 +49,7 @@ inline int is_opcode(ASSEMBLER *as) {
     return 1;
 }
 
-inline int is_variable(ASSEMBLER *as) {
+int is_variable(ASSEMBLER *as) {
     // Variable start with [a-Z] or _
     if(*as->token_start != '_' && !isalpha(*as->token_start)) {
         return 0;

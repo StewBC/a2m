@@ -107,12 +107,6 @@ target_link_libraries(asm6502 PUBLIC
 foreach(tgt IN ITEMS a2m asm6502)
 
   if(TARGET ${tgt})
-
-    if(UNIX AND NOT APPLE)
-      # Add the math library to Unix (Linux) biulds
-      target_link_libraries(${tgt} PRIVATE m)
-    endif()
-
     if(MSVC)
       # Always-on MSVC flags (all configs)
       target_compile_options(${tgt} PRIVATE

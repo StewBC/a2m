@@ -49,10 +49,12 @@ typedef struct ASSEMBLER {
     ERRORLOG *errorlog;                                     // ptr to log that tracks errors
 } ASSEMBLER;
 
-int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, void *user, output_byte ob);
-int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address);
-void assembler_shutdown(ASSEMBLER *as);
-
 static inline uint16_t current_output_address(ASSEMBLER *as) {
         return as->active_segment ? as->active_segment->segment_output_address : as->current_address;
 }
+
+int is_variable(ASSEMBLER *as);
+
+int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, void *user, output_byte ob);
+int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address);
+void assembler_shutdown(ASSEMBLER *as);

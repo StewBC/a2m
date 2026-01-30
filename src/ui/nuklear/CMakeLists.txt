@@ -37,4 +37,5 @@ target_link_libraries(unk PUBLIC
     SDL2::SDL2main
     $<IF:$<TARGET_EXISTS:SDL2_mixer::SDL2_mixer>,SDL2_mixer::SDL2_mixer,SDL2_mixer::SDL2_mixer-static>
     $<IF:$<TARGET_EXISTS:SDL2_image::SDL2_image>,SDL2_image::SDL2_image,SDL2_image::SDL2_image-static>
+    $<$<PLATFORM_ID:Linux>:m>
 )
