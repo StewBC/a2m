@@ -4,7 +4,7 @@
 
 #pragma once
 
-typedef struct ERROR_ENTRY {
+typedef struct {
     size_t line_number;
     size_t message_length;
     size_t supressed;
@@ -12,7 +12,7 @@ typedef struct ERROR_ENTRY {
     char *err_str;
 } ERROR_ENTRY;
 
-typedef struct ERRORLOG {
+typedef struct {
     DYNARRAY log_array;
     size_t longest_error_message_length;
 } ERRORLOG;

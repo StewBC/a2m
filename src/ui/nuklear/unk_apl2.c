@@ -854,7 +854,7 @@ void unk_apl2_screen_hgr(UNK *v, int start, int end) {
 
             const HGRLUTENTRY *e = &hgr_lut[byte & 0x7F][next_lsb][prev_bit][phase][bit_column];
 
-            // emit the 7 pixels already expanded in the LUT
+            // emit_byte the 7 pixels already expanded in the LUT
             p[px + 0] = e->pixel[0];
             p[px + 1] = e->pixel[1];
             p[px + 2] = e->pixel[2];

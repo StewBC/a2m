@@ -6,7 +6,7 @@
 
 typedef struct RUNTIME RUNTIME;
 
-typedef struct BREAKPOINT {
+typedef struct {
     uint16_t address;               // BP/watch address
     uint16_t address_range_end;     // if use_range, end of range value
     VIEW_FLAGS selected_bank;       // Memory in view for user, not 65x02

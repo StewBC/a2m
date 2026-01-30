@@ -4,7 +4,7 @@
 
 #pragma once
 
-typedef struct VIEWMISC {
+typedef struct {
     int dragging;
     FILE_BROWSER file_browser;
     BREAKPOINT_EDIT breakpoint_edit;

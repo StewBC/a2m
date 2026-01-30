@@ -4,7 +4,7 @@
 
 #pragma once
 
-typedef struct FILE_BROWSER {
+typedef struct {
     FILE_INFO file_selected;
     FILE_INFO dir_selected;
     int slot;
@@ -13,7 +13,7 @@ typedef struct FILE_BROWSER {
     DYNARRAY dir_contents;
 } FILE_BROWSER;
 
-typedef struct BREAKPOINT_EDIT {
+typedef struct {
     BREAKPOINT *bp_original;
     BREAKPOINT bp_under_edit;
     struct nk_rect combo_rect;
@@ -27,7 +27,7 @@ typedef struct BREAKPOINT_EDIT {
     int string_type_len;
 } BREAKPOINT_EDIT;
 
-typedef struct ASSEMBLER_CONFIG {
+typedef struct {
     FILE_BROWSER file_browser;
     nk_bool auto_run_after_assemble;
     nk_bool reset_stack;

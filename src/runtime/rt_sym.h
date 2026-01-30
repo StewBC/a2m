@@ -4,7 +4,7 @@
 
 #pragma once
 
-typedef struct SYMBOL {
+typedef struct {
     uint16_t pc;
     char *symbol_name;
     const char *symbol_source;

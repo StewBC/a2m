@@ -5,7 +5,7 @@
 #pragma once
 
 // This is a (virtual) view instance inside viewmem
-typedef struct VIEWMEM_VIEW {
+typedef struct {
     uint16_t view_address;              // address at top line, left
     uint16_t cursor_address;            // where cursor is - might be off-screen
     int rows;                           // how many rows this view shows
@@ -17,7 +17,7 @@ typedef struct VIEWMEM_VIEW {
 } VIEWMEM_VIEW;
 
 // This is the mem view window
-typedef struct VIEWMEM {
+typedef struct {
     uint32_t active_view_index;         // the # of the view that's active
     uint32_t str_buf_len;               // the length of the str_buf char array
     uint32_t find_string_cap;           // the size of the find_string array

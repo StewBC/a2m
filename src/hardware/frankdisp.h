@@ -26,7 +26,7 @@ enum {
     FD80_LIGHTPEN_LO,                                       // 11
 };
 
-typedef struct FRANKLIN_DISPLAY {
+typedef struct {
     uint8_t *display_ram;
     uint8_t reg_num;
     uint8_t bank;

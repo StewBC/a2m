@@ -5,7 +5,7 @@
 #pragma once
 
 // RGB values
-typedef struct mRGB {
+typedef struct {
     union {
         struct {
             uint8_t r, g, b;

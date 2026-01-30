@@ -13,7 +13,7 @@ typedef struct {
     uint32_t    is_directory: 1;    // 1 if directory, 0 otherwise
 } FILE_INFO;
 
-typedef struct UTIL_FILE {
+typedef struct {
     FILE *fp;
     char *file_display_name;        // Points into file_path
     char *file_path;                // UTF-8 full path

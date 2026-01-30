@@ -105,24 +105,24 @@ enum {
 
 // Callback routines with a context
 // The context is a pointer to the installer of the cb - RUNTIME normally
-typedef struct CB_SOFTREAD_CTX {
+typedef struct {
     void *user;
     uint8_t(*cb_softread)(void *user, uint16_t address);
 } CB_SOFTREAD_CTX;
 
-typedef struct CB_SOFTWRITE_CTX {
+typedef struct {
     void *user;
     void (*cb_softwrite)(void *user, uint16_t address, uint8_t value);
 } CB_SOFTWRITE_CTX;
 
 typedef void (*cb_breakpoint)(void *user, uint16_t address, uint8_t mask);
-typedef struct CB_BREAKPOINT_CTX {
+typedef struct {
     void *user;
     void (*cb_breakpoint)(void *user, uint16_t address, uint8_t mask);
 } CB_BREAKPOINT_CTX;
 
 typedef void (*cb_speaker)(void *user);
-typedef struct CB_SPEAKER_CTX {
+typedef struct {
     void *user;
     void (*cb_speaker)(void *user);
 } CB_SPEAKER_CTX;
@@ -130,20 +130,20 @@ typedef struct CB_SPEAKER_CTX {
 typedef void (*cb_diskread)(void *user);
 typedef void (*cb_diskwrite)(void *user);
 
-typedef struct CB_DISKACTIVITY_CTX {
+typedef struct {
     void *user;
     void (*cb_diskread)(void *user);
     void (*cb_diskwrite)(void *user);
 } CB_DISKACTIVITY_CTX;
 
 typedef int (*cb_clipboard)(void *user);
-typedef struct CB_CLIPBOARD_CTX {
+typedef struct {
     void *user;
     int (*cb_clipboard)(void *user);
 } CB_CLIPBOARD_CTX;
 
 typedef int (*cb_trace)(void *user);
-typedef struct CB_TRACE_CTX {
+typedef struct {
     void *user;
     int (*cb_trace)(void *user);
 } CB_TRACE_CTX;
@@ -152,7 +152,7 @@ typedef uint8_t (*cb_read_button)(void *user, int controller_id, int button_id);
 typedef uint8_t (*cb_read_axis)(void *user, int controller_id, int axis_id, uint64_t cycle);
 typedef void (*cb_ptrig)(void *user, uint64_t cycle);
 
-typedef struct CB_INPUTDEVICE_CTX {
+typedef struct {
     void *user;
     cb_ptrig cb_ptrig;
     cb_read_button cb_read_button;
@@ -160,7 +160,7 @@ typedef struct CB_INPUTDEVICE_CTX {
 } CB_INPUTDEVICE_CTX;
 
 // Callbacks that runtime will provide to the hardware
-typedef struct A2OUT_CB {
+typedef struct {
     CB_BREAKPOINT_CTX       cb_breakpoint_ctx;              // Callback when a breakpoint memory read/write triggers
     CB_BREAKPOINT_CTX       cb_brk_ctx;                     // Callback when brk instruction executed
     CB_DISKACTIVITY_CTX     cb_diskactivity_ctx;            // Callback for disk activity (show LEDs)

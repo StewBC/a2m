@@ -34,7 +34,7 @@ typedef struct DISKII_DRIVE {
 } DISKII_DRIVE;
 
 // What the Apple II "talks to".  Each has 2 drives in this emulator
-typedef struct DISKII_CONTROLLER {
+typedef struct {
     DISKII_DRIVE diskii_drive[2];
     uint64_t cycles_at_update;
     uint8_t active;                            // 0 or 1 for which drive is active

@@ -6,7 +6,7 @@
 
 typedef void (*MAP_CX_ROM)(APPLE2 *m);    // Callback prototype to map C800 ROM
 
-typedef struct SLOT_CARDS {
+typedef struct {
     int slot_type;                                          // 1 when a slot contains a card, 0 if not
     void *slot_card;                                        // a handle to the installed card (not ownd by this instance)
     MAP_CX_ROM slot_map_cx_rom;                             // Callback to active C800 ROM on card (NULL = no ROM)

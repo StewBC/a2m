@@ -6,10 +6,7 @@
 
 #define MAX_CLI_PARAMS  1
 
-typedef struct OPTS OPTS;
-typedef void (*cb_arg_handler)(int num_params, const char **params, OPTS *opts);
-
-typedef struct ARGCTX {
+typedef struct {
     int   argc;
     char **argv;
     int   index;   // current index in argv
@@ -17,14 +14,7 @@ typedef struct ARGCTX {
     int   error;   // non-zero on error
 } ARGCTX;
 
-typedef struct ARGSPEC {
-    const char *long_name;
-    const char *short_name;
-    int         param_count;   // -1 optional, 0 none, N exact
-    cb_arg_handler  handler;
-} ARGSPEC;
-
-typedef struct OPTS {
+typedef struct {
     ARGCTX ctx;
     CONSOLE_MODE console_mode;
     const char *ini_file_name;
@@ -37,6 +27,15 @@ typedef struct OPTS {
     uint32_t saveini: 1;
     uint32_t pad: 26;
 } OPTS;
+
+typedef void (*cb_arg_handler)(int num_params, const char **params, OPTS *opts);
+
+typedef struct {
+    const char *long_name;
+    const char *short_name;
+    int         param_count;   // -1 optional, 0 none, N exact
+    cb_arg_handler  handler;
+} ARGSPEC;
 
 void argctx_init(ARGCTX *ctx, int argc, char **argv) {
     ctx->argc  = argc;

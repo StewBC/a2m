@@ -36,7 +36,7 @@ typedef struct {
     uint32_t   ch;
 } rt_input_event;
 
-typedef struct UTXT {
+typedef struct {
     int show_help;
     int ctrl;
     APPLE2 *m;

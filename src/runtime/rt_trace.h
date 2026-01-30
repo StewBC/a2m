@@ -4,14 +4,14 @@
 
 #pragma once
 
-typedef struct TRACE_DATA {
+typedef struct {
     CPU cpu;
     uint8_t b0;
     uint8_t b1;
     uint8_t b2;
 } TRACE_DATA;
 
-typedef struct TRACE_LOG {
+typedef struct {
     size_t trace_position;
     size_t trace_max_entries;
     uint32_t trace_on: 1;

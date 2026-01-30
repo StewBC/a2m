@@ -11,14 +11,14 @@
 #define NUM_PAGES       ((BANK_SIZE)/(PAGE_SIZE))
 
 // A ROM_BLOCK tracks a block of rom bytes
-typedef struct ROM_BLOCK {
+typedef struct {
     uint32_t address;
     uint32_t length;
     uint8_t *bytes;
 } ROM_BLOCK;
 
 // ROM contains an array of ROM_BLOCKs which may (or not) be mapped into the 6502's 64K
-typedef struct ROMS {
+typedef struct {
     ROM_BLOCK *blocks;
     uint16_t num_blocks;
 } ROMS;
@@ -31,7 +31,7 @@ typedef enum {
 
 // Pages is a bundle of arrays.  Each array has pointers to bytes which should
 // be seen as PAGE_SIZE in length (256 bytes)
-typedef struct PAGES {
+typedef struct {
     uint16_t num_pages;
     uint8_t **read_pages;                       // array of page bytes mapped for reading
     uint8_t **write_pages;                      // array of page bytes mapped for writing
@@ -40,7 +40,7 @@ typedef struct PAGES {
     uint64_t **last_write_pages;                // array of page 64 bit entries for tracking write addresses
 } PAGES;
 
-typedef struct RAM {
+typedef struct {
     uint8_t *RAM_MAIN;                          // The ram_size memory - addressable in max 64k chunks
     uint8_t *RAM_WATCH;                         // IO / Breakpoints. See WATCH_MASK
     uint8_t *RAM_LC;                            // LC Ram (Always 2*16 for ease with //e)
@@ -55,7 +55,7 @@ enum {
 };
 
 /* The 6502 internals*/
-typedef struct CPU {
+typedef struct {
     uint16_t pc;                                // Program counter
     uint16_t opcode_pc;                         // for last write, track last opcode pc
     uint16_t sp;                                // Stack pointer

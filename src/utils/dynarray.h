@@ -4,7 +4,7 @@
 
 #pragma once
 
-typedef struct DYNARRAY {
+typedef struct {
     void *data;                                             // Pointer to array data of any type
     size_t size;                                            // Total allocated size
     size_t items;                                           // Number of elements filled

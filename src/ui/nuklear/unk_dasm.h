@@ -4,18 +4,18 @@
 
 #pragma once
 
-typedef struct LINE_INFO {
+typedef struct {
     uint16_t address;
     uint16_t force_byte;
 } LINE_INFO;
 
-typedef struct DECODE_ENTRY {
+typedef struct {
     uint16_t address;
     int line;
     uint8_t opcode;
 } DECODE_ENTRY;
 
-typedef struct VIEWDASM {
+typedef struct {
     int cols;                       // how many cols each line shows
     int dragging;                   // scrollbar
     int non_client_height;          // height of the window header/footer portion

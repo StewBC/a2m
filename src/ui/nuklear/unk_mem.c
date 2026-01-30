@@ -9,7 +9,7 @@
 #define ROW_H                   v->font_height
 #define MAX_FIND_STRING_LENGTH  255
 
-typedef struct RANGE_COLORS {
+typedef struct {
     struct nk_color text_color;
     struct nk_color background_color;
 } RANGE_COLORS;

@@ -100,7 +100,7 @@ enum {
 typedef uint8_t (*ss_read)(APPLE2 *m, uint16_t a);
 typedef void (*ss_write)(APPLE2 *m, uint16_t a, uint8_t v);
 
-typedef struct A2_C0_TABLE {
+typedef struct {
     ss_read r[256];
     ss_write w[256];
 } A2_C0_TABLE;

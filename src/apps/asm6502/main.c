@@ -7,11 +7,11 @@
 #include "utils_lib.h"
 #include "asm_lib.h"
 
-typedef struct RAM {
+typedef struct {
     uint8_t RAM_MAIN[64 * 1024];
 } RAM;
 
-typedef struct MACHINE {
+typedef struct {
     ASSEMBLER as;
     RAM ram;
     uint16_t emit_start;
@@ -206,16 +206,16 @@ int main(int argc, char **argv) {
     
     // If segments were used, show gaps
     if(m.as.segments.items) {
-        uint32_t emit = 0, issue = 0;
+        uint32_t emit_byte = 0, issue = 0;
         uint32_t emit_end = 0;
         for(int si = 0; si < m.as.segments.items; si++) {
             SEGMENT *s = ARRAY_GET(&m.as.segments, SEGMENT, si);
             if(s->do_not_emit) {
                 continue;
             }
-            if(!emit) {
+            if(!emit_byte) {
                 emit_end = s->segment_output_address;
-                emit = 1;
+                emit_byte = 1;
             } else {
                 if(s->segment_start_address > emit_end) {
                     fprintf(stderr, "\nSegment %.*s can start at $%04X*", s->segment_name_length, s->segment_name, emit_end);

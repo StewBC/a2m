@@ -31,7 +31,7 @@ typedef enum {
 } DISKII_KIND;
 
 // NIB file specific data
-typedef struct IMAGE_NIB {
+typedef struct {
     uint32_t writable;        // 0 = no
     uint32_t track_size;      // 6656 or 6384 bytes
     uint32_t num_tracks;      // Typically 35
@@ -40,7 +40,7 @@ typedef struct IMAGE_NIB {
 } IMAGE_NIB;
 
 // The file that's loaded
-typedef struct DISKII_IMAGE {
+typedef struct {
     UTIL_FILE file;
     DISKII_KIND kind;
     DISKII_ENCODING disk_encoding;

@@ -18,7 +18,7 @@ typedef enum {
     LAYOUT_DRAG_APPLE2_CORNER           //  proportional by default
 } LAYOUT_DRAG_KIND;
 
-typedef struct LAYOUT_LIMITS {
+typedef struct {
     int cpu_h_px;                       //  fixed CPU height
     int min_a2_w_px;                    //  Apple II min width
     int min_right_w_px;                 //  minimum width for right column
@@ -31,7 +31,7 @@ typedef struct LAYOUT_LIMITS {
     int dpi_scale;                      //  for scaling borders/gutters if desired
 } LAYOUT_LIMITS;
 
-typedef struct LAYOUT {
+typedef struct {
     //  Fractions that drive compute()
     float split_top_left_right;         //  A: Apple II | right (0..1 of parent W)
     float split_top_bottom;             //  B: Top | Bottom (0..1 of parent H)

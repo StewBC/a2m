@@ -5,7 +5,7 @@
 #pragma once
 
 // SmartPort Block Device
-typedef struct SP_DEVICE {
+typedef struct {
     uint8_t sp_status;
     size_t sp_read_offset;
     size_t sp_write_offset;

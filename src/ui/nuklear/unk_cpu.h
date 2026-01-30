@@ -4,7 +4,7 @@
 
 #pragma once
 
-typedef struct VIEWCPU {
+typedef struct {
     char registers[5][5];
     int register_lengths[5];
     char flags[8][2];
