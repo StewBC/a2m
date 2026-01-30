@@ -5,10 +5,18 @@
 cmake_minimum_required(VERSION 3.16)
 
 add_library(asm STATIC
+    asm_err.c
+    tokens.c
+    symbols.c
+    scope.c
+    segment.c
+    opcds.c
+    incl_fls.c
     asm6502.c
-    asmexpr.c
-    asmgperf.c
-    asm_lib.c
+    expr.c
+    gperf.c
+    parse.c
+    emit.c
 )
 
 target_include_directories(asm PUBLIC
