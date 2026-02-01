@@ -43,7 +43,8 @@ typedef struct ASSEMBLER {
     const char *strcode;                                    // Active .strcode expression
     const char *token_start;                                // Points at the start of a token (and input the end)
     SCOPE *root_scope;
-    SCOPE *active_scope;
+    SCOPE *active_outer_scope;
+    SCOPE *active_locals_scope;
     SEGMENT *active_segment;
     DYNARRAY *symbol_table;                                 // Array of arrays of symbols
     ERRORLOG *errorlog;                                     // ptr to log that tracks errors

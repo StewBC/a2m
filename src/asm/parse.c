@@ -146,7 +146,7 @@ static int resolve_def_target(ASSEMBLER *as, const char *name, int len, SCOPE **
         *out_leaf_len = len - 2;
         return 1;
     }
-    *out_parent = as->active_scope;
+    *out_parent = as->active_outer_scope;
     *out_leaf = name;
     *out_leaf_len = len;
     return 1;
@@ -379,20 +379,30 @@ void dot_endmacro(ASSEMBLER *as) {
 }
 
 void dot_endproc(ASSEMBLER *as) {
-    if(as->active_scope->scope_type != GPERF_DOT_PROC || !scope_pop(as)) {
+    if(as->active_outer_scope->scope_type != GPERF_DOT_PROC || !scope_pop(as)) {
         asm_err(as, ASM_ERR_RESOLVE, ".endproc without a matching .proc");
     }    
 }
 
 void dot_endscope(ASSEMBLER *as) {
-    if(as->active_scope->scope_type != GPERF_DOT_SCOPE || !scope_pop(as)) {
+    if(as->active_outer_scope->scope_type != GPERF_DOT_SCOPE || !scope_pop(as)) {
         asm_err(as, ASM_ERR_RESOLVE, ".endscope without a matching .scope");
     }    
 }
 
 void dot_for(ASSEMBLER *as) {
     FOR_LOOP for_loop;
-    expr_full_evaluate(as);                                  // assignment
+    next_token(as);
+    if(as->current_token.type != TOKEN_VAR) {
+        asm_err(as, ASM_ERR_RESOLVE, ".for must be followed by a variable name");
+        return;
+    }
+    const char *var_name = as->current_token.name;
+    uint32_t var_name_len = as->current_token.name_length;
+    next_token(as);
+    expect_op(as, '=');
+    uint32_t value = expr_evaluate(as);                                  // assignment
+    symbol_write(as, var_name, var_name_len, SYMBOL_VARIABLE, value);
     for_loop.iterations = 0;
     for_loop.loop_condition_start = as->input;
     for_loop.loop_start_file = as->current_file;
@@ -572,7 +582,7 @@ void dot_proc(ASSEMBLER *as) {
     resolve_def_target(as, as->current_token.name, as->current_token.name_length, &parent, &leaf, &leaf_len);
     
     // The name may also not contain further scopes
-    if(token_has_scope_path(leaf, leaf_len)) {
+    if(symbol_has_scope_path(leaf, leaf_len)) {
         asm_err(as, ASM_ERR_DEFINE, "The name %.*s is scoped and not allowed", leaf_len, leaf);
         return;
     }
@@ -689,23 +699,23 @@ void dot_scope(ASSEMBLER *as) {
     char anon_name[11];
     next_token(as);
     if(as->current_token.type == TOKEN_END) {
-        name_length = snprintf(anon_name, 11, "anon_%04X", ++as->active_scope->anon_scope_id);
+        name_length = snprintf(anon_name, 11, "anon_%04X", ++as->active_outer_scope->anon_scope_id);
         name = anon_name;
     } else {
         name = as->current_token.name;
         name_length = as->current_token.name_length;
 
-        if(token_has_scope_path(name, name_length)) {
+        if(symbol_has_scope_path(name, name_length)) {
             asm_err(as, ASM_ERR_DEFINE, "The name %.*s is scoped and not allowed as a scope name", name_length, name);
             return;
         }
     }
 
-    SCOPE *s = scope_find_child(as->active_scope, name, name_length);
+    SCOPE *s = scope_find_child(as->active_outer_scope, name, name_length);
     if(s) {
         scope_push(as, s);
     } else {
-        SCOPE *s = scope_add(as, name, name_length, as->active_scope, GPERF_DOT_SCOPE);
+        SCOPE *s = scope_add(as, name, name_length, as->active_outer_scope, GPERF_DOT_SCOPE);
         if(s) {
             scope_push(as, s);
         }
@@ -729,7 +739,7 @@ void dot_string(ASSEMBLER *as) {
     SYMBOL_LABEL *sl = NULL;
     if(as->strcode) {
         // Add the _ variable if it doesn't yet exist and get a handle to the storage
-        sl = symbol_store_in_scope(as, as->active_scope, "_", 1, SYMBOL_VARIABLE, 0);
+        sl = symbol_store_in_scope(as, as->active_outer_scope, "_", 1, SYMBOL_VARIABLE, 0);
     }
     do {
         // Get to a token to process
@@ -893,7 +903,7 @@ void parse_label(ASSEMBLER *as) {
             ARRAY_ADD(&as->anon_symbols, address);
         }
     } else {
-        symbol_store_qualified(as, symbol_name, name_length, SYMBOL_ADDRESS, current_output_address(as));
+        symbol_write(as, symbol_name, name_length, SYMBOL_ADDRESS, current_output_address(as));
     }
 }
 
@@ -1120,5 +1130,5 @@ void parse_variable(ASSEMBLER *as) {
     uint32_t name_length = as->input - as->token_start;
     next_token(as);
     expect_op(as, '=');
-    symbol_store_in_scope(as, as->active_scope, symbol_name, name_length, SYMBOL_VARIABLE, expr_evaluate(as));
+    symbol_write(as, symbol_name, name_length, SYMBOL_VARIABLE, expr_evaluate(as));
 }

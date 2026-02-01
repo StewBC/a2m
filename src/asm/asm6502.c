@@ -126,16 +126,16 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
         as->current_file = ARRAY_GET(&as->include_files.included_files, UTIL_FILE, 0)->file_display_name;
         as->current_address = address;
         as->pass++;
-        if(as->active_scope != as->root_scope) {
-            asm_err(as, ASM_ERR_RESOLVE, "Scope error.  Open scope %.*s, or one of its children, was not closed", as->active_scope->scope_name_length, as->active_scope->scope_name);
+        if(as->active_outer_scope != as->root_scope) {
+            asm_err(as, ASM_ERR_RESOLVE, "Scope error.  Open scope %.*s, or one of its children, was not closed", as->active_outer_scope->scope_name_length, as->active_outer_scope->scope_name);
         }
         while(as->scope_stack.items > 1) {
             // Just to be safe...
             scope_pop(as);
         }
         // Reset scopes (solves open scope isues and repeatability, of course)
-        as->active_scope = as->root_scope;
-        scope_reset_ids(as->active_scope);
+        as->active_outer_scope = as->root_scope;
+        scope_reset_ids(as->active_outer_scope);
         // Reset segment defenitions (for pass 2, really)
         as->segments.items = 0;
         while(as->pass < 3) {
@@ -166,20 +166,16 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
             // Prioritize specific checks to avoid ambiguity
             if(is_opcode(as)) {                               // Opcode first
                 parse_opcode(as);
-            } else if(is_parse_dot_command(as)) {                   // Dot commands next
+            } else if(is_parse_dot_command(as)) {             // Dot commands next
                 parse_dot_command(as);
             } else if(is_label(as)) {                         // Labels (endings in ":")
                 parse_label(as);
             } else if(is_address(as)) {                       // Address (starting with "*")
                 parse_address(as);
-            } else if(parse_macro_if_is_macro(as)) {             // Macros are like variables but can be found
+            } else if(parse_macro_if_is_macro(as)) {          // Macros are like variables but can be found
                 continue;
             } else if(is_variable(as)) {                      // Variables are last (followed by "=")
-                as->current_token.type = TOKEN_VAR;           // Variable Name
-                as->current_token.name = as->token_start;
-                as->current_token.name_length = as->input - as->token_start;
-                as->current_token.name_hash = util_fnv_1a_hash(as->current_token.name, as->current_token.name_length);
-                expr_evaluate(as);
+                parse_variable(as);
             } else {
                 asm_err(as, ASM_ERR_RESOLVE, "Unknown token");
             }

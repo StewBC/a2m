@@ -10,7 +10,7 @@
 void asm_err(ASSEMBLER *as, ASM_ERR_CLASS cls,const char *format, ...) {
     ERRORLOG *log = as->errorlog;
     int active_log_level = as->error_log_level;
-    switch(cls){
+    switch(cls) {
     case ASM_ERR_RESOLVE:
         if(as->pass == 1) {     // Detect and show in Pass 2
             return;             // Many things unresolved in pass 1

@@ -16,22 +16,13 @@ char *set_name(char **s, const char *name, const int name_length) {
 
 //----------------------------------------------------------------------------
 // SCOPE helpers
-int token_has_scope_path(const char *p, int len) {
-    for(int i = 0; i + 1 < len; i++) {
-        if(p[i] == ':' && p[i + 1] == ':') {
-            return 1;
-        }
-    }
-    return 0;
-}
-
 void scope_to_scope(ASSEMBLER *as, SCOPE *s) {
-    as->active_scope = s;
+    as->active_outer_scope = s;
     as->symbol_table = s->symbol_table;
 }
 
 void scope_push(ASSEMBLER *as, SCOPE *next) {
-    ARRAY_ADD(&as->scope_stack, as->active_scope);
+    ARRAY_ADD(&as->scope_stack, as->active_outer_scope);
     scope_to_scope(as, next);
 }
 

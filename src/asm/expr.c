@@ -131,45 +131,22 @@ static int64_t expr_primary(ASSEMBLER *as) {
         next_token(as);
     } else if(as->current_token.type == TOKEN_VAR) {
         SYMBOL_LABEL *sl;
-        // Peek to see if this is an assignment.  Assignments only look in local scope next
-        next_token(as);
-        if(as->current_token.type == TOKEN_OP && as->current_token.op == '=') {
-            sl = symbol_lookup_local(as, as->current_token.name_hash, as->current_token.name, as->current_token.name_length);
-        } else {
-            sl = symbol_lookup(as, as->current_token.name_hash, as->current_token.name, as->current_token.name_length);
-            // If not found and contains scope, don't pollute the local scope - must be a forward ref
-            if(!sl) {
-                if(as->pass == 1) {
-                    if(token_has_scope_path(as->current_token.name, as->current_token.name_length)) {
-                        return 0xFFFF;
-                    }
-                } else {
-                    asm_err(as, ASM_ERR_RESOLVE, "Scoped variable %.*s not found", as->current_token.name_length, as->current_token.name);
-                    // Return 0 as that surpresses any immidate adressing errors that would also log
-                    return 0x0;
-                }
-            }
-        }
-
-        if(as->pass == 2 && sl && sl->symbol_type == SYMBOL_UNKNOWN) {
-            SYMBOL_LABEL *resolved = symbol_lookup_parent_chain(as, as->current_token.name_hash, as->current_token.name, as->current_token.name_length);
-            if(resolved) {
-                symbol_delete_local(as, as->current_token.name_hash, as->current_token.name, as->current_token.name_length);
-                sl = resolved;
-            }
-        }
-        if(!sl || (as->pass == 2 && sl && sl->symbol_type == SYMBOL_UNKNOWN)) {
-            // All tokens must have resolved by pass 2
-            if(as->pass == 2) {
+        sl = symbol_read(as, as->current_token.name, as->current_token.name_length);
+        if(!sl) {
+            if(as->pass == 1) {
+                return 0xFFFF;
+            } else {
+                // Log the error on Pass 2
                 asm_err(as, ASM_ERR_RESOLVE, "Value for %.*s not found", as->current_token.name_length, as->current_token.name);
+                // And return zero sp exressions like lda #<notfound> don't throw further 16-bit errors
+                return 0x0;
             }
-            // In pass 1 tokens not found have placeholders (SYMBOL_UNKNOWN) created
-            value = 0xFFFF;
-            sl = symbol_store_in_scope(as, as->active_scope, as->current_token.name, as->current_token.name_length, SYMBOL_UNKNOWN, value);
-        } else {
-            value = sl->symbol_value;
         }
+        value = sl->symbol_value;
 
+        // This is very convenient, but not realy correct.  I already had to take
+        // assign out of here, probably should take this out as well
+        next_token(as);
         if(as->current_token.type == TOKEN_OP) {
             char op = as->current_token.op;
             if(op == '=') {

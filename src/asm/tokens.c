@@ -205,10 +205,10 @@ void next_token(ASSEMBLER *as) {
             asm_err(as, ASM_ERR_RESOLVE, "Expected a closing '");
         }
         get_token(as);
-    } else if(*as->token_start == '"'){
+    } else if(*as->token_start == '"') {
         // token_start points at opening quote and as->input is after closing quote
         int len = (int)(as->input - as->token_start);
-        if(len < 2 || as->token_start[len - 1] != '"'){
+        if(len < 2 || as->token_start[len - 1] != '"') {
             asm_err(as, ASM_ERR_RESOLVE, "String missing a closing \"");
         }
         as->current_token.type = TOKEN_STR;
