@@ -287,3 +287,17 @@ SYMBOL_LABEL *symbol_write(ASSEMBLER *as, const char *sym, uint32_t sym_len, SYM
     // Addresses / labels: default to proc scope
     return symbol_store_in_scope(as, as->active_outer_scope, ref.name, ref.name_length, symbol_type, value);
 }
+
+SYMBOL_LABEL *symbol_declare_local_var(ASSEMBLER *as, const char *name, uint32_t name_length) {
+    if(!as->active_locals_scope){
+        asm_err(as, ASM_ERR_RESOLVE, ".local %.*s used with no active local frame", name_length, name);
+        return NULL;
+    }
+    uint32_t name_hash = util_fnv_1a_hash(name, name_length);
+    SYMBOL_LABEL *sl = symbol_lookup_scope(as->active_locals_scope, name_hash, name, name_length);
+    if(sl) {
+        asm_err(as, ASM_ERR_RESOLVE, ".local %.*s already defined", name_length, name);
+        return NULL;
+    }
+    return symbol_store_in_scope(as, as->active_locals_scope, name, name_length, SYMBOL_VARIABLE, 0);
+}

@@ -498,6 +498,29 @@ void dot_include(ASSEMBLER *as) {
     }
 }
 
+void dot_local(ASSEMBLER *as) {
+    // Get to the name of the local being defined
+    next_token(as);
+    if(as->current_token.type != TOKEN_VAR) {
+        asm_err(as, ASM_ERR_RESOLVE, ".local needs to be followed by a variable");
+        return;
+    }
+    const char *symbol_name = as->token_start;
+    uint32_t name_length = as->input - as->token_start;
+    // Now the name is known, create the variable
+    symbol_declare_local_var(as, symbol_name, name_length);
+    // See what's next
+    next_token(as);
+    if(as->current_token.op == '=') {
+        // For assign, evaluate the expression and assign the result
+        symbol_write(as, symbol_name, name_length, SYMBOL_VARIABLE, expr_full_evaluate(as));
+    }
+    if(as->current_token.op == ',') {
+        // or more locals, repeat this process
+        dot_local(as);
+    }
+}
+
 void dot_macro(ASSEMBLER *as) {
     int macro_okay = 1;
     MACRO macro;
@@ -853,6 +876,9 @@ void parse_dot_command(ASSEMBLER *as) {
             break;
         case GPERF_DOT_INCLUDE:
             dot_include(as);
+            break;
+        case GPERF_DOT_LOCAL:
+            dot_local(as);
             break;
         case GPERF_DOT_MACRO:
             dot_macro(as);

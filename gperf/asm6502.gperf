@@ -25,6 +25,7 @@ struct OPCODEINFO
 .if,       GPERF_DOT_IF      , 0, 0, 0
 .incbin,   GPERF_DOT_INCBIN  , 0, 0, 0
 .include,  GPERF_DOT_INCLUDE , 0, 0, 0
+.local,    GPERF_DOT_LOCAL   , 0, 0, 0
 .macro,    GPERF_DOT_MACRO   , 0, 0, 0
 .org,      GPERF_DOT_ORG     , 0, 0, 0
 .proc,     GPERF_DOT_PROC    , 0, 0, 0

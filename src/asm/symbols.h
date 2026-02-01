@@ -29,3 +29,5 @@ SYMBOL_LABEL *symbol_read(ASSEMBLER *as, const char *sym, uint32_t sym_len);
 
 SYMBOL_LABEL *symbol_store_in_scope(ASSEMBLER *as, SCOPE *scope, const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TYPE symbol_type, uint64_t value);
 SYMBOL_LABEL *symbol_write(ASSEMBLER *as, const char *sym, uint32_t sym_len, SYMBOL_TYPE symbol_type, uint64_t value);
+
+SYMBOL_LABEL *symbol_declare_local_var(ASSEMBLER *as, const char *name, uint32_t name_len);
