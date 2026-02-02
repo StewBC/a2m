@@ -28,7 +28,6 @@ typedef struct {
 
 int symbol_has_scope_path(const char *p, int len);
 
-SYMBOL_LABEL *symbol_lookup_scope(SCOPE *scope, uint32_t name_hash, const char *name, uint32_t len);
 SYMBOL_LABEL *symbol_read(ASSEMBLER *as, const char *sym, uint32_t sym_len);
 
 SYMBOL_LABEL *symbol_store_in_scope(ASSEMBLER *as, SCOPE *scope, const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TYPE symbol_type, uint64_t value);

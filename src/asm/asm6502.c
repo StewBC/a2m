@@ -51,25 +51,46 @@ int is_opcode(ASSEMBLER *as) {
 
 int is_variable(ASSEMBLER *as) {
     const char *c = as->token_start;
-    if(*c != '_' && *c != ':' && !isalpha(*c)) {
-        // Variable start with [a-Z], ':' or '_'
+    const char *e = as->input;
+
+    unsigned char ch0 = (unsigned char)*c;
+
+    // Starts with '_' or alpha or ':' (but if ':' it must be '::')
+    if(ch0 == '_') {
+        c++;
+    } else if(isalpha(ch0)) {
+        c++;
+    } else if(ch0 == ':') {
+        if(c + 1 >= e || c[1] != ':') {
+            return 0;
+        }
+        c += 2;
+    } else {
         return 0;
     }
-    // and can contain same plus [0-9] and any ':' must be '::'
-    while(c < as->input && (*c == '_' || isalnum(*c) || *c == ':')) {
-        if(*c == ':') {
+
+    while(c < e) {
+        unsigned char ch = (unsigned char)*c;
+
+        if(ch == '_' || isalnum(ch)) {
             c++;
-            if(*c >= as->input || *c != ':') {
+            continue;
+        }
+
+        if(ch == ':') {
+            if(c + 1 >= e || c[1] != ':') {
                 return 0;
             }
+            c += 2;
+            continue;
         }
-        c++;
-    }
-    if(c != as->input) {
+
         return 0;
     }
+
     return 1;
 }
+
 
 //----------------------------------------------------------------------------
 // Assembler start and end routines
