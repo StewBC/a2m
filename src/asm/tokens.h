@@ -25,4 +25,5 @@ typedef struct {
 
 void get_token(ASSEMBLER *as);
 void next_token(ASSEMBLER *as);
+int peek_next_op(ASSEMBLER *as, int *out_op);
 void expect_op(ASSEMBLER *as, char op);

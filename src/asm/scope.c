@@ -17,12 +17,12 @@ char *set_name(char **s, const char *name, const int name_length) {
 //----------------------------------------------------------------------------
 // SCOPE helpers
 void scope_to_scope(ASSEMBLER *as, SCOPE *s) {
-    as->active_outer_scope = s;
+    as->active_scope = s;
     as->symbol_table = s->symbol_table;
 }
 
 void scope_push(ASSEMBLER *as, SCOPE *next) {
-    ARRAY_ADD(&as->scope_stack, as->active_outer_scope);
+    ARRAY_ADD(&as->scope_stack, as->active_scope);
     scope_to_scope(as, next);
 }
 

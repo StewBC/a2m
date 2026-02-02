@@ -20,6 +20,7 @@ typedef struct ASSEMBLER {
     DYNARRAY loop_stack;                                    // Array of for loops
     DYNARRAY macros;                                        // Array of all macros
     DYNARRAY macro_buffers;                                 // Array of all buffers that macros expand into
+    DYNARRAY macro_expand_stack;                            // Tracks macro renames per invocation
     DYNARRAY segments;                                      // .segdef creates segment defenitions
     DYNARRAY scope_stack;                                   // Needed since scopes can be created outside parent
     INCLUDE_FILES include_files;                            // The arrays for files and stack for .include
@@ -43,8 +44,7 @@ typedef struct ASSEMBLER {
     const char *strcode;                                    // Active .strcode expression
     const char *token_start;                                // Points at the start of a token (and input the end)
     SCOPE *root_scope;
-    SCOPE *active_outer_scope;
-    SCOPE *active_locals_scope;
+    SCOPE *active_scope;
     SEGMENT *active_segment;
     DYNARRAY *symbol_table;                                 // Array of arrays of symbols
     ERRORLOG *errorlog;                                     // ptr to log that tracks errors
@@ -54,6 +54,7 @@ static inline uint16_t current_output_address(ASSEMBLER *as) {
         return as->active_segment ? as->active_segment->segment_output_address : as->current_address;
 }
 
+int is_parse_dot_command(ASSEMBLER *as);
 int is_variable(ASSEMBLER *as);
 
 int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, void *user, output_byte ob);

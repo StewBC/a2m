@@ -50,13 +50,19 @@ int is_opcode(ASSEMBLER *as) {
 }
 
 int is_variable(ASSEMBLER *as) {
-    // Variable start with [a-Z] or _
-    if(*as->token_start != '_' && !isalpha(*as->token_start)) {
+    const char *c = as->token_start;
+    if(*c != '_' && *c != ':' && !isalpha(*c)) {
+        // Variable start with [a-Z], ':' or '_'
         return 0;
     }
-    const char *c = as->token_start;
-    // an can contain same plus [0-9]
-    while(c < as->input && (*c == '_' || isalnum(*c))) {
+    // and can contain same plus [0-9] and any ':' must be '::'
+    while(c < as->input && (*c == '_' || isalnum(*c) || *c == ':')) {
+        if(*c == ':') {
+            c++;
+            if(*c >= as->input || *c != ':') {
+                return 0;
+            }
+        }
         c++;
     }
     if(c != as->input) {
@@ -78,6 +84,7 @@ int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, void *user, output_byte ob
     ARRAY_INIT(&as->loop_stack, FOR_LOOP);
     ARRAY_INIT(&as->macros, MACRO);
     ARRAY_INIT(&as->macro_buffers, char *);
+    ARRAY_INIT(&as->macro_expand_stack, MACRO_EXPAND);
     ARRAY_INIT(&as->segments, SEGMENT);
     ARRAY_INIT(&as->scope_stack, SCOPE*);
     ARRAY_INIT(&as->input_stack, INPUT_STACK);
@@ -126,16 +133,16 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
         as->current_file = ARRAY_GET(&as->include_files.included_files, UTIL_FILE, 0)->file_display_name;
         as->current_address = address;
         as->pass++;
-        if(as->active_outer_scope != as->root_scope) {
-            asm_err(as, ASM_ERR_RESOLVE, "Scope error.  Open scope %.*s, or one of its children, was not closed", as->active_outer_scope->scope_name_length, as->active_outer_scope->scope_name);
+        if(as->active_scope != as->root_scope) {
+            asm_err(as, ASM_ERR_RESOLVE, "Scope error.  Open scope %.*s, or one of its children, was not closed", as->active_scope->scope_name_length, as->active_scope->scope_name);
         }
         while(as->scope_stack.items > 1) {
             // Just to be safe...
             scope_pop(as);
         }
         // Reset scopes (solves open scope isues and repeatability, of course)
-        as->active_outer_scope = as->root_scope;
-        scope_reset_ids(as->active_outer_scope);
+        as->active_scope = as->root_scope;
+        scope_reset_ids(as->active_scope);
         // Reset segment defenitions (for pass 2, really)
         as->segments.items = 0;
         while(as->pass < 3) {

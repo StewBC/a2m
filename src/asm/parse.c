@@ -146,7 +146,7 @@ static int resolve_def_target(ASSEMBLER *as, const char *name, int len, SCOPE **
         *out_leaf_len = len - 2;
         return 1;
     }
-    *out_parent = as->active_outer_scope;
+    *out_parent = as->active_scope;
     *out_leaf = name;
     *out_leaf_len = len;
     return 1;
@@ -280,6 +280,7 @@ int input_stack_push(ASSEMBLER *as) {
     is.next_line_count = as->next_line_count;
     is.next_line_start = as->next_line_start;
     is.line_start = as->line_start;
+    is.token = as->current_token;
     return ARRAY_ADD(&as->input_stack, is);
 }
 
@@ -294,6 +295,33 @@ void input_stack_pop(ASSEMBLER *as) {
         as->next_line_count = is->next_line_count;
         as->next_line_start = is->next_line_start;
         as->line_start = is->line_start;
+        as->current_token = is->token;
+    }
+}
+
+MACRO_EXPAND *macro_stack_push(ASSEMBLER *as, const char *name, uint32_t name_length) {
+    MACRO_EXPAND mes;
+    mes.rename_id = 0;
+    ARRAY_INIT(&mes.renames, RENAME_MAP);
+    mes.macro_name = name;
+    mes.macro_name_length = name_length;
+    if(A2_OK != ARRAY_ADD(&as->macro_expand_stack, mes)) {
+        return NULL;
+    }
+    return ARRAY_GET(&as->macro_expand_stack, MACRO_EXPAND, as->macro_expand_stack.items - 1);
+}
+
+void macro_stack_pop(ASSEMBLER *as) {
+    if(as->macro_expand_stack.items) {
+        MACRO_EXPAND *mes = ARRAY_GET(&as->macro_expand_stack, MACRO_EXPAND, as->macro_expand_stack.items - 1);
+        // Do in reverse order as that's a much more efficient delete in symbol_delete_local
+        for(int ri = mes->renames.items - 1; ri >= 0 ; ri--) {
+            RENAME_MAP *ren = ARRAY_GET(&mes->renames, RENAME_MAP, ri);
+            symbol_delete_local(as->active_scope, ren->generated_name, GEN_NAME_LEN);
+            free(ren->generated_name);
+        }
+        array_free(&mes->renames);
+        as->macro_expand_stack.items--;
     }
 }
 
@@ -373,19 +401,20 @@ void dot_endmacro(ASSEMBLER *as) {
         // Do not free the macro buffer here, there might be a reference to a symbol name
         // Return to the parse point where the macro was called
         input_stack_pop(as);
+        macro_stack_pop(as);
     } else {
         asm_err(as, ASM_ERR_RESOLVE, ".endmacro but not running a macro");
     }
 }
 
 void dot_endproc(ASSEMBLER *as) {
-    if(as->active_outer_scope->scope_type != GPERF_DOT_PROC || !scope_pop(as)) {
+    if(as->active_scope->scope_type != GPERF_DOT_PROC || !scope_pop(as)) {
         asm_err(as, ASM_ERR_RESOLVE, ".endproc without a matching .proc");
     }    
 }
 
 void dot_endscope(ASSEMBLER *as) {
-    if(as->active_outer_scope->scope_type != GPERF_DOT_SCOPE || !scope_pop(as)) {
+    if(as->active_scope->scope_type != GPERF_DOT_SCOPE || !scope_pop(as)) {
         asm_err(as, ASM_ERR_RESOLVE, ".endscope without a matching .scope");
     }    
 }
@@ -508,16 +537,21 @@ void dot_local(ASSEMBLER *as) {
     const char *symbol_name = as->token_start;
     uint32_t name_length = as->input - as->token_start;
     // Now the name is known, create the variable
-    symbol_declare_local_var(as, symbol_name, name_length);
-    // See what's next
-    next_token(as);
-    if(as->current_token.op == '=') {
-        // For assign, evaluate the expression and assign the result
-        symbol_write(as, symbol_name, name_length, SYMBOL_VARIABLE, expr_full_evaluate(as));
-    }
-    if(as->current_token.op == ',') {
-        // or more locals, repeat this process
-        dot_local(as);
+    symbol_declare_local(as, symbol_name, name_length);
+    int next_op;
+    if(peek_next_op(as, &next_op)) {
+        if(next_op == '=') {
+            // Cannot use expect_op since as->current_token.type != TOKEN_OP
+            next_token(as);
+            // For assign, evaluate the expression and assign the result
+            symbol_write(as, symbol_name, name_length, SYMBOL_VARIABLE, expr_full_evaluate(as));
+        }
+        if(next_op == ',') {
+            // Cannot use expect_op since as->current_token.type != TOKEN_OP
+            next_token(as);
+            // or more locals, repeat this process
+            dot_local(as);
+        }
     }
 }
 
@@ -722,7 +756,7 @@ void dot_scope(ASSEMBLER *as) {
     char anon_name[11];
     next_token(as);
     if(as->current_token.type == TOKEN_END) {
-        name_length = snprintf(anon_name, 11, "anon_%04X", ++as->active_outer_scope->anon_scope_id);
+        name_length = snprintf(anon_name, 11, "anon_%04X", ++as->active_scope->anon_scope_id);
         name = anon_name;
     } else {
         name = as->current_token.name;
@@ -734,11 +768,11 @@ void dot_scope(ASSEMBLER *as) {
         }
     }
 
-    SCOPE *s = scope_find_child(as->active_outer_scope, name, name_length);
+    SCOPE *s = scope_find_child(as->active_scope, name, name_length);
     if(s) {
         scope_push(as, s);
     } else {
-        SCOPE *s = scope_add(as, name, name_length, as->active_outer_scope, GPERF_DOT_SCOPE);
+        SCOPE *s = scope_add(as, name, name_length, as->active_scope, GPERF_DOT_SCOPE);
         if(s) {
             scope_push(as, s);
         }
@@ -762,7 +796,7 @@ void dot_string(ASSEMBLER *as) {
     SYMBOL_LABEL *sl = NULL;
     if(as->strcode) {
         // Add the _ variable if it doesn't yet exist and get a handle to the storage
-        sl = symbol_store_in_scope(as, as->active_outer_scope, "_", 1, SYMBOL_VARIABLE, 0);
+        sl = symbol_store_in_scope(as, as->active_scope, "_", 1, SYMBOL_VARIABLE, 0);
     }
     do {
         // Get to a token to process
@@ -878,7 +912,7 @@ void parse_dot_command(ASSEMBLER *as) {
             dot_include(as);
             break;
         case GPERF_DOT_LOCAL:
-            dot_local(as);
+            asm_err(as, ASM_ERR_RESOLVE, ".local is only valid inside a .macro");
             break;
         case GPERF_DOT_MACRO:
             dot_macro(as);
@@ -943,6 +977,14 @@ int parse_macro_if_is_macro(ASSEMBLER *as) {
         MACRO *macro = ARRAY_GET(&as->macros, MACRO, i);
         if(name_length == macro->macro_name_length && 0 == strnicmp(as->token_start, macro->macro_name, name_length)) {
 
+            for(int mei = 0; mei < as->macro_expand_stack.items; mei++) {
+                MACRO_EXPAND *mas = ARRAY_GET(&as->macro_expand_stack, MACRO_EXPAND, mei);
+                if(macro->macro_name_length == mas->macro_name_length && 0 == strnicmp(macro->macro_name, mas->macro_name, mas->macro_name_length)) {
+                    asm_err(as, ASM_ERR_RESOLVE, "Macro %.*s cannot call itself", mas->macro_name_length, mas->macro_name);
+                    return 0;
+                }
+            }
+
             const size_t argc = macro->macro_parameters.items;
 
             // Get the raw parameters to the macro
@@ -983,6 +1025,8 @@ int parse_macro_if_is_macro(ASSEMBLER *as) {
             as->input = p;
             as->token_start = p;
             input_stack_push(as);
+            MACRO_EXPAND *mas = macro_stack_push(as, macro->macro_name, macro->macro_name_length);
+            DYNARRAY *rens = &mas->renames;
 
             // Expand macro body using get_token()
             const char *body_start = macro->macro_body_input.input;
@@ -1023,7 +1067,10 @@ int parse_macro_if_is_macro(ASSEMBLER *as) {
 
                 // Copy or substitute token bytes
                 if(ts < te) {
-                    if(is_variable(as)) {
+                    if(is_parse_dot_command(as) && as->opcode_info.opcode_id == GPERF_DOT_LOCAL) {
+                        dot_local(as);
+                        te = as->input;
+                    } else if(is_variable(as)) {
                         int substituted = 0;
                         for(size_t mi = 0; mi < argc; mi++) {
                             MACRO_VARIABLE *mv = ARRAY_GET(&macro->macro_parameters, MACRO_VARIABLE, mi);
@@ -1038,7 +1085,19 @@ int parse_macro_if_is_macro(ASSEMBLER *as) {
                             }
                         }
                         if(!substituted) {
-                            append_bytes_to_buffer(&out, &out_len, &out_cap, ts, (size_t)(te - ts));
+                            for(size_t ri = 0; ri < rens->items; ri++) {
+                                RENAME_MAP *ren = ARRAY_GET(rens, RENAME_MAP, ri);
+                                if(ren->user_name_len == (int)(te - ts) &&
+                                        0 == strnicmp(ts, ren->user_name, (size_t)(te - ts))) {
+                                    // Substitute generated name for the user given name
+                                    append_bytes_to_buffer(&out, &out_len, &out_cap, ren->generated_name, GEN_NAME_LEN);
+                                    substituted = 1;
+                                    break;
+                                }
+                            }
+                            if(!substituted) {
+                                append_bytes_to_buffer(&out, &out_len, &out_cap, ts, (size_t)(te - ts));
+                            }
                         }
                     } else {
                         append_bytes_to_buffer(&out, &out_len, &out_cap, ts, (size_t)(te - ts));

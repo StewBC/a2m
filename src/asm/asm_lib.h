@@ -25,11 +25,11 @@ typedef struct ASSEMBLER ASSEMBLER;
 #include "gperf.h"
 #include "incl_fls.h"
 #include "opcds.h"
+#include "tokens.h"
 #include "parse.h"
 #include "scope.h"
 #include "segment.h"
 #include "symbols.h"
-#include "tokens.h"
 #include "emit.h"
 #include "asm6502.h"
 

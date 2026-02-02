@@ -95,21 +95,21 @@ done:
 ; sets up what's needed to call textShow which does the printing
 .macro printXYlh xpos, ypos, textL, textH, len, colorMask, inverse
 
-    ; .local color, strIndex
+    .local color, strIndex
 
-    ; color    = dstPtrL                          ; textShow expects color masks in dstPtr(L and H)
-    ; strIndex = sizeL
+    color    = dstPtrL                          ; textShow expects color masks in dstPtr(L and H)
+    strIndex = sizeL
 
     .if .defined colorMask
         ldx colorMask                           ; this is an index into mask[Left|Right]
         lda masksLeft, x
-        sta dstPtrL
+        sta color
         lda masksRight, x
-        sta dstPtrL + 1
+        sta color + 1
     .else
         lda #$ff                                ; no color (white) is a mask of $ff left and right
-        sta dstPtrL
-        sta dstPtrL + 1
+        sta color
+        sta color + 1
     .endif
 
     .if .defined inverse
@@ -125,7 +125,7 @@ done:
     lda textH
     sta textSHowText::read + 2
     ldx len                                     ; 0 based
-    stx sizeL
+    stx strIndex
     lda xpos                                    ; and x/y coords in x and y registers
     asl
     tax

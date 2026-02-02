@@ -231,6 +231,16 @@ void next_token(ASSEMBLER *as) {
     }
 }
 
+int peek_next_op(ASSEMBLER *as, int *out_op) {
+    if(A2_OK != input_stack_push(as)) {
+        return 0;
+    }
+    next_token(as);
+    *out_op = as->current_token.op;
+    input_stack_pop(as);
+    return 1;
+}
+
 void expect_op(ASSEMBLER *as, char op) {
     if(as->current_token.type != TOKEN_OP || as->current_token.op != op) {
         asm_err(as, ASM_ERR_RESOLVE, "Expected '%c'", op);

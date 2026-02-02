@@ -48,7 +48,7 @@ static QRES symbol_resolve_qualified_name(ASSEMBLER *as, const char *sym, int sy
         }
     } else {
         // Lexical anchor (first segment can be found up the parent chain)
-        anchor = as->active_outer_scope;
+        anchor = as->active_scope;
     }
 
     // Parse segments separated by "::".
@@ -215,11 +215,7 @@ SYMBOL_LABEL *symbol_read(ASSEMBLER *as, const char *sym, uint32_t sym_len) {
         return symbol_lookup_scope(ref.scope, ref.name_hash, ref.name, ref.name_length);
     }
 
-    SYMBOL_LABEL *sl = symbol_lookup_chain(as->active_locals_scope, ref.name_hash, ref.name, ref.name_length);
-    if(sl) {
-        return sl;
-    }
-    return symbol_lookup_chain(as->active_outer_scope, ref.name_hash, ref.name, ref.name_length);
+    return symbol_lookup_chain(as->active_scope, ref.name_hash, ref.name, ref.name_length);
 }
 
 SYMBOL_LABEL *symbol_store_in_scope(ASSEMBLER *as, SCOPE *scope, const char *symbol_name, uint32_t symbol_name_length, SYMBOL_TYPE symbol_type, uint64_t value) {
@@ -267,37 +263,48 @@ SYMBOL_LABEL *symbol_write(ASSEMBLER *as, const char *sym, uint32_t sym_len, SYM
     }
 
     if(ref.is_qualified) {
+        // SQW - I may want to stop this from being possible; ::a = 1 maybe but ::a::b::c = 1 maybe not
         return symbol_store_in_scope(as, ref.scope, ref.name, ref.name_length, symbol_type, value);
     }
 
-    if(symbol_type == SYMBOL_VARIABLE) {
-        // first see if this symbol lives in the local scope
-        for(SCOPE *ls = as->active_locals_scope; ls; ls = ls->parent_scope) {
-            SYMBOL_LABEL *sl = symbol_lookup_scope(ls, ref.name_hash, ref.name, ref.name_length);
-            if(sl) {
-                // It is local, set it
-                return symbol_store_in_scope(as, ls, ref.name, ref.name_length, symbol_type, value);
-            }
-        }
-
-        // Not a local variable -> write into current proc scope (your policy)
-        return symbol_store_in_scope(as, as->active_outer_scope, ref.name, ref.name_length, symbol_type, value);
-    }
-
-    // Addresses / labels: default to proc scope
-    return symbol_store_in_scope(as, as->active_outer_scope, ref.name, ref.name_length, symbol_type, value);
+    return symbol_store_in_scope(as, as->active_scope, ref.name, ref.name_length, symbol_type, value);
 }
 
-SYMBOL_LABEL *symbol_declare_local_var(ASSEMBLER *as, const char *name, uint32_t name_length) {
-    if(!as->active_locals_scope){
-        asm_err(as, ASM_ERR_RESOLVE, ".local %.*s used with no active local frame", name_length, name);
+SYMBOL_LABEL *symbol_declare_local(ASSEMBLER *as, const char *name, uint32_t name_len) {
+    RENAME_MAP ren;
+    ren.user_name = name;
+    ren.user_name_len = name_len;
+    ren.generated_name = (char*)malloc(GEN_NAME_LEN + 1);
+    if(!ren.generated_name) {
         return NULL;
     }
-    uint32_t name_hash = util_fnv_1a_hash(name, name_length);
-    SYMBOL_LABEL *sl = symbol_lookup_scope(as->active_locals_scope, name_hash, name, name_length);
-    if(sl) {
-        asm_err(as, ASM_ERR_RESOLVE, ".local %.*s already defined", name_length, name);
+    MACRO_EXPAND *mes = ARRAY_GET(&as->macro_expand_stack, MACRO_EXPAND, as->macro_expand_stack.items - 1);
+    snprintf(ren.generated_name, GEN_NAME_LEN + 1, GEN_NAME_FMT, ++mes->rename_id);
+    if(A2_OK != ARRAY_ADD(&mes->renames, ren)) {
         return NULL;
     }
-    return symbol_store_in_scope(as, as->active_locals_scope, name, name_length, SYMBOL_VARIABLE, 0);
+    return symbol_store_in_scope(as, as->active_scope, ren.generated_name, GEN_NAME_LEN, SYMBOL_VARIABLE, 0);
+}
+
+int symbol_delete_local(SCOPE *scope, const char *symbol_name, uint32_t symbol_name_length) {
+    uint32_t name_hash = util_fnv_1a_hash(symbol_name, symbol_name_length);
+    uint8_t bucket = name_hash & HASH_MASK;
+    DYNARRAY *bucket_array = &scope->symbol_table[bucket];
+
+    for(size_t i = 0; i < bucket_array->items; i++) {
+        SYMBOL_LABEL *sl = ARRAY_GET(bucket_array, SYMBOL_LABEL, i);
+        if(sl->symbol_hash == name_hash && sl->symbol_length == symbol_name_length && !strnicmp(symbol_name, sl->symbol_name, symbol_name_length)) {
+            size_t last = bucket_array->items - 1;
+            if(i != last) {
+                // If the symbol to delete is in the middle, put the last symbol in the list
+                // over the one to delete
+                SYMBOL_LABEL *dst = ARRAY_GET(bucket_array, SYMBOL_LABEL, i);
+                SYMBOL_LABEL *src = ARRAY_GET(bucket_array, SYMBOL_LABEL, last);
+                *dst = *src;
+            }
+            bucket_array->items--;
+            return 1;
+        }
+    }
+    return 0;
 }
