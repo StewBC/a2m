@@ -362,7 +362,10 @@ void dot_else(ASSEMBLER *as) {
 void dot_endfor(ASSEMBLER *as) {
     if(as->loop_stack.items) {
         const char *post_loop = as->input;
-        FOR_LOOP *for_loop = ARRAY_GET(&as->loop_stack, FOR_LOOP, as->loop_stack.items - 1);
+        LOOP *for_loop = ARRAY_GET(&as->loop_stack, LOOP, as->loop_stack.items - 1);
+        if(for_loop->loop_type != LOOP_FOR) {
+            goto bad_nesting;
+        }
         int same_file = stricmp(for_loop->loop_start_file, as->current_file) == 0;
         int loop_iterations = ++for_loop->iterations;
         as->token_start = as->input = for_loop->loop_adjust_start;
@@ -383,6 +386,7 @@ void dot_endfor(ASSEMBLER *as) {
             as->current_line--;
         }
     } else {
+bad_nesting:
         asm_err(as, ASM_ERR_RESOLVE, ".endfor without a matching .for");
     }
 }
@@ -413,6 +417,38 @@ void dot_endproc(ASSEMBLER *as) {
     }    
 }
 
+void dot_endrepeat(ASSEMBLER *as) {
+    if(as->loop_stack.items) {
+        const char *post_loop = as->input;
+        LOOP *repeat_loop = ARRAY_GET(&as->loop_stack, LOOP, as->loop_stack.items - 1);
+        if(repeat_loop->loop_type != LOOP_REPEAT) {
+            goto bad_nesting;
+        }
+        int same_file = stricmp(repeat_loop->loop_start_file, as->current_file) == 0;
+        int loop_iterations = ++repeat_loop->iterations;
+        if(loop_iterations < 65536 && same_file && loop_iterations < repeat_loop->max_iterations) {
+            as->token_start = as->input = repeat_loop->loop_body_start;
+            as->current_line = repeat_loop->body_line;
+            if(repeat_loop->variable_name_lengt) {
+                symbol_write(as, repeat_loop->variable_name, repeat_loop->variable_name_lengt, SYMBOL_VARIABLE, repeat_loop->iterations);                
+            }
+        } else {
+            // Pop the for loop from the stack
+            as->loop_stack.items--;
+            as->token_start = as->input = post_loop;
+            if(!same_file) {
+                asm_err(as, ASM_ERR_RESOLVE, ".endrepeat matches .repeat in file %s, body at line %zd", repeat_loop->loop_start_file, repeat_loop->body_line);
+            } else if(loop_iterations >= 65536) {
+                asm_err(as, ASM_ERR_RESOLVE, "Exiting .repeat loop with body at line %zd, which has iterated 64K times", repeat_loop->body_line);
+            }
+            as->current_line--;
+        }
+    } else {
+bad_nesting:
+        asm_err(as, ASM_ERR_RESOLVE, ".endrepeat without a matching .repeat");
+    }
+}
+
 void dot_endscope(ASSEMBLER *as) {
     if(as->active_scope->scope_type != GPERF_DOT_SCOPE || !scope_pop(as)) {
         asm_err(as, ASM_ERR_RESOLVE, ".endscope without a matching .scope");
@@ -420,7 +456,7 @@ void dot_endscope(ASSEMBLER *as) {
 }
 
 void dot_for(ASSEMBLER *as) {
-    FOR_LOOP for_loop;
+    LOOP for_loop;
     next_token(as);
     if(as->current_token.type != TOKEN_VAR) {
         asm_err(as, ASM_ERR_RESOLVE, ".for must be followed by a variable name");
@@ -435,6 +471,7 @@ void dot_for(ASSEMBLER *as) {
     for_loop.iterations = 0;
     for_loop.loop_condition_start = as->input;
     for_loop.loop_start_file = as->current_file;
+    for_loop.loop_type = LOOP_FOR;
     // evaluate the condition
     if(!expr_full_evaluate(as)) {
         find_ab_passing_over_c(as, ".endfor", NULL, ".for");
@@ -658,6 +695,43 @@ void dot_proc(ASSEMBLER *as) {
     s = scope_add(as, leaf, leaf_len, parent, GPERF_DOT_PROC);
     if(s) {
         scope_push(as, s);
+    }
+}
+
+void dot_repeat(ASSEMBLER *as) {
+    LOOP repeat_loop;
+    next_token(as);
+    repeat_loop.iterations = 0;
+    repeat_loop.max_iterations = expr_evaluate(as);
+    repeat_loop.loop_start_file = as->current_file;
+    repeat_loop.loop_type = LOOP_REPEAT;
+    if(as->current_token.op == ',') {
+        next_token(as);
+        if(as->current_token.type == TOKEN_VAR) {
+            repeat_loop.variable_name = as->current_token.name;
+            repeat_loop.variable_name_lengt = as->current_token.name_length;
+            symbol_write(as, repeat_loop.variable_name, repeat_loop.variable_name_lengt, SYMBOL_VARIABLE, repeat_loop.iterations);
+        } else {
+            asm_err(as, ASM_ERR_RESOLVE, ".repeat expects a variale after a comma, after the number of iterations");
+        }
+    }
+
+    // evaluate the condition
+    if(repeat_loop.iterations >= repeat_loop.max_iterations) {
+        // Skip this repeat -- basicall max_iterations == 0
+        find_ab_passing_over_c(as, ".endrepeat", NULL, ".repeat");
+        if(!*as->input) {
+            // failed so find .endrepeat (must be in same file)
+            asm_err(as, ASM_ERR_RESOLVE, ".repeat without .endrepeat");
+        }
+    } else {
+        do {
+            get_token(as);
+        } while(*as->input && as->token_start != as->input);
+        // to find the loop body
+        repeat_loop.loop_body_start = as->input;
+        repeat_loop.body_line = as->current_line + as->next_line_count;
+        ARRAY_ADD(&as->loop_stack, repeat_loop);
     }
 }
 
@@ -896,6 +970,9 @@ void parse_dot_command(ASSEMBLER *as) {
         case GPERF_DOT_ENDPROC:
             dot_endproc(as);
             break;
+        case GPERF_DOT_ENDREPEAT:
+            dot_endrepeat(as);
+            break;
         case GPERF_DOT_ENDSCOPE:
             dot_endscope(as);
             break;
@@ -925,6 +1002,9 @@ void parse_dot_command(ASSEMBLER *as) {
             break;
         case GPERF_DOT_QWORD:
             emit_cs_values(as, 64, BYTE_ORDER_LO);
+            break;
+        case GPERF_DOT_REPEAT:
+            dot_repeat(as);
             break;
         case GPERF_DOT_RES:
             dot_res(as);

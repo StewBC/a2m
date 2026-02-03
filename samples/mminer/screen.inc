@@ -48,9 +48,9 @@ page1:
 :
     ldx #39
 p1l1:
-    .for Row = $78, Row .lt $C0, Row++
-        sta $100 * (>HGRPage1 | (Row & $07) << 2 | (Row & $30) >> 4) + ((Row & $08) << 4 | (Row & $C0) >> 1 | (Row & $C0) >> 3),x
-    .endfor
+    .repeat $48, Row
+        sta $100 * (>HGRPage1 | ((Row + $78) & $07) << 2 | ((Row + $78) & $30) >> 4) + (((Row + $78) & $08) << 4 | ((Row + $78) & $C0) >> 1 | ((Row + $78) & $C0) >> 3),x
+    .endrepeat
     dex
     bmi p1p2
     jmp p1l1
@@ -58,9 +58,9 @@ p1l1:
 p1p2:
     ldx #39
 p1l2:
-    .for Row=0, Row .lt $78, Row++
+    .repeat $78, Row
         sta $100 * (>HGRPage1 | (Row & $07) << 2 | (Row & $30) >> 4) + ((Row & $08) << 4 | (Row & $C0) >> 1 | (Row & $C0) >> 3),x
-    .endfor
+    .endrepeat
     dex
     bmi done0
     jmp p1l2
@@ -76,9 +76,9 @@ page2:
     ldx #39
 
 p2l1:
-    .for Row = $78, Row .lt $C0, Row++
-        sta $100 * (>HGRPage2 | (Row & $07) << 2 | (Row & $30) >> 4) + ((Row & $08) << 4 | (Row & $C0) >> 1 | (Row & $C0) >> 3),x
-    .endfor
+    .repeat $48, Row
+        sta $100 * (>HGRPage2 | ((Row + $78) & $07) << 2 | ((Row + $78) & $30) >> 4) + (((Row + $78) & $08) << 4 | ((Row + $78) & $C0) >> 1 | ((Row + $78) & $C0) >> 3),x
+    .endrepeat
     dex
     bmi p2p2
     jmp p2l1
@@ -86,9 +86,9 @@ p2l1:
 p2p2:
     ldx #39
 p2l2:
-    .for Row=0, Row .lt $78, Row++
+    .repeat $78, Row
         sta $100 * (>HGRPage2 | (Row & $07) << 2 | (Row & $30) >> 4) + ((Row & $08) << 4 | (Row & $C0) >> 1 | (Row & $C0) >> 3),x
-    .endfor
+    .endrepeat
     dex
     bmi done1
     jmp p2l2

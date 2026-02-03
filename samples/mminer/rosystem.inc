@@ -11,16 +11,16 @@
 ;-----------------------------------------------------------------------------
 ; the lo byte for the memory at the start of every screen row
 rowL:
-    .for Row=0, Row .lt $C0, Row++
+    .repeat $C0, Row
         .byte   (Row & $08) << 4 | (Row & $C0) >> 1 | (Row & $C0) >> 3
-    .endfor
+    .endrep
 
 ;-----------------------------------------------------------------------------
 ; the hi byte for the memory at the start of every screen row
 rowH:
-    .for Row=0, Row .lt $C0, Row++
+    .repeat $C0, Row
         .byte   >$0000 | (Row & $07) << 2 | (Row & $30) >> 4
-    .endfor
+    .endrep
 
 ;-----------------------------------------------------------------------------
 ; Jump table for screen tile rendering, per row - unrolled loops
@@ -94,34 +94,34 @@ rowDrawH:
 
 ;-----------------------------------------------------------------------------
 mult64H:
-.for Row=0, Row .lt MAX_SPRITE_IFRAMES, Row++
+.repeat MAX_SPRITE_IFRAMES, Row
     .byte >(Row * 64)
-.endfor
+.endrep
 
 mult64L:
-.for Row=0, Row .lt MAX_SPRITE_IFRAMES, Row++
+.repeat MAX_SPRITE_IFRAMES, Row
     .byte <(Row * 64)
-.endfor
+.endrep
 
 mult32H:
-.for Row=0, Row .lt 15, Row++
+.repeat 15, Row
     .byte >(Row * 32)
-.endfor
+.endrep
 
 mult32L:
-.for Row=0, Row .lt 15, Row++
+.repeat 15, Row
     .byte <(Row * 32)
-.endfor
+.endrep
 
 mult16:
-.for Row=0, Row .lt 9, Row++
+.repeat 9, Row
     .byte Row * 16
-.endfor
+.endrep
 
 mult8:
-.for Row=0, Row .lt 24, Row++
+.repeat 24, Row
     .byte Row * 8
-.endfor
+.endrep
 
 ;-----------------------------------------------------------------------------
 ; color masks

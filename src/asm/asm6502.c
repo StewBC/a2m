@@ -102,7 +102,7 @@ int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, void *user, output_byte ob
     as->cb_assembler_ctx.output_byte = ob;
 
     ARRAY_INIT(&as->anon_symbols, uint16_t);
-    ARRAY_INIT(&as->loop_stack, FOR_LOOP);
+    ARRAY_INIT(&as->loop_stack, LOOP);
     ARRAY_INIT(&as->macros, MACRO);
     ARRAY_INIT(&as->macro_buffers, char *);
     ARRAY_INIT(&as->macro_expand_stack, MACRO_EXPAND);
@@ -180,7 +180,12 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
                     asm_err(as, ASM_ERR_RESOLVE, ".if without .endif");
                 }
                 if(as->loop_stack.items) {
-                    asm_err(as, ASM_ERR_RESOLVE, ".for L:%05zu, without .endfor", ARRAY_GET(&as->loop_stack, FOR_LOOP, as->loop_stack.items - 1)->body_line - 1);
+                    LOOP *loop = ARRAY_GET(&as->loop_stack, LOOP, as->loop_stack.items - 1);
+                    if(loop->loop_type == LOOP_FOR) {
+                        asm_err(as, ASM_ERR_RESOLVE, ".for L:%05zu, without .endfor", loop->body_line - 1);
+                    } else {
+                        asm_err(as, ASM_ERR_RESOLVE, ".repeat L:%05zu, without .endrepeat", loop->body_line - 1);
+                    }
                     as->loop_stack.items = 0;
                 }
                 // The end of the file has been reached so if it was an included file

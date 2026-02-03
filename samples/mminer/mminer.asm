@@ -25,7 +25,7 @@ quit:
     jsr MLI                                     ; quit using the prodos mli
 
     .byte   $65                                 ; ProDOS Quit request
-    .word   * + 2
+    .addr   * + 2
     .byte   4
     .byte   0
     .word   0000

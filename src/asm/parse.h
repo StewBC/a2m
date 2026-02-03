@@ -15,14 +15,30 @@ typedef struct {
     TOKEN token;
 } INPUT_STACK;
 
-typedef struct {                                            // For init, condition, adjust
-    const char *loop_condition_start;                       // Points at condition
-    const char *loop_adjust_start;                          // Points at loop counter adjust expression
+typedef enum {
+    LOOP_FOR,
+    LOOP_REPEAT
+} LOOP_TYPE;
+
+typedef struct {
+    LOOP_TYPE loop_type;
+    union {
+        struct FOR {
+            const char *loop_condition_start;               // Points at condition
+            const char *loop_adjust_start;                  // Points at loop counter adjust expression
+        };
+        struct REPEAT {
+            int max_iterations;                             // how many times to loop
+            const char *variable_name;
+            int variable_name_lengt;                        // 0 if optional var not given
+        };
+
+    };
     const char *loop_body_start;                            // Points at text to execute in loop
-    const char *loop_start_file;                            // .for and .endfor must be in same file
+    const char *loop_start_file;                            // .repeat and .endrepeat must be in same file
     size_t body_line;                                       // Line number where body loop starts
     size_t iterations;                                      // Break out of runaway loops
-} FOR_LOOP;
+} LOOP;
 
 typedef struct {
     const char *macro_name;
