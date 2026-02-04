@@ -23,18 +23,19 @@ a2m is designed for people who enjoy developing or exploring Apple 2 software.
 ## Quick Key Reference
 In both Normal and Debug Mode, these keys have the listed meanings:
 
-| Key           | Action                         | Key       | Action                              |
-|:--------------|:-------------------------------|:----------|:------------------------------------|
-| F1            | Show Help                      | F2        | Toggle Debug Mode View              |
-| F3            | Toggle Turbo Mode              | F4        |                                     |
-| F5            | Run                            | F6        | Run to cursor                       |
-| F7            |                                | F8        |                                     |
-| F9            | Toggle Breakpoint              | F10       | Step                                |
-| F11           | Break                          | F12       | Monitor Select                      |
-| CTRL+F2       | CTRL+Reset                     | ALT+F2    | CTRL+OpenApple+Reset                |
-| CTRL+SHIFT+F4 | Configure Assembler            | CTRL+F4   | Run Assembler                       |
-| CTRL+F5       | Insert from clipboard          | SHIFT+F11 | Step Out                            |
-|               |                                | SHIFT+F12 | Toggle Franklin Ace Diplay on `][+` |
+| Key           | Action                  | Key               | Action                              |
+|:--------------|:------------------------|:------------------|:------------------------------------|
+| F1            | Show Help               | F2                | Toggle Debug Mode View              |
+| F3            | Toggle Turbo Mode       | F4                |                                     |
+| F5            | Run                     | F6                | Run to cursor                       |
+| F7            |                         | F8                |                                     |
+| F9            | Toggle Breakpoint       | F10               | Step                                |
+| F11           | Break                   | F12               | Monitor Select                      |
+| CTRL+F2       | CTRL+Reset              | ALT+F2            | CTRL+OpenApple+Reset                |
+| CTRL+SHIFT+F4 | Configure Assembler     | CTRL+F4           | Run Assembler                       |
+| CTRL+F5       | Insert from clipboard   | SHIFT+F11         | Step Out                            |
+|               |                         | SHIFT+F12         | Toggle Franklin Ace Diplay on `][+` |
+| CTRL+Pause    | CTRL+Reset              | CTRL+SHIFT+Pause  | CTRL+OpenApple+Reset                |
 
 Debug Mode (`F2`) also reveals the Miscellaneous view, and it is here where disks can be inserted, making the Apple 2 really useful.
 
@@ -97,19 +98,6 @@ The Apple 2 display is always drawn within the largest 4:3 region that fits insi
 Debug Mode is where a2m really shines. Every part of the emulated Apple 2 can be inspected, and many parts can be modified.
 
 Although Debug Mode is often described as a separate mode, it is always active. All function keys route to the debugger even when only the Apple 2 display is visible. Once the debugger views are shown, the full set of tools becomes available.
-
-\Needspace{10\baselineskip}
-***Keyboard controls***
-The following keys control the debugger regardless of whether the Debug Mode View is open (via F2):
-
-| Key       | Action                             | Key | Action                                    |
-|:----------|:-----------------------------------|:----|:------------------------------------------|
-| F1        | Show Help                          | F2  | Toggle Debug Mode View                    |
-| F5        | Run                                | F6  | Run to cursor                             |
-| F7        |                                    | F8  |                                           |
-| F9        | Toggle Breakpoint                  | F10 | Step                                      |
-| F11       | Break                              | F12 | Monitor Select                            |
-| SHIFT+F11 | Step Out                           |     |                                           |
 
 \Needspace{10\baselineskip}
 ## Opening the Debugger
@@ -515,15 +503,17 @@ The assembler supports these features:
 | address          | The address character is `*` and it can be assigned and read                  |
 | expressions      | The assembler has a full expression parser                                    |
 
-\Needspace{38\baselineskip}
-There is a set of directives that control how a 6502 source file is assembled. These are referred to as `dot commands`, since each keyword starts with a `.`. The available `dot commands` are:
+\Needspace{45\baselineskip}
+There is a set of directives that control how a 6502 source file is assembled. These are referred to as `dot commands`, since each keyword starts with a `.` (period). The available `dot commands` are:
 
 | Command         | Meaning                                                                        |
 |:----------------|:-------------------------------------------------------------------------------|
 | .6502           | Only 6502 opcodes are valid. 65C02 opcodes are not valid and will cause errors |
 | .65c02          | Both 6502 and 65C02 opcodes are valid                                          |
 | .org n          | Set the assembly location to address n. Another way to specify `* =`           |
+| .addr           | Synonym for `.word`                                                            |
 | .align v        | Align to v bytes, inserting up to v-1 zeroes into the output                   |
+| .asciiz         | `.string`, but at the end after all segments, emits a '\0'                     |
 | .res l[,b]      | Insert l bytes into the output, value `0` or the value of the optional `b`     |
 | .byte b`[,b]*`    | Insert b as a byte or bytes into the output - See Notes                      |
 | .word w`[,w]*`    | Insert the word bytes w into the output                                      |
@@ -537,7 +527,11 @@ There is a set of directives that control how a 6502 source file is assembled. T
 | .endif          | Ends a `.if` conditional assembler directive                                   |
 | .for p          | Start a loop where p has the form `<initializer>, <condition>, <iteration>`    |
 | .endfor         | Ends a `.for` loop assembler directive                                         |
+| .repeat a`[,v]` | Repeat [0-a) times, setting the count in the optional variable `v`             |
+| .endrepeat      | Ends a `.repeat` assembler directive                                           |
+| .endrep         | Synonym for `.endrepeat`                                                       |
 | .macro n p      | Start a macro procedure with name n and parameters p                           |
+| .local n        | Creates a macro local variable or label with a unique numeric ID in format `__macro_local_XXXX` |
 | .endmacro       | Ends a `.macro` assembler definition                                           |
 | .incbin "f"     | Include the contents of file f verbatim in the output                          |
 | .include "f"    | Include a 6502 assembler file for assembly at this point                       |
