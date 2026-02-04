@@ -19,9 +19,10 @@ typedef struct {
 } MACHINE;
 
 static const char *type_str[] = {
-    "UNK",
     "VAR",
-    "ADR"
+    "ADR",
+    "UNK",
+    "LCL"
 };
 
 // This is the command line assembler version - it just uses a flat 64K buffer
