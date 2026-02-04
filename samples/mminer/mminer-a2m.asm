@@ -2,8 +2,8 @@
 .segdef "LOWMEM", $800, noemit
 .segdef "HGR", $4000
 .segdef "CODE", $6000
-.segdef "RODATA", $89CA
-.segdef "DATA", $BE30
+.segdef "RODATA", $89DC
+.segdef "DATA", $BE40
 
 SETAN3      = $C05F
 CLR80STORE  = $C000
