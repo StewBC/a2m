@@ -246,7 +246,7 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
             }
         }
         if(issue) {
-            asm_err(as, ASM_ERR_RESOLVE, "* Offsets may slightly off, based on .align statement changing output size");
+            asm_err(as, ASM_ERR_RESOLVE, "* Offsets may be slightly off, based on .align statement changing output size");
         }
     }
     if(name) {
