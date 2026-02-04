@@ -869,7 +869,7 @@ void dot_strcode(ASSEMBLER *as) {
     } while(as->current_token.type != TOKEN_END);
 }
 
-void dot_string(ASSEMBLER *as) {
+void dot_string(ASSEMBLER *as, int terminate) {
     SYMBOL_LABEL *sl = NULL;
     if(as->strcode) {
         // Add the _ variable if it doesn't yet exist and get a handle to the storage
@@ -891,6 +891,11 @@ void dot_string(ASSEMBLER *as) {
             }
         }
     } while(as->current_token.op == ',');
+    
+    if(terminate) {
+        // Only one terminator at the end of the entire directive
+        emit_byte(as, 0);
+    }    
 }
 
 //----------------------------------------------------------------------------
@@ -942,6 +947,9 @@ void parse_dot_command(ASSEMBLER *as) {
                 // as->current_address = (as->current_address + (value - 1)) & ~(value - 1);
                 set_current_output_address(as, (current_output_address(as) + (value - 1)) & ~(value - 1));
             }
+            break;
+        case GPERF_DOT_ASCIIZ:
+            dot_string(as, 1);
             break;
         case GPERF_DOT_BYTE:
             dot_byte(as);
@@ -1025,7 +1033,7 @@ void parse_dot_command(ASSEMBLER *as) {
             dot_strcode(as);
             break;
         case GPERF_DOT_STRING:
-            dot_string(as);
+            dot_string(as, 0);
             break;
         case GPERF_DOT_WORD:
             emit_cs_values(as, 16, BYTE_ORDER_LO);
