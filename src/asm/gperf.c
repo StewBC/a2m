@@ -1,15 +1,5 @@
-// 6502 assembler
-// Stefan Wessels, 2025
-// This is free and unencumbered software released into the public domain.
-
-// ***************************************************************************
-// Note! - This file has been modified by hand.  When changes are made, make
-// sure to include only the data changes, not changes to for example,
-// gperf_case_strcmp
-// ***************************************************************************
-
-/* ANSI-C code produced by gperf version 3.1 */
-/* Command-line: gperf gperf/asm6502.gperf  */
+/* ANSI-C code produced by gperf version 3.3 */
+/* Command-line: gperf -c --ignore-case gperf/asm6502.gperf  */
 /* Computed positions: -k'1-2,5,$' */
 
 #if !((' ' == 32) && ('!' == 33) && ('"' == 34) && ('#' == 35) \
@@ -77,17 +67,23 @@ static unsigned char gperf_downcase[256] =
   };
 #endif
 
-#ifndef GPERF_CASE_STRCMP
-#define GPERF_CASE_STRCMP 1
-static int gperf_case_strcmp(register const char *s1, register const char *s2, int32_t l) {
-    for(; l > 0; l--) {
-        unsigned char c1 = gperf_downcase[(unsigned char) *s1++];
-        unsigned char c2 = gperf_downcase[(unsigned char) *s2++];
-        if(c1 != 0 && c1 == c2)
-            continue;
-        return (int) c1 - (int) c2;
+#ifndef GPERF_CASE_STRNCMP
+#define GPERF_CASE_STRNCMP 1
+static int
+gperf_case_strncmp (register const char *s1, register const char *s2, register size_t n)
+{
+  for (; n > 0;)
+    {
+      unsigned char c1 = gperf_downcase[(unsigned char)*s1++];
+      unsigned char c2 = gperf_downcase[(unsigned char)*s2++];
+      if (c1 != 0 && c1 == c2)
+        {
+          n--;
+          continue;
+        }
+      return (int)c1 - (int)c2;
     }
-    return 0;
+  return 0;
 }
 #endif
 
@@ -136,11 +132,21 @@ hash (register const char *str, register size_t len)
     {
       default:
         hval += asso_values[(unsigned char)str[4]];
+#if (defined __cplusplus && (__cplusplus >= 201703L || (__cplusplus >= 201103L && defined __clang__ && __clang_major__ + (__clang_minor__ >= 9) > 3))) || (defined __STDC_VERSION__ && __STDC_VERSION__ >= 202000L && ((defined __GNUC__ && __GNUC__ >= 10) || (defined __clang__ && __clang_major__ >= 9)))
+      [[fallthrough]];
+#elif (defined __GNUC__ && __GNUC__ >= 7) || (defined __clang__ && __clang_major__ >= 10)
+      __attribute__ ((__fallthrough__));
+#endif
       /*FALLTHROUGH*/
       case 4:
       case 3:
       case 2:
         hval += asso_values[(unsigned char)str[1]+1];
+#if (defined __cplusplus && (__cplusplus >= 201703L || (__cplusplus >= 201103L && defined __clang__ && __clang_major__ + (__clang_minor__ >= 9) > 3))) || (defined __STDC_VERSION__ && __STDC_VERSION__ >= 202000L && ((defined __GNUC__ && __GNUC__ >= 10) || (defined __clang__ && __clang_major__ >= 9)))
+      [[fallthrough]];
+#elif (defined __GNUC__ && __GNUC__ >= 7) || (defined __clang__ && __clang_major__ >= 10)
+      __attribute__ ((__fallthrough__));
+#endif
       /*FALLTHROUGH*/
       case 1:
         hval += asso_values[(unsigned char)str[0]];
@@ -152,6 +158,10 @@ hash (register const char *str, register size_t len)
 struct OPCODEINFO *
 in_word_set (register const char *str, register size_t len)
 {
+#if (defined __GNUC__ && __GNUC__ + (__GNUC_MINOR__ >= 6) > 4) || (defined __clang__ && __clang_major__ >= 3)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
   static struct OPCODEINFO wordlist[] =
     {
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
@@ -426,18 +436,23 @@ in_word_set (register const char *str, register size_t len)
 #line 32 "gperf/asm6502.gperf"
       {".local",     GPERF_DOT_LOCAL     , 0, 0, 0}
     };
+#if (defined __GNUC__ && __GNUC__ + (__GNUC_MINOR__ >= 6) > 4) || (defined __clang__ && __clang_major__ >= 3)
+#pragma GCC diagnostic pop
+#endif
 
-    if(len <= MAX_WORD_LENGTH && len >= MIN_WORD_LENGTH) {
-        register unsigned int key = hash(str, len);
+  if (len <= MAX_WORD_LENGTH && len >= MIN_WORD_LENGTH)
+    {
+      register unsigned int key = hash (str, len);
 
-        if(key <= MAX_HASH_VALUE) {
-            register const char *s = wordlist[key].mnemonic;
+      if (key <= MAX_HASH_VALUE)
+        {
+          register const char *s = wordlist[key].mnemonic;
 
-            if((((unsigned char) *str ^ (unsigned char) *s) & ~32) == 0 && !gperf_case_strcmp(str, s, len))
-                return &wordlist[key];
+          if ((((unsigned char)*str ^ (unsigned char)*s) & ~32) == 0 && !gperf_case_strncmp (str, s, len) && s[len] == '\0')
+            return &wordlist[key];
         }
     }
-    return 0;
+  return (struct OPCODEINFO *) 0;
 }
 #line 111 "gperf/asm6502.gperf"
 
