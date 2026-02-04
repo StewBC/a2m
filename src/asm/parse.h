@@ -23,11 +23,11 @@ typedef enum {
 typedef struct {
     LOOP_TYPE loop_type;
     union {
-        struct FOR {
+        struct {                                            // FOR
             const char *loop_condition_start;               // Points at condition
             const char *loop_adjust_start;                  // Points at loop counter adjust expression
         };
-        struct REPEAT {
+        struct {                                            // REPEAT
             int max_iterations;                             // how many times to loop
             const char *variable_name;
             int variable_name_lengt;                        // 0 if optional var not given
@@ -57,8 +57,7 @@ typedef struct {                                            // Maps a .local use
 typedef struct {                                            // Tracks all the RENAM_MAPs for a macro
     const char *macro_name;
     uint32_t macro_name_length;
-    DYNARRAY renames;
-    uint32_t rename_id;
+    DYNARRAY renames;                                       // Array of local to generated names
 } MACRO_EXPAND;
 
 // Parser helpers that asre used external to parse

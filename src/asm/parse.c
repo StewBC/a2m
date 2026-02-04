@@ -301,7 +301,6 @@ void input_stack_pop(ASSEMBLER *as) {
 
 MACRO_EXPAND *macro_stack_push(ASSEMBLER *as, const char *name, uint32_t name_length) {
     MACRO_EXPAND mes;
-    mes.rename_id = 0;
     ARRAY_INIT(&mes.renames, RENAME_MAP);
     mes.macro_name = name;
     mes.macro_name_length = name_length;
@@ -317,8 +316,10 @@ void macro_stack_pop(ASSEMBLER *as) {
         // Do in reverse order as that's a much more efficient delete in symbol_delete_local
         for(int ri = mes->renames.items - 1; ri >= 0 ; ri--) {
             RENAME_MAP *ren = ARRAY_GET(&mes->renames, RENAME_MAP, ri);
-            symbol_delete_local(as->active_scope, ren->generated_name, GEN_NAME_LEN);
-            free(ren->generated_name);
+            // Delete local variables (pass 1) and all locals (pass 2)
+            if(symbol_delete_local(as->active_scope, ren->generated_name, GEN_NAME_LEN, as->pass == 2)) {
+                free(ren->generated_name);
+            }
         }
         array_free(&mes->renames);
         as->macro_expand_stack.items--;
@@ -574,14 +575,16 @@ void dot_local(ASSEMBLER *as) {
     const char *symbol_name = as->token_start;
     uint32_t name_length = as->input - as->token_start;
     // Now the name is known, create the variable
-    symbol_declare_local(as, symbol_name, name_length);
+    SYMBOL_LABEL *sl = symbol_declare_local(as, symbol_name, name_length);
     int next_op;
     if(peek_next_op(as, &next_op)) {
         if(next_op == '=') {
             // Cannot use expect_op since as->current_token.type != TOKEN_OP
             next_token(as);
             // For assign, evaluate the expression and assign the result
-            symbol_write(as, symbol_name, name_length, SYMBOL_VARIABLE, expr_full_evaluate(as));
+            sl->symbol_value = expr_full_evaluate(as);
+            // This also classifies the local as a variable
+            sl->symbol_type = SYMBOL_VARIABLE;
         }
         if(next_op == ',') {
             // Cannot use expect_op since as->current_token.type != TOKEN_OP
@@ -1139,48 +1142,64 @@ int parse_macro_if_is_macro(ASSEMBLER *as) {
                 if(te > body_end) {
                     te = body_end;
                 }
+                int length = te - ts;
 
                 // Copy bytes before token
                 if(cursor < ts) {
-                    append_bytes_to_buffer(&out, &out_len, &out_cap, cursor, (size_t)(ts - cursor));
+                    append_bytes_to_buffer(&out, &out_len, &out_cap, cursor, ts - cursor);
                 }
 
                 // Copy or substitute token bytes
                 if(ts < te) {
-                    if(is_parse_dot_command(as) && as->opcode_info.opcode_id == GPERF_DOT_LOCAL) {
+                    if(is_opcode(as)) {
+                        // Shortcut to avoid searching for replacement text
+                        append_bytes_to_buffer(&out, &out_len, &out_cap, ts, length);
+                    } else if(is_parse_dot_command(as) && as->opcode_info.opcode_id == GPERF_DOT_LOCAL) {
+                        // .local needs definitions - they could be address labels or variables
+                        // so there's a special class called SYMBOL_LOCAL for these
                         dot_local(as);
                         te = as->input;
-                    } else if(is_variable(as)) {
+                    } else if(is_label(as) || is_variable(as)) {
                         int substituted = 0;
-                        for(size_t mi = 0; mi < argc; mi++) {
-                            MACRO_VARIABLE *mv = ARRAY_GET(&macro->macro_parameters, MACRO_VARIABLE, mi);
-                            if(mv->variable_name_length == (int)(te - ts) &&
-                                    0 == strnicmp(ts, mv->variable_name, (size_t)(te - ts))) {
-                                // Substitute raw argument text
-                                if(args[mi].text && args[mi].text_length > 0) {
-                                    append_bytes_to_buffer(&out, &out_len, &out_cap, args[mi].text, (size_t)args[mi].text_length);
+                        int label = is_label(as);
+                        if(!label) {
+                            for(size_t mi = 0; mi < argc; mi++) {
+                                MACRO_VARIABLE *mv = ARRAY_GET(&macro->macro_parameters, MACRO_VARIABLE, mi);
+                                if(mv->variable_name_length == length && 0 == strnicmp(ts, mv->variable_name, length)) {
+                                    // Substitute raw argument text
+                                    if(args[mi].text && args[mi].text_length > 0) {
+                                        append_bytes_to_buffer(&out, &out_len, &out_cap, args[mi].text, (size_t)args[mi].text_length);
+                                    }
+                                    substituted = 1;
+                                    break;
                                 }
-                                substituted = 1;
-                                break;
                             }
                         }
                         if(!substituted) {
+                            // The .local name will not have a trailing ':' so ignore the
+                            // ':' when looking for the name
+                            if(label) {
+                                length--;
+                            }
                             for(size_t ri = 0; ri < rens->items; ri++) {
                                 RENAME_MAP *ren = ARRAY_GET(rens, RENAME_MAP, ri);
-                                if(ren->user_name_len == (int)(te - ts) &&
-                                        0 == strnicmp(ts, ren->user_name, (size_t)(te - ts))) {
+                                if(ren->user_name_len == length &&
+                                        0 == strnicmp(ts, ren->user_name, length)) {
                                     // Substitute generated name for the user given name
                                     append_bytes_to_buffer(&out, &out_len, &out_cap, ren->generated_name, GEN_NAME_LEN);
+                                    if(label) {
+                                        append_bytes_to_buffer(&out, &out_len, &out_cap, ":", 1);
+                                    }
                                     substituted = 1;
                                     break;
                                 }
                             }
                             if(!substituted) {
-                                append_bytes_to_buffer(&out, &out_len, &out_cap, ts, (size_t)(te - ts));
+                                append_bytes_to_buffer(&out, &out_len, &out_cap, ts, length);
                             }
                         }
                     } else {
-                        append_bytes_to_buffer(&out, &out_len, &out_cap, ts, (size_t)(te - ts));
+                        append_bytes_to_buffer(&out, &out_len, &out_cap, ts, length);
                     }
                 }
 

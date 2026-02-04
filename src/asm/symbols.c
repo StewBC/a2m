@@ -186,7 +186,7 @@ static SYMBOL_LABEL *symbol_lookup_scope(SCOPE *scope, uint32_t name_hash, const
     return NULL;
 }
 
-static SYMBOL_LABEL *symbol_lookup_chain(SCOPE *s, uint32_t name_hash, const char *name, uint32_t len) {
+SYMBOL_LABEL *symbol_lookup_chain(SCOPE *s, uint32_t name_hash, const char *name, uint32_t len) {
     for(; s; s = s->parent_scope) {
         SYMBOL_LABEL *hit = symbol_lookup_scope(s, name_hash, name, len);
         if(hit) {
@@ -222,20 +222,30 @@ SYMBOL_LABEL *symbol_store_in_scope(ASSEMBLER *as, SCOPE *scope, const char *sym
     uint32_t name_hash = util_fnv_1a_hash(symbol_name, symbol_name_length);
     SYMBOL_LABEL *sl = symbol_lookup_scope(scope, name_hash, symbol_name, symbol_name_length);
     if(sl) {
-        if(sl->symbol_type == SYMBOL_UNKNOWN) {
-            sl->symbol_type = symbol_type;
-            sl->symbol_value = value;
-        } else {
-            if(sl->symbol_type != symbol_type) {
-                // Symbol changing type error
-                asm_err(as, ASM_ERR_RESOLVE, "Symbol %.*s can't be address and variable type", symbol_name_length, symbol_name);
+        // if symbol_type == SYMBOL_LOCAL it is because in pass 2 a 
+        // local by that name is an address that may be forward referenced,
+        // already exists. Don't create the local (it exists and will be SYMBOL_ADDRESS)
+        if(symbol_type != SYMBOL_LOCAL) {
+            if(sl->symbol_type == SYMBOL_LOCAL) {
+                // If the stored symbol is SYMBOL_LOCAL though, give 
+                // it the type that is now required (address or variable)
+                sl->symbol_value = value;
+                sl->symbol_type = symbol_type;
+            } else if(sl->symbol_type == SYMBOL_UNKNOWN) {
+                sl->symbol_type = symbol_type;
+                sl->symbol_value = value;
             } else {
-                if(sl->symbol_type == SYMBOL_VARIABLE) {
-                    // Variables can change value along the way
-                    sl->symbol_value = value;
-                } else if(sl->symbol_value != value) {
-                    // Addresses may not change value
-                    asm_err(as, ASM_ERR_RESOLVE, "Multiple address labels have name %.*s", symbol_name_length, symbol_name);
+                if(sl->symbol_type != symbol_type) {
+                    // Symbol changing type error
+                    asm_err(as, ASM_ERR_RESOLVE, "Symbol %.*s can't be address and variable type", symbol_name_length, symbol_name);
+                } else {
+                    if(sl->symbol_type == SYMBOL_VARIABLE) {
+                        // Variables can change value along the way
+                        sl->symbol_value = value;
+                    } else if(sl->symbol_value != value) {
+                        // Addresses may not change value
+                        asm_err(as, ASM_ERR_RESOLVE, "Multiple address labels have name %.*s", symbol_name_length, symbol_name);
+                    }
                 }
             }
         }
@@ -279,14 +289,15 @@ SYMBOL_LABEL *symbol_declare_local(ASSEMBLER *as, const char *name, uint32_t nam
         return NULL;
     }
     MACRO_EXPAND *mes = ARRAY_GET(&as->macro_expand_stack, MACRO_EXPAND, as->macro_expand_stack.items - 1);
-    snprintf(ren.generated_name, GEN_NAME_LEN + 1, GEN_NAME_FMT, ++mes->rename_id);
+    // Generate a unique name for this local
+    snprintf(ren.generated_name, GEN_NAME_LEN + 1, GEN_NAME_FMT, ++as->macro_rename_id);
     if(A2_OK != ARRAY_ADD(&mes->renames, ren)) {
         return NULL;
     }
-    return symbol_store_in_scope(as, as->active_scope, ren.generated_name, GEN_NAME_LEN, SYMBOL_VARIABLE, 0);
+    return symbol_store_in_scope(as, as->active_scope, ren.generated_name, GEN_NAME_LEN, SYMBOL_LOCAL, 0);
 }
 
-int symbol_delete_local(SCOPE *scope, const char *symbol_name, uint32_t symbol_name_length) {
+int symbol_delete_local(SCOPE *scope, const char *symbol_name, uint32_t symbol_name_length, int force) {
     uint32_t name_hash = util_fnv_1a_hash(symbol_name, symbol_name_length);
     uint8_t bucket = name_hash & HASH_MASK;
     DYNARRAY *bucket_array = &scope->symbol_table[bucket];
@@ -294,6 +305,10 @@ int symbol_delete_local(SCOPE *scope, const char *symbol_name, uint32_t symbol_n
     for(size_t i = 0; i < bucket_array->items; i++) {
         SYMBOL_LABEL *sl = ARRAY_GET(bucket_array, SYMBOL_LABEL, i);
         if(sl->symbol_hash == name_hash && sl->symbol_length == symbol_name_length && !strnicmp(symbol_name, sl->symbol_name, symbol_name_length)) {
+            // !force == pass 1 and address symbols could be forward referenced by the macro so keep them around
+            if(!force && sl->symbol_type == SYMBOL_ADDRESS) {
+                return 0;
+            }
             size_t last = bucket_array->items - 1;
             if(i != last) {
                 // If the symbol to delete is in the middle, put the last symbol in the list

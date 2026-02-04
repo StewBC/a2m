@@ -28,6 +28,7 @@ typedef struct ASSEMBLER {
     TOKEN current_token;                                    // What is being parsed
     int error_log_level;                                    // logging level (0 - filter duplicates; 1 - all to limit)
     int expression_size;                                    // Forward defs can't change size (16 bit can't become 8 later)
+    int macro_rename_id;                                    // Makes all .local's in macros unique
     int pass;                                               // 1 or 2 for 2 pass assembler
     int valid_opcodes;                                      // 0 = 65c02 (default), 1 = 6502
     int verbose;                                            // cmd-line; 0 supress duplicates, 1 show all (up to 100)
@@ -54,6 +55,8 @@ static inline uint16_t current_output_address(ASSEMBLER *as) {
         return as->active_segment ? as->active_segment->segment_output_address : as->current_address;
 }
 
+int is_label(ASSEMBLER *as);
+int is_opcode(ASSEMBLER *as);
 int is_parse_dot_command(ASSEMBLER *as);
 int is_variable(ASSEMBLER *as);
 

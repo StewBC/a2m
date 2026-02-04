@@ -112,7 +112,7 @@ void next_token(ASSEMBLER *as) {
         as->current_token.type = TOKEN_NUM;
         as->current_token.value = strtoll(as->token_start, (char **) &as->token_start, 16);
         as->input = as->token_start;                        // If there are unconverted characters, set the input back to them
-    } else if(*as->token_start == '0') {                    // Octal number
+    } else if(*as->token_start == '0' && as->token_start[1] >= '0' && as->token_start[1] < '8') {                    // Octal number
         as->token_start++;
         as->current_token.type = TOKEN_NUM;
         as->current_token.value = strtoll(as->token_start, (char **) &as->token_start, 8);
@@ -198,13 +198,20 @@ void next_token(ASSEMBLER *as) {
         as->current_token.name_length = as->input - as->token_start;
         as->current_token.name_hash = util_fnv_1a_hash(as->current_token.name, as->current_token.name_length);
     } else if(*as->token_start == '\'') {
-        get_token(as);
+        // This is quite limiting.  Must literally be '<character>' or will error
+        // No '\0' or anything else allowed as of now
+        char c = as->token_start[1];
+        char e = as->token_start[2];
         as->current_token.type = TOKEN_NUM;
-        as->current_token.value = *as->token_start;
-        if(*as->input != '\'') {
-            asm_err(as, ASM_ERR_RESOLVE, "Expected a closing '");
+        as->current_token.value = c;
+        // Space is not a token so do not get_token to skip the space
+        if(c != ' ') {
+            get_token(as);
         }
         get_token(as);
+        if(e != '\'' || *(as->token_start) != '\'') {
+            asm_err(as, ASM_ERR_RESOLVE, "Expected a closing '");
+        }
     } else if(*as->token_start == '"') {
         // token_start points at opening quote and as->input is after closing quote
         int len = (int)(as->input - as->token_start);

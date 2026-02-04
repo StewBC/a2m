@@ -131,22 +131,57 @@ static int64_t expr_primary(ASSEMBLER *as) {
         next_token(as);
     } else if(as->current_token.type == TOKEN_VAR) {
         SYMBOL_LABEL *sl;
+        // This is very convenient, but not realy correct.
+        // Token to use later -- detects ++ etc.
+        // Take it before processing the symbol because that could could
+        // early return
+        next_token(as);
         sl = symbol_read(as, as->current_token.name, as->current_token.name_length);
-        if(!sl) {
+        if(!sl || sl->symbol_type == SYMBOL_UNKNOWN || sl->symbol_type == SYMBOL_LOCAL) {
             if(as->pass == 1) {
-                return 0xFFFF;
+                if(!sl) {
+                    // Make a symbol so that, in future, the 16-bit-ness is remembered
+                    sl = symbol_write(as, as->current_token.name, as->current_token.name_length, SYMBOL_UNKNOWN, 0xFFFF);
+                }
+                // Looking up an undefined makes it 16-bit - no choice
+                sl->symbol_width = 16;
             } else {
-                // Log the error on Pass 2
-                asm_err(as, ASM_ERR_RESOLVE, "Value for %.*s not found", as->current_token.name_length, as->current_token.name);
-                // And return zero sp exressions like lda #<notfound> don't throw further 16-bit errors
-                return 0x0;
+                // First, see if the UNKNOWN symbol can resolve now
+                if(sl) {
+                    if(sl->symbol_type == SYMBOL_UNKNOWN) {
+                        // Could be UNKNOWN in the parent scopes till
+                        // it resolves, if it ever resolves
+                        SCOPE *s = as->active_scope->parent_scope;
+                        while(s) {
+                            sl = symbol_lookup_chain(s, sl->symbol_hash, sl->symbol_name, sl->symbol_length);
+                            if(sl && sl->symbol_type != SYMBOL_UNKNOWN) {
+                                // It resolved to not UNKNOWN
+                                as->expression_size = 16;
+                                break;
+                            }
+                            s = s->parent_scope;
+                        }
+                        // Never found or resolved
+                        if(sl && sl->symbol_type == SYMBOL_UNKNOWN) {
+                            sl = NULL;
+                        }
+                    } else {
+                        sl = NULL;
+                    }
+                }
+                // In pass 2, if never found or resolved, it's an error
+                if(!sl) {
+                    // Log the error on Pass 2
+                    asm_err(as, ASM_ERR_RESOLVE, "Value for %.*s not found", as->current_token.name_length, as->current_token.name);
+                    // And return zero sp exressions like lda #<notfound> don't throw further 16-bit errors
+                    return 0x0;
+                }
             }
         }
+        // There is a symbol, use its value
         value = sl->symbol_value;
 
-        // This is very convenient, but not realy correct.  I already had to take
-        // assign out of here, probably should take this out as well
-        next_token(as);
+        // Now process on the token taken earlier
         if(as->current_token.type == TOKEN_OP) {
             char op = as->current_token.op;
             if(op == '=') {
@@ -183,11 +218,6 @@ static int64_t expr_primary(ASSEMBLER *as) {
             if(!op) {
                 asm_err(as, ASM_ERR_RESOLVE, "Cannot assign value to label %.*s", sl->symbol_length, sl->symbol_name);
             }
-        }
-        // If a lookup reads an unknown variable, it becomes a 2-byte variable
-        // regardless of value later when that becomes known
-        if(sl->symbol_type == SYMBOL_UNKNOWN) {
-            sl->symbol_width = 16;
         }
         // The expression width is as wide as the widest element
         if(sl->symbol_width > as->expression_size) {

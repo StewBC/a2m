@@ -24,15 +24,6 @@ int is_address(ASSEMBLER *as) {
     return 1;
 }
 
-int is_parse_dot_command(ASSEMBLER *as) {
-    OPCODEINFO *oi;
-    if(*as->token_start != '.' || !(oi = in_word_set(as->token_start, as->input - as->token_start))) {
-        return 0;
-    }
-    as->opcode_info = *oi;
-    return 1;
-}
-
 int is_label(ASSEMBLER *as) {
     if(*(as->input - 1) != ':') {
         return 0;
@@ -43,6 +34,15 @@ int is_label(ASSEMBLER *as) {
 int is_opcode(ASSEMBLER *as) {
     OPCODEINFO *oi;
     if(as->input - as->token_start != 3 || *as->token_start == '.' || !(oi = in_word_set(as->token_start, 3))) {
+        return 0;
+    }
+    as->opcode_info = *oi;
+    return 1;
+}
+
+int is_parse_dot_command(ASSEMBLER *as) {
+    OPCODEINFO *oi;
+    if(*as->token_start != '.' || !(oi = in_word_set(as->token_start, as->input - as->token_start))) {
         return 0;
     }
     as->opcode_info = *oi;
@@ -163,9 +163,9 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
         }
         // Reset scopes (solves open scope isues and repeatability, of course)
         as->active_scope = as->root_scope;
-        scope_reset_ids(as->active_scope);
-        // Reset segment defenitions (for pass 2, really)
-        as->segments.items = 0;
+        scope_reset_ids(as->active_scope);       
+        as->segments.items = 0;     // Reset segment defenitions (for pass 2, really)
+        as->macro_rename_id = 0;    // Reset the global macro unique making ID
         while(as->pass < 3) {
             do {
                 // a newline returns an empty token so keep
