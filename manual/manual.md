@@ -910,10 +910,22 @@ The assembler section sets up a root file to assemble using the built-in assembl
 
 Since the assembler is mapped to `CTRL+F4`, configuring the assembler settings in an `.ini` file makes it possible to assemble and run a program under development by pressing `CTRL+F4` after editing the assembly source, without having to restart or stop the emulator.
 
-\Needspace{9\baselineskip}
+\Needspace{13\baselineskip}
 # Appendix A: Version History
-31 Oct 2024 - Initial release  
- 8 Dec 2024 - Version 1.0 release  
-10 Dec 2024 - Version 1.1 release  
-23 Dec 2025 - Version 2.0 release  
+
+31 Oct 2024
+:   Initial release
+
+8 Dec 2024
+:   Version 1.0 release
+
+10 Dec 2024
+:   Version 1.1 release
+
+23 Dec 2025
+:   Version 2.0 release  
     The version 2 release is a re-architecture of the entire code base, as well as a rewrite of the 6502 core, adding a 65C02 mode. The Apple //e is also supported, along with many new features such as a NIB Disk II, resizable window, window pane sliders, and many more.
+
+4 Feb 2026
+:   Version 2.1 release  
+    This version fixes bugs and has tweaks above the V2.0 release, and it enhances the built-in assembler allowing it to compile the bulk of ca65 assembler targeted sources with only some edits.

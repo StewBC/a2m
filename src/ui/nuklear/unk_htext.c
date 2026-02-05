@@ -856,7 +856,9 @@ const char *unk_help_text[] = {
 "<#H2>31 Oct 2024<#NM> - <#BO>Initial release\n"
 "<#H2> 8 Dec 2024<#NM> - <#BO>Version 1.0 release\n"
 "<#H2>10 Dec 2024<#NM> - <#BO>Version 1.1 release\n"
-"<#H2>23 Dec 2025<#NM> - <#BO>Version 2.0 release\n"
-"    <#NM>The version 2 release is a re-architecture of the entire code base, as well as a rewrite of the 6502 core, adding a 65C02 mode. The Apple //e is also supported, along with many new features such as a NIB Disk II, resizable window, window pane sliders, and many more.\n"
+"<#H2>23 Dec 2025<#NM> - <#BO>Version 2.0 release<#NM>\n"
+"    The version 2 release is a re-architecture of the entire code base, as well as a rewrite of the 6502 core, adding a 65C02 mode. The Apple //e is also supported, along with many new features such as a NIB Disk II, resizable window, window pane sliders, and many more.\n"
+"<#H2> 4 Feb 2026<#NM> - <#BO>Version 2.1 release<#NM>\n"
+"    This version fixes bugs and has tweaks above the V2.0 release, and it enhances the built-in assembler allowing it to compile the bulk of ca65 assembler targeted sources with only some edits.\n"
 "\n"
 };
