@@ -44,10 +44,10 @@ Press F2 to reveal the interface to a2m - the debugger and access to disk drives
 * Oliver Schmidt for, basically, teaching me all I know about the Apple II, but in this case showing me how easy it is to do SmartPort emulation.  
 * Zellyn Hunter for A2Audit.  That helped me identify and fix my Language Card bug.  (https://github.com/zellyn/a2audit)  
   
-## Initial revision  
+## Initial release  
 The initial release was made in London, UK, on 31 October 2024.  
 
-### Releases since:   
+### Releases history:   
 31 Oct 2024
 :   Initial release
 
