@@ -208,14 +208,13 @@ These keys apply **when emulation is stopped**:
 \Needspace{9\baselineskip}
 ### Mouse Controls
 At the bottom of the view are **selector buttons** that choose which memory bank to display.  
-On the Apple ][+ model, the 128 K option is disabled.
+On the Apple ][+ model, the 128K option is disabled, as is the C100 ROM option.
 
 | Label  | Action                                                                                  |
 |:-------|:----------------------------------------------------------------------------------------|
-|6502    | Shows the CPU's current live memory map                                                 |
-|64K     | Shows the first 64 K regardless of soft-switch configuration                            |
-|128K    | On the //e, shows the auxiliary bank                                                    |
-|LC Bank | Toggles between the two language-card banks                                             |
+|RAM     | Pick between CPUs view (map), Main (1st 64K bank) and AUX (2nd 64K bank)                |
+|C100    | Map shows the CPUs view of C100-CFFF, ROM shows the //e ROM in that space               |
+|D000    | Map is the CPUs view, LC1 is 4K bank1, LC2 is 4K bank2 and ROM is the ][+ or //e ROM    |
 
 The **scrollbar** on the right scrolls from address `$0000` to `$FFFF`.  
 A mouse **scroll wheel** scrolls by 4 lines. Scroll sensitivity can be configured (see **INI Files in Depth - Config**).
@@ -275,6 +274,8 @@ A mouse **scroll wheel** scrolls by 4 lines. Scroll sensitivity can be configure
 Click on any row, outside the address section, to place the cursor on that row. Click on the address section to set the address of that row (same as pressing CTRL+a).
 
 Right-click on a value in the hex address matrix to open a pop-up window that shows the last four program-counter addresses where the selected address was modified. The top entry is the most recent change—the change that resulted in the current value at this address. If an address in the pop-up is `$0000`, it means that fewer than four changes to this address were recorded. Select any of the four addresses in the pop-up to move the cursor to the corresponding line in the disassembly view.
+
+The **selector buttons** described in the Disassembly View, mouse controls section are also available in the memory view section.
 
 ## Miscellaneous View
 The Miscellaneous View consists of sub-views that can be opened and closed at will. Each sub-view has a triangle to the left of its name; clicking the triangle opens or closes the sub-view. The Miscellaneous View also has a scrollbar on the right, making it possible to see all details without closing any sub-views.
@@ -777,12 +778,10 @@ Notes:
 The assembler was not written to be compatible with ca65, but the inclusion of `.proc`, `.scope`, and `.segment` significantly increases compatibility. Most of the `Manic Miner` sample code assembles without modification from the ca65 version. The following differences should be noted:
 
 * Expression evaluation order differs. a2m uses C-style operator precedence, while ca65 does not. For example, the expression `counter << 2 & 0xFF` will not produce the same result.
-* a2m uses a `.for` loop construct and does not have a `.repeat` construct.
-* a2m does not support quoted strings in `.byte` directives.
 * In macros, a2m uses `.if .defined`, which is the inverse of ca65's `.ifblank`.
-* Macros are not scoped in a2m; therefore, `.local` is not supported.
 * In a2m, `:=` and `=` are equivalent.
 * In a2m, reading the current address using `*` yields the address at that point in emission, not the start of the line. As a result, ca65 evaluates `lda #*` as `lda #0`, while a2m evaluates it as `lda #1` if the emitter address was 0 when the line was encountered.
+* a2m uses dot comparison operators instead of symbols (for example `.lt` vs `<`)
 
 a2m lacks many of the advanced features found in ca65, but with what is there, a lot of code ports fairly easily to a2m now.
 
