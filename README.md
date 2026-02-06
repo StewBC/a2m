@@ -15,8 +15,10 @@ a2m is designed for people who enjoy developing or exploring Apple 2 software.
 ## Introduction
 a2m began as a small experiment after I discovered the Harte 6502 CPU tests. I wanted to see if I could write a cycle-accurate 6502 CPU emulator, just for fun. Once that worked, it became obvious that it wouldn't take much more code to wrap a minimal Apple 2 environment around it and run the Manic Miner clone I had written. That led to MMM [The Manic Miner Machine](https://github.com/StewBC/mminer-apple2/tree/master/src/mmm). Things escalated from there, and a2m V1.0 was done by the end of 2024. About a year later I started work on V2.0. Apparently, the emulation hook never really let go of me.
 
-## What V1 looked like
-This animated gif is from V1.0.  The look of V2.0 is still similar.
+## What a2m looks like
+[a2m V2.1 overview on YouTube](https://youtu.be/iQ_HLd27As4)  
+
+This animated gif is from V1.0.  The look of V2.0 is still quit similar.
 ![15 FPS Animated Gif of the emulator in action](assets/a2m-15.gif) 
   
 ## License
