@@ -455,7 +455,7 @@ int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
     }
 
     if(nk_begin(ctx, "File Browser", nk_rect(0, 0, 600, 600),
-                NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER | NK_WINDOW_MOVABLE)) {
+                NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
         // 1) Row with Path
         nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 2);
         {
@@ -489,7 +489,7 @@ int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
         nk_layout_row_end(ctx);
 
         // 2) Dir/File list
-        nk_layout_row_dynamic(ctx, 400, 1);
+        nk_layout_row_dynamic(ctx, 500, 1);
         {
             if(nk_group_begin(ctx, "files group", NK_WINDOW_BORDER)) {
                 for(int i = 0; i < fb->dir_contents.items; i++) {

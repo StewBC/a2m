@@ -806,7 +806,7 @@ void unk_render_frame(UI *ui, APPLE2 *m, int dirty) {
             // The scrollbar_active guard prevents accidental layout changes when
             // using scrollbars near layout handles
             int scrollbar_active = (v->viewmem.dragging | v->viewdasm.dragging | v->viewmisc.dragging);
-            if(!scrollbar_active && unk_layout_handle_drag(&v->layout, &v->ctx->input, v->nk_os_rect, &v->lim)) {
+            if(!v->dlg_modal_active && !scrollbar_active && unk_layout_handle_drag(&v->layout, &v->ctx->input, v->nk_os_rect, &v->lim)) {
                 struct nk_rect tr = nk_rect_fit_4x3_center(v->layout.apple2);
                 v->target_rect = nk_to_sdl_rect(tr);
                 unk_mem_resize_view(v);

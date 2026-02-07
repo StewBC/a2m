@@ -16,7 +16,11 @@ void unk_cpu_show(UNK *v, int dirty) {
     if(dirty) {
         unk_cpu_update(v);
     }
-    if(nk_begin(ctx, "CPU", v->layout.cpu, NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
+    int nk_win_flags = NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER;
+    if(v->dlg_modal_active) {
+        nk_win_flags |= NK_WINDOW_NO_INPUT;
+    }
+    if(nk_begin(ctx, "CPU", v->layout.cpu, nk_win_flags)) {
         ctx->current->edit.mode = NK_TEXT_EDIT_MODE_REPLACE;
 
         // The top of 2 rows showing PC, SP etc

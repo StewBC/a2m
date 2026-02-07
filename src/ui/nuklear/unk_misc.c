@@ -64,12 +64,12 @@ void unk_misc_show(UNK *v) {
     struct nk_color ob = ctx->style.window.background;
     int x = 512;
     int w = v->layout.misc.w;
-    int flags = NK_WINDOW_SCROLL_AUTO_HIDE | NK_WINDOW_TITLE | NK_WINDOW_BORDER;
+    int nk_win_flags = NK_WINDOW_SCROLL_AUTO_HIDE | NK_WINDOW_TITLE | NK_WINDOW_BORDER;
     // If the breakpoint "dialog" is open, disable the misc window
-    if(v->dlg_breakpoint) {
-        flags |= NK_WINDOW_NO_INPUT;
+    if(v->dlg_modal_active) {
+        nk_win_flags |= NK_WINDOW_NO_INPUT;
     }
-    if(nk_begin(ctx, "Miscellaneous", v->layout.misc, flags)) {
+    if(nk_begin(ctx, "Miscellaneous", v->layout.misc, nk_win_flags)) {
 
         // 1) Show the slot if it has a card in it
         if(nk_tree_push(ctx, NK_TREE_TAB, "Slots", NK_MAXIMIZED)) {
@@ -256,7 +256,7 @@ void unk_misc_show(UNK *v) {
                 // panel scroll stops as soon as this thing is hovered and it's
                 // both confusing and frustrating
                 int count = 0;
-                flags = NK_WINDOW_BORDER;
+                nk_win_flags = NK_WINDOW_BORDER;
                 uint16_t address = m->cpu.sp + 1;
                 while(address < 0x1ff && count < 6) {
                     uint16_t stack_addr = read_from_memory_debug_16(m, address);
@@ -268,10 +268,10 @@ void unk_misc_show(UNK *v) {
                     }
                 }
                 if(count < 6) {
-                    flags |= NK_WINDOW_NO_SCROLLBAR;
+                    nk_win_flags |= NK_WINDOW_NO_SCROLLBAR;
                 }
 
-                if(nk_group_begin(ctx, "callstack group", flags)) {
+                if(nk_group_begin(ctx, "callstack group", nk_win_flags)) {
                     char callstack_display[256];
 
                     address = m->cpu.sp + 1;

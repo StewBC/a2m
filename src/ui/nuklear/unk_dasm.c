@@ -709,8 +709,11 @@ void unk_dasm_show(UNK *v, int dirty) {
             unk_dasm_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
         }
     }
-
-    if(nk_begin(ctx, "Disassembly", v->layout.dasm, NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
+    int nk_win_flags = NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER;
+    if(v->dlg_modal_active) {
+        nk_win_flags |= NK_WINDOW_NO_INPUT;
+    }
+    if(nk_begin(ctx, "Disassembly", v->layout.dasm, nk_win_flags)) {
         float w_offset = ctx->current->layout->bounds.x;
         ctx->current->layout->bounds.w += w_offset;
         ctx->current->layout->bounds.x = 0;
@@ -835,32 +838,34 @@ void unk_dasm_show(UNK *v, int dirty) {
             sbar_bounds.w = SCROLLBAR_W;
             sbar_bounds.h -= (dv->non_client_height + ADDRESS_LABEL_H);
             sbar_bounds.y += dv->non_client_height;
-            if(nk_input_is_mouse_hovering_rect(&ctx->input, v->layout.dasm)) {
-                int wheel = (int)ctx->input.mouse.scroll_delta.y;
-                if(wheel) {
-                    wheel *= v->scroll_wheel_lines;
-                    int line = 0;
-                    if(wheel < 0) {
-                        // down
-                        wheel = abs(wheel);
-                        if(wheel > dv->rows - 1) {
-                            wheel = dv->rows - 1;
+            if(!v->dlg_modal_active) {
+                if(nk_input_is_mouse_hovering_rect(&ctx->input, v->layout.dasm)) {
+                    int wheel = (int)ctx->input.mouse.scroll_delta.y;
+                    if(wheel) {
+                        wheel *= v->scroll_wheel_lines;
+                        int line = 0;
+                        if(wheel < 0) {
+                            // down
+                            wheel = abs(wheel);
+                            if(wheel > dv->rows - 1) {
+                                wheel = dv->rows - 1;
+                            }
+                            unk_dasm_put_address_on_line(dv, m, unk_dasm_get_line_info(dv, wheel)->address, 0);
+                        } else {
+                            if(wheel > dv->rows - 1) {
+                                wheel = dv->rows - 1;
+                            }
+                            unk_dasm_put_address_on_line(dv, m, unk_dasm_get_line_info(dv, 0)->address, wheel);
                         }
-                        unk_dasm_put_address_on_line(dv, m, unk_dasm_get_line_info(dv, wheel)->address, 0);
-                    } else {
-                        if(wheel > dv->rows - 1) {
-                            wheel = dv->rows - 1;
-                        }
-                        unk_dasm_put_address_on_line(dv, m, unk_dasm_get_line_info(dv, 0)->address, wheel);
                     }
                 }
-            }
-            // The dv->rows * 2 is "2 = average bytes per row" - this can actually be calculated for better results
-            int view_address = unk_dasm_get_line_info(dv, 0)->address;
-            int address = view_address;
-            nk_custom_scrollbarv(ctx, sbar_bounds, 0x10000, dv->rows * 2, &address, &dv->dragging, &dv->grab_offset);
-            if(view_address != address) {
-                unk_dasm_put_address_on_line(dv, m, address, 0);
+                // The dv->rows * 2 is "2 = average bytes per row" - this can actually be calculated for better results
+                int view_address = unk_dasm_get_line_info(dv, 0)->address;
+                int address = view_address;
+                nk_custom_scrollbarv(ctx, sbar_bounds, 0x10000, dv->rows * 2, &address, &dv->dragging, &dv->grab_offset);
+                if(view_address != address) {
+                    unk_dasm_put_address_on_line(dv, m, address, 0);
+                }
             }
         }
         nk_layout_row_end(ctx); // Main Display

@@ -516,7 +516,12 @@ void unk_mem_show(UNK *v) {
     struct nk_vec2 spc = ctx->style.window.spacing;
     struct nk_vec2 gpd = ctx->style.window.group_padding;
     float border = ctx->style.window.border;
-    if(nk_begin(ctx, "Memory", v->layout.mem, NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
+    int nk_win_flags = NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER;
+    if(v->dlg_modal_active) {
+        nk_win_flags |= NK_WINDOW_NO_INPUT;
+    }
+
+    if(nk_begin(ctx, "Memory", v->layout.mem, nk_win_flags)) {
         VIEWMEM_VIEW *active_view;
 
         float w_offset = ctx->current->layout->bounds.x;
@@ -676,18 +681,20 @@ void unk_mem_show(UNK *v) {
             sbar_bounds.h -= (ms->non_client_height + ADDRESS_LABEL_H);
             sbar_bounds.y += ms->non_client_height;
             int address = mv->view_address;
-            if(nk_input_is_mouse_hovering_rect(&ctx->input, v->layout.mem)) {
-                int wheel = (int)ctx->input.mouse.scroll_delta.y;
-                if(wheel) {
-                    wheel *= v->scroll_wheel_lines;
-                    address = (address - wheel * ms->cols) % 0x10000;
-                    if(address < 0) {
-                        address += 0x10000;
+            if(!v->dlg_modal_active) {
+                if(nk_input_is_mouse_hovering_rect(&ctx->input, v->layout.mem)) {
+                    int wheel = (int)ctx->input.mouse.scroll_delta.y;
+                    if(wheel) {
+                        wheel *= v->scroll_wheel_lines;
+                        address = (address - wheel * ms->cols) % 0x10000;
+                        if(address < 0) {
+                            address += 0x10000;
+                        }
                     }
                 }
+                nk_custom_scrollbarv(ctx, sbar_bounds, 0x10000, mv->rows * ms->cols, &address, &ms->dragging, &ms->grab_offset);
+                mv->view_address = (uint16_t)address;
             }
-            nk_custom_scrollbarv(ctx, sbar_bounds, 0x10000, mv->rows * ms->cols, &address, &ms->dragging, &ms->grab_offset);
-            mv->view_address = (uint16_t)address;
         }
 
         // Restore style padding
@@ -744,7 +751,7 @@ void unk_mem_show(UNK *v) {
             }
         }
 
-        if(v->right_click_menu_open) {
+        if(!v->dlg_modal_active && v->right_click_menu_open) {
             if(nk_contextual_begin(ctx, NK_WINDOW_NO_SCROLLBAR, nk_vec2(160, 180), nk_rect(v->right_click_menu_pos.x, v->right_click_menu_pos.y, 1, 1))) {
                 uint64_t last_write = read_last_write_from_selected(m, mv->flags, v->right_click_address);
                 char options_text[6];
