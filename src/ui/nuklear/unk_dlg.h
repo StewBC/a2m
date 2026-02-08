@@ -39,6 +39,15 @@ typedef struct {
     int model;
 } ASSEMBLER_CONFIG;
 
+typedef struct {
+    char *name;
+    int *name_length;
+    int cursor_line;
+    int cursor_offset;
+    uint16_t symbol_address;
+    DYNARRAY *symbols_search;
+} SYMBOL_LOOKUP;
+
 extern char global_entry_buffer[256];
 extern int global_entry_length;
 
@@ -47,4 +56,4 @@ int unk_dlg_assembler_errors(UNK *v, struct nk_context *ctx, struct nk_rect r);
 int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT_EDIT *bpe);
 int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb);
 int unk_dlg_find(struct nk_context *ctx, struct nk_rect r, uint8_t *address, int *address_length, int max_len);
-int unk_dlg_symbol_lookup(struct nk_context *ctx, struct nk_rect r, DYNARRAY *symbols_search, char *name, int *name_length, uint16_t *pc);
+int unk_dlg_symbol_lookup(struct nk_context *ctx, struct nk_rect r, SYMBOL_LOOKUP *sl);

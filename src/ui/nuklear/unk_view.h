@@ -42,6 +42,9 @@ typedef struct UNK {
     VIEWMISC viewmisc;
     VIEWSPEAKER viewspeaker;
 
+    // Shared symbol lookup struct for API
+    SYMBOL_LOOKUP symbol_lookup;
+
     // Help related
     int help_page;
     struct nk_scroll help_scroll[HELP_MAX_PAGES];

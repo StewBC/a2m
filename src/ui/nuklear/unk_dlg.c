@@ -614,42 +614,124 @@ int unk_dlg_find(struct nk_context *ctx, struct nk_rect r, uint8_t *data, int *d
     return ret;
 }
 
-int unk_dlg_symbol_lookup(struct nk_context *ctx, struct nk_rect r, DYNARRAY *symbols_search, char *name, int *name_length, uint16_t *pc) {
+int unk_dlg_symbol_lookup(struct nk_context *ctx, struct nk_rect r, SYMBOL_LOOKUP *sl) {
     int ret = 0;
+    int inserted_line = 0;
+    const int row_h = 18;
+    const int row_stride = row_h + (int)ctx->style.window.spacing.y;
 
     if(nk_popup_begin(ctx, NK_POPUP_STATIC, "Enter a symbol name", 0, r)) {
         int edit_state = NK_EDIT_INACTIVE;
+        int cursor_moved = 0;
+
+        int group_h = (int)(r.h - 85);
+        int usable_h = group_h - (int)(2 * ctx->style.window.group_padding.y);
+        int rows_visible = usable_h > 0 ? (usable_h / row_stride) : 1;
+        if(rows_visible < 1) {
+            rows_visible = 1;
+        }
+
+        if(nk_input_is_key_pressed(&ctx->input, NK_KEY_UP)) {
+            if(sl->cursor_line > 0) {
+                sl->cursor_line--;
+                cursor_moved = 1;
+            }
+        } else if(nk_input_is_key_pressed(&ctx->input, NK_KEY_DOWN)) {
+            if(sl->cursor_line < sl->symbols_search->items) {
+                sl->cursor_line++;
+                cursor_moved = 1;
+            }
+        } else if(nk_input_is_key_pressed(&ctx->input, NK_KEY_SCROLL_UP)) {
+            if(sl->cursor_line < sl->symbols_search->items) {
+                sl->cursor_line -= (rows_visible - 1);
+                cursor_moved = 1;
+            }
+        } else if(nk_input_is_key_pressed(&ctx->input, NK_KEY_SCROLL_DOWN)) {
+            if(sl->cursor_line < sl->symbols_search->items) {
+                sl->cursor_line += (rows_visible - 1);
+                cursor_moved = 1;
+            }
+        }
+
+        int match_count = 0;
+        for(int i = 0; i < sl->symbols_search->items; i++) {
+            SYMBOL *s = *ARRAY_GET(sl->symbols_search, SYMBOL *, i);
+            if(*sl->name_length) {
+                if(NULL == util_strinstr(s->symbol_name, sl->name, *sl->name_length) && NULL == util_strinstr(s->symbol_source, sl->name, *sl->name_length)) {
+                    continue;
+                }
+            }
+            match_count++;
+        }
 
         // 1) Symbol to serach for edit box
         nk_layout_row_dynamic(ctx, 28, 2);
         {
             nk_label(ctx, "Symbol Serach:", NK_TEXT_CENTERED);
-            edit_state = nk_edit_string(ctx, NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, name, name_length, 256, 0);
+            edit_state = nk_edit_string(ctx, NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, sl->name, sl->name_length, 256, 0);
             if(!ctx->active->edit.active) {
                 ctx->current->edit.active = 1;
                 ctx->current->edit.mode = NK_TEXT_EDIT_MODE_REPLACE;
             }
         }
 
+        if(match_count <= 0) {
+            sl->cursor_line = 0;
+            sl->cursor_offset = 0;
+        } else {
+            if(sl->cursor_line < 0) {
+                sl->cursor_line = 0;
+            } else if(sl->cursor_line >= match_count) {
+                sl->cursor_line = match_count - 1;
+            }
+            if(cursor_moved) {
+                int top_line = sl->cursor_offset / row_stride;
+                if(top_line > sl->cursor_line) {
+                    top_line = sl->cursor_line;
+                } else if(sl->cursor_line >= top_line + rows_visible) {
+                    top_line = sl->cursor_line - rows_visible + 1;
+                }
+                int max_top = match_count - rows_visible;
+                if(max_top < 0) {
+                    max_top = 0;
+                }
+                if(top_line < 0) {
+                    top_line = 0;
+                } else if(top_line > max_top) {
+                    top_line = max_top;
+                }
+                sl->cursor_offset = top_line * row_stride;
+            }
+        }
+
         // Symbols that match seach criteria
-        nk_layout_row_dynamic(ctx, r.h - 85, 1);
+        nk_layout_row_dynamic(ctx, group_h, 1);
         {
-            if(nk_group_begin(ctx, "symbols group", NK_WINDOW_BORDER)) {
+            struct nk_color ob = ctx->style.selectable.normal.data.color;
+            nk_uint x_off = 0;
+            nk_uint y_off = (nk_uint)sl->cursor_offset;
+            if(nk_group_scrolled_offset_begin(ctx, &x_off, &y_off, "symbols group", NK_WINDOW_BORDER)) {
                 int i;
-                for(i = 0; i < symbols_search->items; i++) {
+                for(i = 0; i < sl->symbols_search->items; i++) {
                     int insert = 1;
-                    SYMBOL *s = *ARRAY_GET(symbols_search, SYMBOL *, i);
-                    if(*name_length) {
-                        if(NULL == util_strinstr(s->symbol_name, name, *name_length) && NULL == util_strinstr(s->symbol_source, name, *name_length)) {
+                    SYMBOL *s = *ARRAY_GET(sl->symbols_search, SYMBOL *, i);
+                    if(*sl->name_length) {
+                        if(NULL == util_strinstr(s->symbol_name, sl->name, *sl->name_length) && NULL == util_strinstr(s->symbol_source, sl->name, *sl->name_length)) {
                             insert = 0;
                         }
                     }
                     if(insert) {
-                        nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 3);
+                        if(inserted_line == sl->cursor_line) {
+                            ctx->style.selectable.normal.data.color = nk_rgb(100, 100, 100);
+                            // So that pressing ENTER is the same as OK and goes to cursor
+                            sl->symbol_address = s->pc;
+                        }
+                        nk_layout_row_begin(ctx, NK_DYNAMIC, row_h, 3);
                         {
                             nk_layout_row_push(ctx, 0.64f);
                             if(nk_select_label(ctx, s->symbol_name, NK_TEXT_ALIGN_LEFT, 0)) {
-                                *pc = s->pc;
+                                // Click address isn't necessarily the cursor address
+                                sl->symbol_address = s->pc;
                                 ret = 1;
                             }
                             nk_layout_row_push(ctx, 0.15f);
@@ -658,9 +740,15 @@ int unk_dlg_symbol_lookup(struct nk_context *ctx, struct nk_rect r, DYNARRAY *sy
                             nk_label(ctx, s->symbol_source, NK_TEXT_LEFT);
                         }
                         nk_layout_row_end(ctx);
+                        if(inserted_line++ == sl->cursor_line) {
+                            ctx->style.selectable.normal.data.color = ob;
+                        }
                     }
                 }
                 nk_group_end(ctx);
+            }
+            if(!cursor_moved) {
+                sl->cursor_offset = (int)y_off;
             }
         }
 
@@ -669,7 +757,11 @@ int unk_dlg_symbol_lookup(struct nk_context *ctx, struct nk_rect r, DYNARRAY *sy
         {
             if(edit_state & NK_EDIT_COMMITED || nk_button_label(ctx, "OK")) {
                 nk_popup_close(ctx);
-                ret = 2;
+                if(inserted_line) {
+                    ret = 1;
+                } else {
+                    ret = 2;
+                }
             }
             if(nk_button_label(ctx, "Cancel")) {
                 nk_popup_close(ctx);

@@ -525,6 +525,9 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                 global_entry_length = 0;
                 v->dlg_modal_active = 1;
                 v->dlg_symbol_lookup_dbg = 1;
+                v->symbol_lookup.cursor_line = 0;
+                v->symbol_lookup.cursor_offset = 0;
+                v->symbol_lookup.symbols_search = &v->rt->symbols_search;
             }
             break;
 
@@ -898,10 +901,9 @@ void unk_dasm_show(UNK *v, int dirty) {
             }
         }
         if(v->dlg_symbol_lookup_dbg) {
-            static uint16_t pc = 0;
-            if((ret = unk_dlg_symbol_lookup(ctx, nk_rect(0, 0, 360, 430), &rt->symbols_search, global_entry_buffer, &global_entry_length, &pc))) {
+            if((ret = unk_dlg_symbol_lookup(ctx, nk_rect(0, 0, 360, 430), &v->symbol_lookup))) {
                 if(ret == 1) {
-                    dv->cursor_address = pc;
+                    dv->cursor_address = v->symbol_lookup.symbol_address;
                     unk_dasm_put_address_on_line(dv, m, dv->cursor_address, dv->rows / 2);
                 }
                 v->dlg_symbol_lookup_dbg = 0;

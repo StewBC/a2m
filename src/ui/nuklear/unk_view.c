@@ -540,6 +540,10 @@ int unk_init(UNK *v, int model, INI_STORE *ini_store) {
         return A2_ERR;
     }
 
+    // Init the shared symbol lookup struct - portions that can now be set
+    v->symbol_lookup.name = global_entry_buffer;
+    v->symbol_lookup.name_length = &global_entry_length;
+
     // Init nuklear
     struct nk_font_atlas *atlas;
     struct nk_font_config config = nk_font_config(0);

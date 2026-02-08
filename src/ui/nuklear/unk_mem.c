@@ -355,6 +355,9 @@ int unk_mem_process_event(UNK *v, SDL_Event *e) {
                 global_entry_length = 0;
                 v->dlg_modal_active = 1;
                 v->dlg_symbol_lookup_mem = 1;
+                v->symbol_lookup.cursor_line = 0;
+                v->symbol_lookup.cursor_offset = 0;
+                v->symbol_lookup.symbols_search = &v->rt->symbols_search;
                 break;
 
             case SDLK_t:                                        // CTRL T - Toggle between ascii and hex edit
@@ -737,13 +740,12 @@ void unk_mem_show(UNK *v) {
         }
 
         if(v->dlg_symbol_lookup_mem) {
-            static uint16_t pc = 0;
             int ret;
             VIEWDASM *dv = &v->viewdasm;
-            if((ret = unk_dlg_symbol_lookup(ctx, nk_rect(0, 0, 500, 240), &rt->symbols_search, global_entry_buffer, &global_entry_length, &pc))) {
+            if((ret = unk_dlg_symbol_lookup(ctx, nk_rect(0, 0, 500, 240), &v->symbol_lookup))) {
                 if(ret == 1) {
-                    mv->view_address = pc;  // Consider delta calc and -col
-                    mv->cursor_address = pc;
+                    mv->view_address = v->symbol_lookup.symbol_address;  // Consider delta calc and -col
+                    mv->cursor_address = v->symbol_lookup.symbol_address;
                 }
                 v->dlg_symbol_lookup_mem = 0;
                 v->dlg_modal_active = 0;
