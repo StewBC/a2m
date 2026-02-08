@@ -440,6 +440,8 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
 
 int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
     int ret = -1;
+    const int row_h = 18;
+    const int row_stride = row_h + (int)ctx->style.window.spacing.y;
     // The current folder is not loaded, so load it
     if(!fb->dir_contents.items) {
         // fb->file_selected.name_length = strlen(fb->file_selected.name);
@@ -452,10 +454,13 @@ int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
             return 0;
         }
         qsort(fb->dir_contents.data, fb->dir_contents.items, fb->dir_contents.element_size, util_file_info_qsort_cmp);
+        fb->cursor_line = 0;
+        fb->cursor_offset = 0;
     }
 
     if(nk_begin(ctx, "File Browser", nk_rect(0, 0, 600, 600),
                 NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
+        int cursor_moved = 0;
         // 1) Row with Path
         nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 2);
         {
@@ -480,6 +485,8 @@ int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
                     // rescan the current, which if it was typed correctly, will be what was typed,
                     // else rescan what was already "current"
                     fb->dir_contents.items = 0;
+                    fb->cursor_line = 0;
+                    fb->cursor_offset = 0;
                     util_dir_get_current(fb->dir_selected.name, PATH_MAX);
                     fb->dir_selected.name_length = strnlen(fb->dir_selected.name, PATH_MAX);
                 }
@@ -488,15 +495,79 @@ int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
         }
         nk_layout_row_end(ctx);
 
+        int rows_visible = (int)((500 - (2 * ctx->style.window.group_padding.y)) / row_stride);
+        if(rows_visible < 1) {
+            rows_visible = 1;
+        }
+
+        if(nk_input_is_key_pressed(&ctx->input, NK_KEY_UP)) {
+            if(fb->cursor_line > 0) {
+                fb->cursor_line--;
+                cursor_moved = 1;
+            }
+        } else if(nk_input_is_key_pressed(&ctx->input, NK_KEY_DOWN)) {
+            if(fb->cursor_line < fb->dir_contents.items - 1) {
+                fb->cursor_line++;
+                cursor_moved = 1;
+            }
+        } else if(nk_input_is_key_pressed(&ctx->input, NK_KEY_SCROLL_UP)) {
+            if(fb->cursor_line > 0) {
+                fb->cursor_line -= (rows_visible - 1);
+                if(fb->cursor_line < 0) {
+                    fb->cursor_line = 0;
+                }
+                cursor_moved = 1;
+            }
+        } else if(nk_input_is_key_pressed(&ctx->input, NK_KEY_SCROLL_DOWN)) {
+            if(fb->cursor_line < fb->dir_contents.items - 1) {
+                fb->cursor_line += (rows_visible - 1);
+                if(fb->cursor_line > fb->dir_contents.items - 1) {
+                    fb->cursor_line = fb->dir_contents.items - 1;
+                }
+                cursor_moved = 1;
+            }
+        }
+
+        if(fb->dir_contents.items <= 0) {
+            fb->cursor_line = 0;
+            fb->cursor_offset = 0;
+        } else if(cursor_moved) {
+            int top_line = fb->cursor_offset / row_stride;
+            if(top_line > fb->cursor_line) {
+                top_line = fb->cursor_line;
+            } else if(fb->cursor_line >= top_line + rows_visible) {
+                top_line = fb->cursor_line - rows_visible + 1;
+            }
+            int max_top = fb->dir_contents.items - rows_visible;
+            if(max_top < 0) {
+                max_top = 0;
+            }
+            if(top_line < 0) {
+                top_line = 0;
+            } else if(top_line > max_top) {
+                top_line = max_top;
+            }
+            fb->cursor_offset = top_line * row_stride;
+        }
+
         // 2) Dir/File list
         nk_layout_row_dynamic(ctx, 500, 1);
         {
-            if(nk_group_begin(ctx, "files group", NK_WINDOW_BORDER)) {
+            FILE_INFO *cursor_fi = NULL;
+            nk_uint x_off = 0;
+            nk_uint y_off = (nk_uint)fb->cursor_offset;
+            struct nk_color ob = ctx->style.selectable.normal.data.color;
+            if(nk_group_scrolled_offset_begin(ctx, &x_off, &y_off, "files group", NK_WINDOW_BORDER)) {
                 for(int i = 0; i < fb->dir_contents.items; i++) {
                     FILE_INFO *fi = ARRAY_GET(&fb->dir_contents, FILE_INFO, i);
 
+                    if(i == fb->cursor_line) {
+                        cursor_fi = fi;
+                        ctx->style.selectable.normal.data.color = nk_rgb(100, 100, 100);
+                    }
+
                     // A) The row with the file/dir name details
-                    nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 3);
+                    nk_layout_row_begin(ctx, NK_DYNAMIC, row_h, 3);
                     {
                         nk_layout_row_push(ctx, 0.8f);
                         if(nk_select_label(ctx, fi->name, NK_TEXT_ALIGN_LEFT, 0)) {
@@ -509,7 +580,10 @@ int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
                                 fb->dir_contents.items = 0;
                                 // Not checking for success as the options are to close the dialog (bad) or ignore error.
                                 util_dir_change(fi->name);
+                                fb->cursor_line = 0;
+                                fb->cursor_offset = 0;
                             }
+                            ctx->style.selectable.normal.data.color = ob;
                             break;
                         }
                         nk_layout_row_push(ctx, 0.1f);
@@ -518,8 +592,27 @@ int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
                         nk_label(ctx, fi->is_directory ? "Dir" : "File", NK_TEXT_LEFT);
                     }
                     nk_layout_row_end(ctx);
+
+                    if(i == fb->cursor_line) {
+                        ctx->style.selectable.normal.data.color = ob;
+                    }
                 }
                 nk_group_end(ctx);
+            }
+            if(!cursor_moved) {
+                fb->cursor_offset = (int)y_off;
+            }
+
+            if(!ctx->active->edit.active && nk_input_is_key_pressed(&ctx->input, NK_KEY_ENTER) && cursor_fi) {
+                if(!cursor_fi->is_directory) {
+                    fb->file_selected = *cursor_fi;
+                    ret = 1;
+                } else {
+                    fb->dir_contents.items = 0;
+                    util_dir_change(cursor_fi->name);
+                    fb->cursor_line = 0;
+                    fb->cursor_offset = 0;
+                }
             }
         }
 

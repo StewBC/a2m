@@ -11,6 +11,8 @@ typedef struct {
     int device;                                         // drive 0 or 1
     int device_type;                                    // SLOT_TYPE_SMARTPORT | SLOT_TYPE_DISKII
     DYNARRAY dir_contents;
+    int cursor_line;
+    int cursor_offset;
 } FILE_BROWSER;
 
 typedef struct {
