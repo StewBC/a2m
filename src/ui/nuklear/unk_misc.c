@@ -409,6 +409,7 @@ void unk_misc_show(UNK *v) {
                                         if(nk_button_label(ctx, "Edit")) {
                                             bpe->bp_original = bp;
                                             bpe->bp_under_edit = *bp;
+                                            bpe->bp_under_edit.model = m->model == MODEL_APPLE_IIEE;
                                             bpe->string_type_len = parse_encode_c_string(bp->type_text, bpe->string_type, 128);
                                             bpe->string_address_len[0] = sprintf(bpe->string_address[0], "%04X", bp->address);
                                             bpe->string_address_len[1] = sprintf(bpe->string_address[1], "%04X", bp->address_range_end);
@@ -541,7 +542,7 @@ void unk_misc_show(UNK *v) {
     // Dialogs
     if(v->dlg_breakpoint) {
         struct nk_rect mvr = v->layout.misc;
-        struct nk_rect r = nk_rect(mvr.x + 10, mvr.y + 10, 480, 170);
+        struct nk_rect r = nk_rect(mvr.x + 10, mvr.y + 10, 480, 195);
         int ret = unk_dlg_breakpoint_edit(ctx, r, &v->viewmisc.breakpoint_edit);
         if(ret >= 0) {
             v->dlg_breakpoint = 0;

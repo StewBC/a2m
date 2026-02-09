@@ -36,19 +36,14 @@ uint8_t pages_init(PAGES *pages, uint32_t length) {
     pages->num_pages = num_pages;
     pages->read_pages = (uint8_t**)malloc(sizeof(uint8_t*) * num_pages);
     pages->write_pages = (uint8_t**)malloc(sizeof(uint8_t*) * num_pages);
-    pages->watch_read_pages = (uint8_t**)malloc(sizeof(uint8_t*) * num_pages);
-    pages->watch_write_pages = (uint8_t**)malloc(sizeof(uint8_t*) * num_pages);
     pages->last_write_pages = (uint64_t**)malloc(sizeof(uint64_t*) * num_pages);
-    if(!pages->read_pages || !pages->write_pages || !pages->watch_read_pages ||
-        !pages->watch_write_pages || !pages->last_write_pages) {
+    if(!pages->read_pages || !pages->write_pages || !pages->last_write_pages) {
             return A2_ERR;
     }
 
     for(int page = 0; page < num_pages; page++) {
         pages->read_pages[page] = NULL;
         pages->write_pages[page] = NULL;
-        pages->watch_read_pages[page] = NULL;
-        pages->watch_write_pages[page] = NULL;
         pages->last_write_pages[page] = NULL;
     }
     return A2_OK;
@@ -61,7 +56,6 @@ void pages_map(PAGES *pages, PAGE_MAP_TYPE map_type, uint32_t address, uint32_t 
     if(map_type == PAGE_MAP_READ) {
         while(num_pages) {
             pages->read_pages[page] = &ram->RAM_MAIN[address];
-            pages->watch_read_pages[page] = &ram->RAM_WATCH[address];
             page++;
             address += PAGE_SIZE;
             num_pages--;
@@ -69,7 +63,6 @@ void pages_map(PAGES *pages, PAGE_MAP_TYPE map_type, uint32_t address, uint32_t 
     } else {
         while(num_pages) {
             pages->write_pages[page] = &ram->RAM_MAIN[address];
-            pages->watch_write_pages[page] = &ram->RAM_WATCH[address];
             pages->last_write_pages[page] = &ram->RAM_LAST_WRITE[address];
             page++;
             address += PAGE_SIZE;
@@ -84,7 +77,6 @@ void pages_map_lc(PAGES *pages, PAGE_MAP_TYPE map_type, uint32_t address, uint32
     if(map_type == PAGE_MAP_READ) {
         while(num_pages) {
             pages->read_pages[page] = &ram->RAM_LC[from];
-            pages->watch_read_pages[page] = &ram->RAM_LC_WATCH[from];
             page++;
             from += PAGE_SIZE;
             num_pages--;
@@ -92,7 +84,6 @@ void pages_map_lc(PAGES *pages, PAGE_MAP_TYPE map_type, uint32_t address, uint32
     } else {
         while(num_pages) {
             pages->write_pages[page] = &ram->RAM_LC[from];
-            pages->watch_write_pages[page] = &ram->RAM_LC_WATCH[from];
             pages->last_write_pages[page] = &ram->RAM_LC_LAST_WRITE[from];
             page++;
             from += PAGE_SIZE;
@@ -102,14 +93,13 @@ void pages_map_lc(PAGES *pages, PAGE_MAP_TYPE map_type, uint32_t address, uint32
 }
 
 
-void pages_map_rom(PAGES *pages, uint32_t address, uint32_t length, uint8_t *rom_bytes, RAM *ram) {
+void pages_map_rom(PAGES *pages, uint32_t address, uint32_t length, uint8_t *rom_bytes) {
     uint16_t page = address / PAGE_SIZE;
     uint16_t num_pages = length / PAGE_SIZE;
     uint8_t *bytes = rom_bytes;
     assert(page + num_pages <= pages->num_pages);
     while(num_pages) {
         pages->read_pages[page] = bytes;
-        pages->watch_read_pages[page] = &ram->RAM_WATCH[address];
         page++;
         bytes += PAGE_SIZE;
         address += PAGE_SIZE;
@@ -117,7 +107,7 @@ void pages_map_rom(PAGES *pages, uint32_t address, uint32_t length, uint8_t *rom
     }
 }
 
-void pages_map_rom_block(PAGES *pages, ROM_BLOCK *block, RAM *ram) {
+void pages_map_rom_block(PAGES *pages, ROM_BLOCK *block) {
     uint16_t address = block->address;
     uint16_t page = address / PAGE_SIZE;
     uint16_t num_pages = block->length / PAGE_SIZE;
@@ -125,7 +115,6 @@ void pages_map_rom_block(PAGES *pages, ROM_BLOCK *block, RAM *ram) {
     assert(page + num_pages <= pages->num_pages);
     while(num_pages) {
         pages->read_pages[page] = bytes;
-        pages->watch_read_pages[page] = &ram->RAM_WATCH[address];
         page++;
         bytes += PAGE_SIZE;
         address += PAGE_SIZE;

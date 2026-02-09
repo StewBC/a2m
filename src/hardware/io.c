@@ -19,7 +19,7 @@ void io_language_card_map_memory_read(APPLE2 *m) {
         pages_map_lc(&m->pages, PAGE_MAP_READ, 0xD000, 0x1000, bank_addr + aux_addr, &m->ram);
         pages_map_lc(&m->pages, PAGE_MAP_READ, 0xE000, 0x2000, 0x2000 + aux_addr, &m->ram);
     } else {
-        pages_map_rom_block(&m->pages, &m->roms.blocks[ROM_APPLE2], &m->ram);
+        pages_map_rom_block(&m->pages, &m->roms.blocks[ROM_APPLE2]);
     }
 }
 
@@ -42,12 +42,12 @@ static void io_apply_c800_latch(APPLE2 *m, A2_STATE s) {
     //   - strobed_slot 1..7 maps that slot's C800 ROM if present.
     //   - otherwise C800 reads fall through to RAM.
     if(s & A2S_CXSLOTROM_MB_ENABLE) {
-        pages_map_rom(&m->pages, 0xC800, 0x800, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x800], &m->ram);
+        pages_map_rom(&m->pages, 0xC800, 0x800, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x800]);
         return;
     }
 
     if(m->strobed_slot == C800_INTERNAL) {
-        pages_map_rom(&m->pages, 0xC800, 0x800, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x800], &m->ram);
+        pages_map_rom(&m->pages, 0xC800, 0x800, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x800]);
         return;
     }
 
@@ -62,7 +62,7 @@ static void io_apply_c800_latch(APPLE2 *m, A2_STATE s) {
 
 static void io_map_cxrom(APPLE2 *m, A2_STATE new) {
     if(new & A2S_CXSLOTROM_MB_ENABLE) {
-        pages_map_rom(&m->pages, 0xC100, 0xF00, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x100], &m->ram);
+        pages_map_rom(&m->pages, 0xC100, 0xF00, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x100]);
     } else {
         // Restore the slot mappings
         m->pages.read_pages[0xC100 / PAGE_SIZE] = m->rom_shadow_pages[1];
@@ -84,7 +84,7 @@ static void io_map_c3rom(APPLE2 *m, A2_STATE new) {
     if(new & A2S_SLOT3ROM_MB_DISABLE) {
         m->pages.read_pages[0xC300 / PAGE_SIZE] = m->rom_shadow_pages[3];
     } else {
-        pages_map_rom(&m->pages, 0xC300, 0x100, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x300], &m->ram);
+        pages_map_rom(&m->pages, 0xC300, 0x100, &m->roms.blocks[ROM_APPLE2_SLOTS].bytes[0x300]);
     }
     io_apply_c800_latch(m, new);
 }

@@ -249,13 +249,6 @@ void unk_bank_view_selector(struct nk_context *ctx, int model, VIEW_FLAGS *vf, c
         en_c100 = 0x1; // Map only
     }
 
-    // If RAM == MAPPED, force D000 == MAPPED and disable D000 selector
-    int ram_is_mapped = (sel_ram == A2SEL48K_MAPPED) ? 1 : 0;
-    if(ram_is_mapped) {
-        sel_d000 = A2SELD000_MAPPED;
-        vf_set_d000(vf, (A2SEL_D000)sel_d000);
-        en_d000 = 0x1; // only Map enabled
-    } 
 
     // row 1: row_label + "RAM:" + 3 segments = 5 cols
     nk_layout_row_begin(ctx, NK_STATIC, 18, 5);
@@ -271,20 +264,6 @@ void unk_bank_view_selector(struct nk_context *ctx, int model, VIEW_FLAGS *vf, c
         if(nk_segmented_cells(ctx, labels_ram, 3, en_ram, &sel_ram, 40.0f)) {
             vf_set_ram(vf, (A2SEL_48K)sel_ram);
 
-            // If user just switched RAM to mapped, immediately apply D000 rule
-            ram_is_mapped = (sel_ram == A2SEL48K_MAPPED) ? 1 : 0;
-            if(ram_is_mapped) {
-                sel_d000 = A2SELD000_MAPPED;
-                vf_set_d000(vf, (A2SEL_D000)sel_d000);
-                en_d000 = 0x1;
-            } else {
-                // RAM leaving mapped, set D000 to LC2 if it is set to mapped
-                if(sel_d000 == A2SELD000_MAPPED) {
-                    sel_d000 = A2SELD000_LC_B2;
-                    vf_set_d000(vf, (A2SEL_D000)sel_d000);
-                }
-                en_d000 = 0xF;
-            }
         }
     }
     nk_layout_row_end(ctx);

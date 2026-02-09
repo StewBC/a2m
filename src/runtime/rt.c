@@ -190,7 +190,7 @@ void rt_apply_ini(RUNTIME *rt, INI_STORE *ini_store) {
                         bp.type_text = parsed_line.type_text;
                         bp.slot = parsed_line.slot;
                         bp.device = parsed_line.device;
-                        // bp.selected_bank = MEM_MAPPED_6502;
+                        bp.selected_bank = parsed_line.view_flags_set ? (VIEW_FLAGS)parsed_line.view_flags : 0;
                         ARRAY_ADD(&rt->breakpoints, bp);
                         // SQW temp solution
                         if(parsed_line.action == ACTION_TRON) {
@@ -626,4 +626,3 @@ int rt_feed_clipboard_key(RUNTIME *rt) {
         }
     }
 }
-

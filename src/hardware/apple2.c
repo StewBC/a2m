@@ -113,19 +113,17 @@ int apple2_init(APPLE2 *m, INI_STORE *ini_store) {
 
     // Allocate the RAM
     m->ram.RAM_MAIN = (uint8_t *) malloc(m->ram_size);
-    m->ram.RAM_WATCH = (uint8_t *) malloc(m->ram_size);
+    m->ram.RAM_WATCH = (uint8_t *) malloc(BANK_SIZE);
     m->ram.RAM_LAST_WRITE = (uint64_t *) malloc(m->ram_size * sizeof(uint64_t));
     // The language_card has 16 KB.  It is set up as
     // 4K ($0000 - $0FFF) Bank 1 @ $D000 - $DFFF
     // 4K ($1000 - $1FFF) Bank 2 @ $D000 - $DFFF
     // 8K ($2000 - $3FFF)        @ $E000 - $FFFF
     // That's 16K but 2x for AUX version in IIe (allocated on ][+ as well)
-    // Allocate the WATCH RAM (for breakpoints and IO callbacks)
     m->ram.RAM_LC = (uint8_t *) malloc(32 * 1024 * sizeof(uint8_t));
-    m->ram.RAM_LC_WATCH = (uint8_t *) malloc(32 * 1024 * sizeof(uint8_t));
     m->ram.RAM_LC_LAST_WRITE = (uint64_t *) malloc(32 * 1024 * sizeof(uint64_t));
     if(!m->ram.RAM_MAIN || !m->ram.RAM_LC || !m->ram.RAM_WATCH || 
-        !m->ram.RAM_LC_WATCH || !m->ram.RAM_LAST_WRITE || !m->ram.RAM_LC_LAST_WRITE) {
+        !m->ram.RAM_LAST_WRITE || !m->ram.RAM_LC_LAST_WRITE) {
         return A2_ERR;
     }
     // Init RAM to a fixed pattern
@@ -135,8 +133,7 @@ int apple2_init(APPLE2 *m, INI_STORE *ini_store) {
     memset(m->ram.RAM_LAST_WRITE, 0, m->ram_size * sizeof(uint64_t));
     memset(m->ram.RAM_LC_LAST_WRITE, 0, 32 * 1024 * sizeof(uint64_t));
     // Set the watch to not watching anything
-    memset(m->ram.RAM_WATCH, WATCH_NONE, m->ram_size);
-    memset(m->ram.RAM_LC_WATCH, WATCH_NONE, 32 * 1024 * sizeof(uint8_t));
+    memset(m->ram.RAM_WATCH, WATCH_NONE, BANK_SIZE);
 
     // And IO area floating bus is a lot of 160's
     memset(&m->ram.RAM_MAIN[0xC001], 0xA0, 0x0FFE);
@@ -172,7 +169,7 @@ int apple2_init(APPLE2 *m, INI_STORE *ini_store) {
     pages_map(&m->pages, PAGE_MAP_WRITE, 0, BANK_SIZE, &m->ram);
 
     // Map the rom ($D000-$FFFF) as read pages
-    pages_map_rom_block(&m->pages, &m->roms.blocks[ROM_APPLE2], &m->ram);
+    pages_map_rom_block(&m->pages, &m->roms.blocks[ROM_APPLE2]);
 
     // Map watch area checks - start with no watch
     // Add the IO ports by flagging them as 1 in the RAM watch (incl LC 0xc08x area)
@@ -233,10 +230,6 @@ void apple2_shutdown(APPLE2 *m) {
     m->pages.read_pages = NULL;
     free(m->pages.write_pages);
     m->pages.write_pages = NULL;
-    free(m->pages.watch_read_pages);
-    m->pages.watch_read_pages = NULL;
-    free(m->pages.watch_write_pages);
-    m->pages.watch_write_pages = NULL;
     m->pages.num_pages = 0;
     // ROMS
     free(m->roms.blocks);

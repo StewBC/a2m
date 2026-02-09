@@ -16,15 +16,17 @@ typedef enum {
 } BRKACTION;
 
 typedef struct {
-    uint32_t    start;     // required
-    uint32_t    end;       // = start if no range
-    uint32_t    mode;      // default = BREAK_MODE_PC
-    BRKACTION   action;    // default = ACTION_BREAK
-    int         count;     // optional; 0 if unset
-    int         reset;     // optional; 0 if unset
+    uint32_t    start;              // required
+    uint32_t    end;                // = start if no range
+    uint32_t    mode;               // default = BREAK_MODE_PC
+    BRKACTION   action;             // default = ACTION_BREAK
+    int         count;              // optional; 0 if unset
+    int         reset;              // optional; 0 if unset
     int         slot;
     int         device;
     char        *type_text;
+    uint32_t    view_flags;         // optional VIEW_FLAGS for bank selection
+    uint8_t     view_flags_set;     // 1 if view_flags is valid
 } PARSEDBP;
 
 int parse_line(const char *val, PARSEDBP *out);

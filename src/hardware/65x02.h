@@ -35,16 +35,13 @@ typedef struct {
     uint16_t num_pages;
     uint8_t **read_pages;                       // array of page bytes mapped for reading
     uint8_t **write_pages;                      // array of page bytes mapped for writing
-    uint8_t **watch_read_pages;                 // array of page bytes mapped for watch (IO/Breakpoints)
-    uint8_t **watch_write_pages;                // array of page bytes mapped for watch (IO/Breakpoints)
     uint64_t **last_write_pages;                // array of page 64 bit entries for tracking write addresses
 } PAGES;
 
 typedef struct {
     uint8_t *RAM_MAIN;                          // The ram_size memory - addressable in max 64k chunks
-    uint8_t *RAM_WATCH;                         // IO / Breakpoints. See WATCH_MASK
+    uint8_t *RAM_WATCH;                         // 64K watch map for IO / Breakpoints. See WATCH_MASK
     uint8_t *RAM_LC;                            // LC Ram (Always 2*16 for ease with //e)
-    uint8_t *RAM_LC_WATCH;                      // LC Ram watch (Always 2*16 for ease with //e)
     uint64_t *RAM_LAST_WRITE;                   // 64-bit array of ram size
     uint64_t *RAM_LC_LAST_WRITE;                // 64-bit array of 32K (LC ram size)
 } RAM;
@@ -153,8 +150,8 @@ void rom_add(ROMS *rom, uint8_t block_num, uint32_t address, uint32_t length, ui
 uint8_t pages_init(PAGES *pages, uint32_t length);
 void pages_map(PAGES *pages, PAGE_MAP_TYPE map, uint32_t address, uint32_t length, RAM *ram);
 void pages_map_lc(PAGES *pages, PAGE_MAP_TYPE map_type, uint32_t address, uint32_t length, uint32_t from, RAM *ram);
-void pages_map_rom(PAGES *pages, uint32_t address, uint32_t length, uint8_t *rom_bytes, RAM *ram);
-void pages_map_rom_block(PAGES *pages, ROM_BLOCK *block, RAM *ram);
+void pages_map_rom(PAGES *pages, uint32_t address, uint32_t length, uint8_t *rom_bytes);
+void pages_map_rom_block(PAGES *pages, ROM_BLOCK *block);
 
 // 1 time init
 void cpu_init(APPLE2 *m);

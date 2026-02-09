@@ -5,8 +5,8 @@
 #pragma once
 
 #include "common.h"
-#include "utils_lib.h"
 #include "hardware_lib.h"
+#include "utils_lib.h"
 
 #define SYMBOL_COL_LEN          17
 

@@ -11,7 +11,8 @@ static inline uint8_t read_from_memory(APPLE2 *m, uint16_t address) {
     size_t page = address / PAGE_SIZE;
     size_t offset = address % PAGE_SIZE;
     assert(page < m->pages.num_pages);
-    uint8_t cb_mask = m->pages.watch_read_pages[page][offset];
+    // RAM_WATCH is always a single 64K watch map, independent of banking
+    uint8_t cb_mask = m->ram.RAM_WATCH[address];
     uint8_t byte = m->pages.read_pages[page][offset];
     if(cb_mask) {
         // Want to do read before breakpoint is checked
@@ -29,7 +30,8 @@ static inline void write_to_memory(APPLE2 *m, uint16_t address, uint8_t value) {
     size_t page = address / PAGE_SIZE;
     size_t offset = address % PAGE_SIZE;
     assert(page < m->pages.num_pages);
-    uint8_t cb_mask = m->pages.watch_write_pages[page][offset];
+    // RAM_WATCH is always a single 64K watch map, independent of banking
+    uint8_t cb_mask = m->ram.RAM_WATCH[address];
     uint64_t last_write = m->pages.last_write_pages[page][offset];
     last_write <<= 16;
     last_write |= m->cpu.opcode_pc;
@@ -87,7 +89,7 @@ static inline uint8_t read_from_memory_in_view(APPLE2 *m, VIEW_FLAGS vf, uint16_
 
     // D000-FFFF
     if(address >= 0xD000) {
-        if(ram == A2SEL48K_MAPPED) {
+        if(ram == A2SEL48K_MAPPED && vf_get_d000(vf) == A2SELD000_MAPPED) {
             // Mapped
             return m->pages.read_pages[address / PAGE_SIZE][address % PAGE_SIZE];
         }
@@ -154,7 +156,7 @@ static inline void write_to_memory_in_view(APPLE2 *m, VIEW_FLAGS vf, uint16_t ad
 
     // D000-FFFF
     if(address >= 0xD000) {
-        if(ram == A2SEL48K_MAPPED) {
+        if(ram == A2SEL48K_MAPPED && vf_get_d000(vf) == A2SELD000_MAPPED) {
             // Mapped
             m->pages.write_pages[address / PAGE_SIZE][address % PAGE_SIZE] = value;
             return;
@@ -223,7 +225,7 @@ static inline uint64_t read_last_write_from_selected(APPLE2 *m, VIEW_FLAGS vf, u
 
     // D000-FFFF
     if(address >= 0xD000) {
-        if(ram == A2SEL48K_MAPPED) {
+        if(ram == A2SEL48K_MAPPED && vf_get_d000(vf) == A2SELD000_MAPPED) {
             // Mapped
             return m->pages.last_write_pages[address / PAGE_SIZE][address % PAGE_SIZE];
         }

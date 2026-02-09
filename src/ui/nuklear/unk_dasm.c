@@ -642,6 +642,8 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                     bp.break_on_exec = 1;
                     bp.break_on_read = bp.break_on_write = 0;
                     bp.counter_stop_value = bp.counter_reset = 1;
+                    bp.selected_bank = dv->flags;
+                    bp.model = m->model == MODEL_APPLE_IIEE;
                     ARRAY_ADD(&rt->breakpoints, bp);
                 } else {
                     array_remove(&rt->breakpoints, b);

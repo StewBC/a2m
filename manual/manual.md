@@ -434,6 +434,8 @@ Press the `[OK]` button to close the dialog. If a file is highlighted when `[OK]
 ### Breakpoint Editor
 The breakpoint editor dialog is used to change the way a breakpoint works. In it you can configure the address or address range that a breakpoint activates on, and whether that activation is on execution, read, write, or read or write. Actions can also be assigned to breakpoints here, as well as counters, as discussed in the Breakpoints section.
 
+The dialog also includes an `In Bank` row that selects which memory bank the breakpoint applies to. `Map` matches the CPU's current mapping, while `Main`, `Aux`, `LC1/LC2`, and `ROM` restrict the breakpoint to those views.
+
 The dialog has `Break At [nnnn] on [] PC [] Address Access`. In this, `nnnn` is the memory address to watch for an execution break if `on PC` is checked. If `Address Access` is checked, the breakpoint will activate on a read, write, or either. This depends on the checked state of `[] Read [] Write`, which is available if `Address Access` is chosen. Also available when `Address Access` is chosen is `[] Range`. Check `Range` to enter a second address. All selected accesses between the `Break At` and `Range` addresses will now cause a stop.
 
 \Needspace{11\baselineskip}
@@ -860,7 +862,7 @@ The Debug section is not a normal INI section. Normally, a variable (or key, in 
 
 \Needspace{2\baselineskip}
 The `break` variable takes the form:  
-`break = <address[-address]>[,<pc|read|write|access|reset|fast|slow|swap sNdX|tron|troff|type str|count[,reset]>`
+`break = <address[-address]>[,<pc|read|write|access|map|main|aux|lc1|lc2|rom|c100rom|c100map|d000map|reset|fast|slow|swap sNdX|tron|troff|type str|count[,reset]>`
 
 In this syntax, elements in `<>` are required, and elements in `[]` are optional. When `|` is used, it means "or". For example, `[,pc|read|write]` means an optional comma followed by one of `pc`, `read`, or `write`.
 
@@ -870,6 +872,7 @@ In this syntax, elements in `<>` are required, and elements in `[]` are optional
 * **read** means the breakpoint is activated by a read from the address or range.
 * **write** means the breakpoint is activated by a write to the address or range.
 * **access** means the breakpoint is activated by either a read from or a write to the address or range.
+* **map/main/aux/lc1/lc2/rom/c100rom/c100map/d000map** set the breakpoint bank view for ini breakpoints.
 * **fast** sets Turbo Mode to `max`.
 * **slow** sets Turbo Mode to 1 MHz.
 * **restore** sets Turbo Mode back to the value it had before `slow` or `fast` was used.

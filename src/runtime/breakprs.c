@@ -3,6 +3,7 @@
 // This is free and unencumbered software released into the public domain.
 
 #include "common.h"
+#include "hardware_lib.h"
 #include "utils_lib.h"
 
 static char *parse_ltrim(char *s) {
@@ -239,16 +240,59 @@ int parse_breakpoint_line(const char *val, PARSEDBP *out) {
 
         if(*param != '\0') {
             // Try keywords first
-            if(stricmp(param, "pc") == 0) {
-                out->mode |= WATCH_EXEC_BREAKPOINT;
-            } else if(0 == stricmp(param, "access")) {
+            if(0 == stricmp(param, "access")) {
                 out->mode |= WATCH_READ_BREAKPOINT | WATCH_WRITE_BREAKPOINT;
+            } else if(0 == stricmp(param, "aux")) {
+                VIEW_FLAGS vf = (VIEW_FLAGS)out->view_flags;
+                vf_set_ram(&vf, A2SEL48K_AUX);
+                out->view_flags = vf;
+                out->view_flags_set = 1;
+            } else if(0 == stricmp(param, "c100map") || 0 == stricmp(param, "c100mapped")) {
+                VIEW_FLAGS vf = (VIEW_FLAGS)out->view_flags;
+                vf_set_c100(&vf, A2SELC100_MAPPED);
+                out->view_flags = vf;
+                out->view_flags_set = 1;
+            } else if(0 == stricmp(param, "c100rom")) {
+                VIEW_FLAGS vf = (VIEW_FLAGS)out->view_flags;
+                vf_set_c100(&vf, A2SELC100_ROM);
+                out->view_flags = vf;
+                out->view_flags_set = 1;
+            } else if(0 == stricmp(param, "d000map") || 0 == stricmp(param, "d000mapped")) {
+                VIEW_FLAGS vf = (VIEW_FLAGS)out->view_flags;
+                vf_set_d000(&vf, A2SELD000_MAPPED);
+                out->view_flags = vf;
+                out->view_flags_set = 1;
             } else if(0 == stricmp(param, "fast")) {
                 out->action = ACTION_FAST;
+            } else if(0 == stricmp(param, "lc1")) {
+                VIEW_FLAGS vf = (VIEW_FLAGS)out->view_flags;
+                vf_set_d000(&vf, A2SELD000_LC_B1);
+                out->view_flags = vf;
+                out->view_flags_set = 1;
+            } else if(0 == stricmp(param, "lc2")) {
+                VIEW_FLAGS vf = (VIEW_FLAGS)out->view_flags;
+                vf_set_d000(&vf, A2SELD000_LC_B2);
+                out->view_flags = vf;
+                out->view_flags_set = 1;
+            } else if(0 == stricmp(param, "map") || 0 == stricmp(param, "mapped")) {
+                out->view_flags = 0;
+                out->view_flags_set = 1;
+            } else if(0 == stricmp(param, "main")) {
+                VIEW_FLAGS vf = (VIEW_FLAGS)out->view_flags;
+                vf_set_ram(&vf, A2SEL48K_MAIN);
+                out->view_flags = vf;
+                out->view_flags_set = 1;
+            } else if(stricmp(param, "pc") == 0) {
+                out->mode |= WATCH_EXEC_BREAKPOINT;
             } else if(0 == stricmp(param, "read")) {
                 out->mode |= WATCH_READ_BREAKPOINT;
             } else if(0 == stricmp(param, "restore")) {
                 out->action = ACTION_RESTORE;
+            } else if(0 == stricmp(param, "rom")) {
+                VIEW_FLAGS vf = (VIEW_FLAGS)out->view_flags;
+                vf_set_d000(&vf, A2SELD000_ROM);
+                out->view_flags = vf;
+                out->view_flags_set = 1;
             } else if(0 == stricmp(param, "slow")) {
                 out->action = ACTION_SLOW;
             } else if(0 == strnicmp(param, "swap", 4)) {
