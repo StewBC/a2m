@@ -29,10 +29,12 @@ typedef struct {
     float level;
 
     // simple filter state (optional)
-    float hp_prev_out;
+    float x_prev;
+    float y_prev;
     float prev_sample;
 } VIEWSPEAKER;
 
+void audio_prime_queue_and_start(VIEWSPEAKER *speaker);
 int  unk_audio_speaker_init(VIEWSPEAKER *sp, double cpu_hz, int sample_rate, int channels, float target_latency_ms, uint32_t chunk_frames);
 void unk_audio_speaker_on_cycles(UI *ui, uint32_t cycles_executed);
 // void unk_audio_speaker_pump(VIEWSPEAKER *sp);

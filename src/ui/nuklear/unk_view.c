@@ -536,10 +536,6 @@ int unk_init(UNK *v, int model, INI_STORE *ini_store) {
         return A2_ERR;
     }
 
-    if(A2_OK != unk_audio_speaker_init(&v->viewspeaker, CPU_FREQUENCY, 48000, 2, 40.0f, 256)) {
-        return A2_ERR;
-    }
-
     // Init the shared symbol lookup struct - portions that can now be set
     v->symbol_lookup.name = global_entry_buffer;
     v->symbol_lookup.name_length = &global_entry_length;
@@ -580,6 +576,11 @@ int unk_init(UNK *v, int model, INI_STORE *ini_store) {
 
     // Set up a table to speed up rendering HGR
     unk_apl2_init_color_table(v);
+
+    // Do this late since this also starts the audio rolling - consuming the queue
+    if(A2_OK != unk_audio_speaker_init(&v->viewspeaker, CPU_FREQUENCY, 48000, 2, 32.0f, 256)) {
+        return A2_ERR;
+    }
 
     return A2_OK;
 }

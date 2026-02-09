@@ -270,6 +270,7 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
                     case SDLK_PAUSE:
                         // Reset the machine
                         rt_machine_reset(rt);
+                        audio_prime_queue_and_start(&v->viewspeaker);
                         v->prev_cycles = 0;                     // So MHz doesn't jump massively
                         return;
 
