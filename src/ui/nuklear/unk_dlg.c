@@ -728,7 +728,8 @@ int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
         }
 
         // 2) Dir/File list
-        nk_layout_row_dynamic(ctx, 500, 1);
+        int file_list_height = 500 - (fb->dir_select_okay ? 30 : 0);
+        nk_layout_row_dynamic(ctx, file_list_height, 1);
         {
             FILE_INFO *cursor_fi = NULL;
             nk_uint x_off = 0;
@@ -798,6 +799,12 @@ int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
         {
             if(nk_button_label(ctx, "Cancel")) {
                 ret = 0;
+            }
+            if(fb->dir_select_okay) {
+                if(nk_button_label(ctx, "Ok")) {
+                    fb->file_selected.name_length = 0;
+                    ret = 1;
+                }
             }
         }
     }

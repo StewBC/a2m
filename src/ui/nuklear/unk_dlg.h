@@ -13,6 +13,7 @@ typedef struct {
     DYNARRAY dir_contents;
     int cursor_line;
     int cursor_offset;
+    int dir_select_okay;
 } FILE_BROWSER;
 
 typedef struct {

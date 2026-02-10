@@ -59,6 +59,13 @@ typedef struct {
     int browse_target;
 } MACHINE_CONFIG;
 
+enum {
+    CNF_CNG_NONE            = 1 << 0,
+    CNF_CNG_INI_FILE_NAME   = 1 << 1,
+    CNF_CNG_SAVE_ON_EXIT    = 1 << 2,
+    CNF_CNG_RESTART         = 1 << 3,
+};
+
 void cmn_config_apply(MACHINE_CONFIG *mc, INI_STORE *ini_store);
 void cmn_config_from_ini(MACHINE_CONFIG *mc, INI_STORE *ini_store);
 int cmn_config_changed(const MACHINE_CONFIG *a, const MACHINE_CONFIG *b);

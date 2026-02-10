@@ -303,76 +303,76 @@ static int config_text_equal(const char *a, int a_len, const char *b, int b_len,
 }
 
 int cmn_config_changed(const MACHINE_CONFIG *a, const MACHINE_CONFIG *b) {
+    int ret = CNF_CNG_NONE;
+    if(!config_text_equal(a->ini_file_text, a->ini_file_text_len,
+                          b->ini_file_text, b->ini_file_text_len,
+                          sizeof(a->ini_file_text))) {
+        ret = CNF_CNG_INI_FILE_NAME;
+    }
+    if(a->save_ini != b->save_ini) {
+        ret |= CNF_CNG_SAVE_ON_EXIT;
+    }
+
     if(!a || !b) {
-        return 1;
+        return ret | CNF_CNG_RESTART;
     }
     if(a->model != b->model) {
-        return 1;
+        return ret | CNF_CNG_RESTART;
     }
     if(a->ui_sel != b->ui_sel) {
-        return 1;
+        return ret | CNF_CNG_RESTART;
     }
     if(a->disk_leds != b->disk_leds) {
-        return 1;
+        return ret | CNF_CNG_RESTART;
     }
     if(a->remember_ini != b->remember_ini) {
-        return 1;
+        return ret | CNF_CNG_RESTART;
     }
     if(a->asm_dest_flags != b->asm_dest_flags) {
-        return 1;
+        return ret | CNF_CNG_RESTART;
     }
     if(a->asm_reset_stack != b->asm_reset_stack) {
-        return 1;
+        return ret | CNF_CNG_RESTART;
     }
     if(a->asm_auto_run != b->asm_auto_run) {
-        return 1;
+        return ret | CNF_CNG_RESTART;
     }
 
     for(int i = 0; i < 7; i++) {
         if(a->slot_sel[i] != b->slot_sel[i]) {
-            return 1;
+            return ret | CNF_CNG_RESTART;
         }
     }
 
     if(!config_text_equal(a->wheel_speed_text, a->wheel_speed_text_len,
                           b->wheel_speed_text, b->wheel_speed_text_len,
                           sizeof(a->wheel_speed_text))) {
-        return 1;
+        return ret | CNF_CNG_RESTART;
     }
 
     if(!config_text_equal(a->turbo_text, a->turbo_text_len,
                           b->turbo_text, b->turbo_text_len,
                           sizeof(a->turbo_text))) {
-        return 1;
+        return ret | CNF_CNG_RESTART;
     }
 
     if(!config_text_equal(a->symbols_text, a->symbols_text_len,
                           b->symbols_text, b->symbols_text_len,
                           sizeof(a->symbols_text))) {
-        return 1;
+        return ret | CNF_CNG_RESTART;
     }
 
     if(!config_text_equal(a->asm_source_text, a->asm_source_text_len,
                           b->asm_source_text, b->asm_source_text_len,
                           sizeof(a->asm_source_text))) {
-        return 1;
+        return ret | CNF_CNG_RESTART;
     }
 
     if(!config_text_equal(a->asm_address_text, a->asm_address_text_len,
                           b->asm_address_text, b->asm_address_text_len,
                           sizeof(a->asm_address_text))) {
-        return 1;
+        return ret | CNF_CNG_RESTART;
     }
 
-    if(!config_text_equal(a->ini_file_text, a->ini_file_text_len,
-                          b->ini_file_text, b->ini_file_text_len,
-                          sizeof(a->ini_file_text))) {
-        return 2;
-    }
-
-    if(a->save_ini != b->save_ini) {
-        return 3;
-    }
-
-    return 0;
+    return ret;
 }

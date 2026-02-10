@@ -199,6 +199,7 @@ void unk_misc_show(UNK *v) {
                 if(nk_button_label(ctx, "Configure") && !v->dlg_modal_active) {
                     cmn_config_from_ini(mc, v->ini_store);
                     v->viewmisc.machine_config_original = *mc;
+                    v->file_browser.dir_select_okay = 1;
                     v->dlg_machine_configure = 1;
                     v->dlg_modal_active = 1;
                 }
@@ -583,6 +584,7 @@ void unk_misc_show(UNK *v) {
         struct nk_rect r = nk_rect(0, 0, 560, 430);
         int ret = unk_dlg_machine_configure(ctx, r, mc, &v->file_browser);
         if(ret != 0) {
+            v->file_browser.dir_select_okay = 0;
             v->dlg_machine_configure = 0;
             v->dlg_modal_active = 0;
             v->dlg_modal_mouse_down = ctx->input.mouse.buttons[NK_BUTTON_LEFT].down;
@@ -591,10 +593,11 @@ void unk_misc_show(UNK *v) {
                 if(changed) {
                     // Apply the changes no matter what changed
                     cmn_config_apply(mc, v->ini_store);
-                    if(changed == 1) {
+                    if(changed & CNF_CNG_RESTART) {
                         // Config invalidated
                         v->request_reconfig = 1;
-                    } else if(changed == 2 && !ini_get(v->ini_store, "Config", "save_ini")) {
+                    } 
+                    if(changed & CNF_CNG_INI_FILE_NAME && !ini_get(v->ini_store, "Config", "save_ini")) {
                         // Only ini file name changed, and save on quit not clicked,
                         // so save now.  If save on quit set, then don't save, will save on quit
                         ini_remove_key(v->ini_store, "Config", "ini_file");
@@ -642,7 +645,24 @@ void unk_misc_show(UNK *v) {
                     mc->asm_source_text[sizeof(mc->asm_source_text) - 1] = '\0';
                     mc->asm_source_text_len = (int)strnlen(mc->asm_source_text, sizeof(mc->asm_source_text) - 1);
                 } else if(mc->browse_target == MACHINE_BROWSE_INI_FILE) {
-                    strncpy(mc->ini_file_text, cfgfb->dir_selected.name, sizeof(mc->ini_file_text) - 1);
+                    const char *new_name;
+                    if(!cfgfb->file_selected.name_length) {
+                        // A directory was selected.
+                        const char *file_display_name = (char *)util_strrtok(mc->ini_file_text, "\\/");
+                        if(!file_display_name) {
+                            file_display_name = mc->ini_file_text;
+                        } else {
+                            file_display_name++;
+                        }
+                        cfgfb->dir_selected.name[cfgfb->dir_selected.name_length] = '\0';
+                        strcpy(cfgfb->file_selected.name, cfgfb->dir_selected.name);
+                        strncat(cfgfb->file_selected.name, "/", PATH_MAX - 2);
+                        strncat(cfgfb->file_selected.name, file_display_name, PATH_MAX - 2);
+                        new_name = cfgfb->file_selected.name;
+                    } else {
+                        new_name = cfgfb->dir_selected.name;
+                    }
+                    strncpy(mc->ini_file_text, new_name, sizeof(mc->ini_file_text) - 1);
                     mc->ini_file_text[sizeof(mc->ini_file_text) - 1] = '\0';
                     mc->ini_file_text_len = (int)strnlen(mc->ini_file_text, sizeof(mc->ini_file_text) - 1);
                 }
