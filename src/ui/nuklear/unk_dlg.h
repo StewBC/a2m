@@ -58,4 +58,5 @@ int unk_dlg_assembler_errors(UNK *v, struct nk_context *ctx, struct nk_rect r);
 int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT_EDIT *bpe);
 int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb);
 int unk_dlg_find(struct nk_context *ctx, struct nk_rect r, uint8_t *address, int *address_length, int max_len);
+int unk_dlg_machine_configure(struct nk_context *ctx, struct nk_rect r, MACHINE_CONFIG *mc, FILE_BROWSER *fb);
 int unk_dlg_symbol_lookup(struct nk_context *ctx, struct nk_rect r, SYMBOL_LOOKUP *sl);

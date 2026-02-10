@@ -95,6 +95,218 @@ int unk_dlg_assembler_config(struct nk_context *ctx, struct nk_rect r, ASSEMBLER
     return ret;
 }
 
+int unk_dlg_machine_configure(struct nk_context *ctx, struct nk_rect r, MACHINE_CONFIG *mc, FILE_BROWSER *fb) {
+    int ret = 0;
+    static const char *tab_labels[] = {"Machine", "Emulator", "Assembler"};
+    static const char *model_labels[] = {"Apple ][+", "Apple //e Enhanced"};
+    static const char *ui_labels[] = {"Gui", "Text"};
+    static const char *slot_labels_all[] = {"Empty", "Disk II", "SmartPort", "Franklin Ace Display"};
+    static const char *slot_labels_std[] = {"Empty", "Disk II", "SmartPort"};
+
+    if(nk_begin_titled(ctx, "MachineConfig", "Configure", r, NK_WINDOW_BORDER | NK_WINDOW_TITLE | NK_WINDOW_NO_SCROLLBAR)) {
+        const float row_gap = ctx->style.window.spacing.y;
+        const float tab_h = 22.0f;
+        const float bottom_h = 6.0f + 22.0f + 22.0f + 22.0f + (3.0f * row_gap); // spacer + ini row + save checkbox + buttons
+        struct nk_vec2 cr_min = nk_window_get_content_region_min(ctx);
+        struct nk_vec2 cr_max = nk_window_get_content_region_max(ctx);
+        const float avail_h = cr_max.y - cr_min.y;
+        const float content_h = avail_h - tab_h - bottom_h - (2.0f * row_gap);
+
+        // Tabs
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 3);
+        {
+            for(int i = 0; i < 3; i++) {
+                int active = (mc->active_tab == i) ? 1 : 0;
+                int was_active = active;
+                nk_layout_row_push(ctx, 0.3333f);
+                if(nk_selectable_label(ctx, tab_labels[i], NK_TEXT_CENTERED, &active) && active && !was_active) {
+                    mc->active_tab = i;
+                }
+            }
+        }
+        nk_layout_row_end(ctx);
+
+        ctx->current->edit.mode = NK_TEXT_EDIT_MODE_INSERT;
+
+        // Fixed-height content group to keep bottom controls aligned
+        nk_layout_row_dynamic(ctx, content_h > 50.0f ? content_h : 50.0f, 1);
+        if(nk_group_begin(ctx, "machine_config_tabs", NK_WINDOW_NO_SCROLLBAR)) {
+            if(mc->active_tab == MACHINE_CONFIG_TAB_MACHINE) {
+                // Model selection
+                nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 2);
+                {
+                    nk_layout_row_push(ctx, 0.35f);
+                    nk_label(ctx, "Model", NK_TEXT_LEFT);
+                    nk_layout_row_push(ctx, 0.65f);
+                    mc->model = nk_combo(ctx, model_labels, 2, mc->model, 20, nk_vec2(220, 120));
+                }
+                nk_layout_row_end(ctx);
+
+                // Slot selections
+                for(int i = 0; i < 7; i++) {
+                    char label[16];
+                    int slot_index = i + 1;
+                    int sel = mc->slot_sel[i];
+                    const char *const *labels = slot_labels_std;
+                    int count = 3;
+
+                    if(slot_index == 3 && mc->model == MODEL_APPLE_II_PLUS) {
+                        labels = slot_labels_all;
+                        count = 4;
+                    } else if(sel == MACHINE_SLOT_FRANKLIN) {
+                        sel = MACHINE_SLOT_EMPTY;
+                    }
+
+                    nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 2);
+                    {
+                        nk_layout_row_push(ctx, 0.35f);
+                        snprintf(label, sizeof(label), "Slot %d", slot_index);
+                        nk_label(ctx, label, NK_TEXT_LEFT);
+                        nk_layout_row_push(ctx, 0.65f);
+                        sel = nk_combo(ctx, labels, count, sel, 20, nk_vec2(220, 120));
+                    }
+                    nk_layout_row_end(ctx);
+                    mc->slot_sel[i] = sel;
+                }
+            } else if(mc->active_tab == MACHINE_CONFIG_TAB_EMULATOR) {
+                // UI selection
+                nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 2);
+                {
+                    nk_layout_row_push(ctx, 0.35f);
+                    nk_label(ctx, "UI", NK_TEXT_LEFT);
+                    nk_layout_row_push(ctx, 0.65f);
+                    mc->ui_sel = nk_combo(ctx, ui_labels, 2, mc->ui_sel, 20, nk_vec2(180, 80));
+                }
+                nk_layout_row_end(ctx);
+
+                // Scroll wheel speed
+                nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 2);
+                {
+                    nk_layout_row_push(ctx, 0.35f);
+                    nk_label(ctx, "Scroll Wheel Speed", NK_TEXT_LEFT);
+                    nk_layout_row_push(ctx, 0.65f);
+                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD, mc->wheel_speed_text, &mc->wheel_speed_text_len, 3, nk_filter_decimal);
+                }
+                nk_layout_row_end(ctx);
+
+                // Disk LEDs
+                nk_layout_row_dynamic(ctx, 22, 1);
+                {
+                    nk_checkbox_label_align(ctx, "Disk LEDs", &mc->disk_leds, 0, NK_TEXT_LEFT);
+                }
+
+                // Symbol files
+                nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 3);
+                {
+                    nk_layout_row_push(ctx, 0.28f);
+                    nk_label(ctx, "Symbol Files", NK_TEXT_LEFT);
+                    nk_layout_row_push(ctx, 0.52f);
+                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD, mc->symbols_text, &mc->symbols_text_len, (int)sizeof(mc->symbols_text) - 1, nk_filter_default);
+                    nk_layout_row_push(ctx, 0.20f);
+                    if(nk_button_label(ctx, "Browse")) {
+                        mc->dlg_filebrowser = 1;
+                        mc->browse_target = MACHINE_BROWSE_SYMBOLS;
+                        fb->dir_contents.items = 0;
+                    }
+                }
+                nk_layout_row_end(ctx);
+
+                // Remember ini settings
+                nk_layout_row_dynamic(ctx, 22, 1);
+                {
+                    nk_checkbox_label_align(ctx, "Remember INI settings", &mc->remember_ini, 0, NK_TEXT_LEFT);
+                }
+
+                // Turbo speeds
+                nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 2);
+                {
+                    nk_layout_row_push(ctx, 0.35f);
+                    nk_label(ctx, "Turbo Speeds", NK_TEXT_LEFT);
+                    nk_layout_row_push(ctx, 0.65f);
+                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD, mc->turbo_text, &mc->turbo_text_len, (int)sizeof(mc->turbo_text) - 1, nk_filter_default);
+                }
+                nk_layout_row_end(ctx);
+            } else if(mc->active_tab == MACHINE_CONFIG_TAB_ASSEMBLER) {
+                // Source
+                nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 3);
+                {
+                    nk_layout_row_push(ctx, 0.20f);
+                    nk_label(ctx, "Source", NK_TEXT_LEFT);
+                    nk_layout_row_push(ctx, 0.60f);
+                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD, mc->asm_source_text, &mc->asm_source_text_len, PATH_MAX - 1, nk_filter_default);
+                    nk_layout_row_push(ctx, 0.20f);
+                    if(nk_button_label(ctx, "Browse")) {
+                        mc->dlg_filebrowser = 1;
+                        mc->browse_target = MACHINE_BROWSE_ASM_SOURCE;
+                        fb->dir_contents.items = 0;
+                    }
+                }
+                nk_layout_row_end(ctx);
+
+                // Destination Selector
+                unk_bank_view_selector(ctx, mc->model, &mc->asm_dest_flags, "Dest");
+
+                // Reset stack / Auto run / Address
+                nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 4);
+                {
+                    nk_layout_row_push(ctx, 0.30f);
+                    nk_checkbox_label_align(ctx, "Reset Stack", &mc->asm_reset_stack, 0, NK_TEXT_LEFT);
+                    nk_layout_row_push(ctx, 0.25f);
+                    nk_checkbox_label_align(ctx, "Auto Run", &mc->asm_auto_run, 0, NK_TEXT_LEFT);
+                    nk_layout_row_push(ctx, 0.25f);
+                    nk_label(ctx, "Auto Run Address", NK_TEXT_RIGHT);
+                    nk_layout_row_push(ctx, 0.20f);
+                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD, mc->asm_address_text, &mc->asm_address_text_len, 5, nk_filter_hex);
+                }
+                nk_layout_row_end(ctx);
+            }
+            nk_group_end(ctx);
+        }
+
+        // Always-visible fields
+        nk_layout_row_dynamic(ctx, 6, 1);
+        nk_spacer(ctx);
+
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 3);
+        {
+            nk_layout_row_push(ctx, 0.28f);
+            nk_label(ctx, "INI file name", NK_TEXT_LEFT);
+            nk_layout_row_push(ctx, 0.52f);
+            nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD, mc->ini_file_text, &mc->ini_file_text_len, PATH_MAX - 1, nk_filter_default);
+            nk_layout_row_push(ctx, 0.20f);
+            if(nk_button_label(ctx, "Browse")) {
+                mc->dlg_filebrowser = 1;
+                mc->browse_target = MACHINE_BROWSE_INI_FILE;
+                fb->dir_contents.items = 0;
+            }
+        }
+        nk_layout_row_end(ctx);
+
+        nk_layout_row_dynamic(ctx, 22, 1);
+        {
+            nk_checkbox_label_align(ctx, "Save settings on Quit", &mc->remember_ini, 0, NK_TEXT_LEFT);
+        }
+
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 3);
+        {
+            nk_layout_row_push(ctx, 0.40f);
+            nk_spacer(ctx);
+            nk_layout_row_push(ctx, 0.30f);
+            if(nk_button_label(ctx, "Cancel")) {
+                ret = -1;
+            }
+            nk_layout_row_push(ctx, 0.30f);
+            if(nk_button_label(ctx, "OK")) {
+                ret = 1;
+            }
+        }
+        nk_layout_row_end(ctx);
+    }
+
+    nk_end(ctx);
+    return ret;
+}
+
 int unk_dlg_assembler_errors(UNK *v, struct nk_context *ctx, struct nk_rect r) {
     int ret = 0;
     VIEWDASM *dv = &v->viewdasm;

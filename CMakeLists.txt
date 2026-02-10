@@ -38,6 +38,7 @@ endif()
 
 # LIBRARIES
 add_subdirectory(src/utils)
+add_subdirectory(src/common)
 add_subdirectory(src/asm)
 add_subdirectory(src/hardware)
 add_subdirectory(src/runtime)
@@ -49,10 +50,9 @@ add_subdirectory(src/ui)
 # Add the executable
 add_executable(a2m
     src/apps/a2m/main.c
-    src/common/common.c
 )
 
-# utils, asm, hardware & runtime all pulled in via ui, as is SDL2, SDL2main, SDL2_mixer & SDL2_image
+# utils, common, asm, hardware & runtime all pulled in via ui, as is SDL2, SDL2main, SDL2_mixer & SDL2_image
 target_link_libraries(a2m PUBLIC
     ui
 )

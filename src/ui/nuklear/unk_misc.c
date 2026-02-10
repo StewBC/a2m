@@ -56,8 +56,9 @@ void unk_misc_show(UNK *v) {
     APPLE2 *m = v->m;
     RUNTIME *rt = v->rt;
     VIEWDASM *dv = &v->viewdasm;
-    FILE_BROWSER *fb = &v->viewmisc.file_browser;
+    FILE_BROWSER *fb = &v->file_browser;
     BREAKPOINT_EDIT *bpe = &v->viewmisc.breakpoint_edit;
+    MACHINE_CONFIG *mc = &v->viewmisc.machine_config;
     static int last_state = 0;
     struct nk_context *ctx = v->ctx;
 
@@ -72,7 +73,7 @@ void unk_misc_show(UNK *v) {
     if(nk_begin(ctx, "Miscellaneous", v->layout.misc, nk_win_flags)) {
 
         // 1) Show the slot if it has a card in it
-        if(nk_tree_push(ctx, NK_TREE_TAB, "Slots", NK_MAXIMIZED)) {
+        if(nk_tree_push(ctx, NK_TREE_TAB, "Hardware", NK_MAXIMIZED)) {
             for(int i = 1; i < 8; i++) {
                 if(m->slot_cards[i].slot_type == SLOT_TYPE_EMPTY) {
                     continue;
@@ -193,7 +194,15 @@ void unk_misc_show(UNK *v) {
                     }
                 }
             }
-            nk_tree_pop(ctx); // Slots
+            nk_layout_row_dynamic(ctx, 22, 1);
+            {
+                if(nk_button_label(ctx, "Configure") && !v->dlg_modal_active) {
+                    cmn_config_from_ini(mc, v->ini_store);
+                    v->dlg_machine_configure = 1;
+                    v->dlg_modal_active = 1;
+                }
+            }
+            nk_tree_pop(ctx); // Hardware
         }
 
         // 2) The Debugger tab
@@ -568,10 +577,69 @@ void unk_misc_show(UNK *v) {
         }
     }
 
+    // Machine Configuration dialog
+    if(v->dlg_machine_configure) {
+        struct nk_rect r = nk_rect(0, 0, 560, 430);
+        int ret = unk_dlg_machine_configure(ctx, r, mc, &v->file_browser);
+        if(ret != 0) {
+            v->dlg_machine_configure = 0;
+            v->dlg_modal_active = 0;
+            v->dlg_modal_mouse_down = ctx->input.mouse.buttons[NK_BUTTON_LEFT].down;
+            if(ret > 0) {
+                cmn_config_apply(mc, v->ini_store);
+                v->request_reconfig = 1;
+            }
+        }
+    }
+
+    // Config file browser
+    if(mc->dlg_filebrowser) {
+        FILE_BROWSER *cfgfb = &v->file_browser;
+        int ret = unk_dlg_file_browser(ctx, cfgfb);
+        if(ret >= 0) {
+            array_free(&v->file_browser.dir_contents);
+            mc->dlg_filebrowser = 0;
+            v->dlg_modal_active = v->dlg_machine_configure ? 1 : 0;
+            v->dlg_modal_mouse_down = ctx->input.mouse.buttons[NK_BUTTON_LEFT].down;
+            if(1 == ret) {
+                // A file was selected, so get a FQN
+                strncat(cfgfb->dir_selected.name, "/", PATH_MAX - 1);
+                strncat(cfgfb->dir_selected.name, cfgfb->file_selected.name, PATH_MAX - 1);
+
+                if(mc->browse_target == MACHINE_BROWSE_SYMBOLS) {
+                    const char *path = cfgfb->dir_selected.name;
+                    int needs_quotes = strchr(path, ',') != NULL;
+                    if(mc->symbols_text_len > 0 && mc->symbols_text_len < (int)sizeof(mc->symbols_text) - 1) {
+                        mc->symbols_text[mc->symbols_text_len++] = ',';
+                        mc->symbols_text[mc->symbols_text_len] = '\0';
+                    }
+                    if(needs_quotes && mc->symbols_text_len < (int)sizeof(mc->symbols_text) - 2) {
+                        mc->symbols_text[mc->symbols_text_len++] = '"';
+                        mc->symbols_text[mc->symbols_text_len] = '\0';
+                    }
+                    strncat(mc->symbols_text, path, sizeof(mc->symbols_text) - 1 - mc->symbols_text_len);
+                    mc->symbols_text_len = (int)strnlen(mc->symbols_text, sizeof(mc->symbols_text) - 1);
+                    if(needs_quotes && mc->symbols_text_len < (int)sizeof(mc->symbols_text) - 1) {
+                        mc->symbols_text[mc->symbols_text_len++] = '"';
+                        mc->symbols_text[mc->symbols_text_len] = '\0';
+                    }
+                } else if(mc->browse_target == MACHINE_BROWSE_ASM_SOURCE) {
+                    strncpy(mc->asm_source_text, cfgfb->dir_selected.name, sizeof(mc->asm_source_text) - 1);
+                    mc->asm_source_text[sizeof(mc->asm_source_text) - 1] = '\0';
+                    mc->asm_source_text_len = (int)strnlen(mc->asm_source_text, sizeof(mc->asm_source_text) - 1);
+                } else if(mc->browse_target == MACHINE_BROWSE_INI_FILE) {
+                    strncpy(mc->ini_file_text, cfgfb->dir_selected.name, sizeof(mc->ini_file_text) - 1);
+                    mc->ini_file_text[sizeof(mc->ini_file_text) - 1] = '\0';
+                    mc->ini_file_text_len = (int)strnlen(mc->ini_file_text, sizeof(mc->ini_file_text) - 1);
+                }
+            }
+        }
+    }
+
     // File Browser (Floating windows outside the main misc window)
     ctx->style.window.background = ob;
     if(v->dlg_filebrowser) {
-        int ret = unk_dlg_file_browser(ctx, &v->viewmisc.file_browser);
+        int ret = unk_dlg_file_browser(ctx, &v->file_browser);
         if(ret >= 0) {
             array_free(&dv->temp_assembler_config.file_browser.dir_contents);
             v->dlg_filebrowser = 0;
@@ -581,7 +649,7 @@ void unk_misc_show(UNK *v) {
                 // A file was selected, so get a FQN
                 strncat(fb->dir_selected.name, "/", PATH_MAX - 1);
                 strncat(fb->dir_selected.name, fb->file_selected.name, PATH_MAX - 1);
-                if(v->viewmisc.file_browser.device_type == SLOT_TYPE_SMARTPORT) {
+                if(v->file_browser.device_type == SLOT_TYPE_SMARTPORT) {
                     util_file_discard(&m->sp_device[fb->slot].sp_files[fb->device]);
                     // Eject the file that's active, if there is one, and mount the new one
                     if(A2_ERR == sp_mount(m, fb->slot, fb->device, fb->dir_selected.name)) {

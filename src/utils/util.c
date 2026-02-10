@@ -507,6 +507,14 @@ const char *util_strrtok(const char *str, const char *delim) {
     return NULL;
 }
 
+char *util_strtok_r(char *s, const char *delim, char **ctx) {
+#ifdef _WIN32
+    return strtok_s(s, delim, ctx);
+#else
+    return strtok_r(s, delim, ctx);
+#endif
+}
+
 void *util_memset32(void *ptr, uint32_t value, size_t count) {
     uint32_t *p = ptr;
     while(count--) {

@@ -6,8 +6,8 @@
 
 typedef struct {
     int dragging;
-    FILE_BROWSER file_browser;
     BREAKPOINT_EDIT breakpoint_edit;
+    MACHINE_CONFIG machine_config;
 } VIEWMISC;
 
 int unk_misc_init(VIEWMISC *viewmisc);

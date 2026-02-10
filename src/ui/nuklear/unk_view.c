@@ -408,15 +408,7 @@ void unk_config_ui(UNK *v, INI_STORE *ini_store) {
     }
     val = ini_get(ini_store, "Assembler", "dest");
     if(val) {
-        // VIEW_FLAGS flags = MEM_MAPPED_6502;
-        // if (0 == stricmp(val, "64K")) {
-        //     flags = MEM_MAIN;
-        // } else if (0 == stricmp(val, "128K")) {
-        //     flags = MEM_AUX;
-        // } else if (0 == stricmp(val, "LC Bank")) {
-        //     flags = MEM_LC_BANK2;
-        // }
-        // v->viewdasm.assembler_config.flags = flags;
+        v->viewdasm.assembler_config.flags = cmn_parse_mem_dest_string(val);
     }
     val = ini_get(ini_store, "Assembler", "reset_stack");
     if(val) {
@@ -440,6 +432,7 @@ void unk_config_ui(UNK *v, INI_STORE *ini_store) {
 
 int unk_init(UNK *v, int model, INI_STORE *ini_store) {
     v->scroll_wheel_lines = 4;
+    v->ini_store = ini_store;
 
     // Init the dasm config before seeing if the ini file overrides it
     if(A2_OK != unk_dasm_init(&v->viewdasm, model)) {
@@ -537,8 +530,8 @@ int unk_init(UNK *v, int model, INI_STORE *ini_store) {
     v->ctx->style.window.popup_border_color = color_popup_border;
 
     // Init the file_broswer dynamic array
-    array_init(&v->viewmisc.file_browser.dir_contents, sizeof(FILE_INFO));
-
+     ARRAY_INIT(&v->file_browser.dir_contents, FILE_INFO);
+     
     v->lim.cpu_h_px = 90;
     v->lim.min_a2_w_px = 320;
     v->lim.min_right_w_px = 240;
@@ -668,6 +661,11 @@ int unk_process_events(UI *ui, APPLE2 *m) {
         }
     }
 
+    if(v->request_reconfig) {
+        ui->reconfig = 1;
+        ret = 1;
+    }
+
     return ret;
 }
 
@@ -683,7 +681,7 @@ void unk_shutdown(UNK *v) {
     unk_audio_speaker_shutdown(&v->viewspeaker);
 
     // Shut down the dialog
-    array_free(&v->viewmisc.file_browser.dir_contents);
+    array_free(&v->file_browser.dir_contents);
 
 
     // Then shut SDL down

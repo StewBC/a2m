@@ -28,4 +28,5 @@ target_precompile_headers(hardware PUBLIC "hardware_lib.h")
 
 target_link_libraries(hardware PUBLIC
     utils
+    common
 )

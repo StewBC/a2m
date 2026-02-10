@@ -59,6 +59,8 @@ typedef struct UNK {
     // doesn't hold state.  RT is persistant
     APPLE2 *m;
     RUNTIME *rt;
+    INI_STORE *ini_store;
+    FILE_BROWSER file_browser;
 
     // Shadow of machine states
     A2_STATE shadow_state;
@@ -80,6 +82,7 @@ typedef struct UNK {
     uint32_t dlg_assembler_errors: 1;
     uint32_t dlg_breakpoint: 1;
     uint32_t dlg_filebrowser: 1;
+    uint32_t dlg_machine_configure: 1;
     uint32_t dlg_memory_find: 1;
     uint32_t dlg_memory_go: 1;
     uint32_t dlg_modal_active: 1;
@@ -93,7 +96,8 @@ typedef struct UNK {
     uint32_t shadow_run: 1;
     uint32_t show_help: 1;
     uint32_t show_leds: 1;
-    uint32_t pad: 8;
+    uint32_t request_reconfig: 1;
+    uint32_t pad: 6;
 } UNK;
 
 extern const UI_OPS unk_ops;

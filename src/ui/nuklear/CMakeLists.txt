@@ -31,6 +31,7 @@ target_precompile_headers(unk PUBLIC "unk_lib.h")
 
 target_link_libraries(unk PUBLIC
     asm
+    common
     hardware
     runtime
     SDL2::SDL2

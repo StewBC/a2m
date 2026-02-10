@@ -1,1 +1,3 @@
-The common folder holds a shared include file, used by all the apps and libraries in this project.  It is the standard includes, and some defines/macros that I share everywhere.
+The common folder holds a shared library, named common.  This library contains utilities used by higher-level layers, such as machine configuration. etc.
+
+There is also the common.h header file that is included more or less everywhere because it contains a2m wide macros and defenitions.

@@ -418,6 +418,7 @@ int main(int argc, char **argv) {
     }
 
     main_ini_merge_to(&opts.ini_store, &ini_store);
+    ini_set(&ini_store, "Config", "ini_file", opts.ini_file_name);
 
     // One time softswitch dispatch table init
     io_c0_table_init();
@@ -454,6 +455,10 @@ int main(int argc, char **argv) {
         rt_run(&rt, &m, &ui);
 
         reconfig = ui.reconfig;
+        const char *new_ini_name = ini_get(&ini_store, "Config", "ini_file");
+        if(new_ini_name && new_ini_name[0]) {
+            opts.ini_file_name = new_ini_name;
+        }
 
         // Shut everything down
 ui_err:

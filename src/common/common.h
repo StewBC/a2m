@@ -33,6 +33,3 @@
 #define tst_flags(status, flag_mask)        ((status) & (flag_mask))
 #define set_flags(status, flag_mask)        ((status) |= (flag_mask))
 #define clr_flags(status, flag_mask)        ((status) &= ~(flag_mask))
-
-// The UIs use this so a2m links in common.c, where it lives
-extern int apl2_txt_row_start[];
