@@ -4,5 +4,6 @@ build/
 disks/
 *.ini
 *.txt
+!CMakeLists.txt
 symbols/USER.SYM
 samples/penetrator
