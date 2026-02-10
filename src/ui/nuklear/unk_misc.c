@@ -198,6 +198,7 @@ void unk_misc_show(UNK *v) {
             {
                 if(nk_button_label(ctx, "Configure") && !v->dlg_modal_active) {
                     cmn_config_from_ini(mc, v->ini_store);
+                    v->viewmisc.machine_config_original = *mc;
                     v->dlg_machine_configure = 1;
                     v->dlg_modal_active = 1;
                 }
@@ -586,8 +587,21 @@ void unk_misc_show(UNK *v) {
             v->dlg_modal_active = 0;
             v->dlg_modal_mouse_down = ctx->input.mouse.buttons[NK_BUTTON_LEFT].down;
             if(ret > 0) {
-                cmn_config_apply(mc, v->ini_store);
-                v->request_reconfig = 1;
+                int changed = cmn_config_changed(mc, &v->viewmisc.machine_config_original);
+                if(changed) {
+                    // Apply the changes no matter what changed
+                    cmn_config_apply(mc, v->ini_store);
+                    if(changed == 1) {
+                        // Config invalidated
+                        v->request_reconfig = 1;
+                    } else if(changed == 2 && !ini_get(v->ini_store, "Config", "save_ini")) {
+                        // Only ini file name changed, and save on quit not clicked,
+                        // so save now.  If save on quit set, then don't save, will save on quit
+                        ini_remove_key(v->ini_store, "Config", "ini_file");
+                        util_ini_save_file(mc->ini_file_text, v->ini_store);
+                        ini_set(v->ini_store, "Config", "ini_file", mc->ini_file_text);
+                    }
+                }
             }
         }
     }

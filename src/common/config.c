@@ -46,6 +46,7 @@ void cmn_config_from_ini(MACHINE_CONFIG *mc, INI_STORE *ini_store) {
     mc->ui_sel = 0;
     mc->disk_leds = 0;
     mc->remember_ini = 0;
+    mc->save_ini = 0;
     mc->asm_dest_flags = 0;
 
     const char *val = ini_get(ini_store, "Machine", "Model");
@@ -91,6 +92,10 @@ void cmn_config_from_ini(MACHINE_CONFIG *mc, INI_STORE *ini_store) {
 
     if(ini_get(ini_store, "Config", "Save")) {
         mc->remember_ini = 1;
+    }
+
+    if(ini_get(ini_store, "Config", "save_ini")) {
+        mc->save_ini = 1;
     }
 
     val = ini_get(ini_store, "Machine", "Turbo");
@@ -168,6 +173,7 @@ void cmn_config_apply(MACHINE_CONFIG *mc, INI_STORE *ini_store) {
     ini_set(ini_store, "Machine", "Model", model_val);
 
     if(mc->turbo_text_len > 0) {
+        mc->turbo_text[mc->turbo_text_len] = '\0';
         ini_set(ini_store, "Machine", "Turbo", mc->turbo_text);
     } else {
         ini_remove_key(ini_store, "Machine", "Turbo");
@@ -177,6 +183,7 @@ void cmn_config_apply(MACHINE_CONFIG *mc, INI_STORE *ini_store) {
 
     if(mc->wheel_speed_text_len > 0) {
         int speed = 0;
+        mc->wheel_speed_text[mc->wheel_speed_text_len] = '\0';
         if(1 == sscanf(mc->wheel_speed_text, "%d", &speed)) {
             char buf[8];
             snprintf(buf, sizeof(buf), "%d", speed);
@@ -196,19 +203,28 @@ void cmn_config_apply(MACHINE_CONFIG *mc, INI_STORE *ini_store) {
         ini_remove_key(ini_store, "Config", "Save");
     }
 
+    if(mc->save_ini) {
+        ini_set(ini_store, "Config", "save_ini", "yes");
+    } else {
+        ini_remove_key(ini_store, "Config", "save_ini");
+    }
+
     if(mc->symbols_text_len > 0) {
+        mc->symbols_text[mc->symbols_text_len] = '\0';
         ini_set(ini_store, "Config", "symbols", mc->symbols_text);
     } else {
         ini_remove_key(ini_store, "Config", "symbols");
     }
 
     if(mc->ini_file_text_len > 0) {
+        mc->ini_file_text[mc->ini_file_text_len] = '\0';
         ini_set(ini_store, "Config", "ini_file", mc->ini_file_text);
     } else {
         ini_remove_key(ini_store, "Config", "ini_file");
     }
 
     if(mc->asm_source_text_len > 0) {
+        mc->asm_source_text[mc->asm_source_text_len] = '\0';
         ini_set(ini_store, "Assembler", "source", mc->asm_source_text);
     } else {
         ini_remove_key(ini_store, "Assembler", "source");
@@ -231,6 +247,7 @@ void cmn_config_apply(MACHINE_CONFIG *mc, INI_STORE *ini_store) {
     }
 
     if(mc->asm_address_text_len > 0) {
+        mc->asm_address_text[mc->asm_address_text_len] = '\0';
         uint16_t addr = (uint16_t)strtoul(mc->asm_address_text, NULL, 16);
         char buf[10];
         snprintf(buf, sizeof(buf), "0x%04X", addr);
@@ -267,4 +284,95 @@ void cmn_config_apply(MACHINE_CONFIG *mc, INI_STORE *ini_store) {
             }
         }
     }
+}
+
+static int config_text_equal(const char *a, int a_len, const char *b, int b_len, size_t cap) {
+    if(a_len != b_len) {
+        return 0;
+    }
+    if(a_len <= 0) {
+        return 1;
+    }
+    if(a_len < 0 || b_len < 0) {
+        return 0;
+    }
+    if((size_t)a_len > cap || (size_t)b_len > cap) {
+        return 0;
+    }
+    return strncmp(a, b, (size_t)a_len) == 0;
+}
+
+int cmn_config_changed(const MACHINE_CONFIG *a, const MACHINE_CONFIG *b) {
+    if(!a || !b) {
+        return 1;
+    }
+    if(a->model != b->model) {
+        return 1;
+    }
+    if(a->ui_sel != b->ui_sel) {
+        return 1;
+    }
+    if(a->disk_leds != b->disk_leds) {
+        return 1;
+    }
+    if(a->remember_ini != b->remember_ini) {
+        return 1;
+    }
+    if(a->asm_dest_flags != b->asm_dest_flags) {
+        return 1;
+    }
+    if(a->asm_reset_stack != b->asm_reset_stack) {
+        return 1;
+    }
+    if(a->asm_auto_run != b->asm_auto_run) {
+        return 1;
+    }
+
+    for(int i = 0; i < 7; i++) {
+        if(a->slot_sel[i] != b->slot_sel[i]) {
+            return 1;
+        }
+    }
+
+    if(!config_text_equal(a->wheel_speed_text, a->wheel_speed_text_len,
+                          b->wheel_speed_text, b->wheel_speed_text_len,
+                          sizeof(a->wheel_speed_text))) {
+        return 1;
+    }
+
+    if(!config_text_equal(a->turbo_text, a->turbo_text_len,
+                          b->turbo_text, b->turbo_text_len,
+                          sizeof(a->turbo_text))) {
+        return 1;
+    }
+
+    if(!config_text_equal(a->symbols_text, a->symbols_text_len,
+                          b->symbols_text, b->symbols_text_len,
+                          sizeof(a->symbols_text))) {
+        return 1;
+    }
+
+    if(!config_text_equal(a->asm_source_text, a->asm_source_text_len,
+                          b->asm_source_text, b->asm_source_text_len,
+                          sizeof(a->asm_source_text))) {
+        return 1;
+    }
+
+    if(!config_text_equal(a->asm_address_text, a->asm_address_text_len,
+                          b->asm_address_text, b->asm_address_text_len,
+                          sizeof(a->asm_address_text))) {
+        return 1;
+    }
+
+    if(!config_text_equal(a->ini_file_text, a->ini_file_text_len,
+                          b->ini_file_text, b->ini_file_text_len,
+                          sizeof(a->ini_file_text))) {
+        return 2;
+    }
+
+    if(a->save_ini != b->save_ini) {
+        return 3;
+    }
+
+    return 0;
 }

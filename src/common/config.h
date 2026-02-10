@@ -37,11 +37,12 @@ typedef struct {
     int ui_sel;
     int disk_leds;
     int remember_ini;
+    int save_ini;
     char wheel_speed_text[3];
     int wheel_speed_text_len;
     char turbo_text[96];
     int turbo_text_len;
-    char symbols_text[512];
+    char symbols_text[PATH_MAX];
     int symbols_text_len;
     char ini_file_text[PATH_MAX];
     int ini_file_text_len;
@@ -60,3 +61,4 @@ typedef struct {
 
 void cmn_config_apply(MACHINE_CONFIG *mc, INI_STORE *ini_store);
 void cmn_config_from_ini(MACHINE_CONFIG *mc, INI_STORE *ini_store);
+int cmn_config_changed(const MACHINE_CONFIG *a, const MACHINE_CONFIG *b);

@@ -8,6 +8,7 @@ typedef struct {
     int dragging;
     BREAKPOINT_EDIT breakpoint_edit;
     MACHINE_CONFIG machine_config;
+    MACHINE_CONFIG machine_config_original;
 } VIEWMISC;
 
 int unk_misc_init(VIEWMISC *viewmisc);

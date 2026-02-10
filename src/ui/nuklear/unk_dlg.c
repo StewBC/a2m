@@ -105,7 +105,7 @@ int unk_dlg_machine_configure(struct nk_context *ctx, struct nk_rect r, MACHINE_
 
     if(nk_begin_titled(ctx, "MachineConfig", "Configure", r, NK_WINDOW_BORDER | NK_WINDOW_TITLE | NK_WINDOW_NO_SCROLLBAR)) {
         const float row_gap = ctx->style.window.spacing.y;
-        const float tab_h = 22.0f;
+        const float tab_h = 22.0f + 8.0f;
         const float bottom_h = 6.0f + 22.0f + 22.0f + 22.0f + (3.0f * row_gap); // spacer + ini row + save checkbox + buttons
         struct nk_vec2 cr_min = nk_window_get_content_region_min(ctx);
         struct nk_vec2 cr_max = nk_window_get_content_region_max(ctx);
@@ -284,7 +284,7 @@ int unk_dlg_machine_configure(struct nk_context *ctx, struct nk_rect r, MACHINE_
 
         nk_layout_row_dynamic(ctx, 22, 1);
         {
-            nk_checkbox_label_align(ctx, "Save settings on Quit", &mc->remember_ini, 0, NK_TEXT_LEFT);
+            nk_checkbox_label_align(ctx, "Save settings on Quit", &mc->save_ini, 0, NK_TEXT_LEFT);
         }
 
         nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 3);

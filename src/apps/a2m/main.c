@@ -418,7 +418,11 @@ int main(int argc, char **argv) {
     }
 
     main_ini_merge_to(&opts.ini_store, &ini_store);
+    // Use ini_store as a place to temporarily store values needed later
     ini_set(&ini_store, "Config", "ini_file", opts.ini_file_name);
+    if(opts.saveini) {
+        ini_set(&ini_store, "Config", "save_ini", "yes");
+    }
 
     // One time softswitch dispatch table init
     io_c0_table_init();
@@ -473,7 +477,10 @@ rt_err:
 
     // If the ini file needs to be saved, save it
     if(!opts.nosaveini) {
-        if(opts.saveini || ini_get(&ini_store, "Config", "Save")) {
+        if(opts.saveini || ini_get(&ini_store, "Config", "save_ini") || ini_get(&ini_store, "Config", "Save")) {
+            // Ditch the file name
+            ini_remove_key(&ini_store, "Config", "ini_file");
+            ini_remove_key(&ini_store, "Config", "save_ini");
             util_ini_save_file(opts.ini_file_name, &ini_store);
         }
     }
