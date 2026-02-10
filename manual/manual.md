@@ -456,12 +456,25 @@ Lastly, there is the `[] use Counter` setting. Select this option to enter two c
 
 Using `[Cancel]` will not apply any changes to the breakpoint, but pressing `[Apply]` will apply the changes to the breakpoint.
 
+### Machine Configuration Dialog
+The machine configuration dialog allows common emulator settings to be edited without hand-editing the INI file. It has three tabs: `Machine`, `Emulator`, and `Assembler`.
+
+On the `Machine` tab, select the model (`Apple ][+` or `Apple //e Enhanced`) and the device installed in slots 1-7. On the ][+ model, Slot 3 also allows a Franklin Ace Display card.
+
+On the `Emulator` tab, configure the UI (`Gui` or `Text`), the scroll wheel speed, Disk LEDs, and symbol files (a comma-separated list). The symbol files row includes a `[Browse]` button. There is also a `Remember INI settings` / `Save settings on Quit` checkbox, and a `Turbo Speeds` field for comma-separated multipliers such as `1, 8, max`.
+
+On the `Assembler` tab, select the assembler source file (with a `[Browse]` button), pick the destination bank, and configure `Reset Stack`, `Auto Run`, and the `Auto Run Address`.
+
+At the bottom is the `INI file name` field with its own `[Browse]` button, plus `[OK]` and `[Cancel]` buttons. `[OK]` applies the changes; `[Cancel]` closes the dialog without applying them.
+
 ### Symbols Dialog
 The symbol search dialog has a search box at the top and two buttons, `[OK]` and `[Cancel]`, at the bottom. In the middle is a list of names, addresses, and a symbol source name.
 
 Typing into the symbol search box performs a search on the name and the symbol source, and any matching symbols are shown in the middle section. For example, typing `PP` might show all symbols from the A`PP`LE2E source, as well as `A.TEMPP`T from the A2_BASIC source.
 
-Clicking on any line in the middle section, for example `A.TEMPPT $0052 A2_BASIC`, sets the Disassembly View cursor to address `$0052` and makes the cursor visible in the Disassembly View.
+You can move the selection with the `Up/Down` keys (and `Page Up/Page Down` to move by a page). Press ENTER or click `[OK]` to select the highlighted line. Clicking on any line in the middle section, for example `A.TEMPPT $0052 A2_BASIC`, also selects that symbol.
+
+Selecting a symbol sets the Disassembly View cursor to the symbol address and makes the cursor visible in the Disassembly View.
 
 Clicking `[OK]` closes the dialog.
 
