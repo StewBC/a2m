@@ -457,15 +457,21 @@ Lastly, there is the `[] use Counter` setting. Select this option to enter two c
 Using `[Cancel]` will not apply any changes to the breakpoint, but pressing `[Apply]` will apply the changes to the breakpoint.
 
 ### Machine Configuration Dialog
-The machine configuration dialog allows common emulator settings to be edited without hand-editing the INI file. It has three tabs: `Machine`, `Emulator`, and `Assembler`.
+The Machine Configuration dialog allows common emulator settings to be edited without manually editing the INI file. It has three tabs: `Machine`, `Emulator`, and `Assembler`.
 
-On the `Machine` tab, select the model (`Apple ][+` or `Apple //e Enhanced`) and the device installed in slots 1-7. On the ][+ model, Slot 3 also allows a Franklin Ace Display card.
+#### Machine tab
+Select the model (`Apple ][+` or `Apple //e Enhanced`) and the device installed in slots 1-7. On the `Apple ][+` model, Slot 3 also allows a `Franklin Ace Display` card.
 
-On the `Emulator` tab, configure the UI (`Gui` or `Text`), the scroll wheel speed, Disk LEDs, and symbol files (a comma-separated list). The symbol files row includes a `[Browse]` button. There is also a `Remember INI settings` / `Save settings on Quit` checkbox, and a `Turbo Speeds` field for comma-separated multipliers such as `1, 8, max`.
+#### Emulator tab
+Configure the UI (`GUI` or `Text`), the scroll wheel speed, and symbol files (a comma-separated list). The symbol files row includes a `[Browse]` button. Each file selected through the Browse button is added to the list in the symbol files field. To remove a file, edit the field manually.
+The `Turbo Speeds` field accepts comma-separated multipliers such as `1, 8, max`.  There are also Disk LEDs, and Remember INI settings checkboxes. Selecting the `Remember INI settings` option always saves the INI file when the emulator exits. 
 
-On the `Assembler` tab, select the assembler source file (with a `[Browse]` button), pick the destination bank, and configure `Reset Stack`, `Auto Run`, and the `Auto Run Address`.
+#### Assembler tab
+Select the assembler source file (using the `[Browse]` button), choose the destination bank, and configure `Reset Stack`, `Auto Run`, and the `Auto Run Address`.
 
-At the bottom is the `INI file name` field with its own `[Browse]` button, plus `[OK]` and `[Cancel]` buttons. `[OK]` applies the changes; `[Cancel]` closes the dialog without applying them.
+#### Common fields
+At the bottom is the `INI file name` field with its own `[Browse]` button, along with `Save settings on Quit`, `[OK]`, and `[Cancel]` buttons. `[OK]` applies the changes. `[Cancel]` closes the dialog without applying them. If the `INI file name` is changed, the configuration is saved immediately to the INI file when `[OK]` is selected, unless `Save settings on Quit` is enabled. In that case, the file is saved when the emulator exits.
+For clarity, `Save settings on Quit` is a one-time option, whereas `Remember INI settings` always saves changes. Also note that disk selections and changes for `DiskII` and `SmartPort` are saved to the INI file as well.
 
 ### Symbols Dialog
 The symbol search dialog has a search box at the top and two buttons, `[OK]` and `[Cancel]`, at the bottom. In the middle is a list of names, addresses, and a symbol source name.

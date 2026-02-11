@@ -502,20 +502,14 @@ int unk_dlg_machine_configure(struct nk_context *ctx, struct nk_rect r, MACHINE_
                 }
                 nk_layout_row_end(ctx);
 
-                // Disk LEDs
-                nk_layout_row_dynamic(ctx, 22, 1);
-                {
-                    nk_checkbox_label_align(ctx, "Disk LEDs", &mc->disk_leds, 0, NK_TEXT_LEFT);
-                }
-
                 // Symbol files
                 nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 3);
                 {
-                    nk_layout_row_push(ctx, 0.28f);
+                    nk_layout_row_push(ctx, 0.35f);
                     nk_label(ctx, "Symbol Files", NK_TEXT_LEFT);
-                    nk_layout_row_push(ctx, 0.52f);
+                    nk_layout_row_push(ctx, 0.53f);
                     nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD, mc->symbols_text, &mc->symbols_text_len, (int)sizeof(mc->symbols_text) - 1, nk_filter_default);
-                    nk_layout_row_push(ctx, 0.20f);
+                    nk_layout_row_push(ctx, 0.12f);
                     if(nk_button_label(ctx, "Browse")) {
                         mc->dlg_filebrowser = 1;
                         mc->browse_target = MACHINE_BROWSE_SYMBOLS;
@@ -523,12 +517,6 @@ int unk_dlg_machine_configure(struct nk_context *ctx, struct nk_rect r, MACHINE_
                     }
                 }
                 nk_layout_row_end(ctx);
-
-                // Remember ini settings
-                nk_layout_row_dynamic(ctx, 22, 1);
-                {
-                    nk_checkbox_label_align(ctx, "Remember INI settings", &mc->remember_ini, 0, NK_TEXT_LEFT);
-                }
 
                 // Turbo speeds
                 nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 2);
@@ -539,6 +527,18 @@ int unk_dlg_machine_configure(struct nk_context *ctx, struct nk_rect r, MACHINE_
                     nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD, mc->turbo_text, &mc->turbo_text_len, (int)sizeof(mc->turbo_text) - 1, nk_filter_default);
                 }
                 nk_layout_row_end(ctx);
+
+                // Disk LEDs
+                nk_layout_row_dynamic(ctx, 22, 1);
+                {
+                    nk_checkbox_label_align(ctx, "Disk LEDs", &mc->disk_leds, 0, NK_TEXT_LEFT);
+                }
+
+                // Remember ini settings
+                nk_layout_row_dynamic(ctx, 22, 1);
+                {
+                    nk_checkbox_label_align(ctx, "Remember INI settings", &mc->remember_ini, 0, NK_TEXT_LEFT);
+                }
             } else if(mc->active_tab == MACHINE_CONFIG_TAB_ASSEMBLER) {
                 // Source
                 nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 3);
