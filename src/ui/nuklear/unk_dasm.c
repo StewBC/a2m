@@ -313,7 +313,6 @@ int unk_dasm_init(VIEWDASM *dv, int model) {
     dv->assembler_config.start_address = 0x2000;
     dv->assembler_config.start_address_text_len =
         sprintf(dv->assembler_config.start_address_text, "%04X", dv->assembler_config.start_address);
-    dv->assembler_config.dlg_asm_filebrowser = 0;
     array_init(&dv->assembler_config.file_browser.dir_contents, sizeof(FILE_INFO));
     array_init(&dv->line_info, sizeof(LINE_INFO));
     array_init(&dv->valid_stack, sizeof(DECODE_ENTRY));
@@ -925,9 +924,11 @@ void unk_dasm_show(UNK *v, int dirty) {
             array_free(&dv->temp_assembler_config.file_browser.dir_contents);
             dv->temp_assembler_config.dlg_asm_filebrowser = 0;
             if(1 == ret) {
-                // A file was selected, so get a FQN
-                strncat(fb->dir_selected.name, "/", PATH_MAX - 1);
+                // A file was selected, so get a name incl. file name
+                fb->dir_selected.name[fb->dir_selected.name_length++] = PATH_SEPARATOR;
+                fb->dir_selected.name[fb->dir_selected.name_length++] = '\0';
                 strncat(fb->dir_selected.name, fb->file_selected.name, PATH_MAX - 1);
+                fb->dir_selected.name_length = strlen(fb->dir_selected.name);
             }
         }
     }

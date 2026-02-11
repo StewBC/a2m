@@ -4,8 +4,83 @@
 
 #include "unk_lib.h"
 
-// Display variables
-// static const char *access_mode[3] = { "E", "R", "W" };
+static void unk_misc_ini_set_disk_key(INI_STORE *st, const char *section, int slot, int device, const char *value) {
+    char key[5];
+    if(!st || !section) {
+        return;
+    }
+    snprintf(key, sizeof(key), "s%dd%d", slot, device);
+    ini_set(st, section, key, value ? value : "");
+}
+
+static void unk_misc_ini_update_smartport(INI_STORE *st, const char *base_path, int slot, int device, UTIL_FILE *file) {
+    char val[PATH_MAX + 2];
+    val[0] = '\0';
+    if(file && file->is_file_open && file->file_path) {
+        char path_buf[PATH_MAX];
+        util_format_path(base_path, file->file_path, path_buf, sizeof(path_buf));
+        if(path_buf[0]) {
+            if(util_path_needs_quotes(path_buf)) {
+                snprintf(val, sizeof(val), "\"%s\"", path_buf);
+            } else {
+                strncpy(val, path_buf, sizeof(val) - 1);
+                val[sizeof(val) - 1] = '\0';
+            }
+        }
+    }
+    unk_misc_ini_set_disk_key(st, "SmartPort", slot, device, val);
+}
+
+static void unk_misc_ini_update_diskii(INI_STORE *st, const char *base_path, int slot, int device, DISKII_DRIVE *dd) {
+    if(!st || !dd) {
+        return;
+    }
+    if(dd->images.items == 0) {
+        unk_misc_ini_set_disk_key(st, "DiskII", slot, device, "");
+        return;
+    }
+
+    size_t items = dd->images.items;
+    size_t cap = items * (PATH_MAX + 4) + 1;
+    if(cap < PATH_MAX) {
+        cap = PATH_MAX;
+    }
+    char *val = (char *)malloc(cap);
+    if(!val) {
+        return;
+    }
+    val[0] = '\0';
+
+    int start = dd->image_index;
+    if(start < 0 || start >= (int)items) {
+        start = 0;
+    }
+    for(size_t i = 0; i < items; i++) {
+        int idx = (start + (int)i) % (int)items;
+        DISKII_IMAGE *img = ARRAY_GET(&dd->images, DISKII_IMAGE, idx);
+        if(!img || !img->file.file_path) {
+            continue;
+        }
+        char path_buf[PATH_MAX];
+        util_format_path(base_path, img->file.file_path, path_buf, sizeof(path_buf));
+        if(!path_buf[0]) {
+            continue;
+        }
+        if(val[0]) {
+            strncat(val, ",", cap - 1 - strnlen(val, cap - 1));
+        }
+        if(util_path_needs_quotes(path_buf)) {
+            strncat(val, "\"", cap - 1 - strnlen(val, cap - 1));
+            strncat(val, path_buf, cap - 1 - strnlen(val, cap - 1));
+            strncat(val, "\"", cap - 1 - strnlen(val, cap - 1));
+        } else {
+            strncat(val, path_buf, cap - 1 - strnlen(val, cap - 1));
+        }
+    }
+
+    unk_misc_ini_set_disk_key(st, "DiskII", slot, device, val);
+    free(val);
+}
 
 // Calculate the rect where the scrollbar lives
 static struct nk_rect nk_window_vscroll_rect(struct nk_context *ctx) {
@@ -105,6 +180,7 @@ void unk_misc_show(UNK *v) {
                                 nk_layout_row_push(ctx, 0.08f);
                                 if(nk_button_label(ctx, "Eject")) {
                                     util_file_discard(&spd[i].sp_files[j]);
+                                    unk_misc_ini_update_smartport(v->ini_store, v->start_path, i, j, &spd[i].sp_files[j]);
                                 }
                                 nk_layout_row_push(ctx, 0.1f);
                                 if(nk_button_label(ctx, "Insert")) {
@@ -150,6 +226,7 @@ void unk_misc_show(UNK *v) {
                                 nk_layout_row_push(ctx, 0.08f);
                                 if(nk_button_label(ctx, "Eject")) {
                                     diskii_eject(m, i, j, 1);
+                                    unk_misc_ini_update_diskii(v->ini_store, v->start_path, i, j, &d[i].diskii_drive[j]);
                                 }
                                 w -= 0.1f;
                                 nk_layout_row_push(ctx, 0.1f);
@@ -176,6 +253,7 @@ void unk_misc_show(UNK *v) {
                                     nk_layout_row_push(ctx, 0.18f);
                                     if(nk_button_label(ctx, title)) {
                                         diskii_mount_image(m, i, j, index >= items ? 0 : index);
+                                        unk_misc_ini_update_diskii(v->ini_store, v->start_path, i, j, &d[i].diskii_drive[j]);
                                     }
                                 }
                                 nk_layout_row_push(ctx, w);
@@ -620,12 +698,13 @@ void unk_misc_show(UNK *v) {
             v->dlg_modal_mouse_down = ctx->input.mouse.buttons[NK_BUTTON_LEFT].down;
             if(1 == ret) {
                 // A file was selected, so get a FQN
-                strncat(cfgfb->dir_selected.name, "/", PATH_MAX - 1);
+                cfgfb->dir_selected.name[cfgfb->dir_selected.name_length++] = PATH_SEPARATOR;
+                cfgfb->dir_selected.name[cfgfb->dir_selected.name_length++] = '\0';
                 strncat(cfgfb->dir_selected.name, cfgfb->file_selected.name, PATH_MAX - 1);
 
                 if(mc->browse_target == MACHINE_BROWSE_SYMBOLS) {
                     const char *path = cfgfb->dir_selected.name;
-                    int needs_quotes = strchr(path, ',') != NULL;
+                    int needs_quotes = util_path_needs_quotes(path);
                     if(mc->symbols_text_len > 0 && mc->symbols_text_len < (int)sizeof(mc->symbols_text) - 1) {
                         mc->symbols_text[mc->symbols_text_len++] = ',';
                         mc->symbols_text[mc->symbols_text_len] = '\0';
@@ -681,18 +760,24 @@ void unk_misc_show(UNK *v) {
             v->dlg_modal_mouse_down = ctx->input.mouse.buttons[NK_BUTTON_LEFT].down;
             if(1 == ret) {
                 // A file was selected, so get a FQN
-                strncat(fb->dir_selected.name, "/", PATH_MAX - 1);
-                strncat(fb->dir_selected.name, fb->file_selected.name, PATH_MAX - 1);
+                char selected_path[PATH_MAX];
+                strcpy(selected_path, fb->dir_selected.name);
+                selected_path[fb->dir_selected.name_length] = PATH_SEPARATOR;
+                selected_path[fb->dir_selected.name_length + 1] = '\0';
+                strncat(selected_path, fb->file_selected.name, PATH_MAX - fb->dir_selected.name_length - 2);
                 if(v->file_browser.device_type == SLOT_TYPE_SMARTPORT) {
                     util_file_discard(&m->sp_device[fb->slot].sp_files[fb->device]);
                     // Eject the file that's active, if there is one, and mount the new one
-                    if(A2_ERR == sp_mount(m, fb->slot, fb->device, fb->dir_selected.name)) {
+                    if(A2_ERR == sp_mount(m, fb->slot, fb->device, selected_path)) {
                         // If it fails, just discard the file
                         util_file_discard(&m->sp_device[fb->slot].sp_files[fb->device]);
                     }
+                    unk_misc_ini_update_smartport(v->ini_store, v->start_path, fb->slot, fb->device, &m->sp_device[fb->slot].sp_files[fb->device]);
                 } else {
                     // SLOT_TYPE_DISKII
-                    diskii_mount(m, fb->slot, fb->device, fb->dir_selected.name);
+                    if(A2_OK == diskii_mount(m, fb->slot, fb->device, selected_path)) {
+                        unk_misc_ini_update_diskii(v->ini_store, v->start_path, fb->slot, fb->device, &m->diskii_controller[fb->slot].diskii_drive[fb->device]);
+                    }
                 }
             }
         }

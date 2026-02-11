@@ -549,6 +549,15 @@ int unk_init(UNK *v, int model, INI_STORE *ini_store) {
     // Set up a table to speed up rendering HGR
     unk_apl2_init_color_table(v);
 
+    // Get the base path and set it in the shared FILE_BROWSER object
+    // Since v is memset 0, everything is already null (terminated) for the "else" clause
+    if(A2_OK == util_dir_get_current(v->start_path, PATH_MAX)) {
+        strncpy(v->file_browser.base_path, v->start_path, PATH_MAX - 1);
+        strncpy(v->file_browser.last_path_selected, v->start_path, PATH_MAX - 1);
+        strncpy(v->viewdasm.assembler_config.file_browser.base_path, v->start_path, PATH_MAX - 1);
+        strncpy(v->viewdasm.assembler_config.file_browser.last_path_selected, v->start_path, PATH_MAX - 1);
+    }
+
     // Do this late since this also starts the audio rolling - consuming the queue
     if(A2_OK != unk_audio_speaker_init(&v->viewspeaker, CPU_FREQUENCY, 48000, 2, 32.0f, 256)) {
         return A2_ERR;

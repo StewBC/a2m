@@ -9,6 +9,307 @@ int global_entry_length = 0;
 const char *str_actions[] = { "BREAK", "FAST", "RESTORE", "SLOW", "SWAP", "TROFF", "TRON", "TYPE" };
 const int num_actions = sizeof(str_actions) / sizeof(str_actions[0]);
 
+static void file_browser_set_display_path(FILE_BROWSER *fb, const char *absolute_path) {
+    if(!fb || !absolute_path) {
+        return;
+    }
+
+    strncpy(fb->dir_selected.name, absolute_path, PATH_MAX - 1);
+    fb->dir_selected.name[PATH_MAX - 1] = '\0';
+    fb->dir_selected.name_length = (int)strnlen(fb->dir_selected.name, PATH_MAX - 1);
+
+    if(fb->base_path[0]) {
+        char rel[PATH_MAX];
+        strncpy(rel, absolute_path, PATH_MAX - 1);
+        rel[PATH_MAX - 1] = '\0';
+        if(util_path_make_relative(fb->base_path, rel) == A2_OK) {
+            strncpy(fb->dir_selected.name, rel, PATH_MAX - 1);
+            fb->dir_selected.name[PATH_MAX - 1] = '\0';
+            fb->dir_selected.name_length = (int)strnlen(fb->dir_selected.name, PATH_MAX - 1);
+        }
+    }
+}
+
+static int file_browser_resolve_path(const FILE_BROWSER *fb, const char *path, char *out, size_t out_sz) {
+    if(!path || !out || out_sz == 0) {
+        return A2_ERR;
+    }
+    if(!fb || !fb->base_path[0]) {
+        size_t len = strnlen(path, out_sz);
+        if(len >= out_sz) {
+            return A2_ERR;
+        }
+        memcpy(out, path, len);
+        out[len] = '\0';
+        return A2_OK;
+    }
+
+    if(util_path_resolve(fb->base_path, path, out, out_sz) != A2_OK) {
+        size_t len = strnlen(path, out_sz);
+        if(len >= out_sz) {
+            return A2_ERR;
+        }
+        memcpy(out, path, len);
+        out[len] = '\0';
+    }
+    return A2_OK;
+}
+
+static void file_browser_set_last_path(FILE_BROWSER *fb, const char *absolute_path) {
+    if(!fb || !absolute_path) {
+        return;
+    }
+    strncpy(fb->last_path_selected, absolute_path, PATH_MAX - 1);
+    fb->last_path_selected[PATH_MAX - 1] = '\0';
+}
+
+static void file_browser_set_last_path_from_file(FILE_BROWSER *fb, const char *absolute_file_path) {
+    if(!fb || !absolute_file_path) {
+        return;
+    }
+    strncpy(fb->last_path_selected, absolute_file_path, PATH_MAX - 1);
+    fb->last_path_selected[PATH_MAX - 1] = '\0';
+    char *sep = (char *)util_strrtok(fb->last_path_selected, "\\/");
+    if(sep) {
+        *sep = '\0';
+    }
+}
+
+int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
+    int ret = -1;
+    const int row_h = 18;
+    const int row_stride = row_h + (int)ctx->style.window.spacing.y;
+    // The current folder is not loaded, so load it
+    if(!fb->dir_contents.items) {
+        char abs_path[PATH_MAX];
+        // make CWD the last path of this browser (or the start path if no last path set)
+        if(fb->last_path_selected[0]) {
+            util_dir_change(fb->last_path_selected);
+        } else if(fb->base_path[0]) {
+            util_dir_change(fb->base_path);
+        }
+        // Get the actual path now
+        if(A2_OK != util_dir_get_current(abs_path, PATH_MAX)) {
+            return 0;
+        }
+        // And set as the last path
+        file_browser_set_last_path(fb, abs_path);
+        // And set a display path that is relative to the current path
+        file_browser_set_display_path(fb, abs_path);
+        // Get the files/folders in this path
+        if(A2_OK != util_dir_load_contents(&fb->dir_contents)) {
+            return 0;
+        }
+        qsort(fb->dir_contents.data, fb->dir_contents.items, fb->dir_contents.element_size, util_file_info_qsort_cmp);
+        fb->cursor_line = 0;
+        fb->cursor_offset = 0;
+    }
+
+    if(nk_begin(ctx, "File Browser", nk_rect(0, 0, 600, 600),
+                NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
+        int cursor_moved = 0;
+        // 1) Row with Path
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 2);
+        {
+            nk_layout_row_push(ctx, 0.10f);
+            nk_label(ctx, "Path", NK_TEXT_LEFT);
+            nk_layout_row_push(ctx, 0.90f);
+            if(NK_EDIT_COMMITED &
+                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, fb->dir_selected.name,
+                                   &fb->dir_selected.name_length, PATH_MAX - 1, nk_filter_default)) {
+                UTIL_FILE file;
+                char resolved_path[PATH_MAX];
+                memset(&file, 0, sizeof(file));
+                fb->dir_selected.name[fb->dir_selected.name_length] = '\0';
+                if(A2_OK != file_browser_resolve_path(fb, fb->dir_selected.name, resolved_path, sizeof(resolved_path))) {
+                    resolved_path[0] = '\0';
+                }
+                if(resolved_path[0] && A2_OK == util_file_open(&file, resolved_path, "r")) {
+                    // If the file could open, well, it's a file that was selected, so use it
+                    strcpy(fb->file_selected.name, file.file_display_name);
+                    fb->file_selected.name_length = (int)strnlen(fb->file_selected.name, PATH_MAX - 1);
+                    file_browser_set_last_path_from_file(fb, resolved_path);
+                    char *sep = (char *)util_strrtok(resolved_path, "\\/");
+                    if(sep) {
+                        *sep = '\0';
+                    }
+                    file_browser_set_display_path(fb, resolved_path);
+                    util_file_discard(&file);
+                    ret = 1;
+                } else {
+                    // If it wasn't a file, assume it was a folder and just ignore any errors here
+                    if(resolved_path[0]) {
+                        util_dir_change(resolved_path);
+                    } else {
+                        util_dir_change(fb->dir_selected.name);
+                    }
+                    // rescan the current, which if it was typed correctly, will be what was typed,
+                    // else rescan what was already "current"
+                    fb->dir_contents.items = 0;
+                    fb->cursor_line = 0;
+                    fb->cursor_offset = 0;
+                    if(A2_OK == util_dir_get_current(resolved_path, PATH_MAX)) {
+                        file_browser_set_last_path(fb, resolved_path);
+                        file_browser_set_display_path(fb, resolved_path);
+                    }
+                }
+            }
+            ctx->current->edit.mode = NK_TEXT_EDIT_MODE_INSERT;
+        }
+        nk_layout_row_end(ctx);
+
+        int rows_visible = (int)((500 - (2 * ctx->style.window.group_padding.y)) / row_stride);
+        if(rows_visible < 1) {
+            rows_visible = 1;
+        }
+
+        if(nk_input_is_key_pressed(&ctx->input, NK_KEY_UP)) {
+            if(fb->cursor_line > 0) {
+                fb->cursor_line--;
+                cursor_moved = 1;
+            }
+        } else if(nk_input_is_key_pressed(&ctx->input, NK_KEY_DOWN)) {
+            if(fb->cursor_line < fb->dir_contents.items - 1) {
+                fb->cursor_line++;
+                cursor_moved = 1;
+            }
+        } else if(nk_input_is_key_pressed(&ctx->input, NK_KEY_SCROLL_UP)) {
+            if(fb->cursor_line > 0) {
+                fb->cursor_line -= (rows_visible - 1);
+                if(fb->cursor_line < 0) {
+                    fb->cursor_line = 0;
+                }
+                cursor_moved = 1;
+            }
+        } else if(nk_input_is_key_pressed(&ctx->input, NK_KEY_SCROLL_DOWN)) {
+            if(fb->cursor_line < fb->dir_contents.items - 1) {
+                fb->cursor_line += (rows_visible - 1);
+                if(fb->cursor_line > fb->dir_contents.items - 1) {
+                    fb->cursor_line = fb->dir_contents.items - 1;
+                }
+                cursor_moved = 1;
+            }
+        }
+
+        if(fb->dir_contents.items <= 0) {
+            fb->cursor_line = 0;
+            fb->cursor_offset = 0;
+        } else if(cursor_moved) {
+            int top_line = fb->cursor_offset / row_stride;
+            if(top_line > fb->cursor_line) {
+                top_line = fb->cursor_line;
+            } else if(fb->cursor_line >= top_line + rows_visible) {
+                top_line = fb->cursor_line - rows_visible + 1;
+            }
+            int max_top = fb->dir_contents.items - rows_visible;
+            if(max_top < 0) {
+                max_top = 0;
+            }
+            if(top_line < 0) {
+                top_line = 0;
+            } else if(top_line > max_top) {
+                top_line = max_top;
+            }
+            fb->cursor_offset = top_line * row_stride;
+        }
+
+        // 2) Dir/File list
+        int file_list_height = 500 - (fb->dir_select_okay ? 30 : 0);
+        nk_layout_row_dynamic(ctx, file_list_height, 1);
+        {
+            FILE_INFO *cursor_fi = NULL;
+            nk_uint x_off = 0;
+            nk_uint y_off = (nk_uint)fb->cursor_offset;
+            struct nk_color ob = ctx->style.selectable.normal.data.color;
+            if(nk_group_scrolled_offset_begin(ctx, &x_off, &y_off, "files group", NK_WINDOW_BORDER)) {
+                for(int i = 0; i < fb->dir_contents.items; i++) {
+                    FILE_INFO *fi = ARRAY_GET(&fb->dir_contents, FILE_INFO, i);
+
+                    if(i == fb->cursor_line) {
+                        cursor_fi = fi;
+                        ctx->style.selectable.normal.data.color = nk_rgb(100, 100, 100);
+                    }
+
+                    // A) The row with the file/dir name details
+                    nk_layout_row_begin(ctx, NK_DYNAMIC, row_h, 3);
+                    {
+                        nk_layout_row_push(ctx, 0.8f);
+                        if(nk_select_label(ctx, fi->name, NK_TEXT_ALIGN_LEFT, 0)) {
+                            if(!fi->is_directory) {
+                                // A file to load has been selected
+                                fb->file_selected = *fi;
+                                ret = 1;
+                            } else {
+                                char abs_path[PATH_MAX];
+                                // A folder was selected, so dump current and change to selected
+                                fb->dir_contents.items = 0;
+                                // Not checking for success as the options are to close the dialog (bad) or ignore error.
+                                util_dir_change(fi->name);
+                                if(A2_OK == util_dir_get_current(abs_path, PATH_MAX)) {
+                                    file_browser_set_last_path(fb, abs_path);
+                                }
+                                fb->cursor_line = 0;
+                                fb->cursor_offset = 0;
+                            }
+                            ctx->style.selectable.normal.data.color = ob;
+                            break;
+                        }
+                        nk_layout_row_push(ctx, 0.1f);
+                        nk_labelf(ctx, NK_TEXT_LEFT, "%zd", fi->size);
+                        nk_layout_row_push(ctx, 0.09f);
+                        nk_label(ctx, fi->is_directory ? "Dir" : "File", NK_TEXT_LEFT);
+                    }
+                    nk_layout_row_end(ctx);
+
+                    if(i == fb->cursor_line) {
+                        ctx->style.selectable.normal.data.color = ob;
+                    }
+                }
+                nk_group_end(ctx);
+            }
+            if(!cursor_moved) {
+                fb->cursor_offset = (int)y_off;
+            }
+
+            if(!ctx->active->edit.active && nk_input_is_key_pressed(&ctx->input, NK_KEY_ENTER) && cursor_fi) {
+                if(!cursor_fi->is_directory) {
+                    fb->file_selected = *cursor_fi;
+                    ret = 1;
+                } else {
+                    char abs_path[PATH_MAX];
+                    fb->dir_contents.items = 0;
+                    util_dir_change(cursor_fi->name);
+                    if(A2_OK == util_dir_get_current(abs_path, PATH_MAX)) {
+                        file_browser_set_last_path(fb, abs_path);
+                    }
+                    fb->cursor_line = 0;
+                    fb->cursor_offset = 0;
+                }
+            }
+        }
+
+        // 3) Cancel button
+        nk_layout_row_dynamic(ctx, 20, 1);
+        {
+            if(nk_button_label(ctx, "Cancel")) {
+                ret = 0;
+            }
+            if(fb->dir_select_okay) {
+                if(nk_button_label(ctx, "Ok")) {
+                    fb->file_selected.name_length = 0;
+                    ret = 1;
+                }
+            }
+        }
+    }
+    nk_end(ctx);
+
+    if(ret >= 0 && fb->base_path[0]) {
+        util_dir_change(fb->base_path);
+    }
+    return ret;
+}
+
 int unk_dlg_assembler_config(struct nk_context *ctx, struct nk_rect r, ASSEMBLER_CONFIG *ac) {
     int ret = 0;
     FILE_BROWSER *fb = &ac->file_browser;
@@ -24,22 +325,34 @@ int unk_dlg_assembler_config(struct nk_context *ctx, struct nk_rect r, ASSEMBLER
                     nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, fb->dir_selected.name,
                                    &fb->dir_selected.name_length, PATH_MAX - 1, nk_filter_default)) {
                 UTIL_FILE file;
+                char resolved_path[PATH_MAX];
                 memset(&file, 0, sizeof(file));
                 fb->dir_selected.name[fb->dir_selected.name_length] = '\0';
-                if(A2_OK == util_file_open(&file, fb->dir_selected.name, "r")) {
+                if(A2_OK != file_browser_resolve_path(fb, fb->dir_selected.name, resolved_path, sizeof(resolved_path))) {
+                    resolved_path[0] = '\0';
+                }
+                if(resolved_path[0] && A2_OK == util_file_open(&file, resolved_path, "r")) {
                     // If the file could open, well, it's a file that was selected, so use it
                     strcpy(fb->file_selected.name, file.file_display_name);
+                    fb->file_selected.name_length = (int)strnlen(fb->file_selected.name, PATH_MAX - 1);
                     // fb->dir_selected.name[file.file_display_name - file.file_path] = '\0';
+                    file_browser_set_last_path_from_file(fb, resolved_path);
                     util_file_discard(&file);
                     ret = 1;
                 } else {
                     // If it wasn't a file, assume it was a folder and just ignore any errors here
-                    util_dir_change(fb->dir_selected.name);
+                    if(resolved_path[0]) {
+                        util_dir_change(resolved_path);
+                    } else {
+                        util_dir_change(fb->dir_selected.name);
+                    }
                     // rescan the current, which if it was typed correctly, will be what was typed,
                     // else rescan what was already "current"
                     fb->dir_contents.items = 0;
-                    util_dir_get_current(fb->dir_selected.name, PATH_MAX);
-                    fb->dir_selected.name_length = strnlen(fb->dir_selected.name, PATH_MAX);
+                    if(A2_OK == util_dir_get_current(resolved_path, PATH_MAX)) {
+                        file_browser_set_last_path(fb, resolved_path);
+                        file_browser_set_display_path(fb, resolved_path);
+                    }
                     // This keeps the cursor active in the edit box, and places it at the end
                     ctx->current->edit.cursor = ctx->current->edit.sel_start = ctx->current->edit.sel_end =
                                                     strnlen(fb->dir_selected.name, PATH_MAX);
@@ -611,204 +924,6 @@ int unk_dlg_breakpoint_edit(struct nk_context *ctx, struct nk_rect r, BREAKPOINT
     // Restore previous style and thickness for windows, after nk_end(ctx) otherwise it doesn't apply
     nk_style_pop_color(ctx);
     nk_style_pop_float(ctx);
-
-    return ret;
-}
-
-int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
-    int ret = -1;
-    const int row_h = 18;
-    const int row_stride = row_h + (int)ctx->style.window.spacing.y;
-    // The current folder is not loaded, so load it
-    if(!fb->dir_contents.items) {
-        // fb->file_selected.name_length = strlen(fb->file_selected.name);
-        // Get the full path to the active folder
-        if(A2_OK != util_dir_get_current(fb->dir_selected.name, PATH_MAX)) {
-            return 0;
-        }
-        fb->dir_selected.name_length = strlen(fb->dir_selected.name);
-        if(A2_OK != util_dir_load_contents(&fb->dir_contents)) {
-            return 0;
-        }
-        qsort(fb->dir_contents.data, fb->dir_contents.items, fb->dir_contents.element_size, util_file_info_qsort_cmp);
-        fb->cursor_line = 0;
-        fb->cursor_offset = 0;
-    }
-
-    if(nk_begin(ctx, "File Browser", nk_rect(0, 0, 600, 600),
-                NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_TITLE | NK_WINDOW_BORDER)) {
-        int cursor_moved = 0;
-        // 1) Row with Path
-        nk_layout_row_begin(ctx, NK_DYNAMIC, 28, 2);
-        {
-            nk_layout_row_push(ctx, 0.10f);
-            nk_label(ctx, "Path", NK_TEXT_LEFT);
-            nk_layout_row_push(ctx, 0.90f);
-            if(NK_EDIT_COMMITED &
-                    nk_edit_string(ctx, NK_EDIT_SELECTABLE | NK_EDIT_CLIPBOARD | NK_EDIT_SIG_ENTER, fb->dir_selected.name,
-                                   &fb->dir_selected.name_length, PATH_MAX - 1, nk_filter_default)) {
-                UTIL_FILE file;
-                memset(&file, 0, sizeof(file));
-                fb->dir_selected.name[fb->dir_selected.name_length] = '\0';
-                if(A2_OK == util_file_open(&file, fb->dir_selected.name, "r")) {
-                    // If the file could open, well, it's a file that was selected, so use it
-                    strcpy(fb->file_selected.name, file.file_display_name);
-                    fb->dir_selected.name[file.file_display_name - file.file_path] = '\0';
-                    util_file_discard(&file);
-                    ret = 1;
-                } else {
-                    // If it wasn't a file, assume it was a folder and just ignore any errors here
-                    util_dir_change(fb->dir_selected.name);
-                    // rescan the current, which if it was typed correctly, will be what was typed,
-                    // else rescan what was already "current"
-                    fb->dir_contents.items = 0;
-                    fb->cursor_line = 0;
-                    fb->cursor_offset = 0;
-                    util_dir_get_current(fb->dir_selected.name, PATH_MAX);
-                    fb->dir_selected.name_length = strnlen(fb->dir_selected.name, PATH_MAX);
-                }
-            }
-            ctx->current->edit.mode = NK_TEXT_EDIT_MODE_INSERT;
-        }
-        nk_layout_row_end(ctx);
-
-        int rows_visible = (int)((500 - (2 * ctx->style.window.group_padding.y)) / row_stride);
-        if(rows_visible < 1) {
-            rows_visible = 1;
-        }
-
-        if(nk_input_is_key_pressed(&ctx->input, NK_KEY_UP)) {
-            if(fb->cursor_line > 0) {
-                fb->cursor_line--;
-                cursor_moved = 1;
-            }
-        } else if(nk_input_is_key_pressed(&ctx->input, NK_KEY_DOWN)) {
-            if(fb->cursor_line < fb->dir_contents.items - 1) {
-                fb->cursor_line++;
-                cursor_moved = 1;
-            }
-        } else if(nk_input_is_key_pressed(&ctx->input, NK_KEY_SCROLL_UP)) {
-            if(fb->cursor_line > 0) {
-                fb->cursor_line -= (rows_visible - 1);
-                if(fb->cursor_line < 0) {
-                    fb->cursor_line = 0;
-                }
-                cursor_moved = 1;
-            }
-        } else if(nk_input_is_key_pressed(&ctx->input, NK_KEY_SCROLL_DOWN)) {
-            if(fb->cursor_line < fb->dir_contents.items - 1) {
-                fb->cursor_line += (rows_visible - 1);
-                if(fb->cursor_line > fb->dir_contents.items - 1) {
-                    fb->cursor_line = fb->dir_contents.items - 1;
-                }
-                cursor_moved = 1;
-            }
-        }
-
-        if(fb->dir_contents.items <= 0) {
-            fb->cursor_line = 0;
-            fb->cursor_offset = 0;
-        } else if(cursor_moved) {
-            int top_line = fb->cursor_offset / row_stride;
-            if(top_line > fb->cursor_line) {
-                top_line = fb->cursor_line;
-            } else if(fb->cursor_line >= top_line + rows_visible) {
-                top_line = fb->cursor_line - rows_visible + 1;
-            }
-            int max_top = fb->dir_contents.items - rows_visible;
-            if(max_top < 0) {
-                max_top = 0;
-            }
-            if(top_line < 0) {
-                top_line = 0;
-            } else if(top_line > max_top) {
-                top_line = max_top;
-            }
-            fb->cursor_offset = top_line * row_stride;
-        }
-
-        // 2) Dir/File list
-        int file_list_height = 500 - (fb->dir_select_okay ? 30 : 0);
-        nk_layout_row_dynamic(ctx, file_list_height, 1);
-        {
-            FILE_INFO *cursor_fi = NULL;
-            nk_uint x_off = 0;
-            nk_uint y_off = (nk_uint)fb->cursor_offset;
-            struct nk_color ob = ctx->style.selectable.normal.data.color;
-            if(nk_group_scrolled_offset_begin(ctx, &x_off, &y_off, "files group", NK_WINDOW_BORDER)) {
-                for(int i = 0; i < fb->dir_contents.items; i++) {
-                    FILE_INFO *fi = ARRAY_GET(&fb->dir_contents, FILE_INFO, i);
-
-                    if(i == fb->cursor_line) {
-                        cursor_fi = fi;
-                        ctx->style.selectable.normal.data.color = nk_rgb(100, 100, 100);
-                    }
-
-                    // A) The row with the file/dir name details
-                    nk_layout_row_begin(ctx, NK_DYNAMIC, row_h, 3);
-                    {
-                        nk_layout_row_push(ctx, 0.8f);
-                        if(nk_select_label(ctx, fi->name, NK_TEXT_ALIGN_LEFT, 0)) {
-                            if(!fi->is_directory) {
-                                // A file to load has been selected
-                                fb->file_selected = *fi;
-                                ret = 1;
-                            } else {
-                                // A folder was selected, so dump current and change to selected
-                                fb->dir_contents.items = 0;
-                                // Not checking for success as the options are to close the dialog (bad) or ignore error.
-                                util_dir_change(fi->name);
-                                fb->cursor_line = 0;
-                                fb->cursor_offset = 0;
-                            }
-                            ctx->style.selectable.normal.data.color = ob;
-                            break;
-                        }
-                        nk_layout_row_push(ctx, 0.1f);
-                        nk_labelf(ctx, NK_TEXT_LEFT, "%zd", fi->size);
-                        nk_layout_row_push(ctx, 0.09f);
-                        nk_label(ctx, fi->is_directory ? "Dir" : "File", NK_TEXT_LEFT);
-                    }
-                    nk_layout_row_end(ctx);
-
-                    if(i == fb->cursor_line) {
-                        ctx->style.selectable.normal.data.color = ob;
-                    }
-                }
-                nk_group_end(ctx);
-            }
-            if(!cursor_moved) {
-                fb->cursor_offset = (int)y_off;
-            }
-
-            if(!ctx->active->edit.active && nk_input_is_key_pressed(&ctx->input, NK_KEY_ENTER) && cursor_fi) {
-                if(!cursor_fi->is_directory) {
-                    fb->file_selected = *cursor_fi;
-                    ret = 1;
-                } else {
-                    fb->dir_contents.items = 0;
-                    util_dir_change(cursor_fi->name);
-                    fb->cursor_line = 0;
-                    fb->cursor_offset = 0;
-                }
-            }
-        }
-
-        // 3) Cancel button
-        nk_layout_row_dynamic(ctx, 20, 1);
-        {
-            if(nk_button_label(ctx, "Cancel")) {
-                ret = 0;
-            }
-            if(fb->dir_select_okay) {
-                if(nk_button_label(ctx, "Ok")) {
-                    fb->file_selected.name_length = 0;
-                    ret = 1;
-                }
-            }
-        }
-    }
-    nk_end(ctx);
 
     return ret;
 }

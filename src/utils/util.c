@@ -515,6 +515,316 @@ char *util_strtok_r(char *s, const char *delim, char **ctx) {
 #endif
 }
 
+int util_path_needs_quotes(const char *path) {
+    if(!path) {
+        return 0;
+    }
+    for(const char *p = path; *p; p++) {
+        if(*p == ',' || isspace((unsigned char)*p)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static inline int util_path_is_sep(char c) {
+    return c == '/' || c == '\\';
+}
+
+static int util_path_root_len(const char *p) {
+#ifdef _WIN32
+    if(!p || !*p) {
+        return 0;
+    }
+    if(util_path_is_sep(p[0]) && util_path_is_sep(p[1])) {
+        // UNC: \\server\share\...
+        const char *s = p + 2;
+        while(*s && !util_path_is_sep(*s)) {
+            s++;
+        }
+        if(!*s) {
+            return 0;
+        }
+        s++; // skip separator
+        while(*s && !util_path_is_sep(*s)) {
+            s++;
+        }
+        return (int)(s - p);
+    }
+    if(isalpha((unsigned char)p[0]) && p[1] == ':') {
+        return 2;
+    }
+    return 0;
+#else
+    return (p && p[0] == '/') ? 1 : 0;
+#endif
+}
+
+static int util_path_split_components(char *p, char **out, int max_out) {
+    int count = 0;
+    while(p && *p) {
+        while(*p && util_path_is_sep(*p)) {
+            p++;
+        }
+        if(!*p) {
+            break;
+        }
+        if(count >= max_out) {
+            return count;
+        }
+        out[count++] = p;
+        while(*p && !util_path_is_sep(*p)) {
+            p++;
+        }
+        if(*p) {
+            *p++ = '\0';
+        }
+    }
+    return count;
+}
+
+int util_path_make_relative(const char *base_path, char *target_path) {
+    if(!base_path || !target_path) {
+        return A2_ERR;
+    }
+
+    char base_buf[PATH_MAX];
+    char target_buf[PATH_MAX];
+    size_t base_len = strlen(base_path);
+    size_t target_len = strlen(target_path);
+    if(base_len == 0 || target_len == 0 || base_len >= PATH_MAX || target_len >= PATH_MAX) {
+        return A2_ERR;
+    }
+
+    memcpy(base_buf, base_path, base_len + 1);
+    memcpy(target_buf, target_path, target_len + 1);
+
+    int base_root_len = util_path_root_len(base_buf);
+    int target_root_len = util_path_root_len(target_buf);
+    if(base_root_len == 0 || target_root_len == 0) {
+        return A2_ERR;
+    }
+    if(base_root_len != target_root_len) {
+        return A2_ERR;
+    }
+#ifdef _WIN32
+    if(strnicmp(base_buf, target_buf, (size_t)base_root_len) != 0) {
+        return A2_ERR;
+    }
+#else
+    if(strncmp(base_buf, target_buf, (size_t)base_root_len) != 0) {
+        return A2_ERR;
+    }
+#endif
+
+    char *base_ptr = base_buf + base_root_len;
+    char *target_ptr = target_buf + target_root_len;
+
+    char *base_comps[PATH_MAX / 2];
+    char *target_comps[PATH_MAX / 2];
+    int base_count = util_path_split_components(base_ptr, base_comps, (int)(PATH_MAX / 2));
+    int target_count = util_path_split_components(target_ptr, target_comps, (int)(PATH_MAX / 2));
+
+    int common = 0;
+    int max_common = (base_count < target_count) ? base_count : target_count;
+    while(common < max_common) {
+#ifdef _WIN32
+        if(stricmp(base_comps[common], target_comps[common]) != 0) {
+            break;
+        }
+#else
+        if(strcmp(base_comps[common], target_comps[common]) != 0) {
+            break;
+        }
+#endif
+        common++;
+    }
+
+    int up_levels = base_count - common;
+
+    char rel[PATH_MAX];
+    size_t rel_len = 0;
+    int remaining = target_count - common;
+
+    if(up_levels == 0) {
+        if(remaining <= 0) {
+            rel[rel_len++] = '.';
+        } else {
+            rel[rel_len++] = '.';
+            for(int i = common; i < target_count; i++) {
+                size_t part_len = strlen(target_comps[i]);
+                if(rel_len && rel_len + 1 < PATH_MAX) {
+                    rel[rel_len++] = PATH_SEPARATOR;
+                }
+                if(rel_len + part_len >= PATH_MAX) {
+                    return A2_ERR;
+                }
+                memcpy(rel + rel_len, target_comps[i], part_len);
+                rel_len += part_len;
+            }
+        }
+    } else {
+        for(int up = 0; up < up_levels; up++) {
+            if(rel_len + 2 >= PATH_MAX) {
+                return A2_ERR;
+            }
+            if(rel_len) {
+                rel[rel_len++] = PATH_SEPARATOR;
+            }
+            rel[rel_len++] = '.';
+            rel[rel_len++] = '.';
+        }
+        if(remaining > 0) {
+            if(rel_len + 1 >= PATH_MAX) {
+                return A2_ERR;
+            }
+            rel[rel_len++] = PATH_SEPARATOR;
+            for(int i = common; i < target_count; i++) {
+                size_t part_len = strlen(target_comps[i]);
+                if(i > common) {
+                    if(rel_len + 1 >= PATH_MAX) {
+                        return A2_ERR;
+                    }
+                    rel[rel_len++] = PATH_SEPARATOR;
+                }
+                if(rel_len + part_len >= PATH_MAX) {
+                    return A2_ERR;
+                }
+                memcpy(rel + rel_len, target_comps[i], part_len);
+                rel_len += part_len;
+            }
+        }
+    }
+
+    if(rel_len == 0 || rel_len >= PATH_MAX) {
+        return A2_ERR;
+    }
+    rel[rel_len] = '\0';
+    memcpy(target_path, rel, rel_len + 1);
+    return A2_OK;
+}
+
+int util_path_resolve(const char *base_path, const char *path, char *out, size_t out_sz) {
+    if(!path || !out || out_sz == 0) {
+        return A2_ERR;
+    }
+
+    size_t path_len = strlen(path);
+    if(path_len >= out_sz || path_len >= PATH_MAX) {
+        return A2_ERR;
+    }
+
+    if(!base_path || !*base_path) {
+        memcpy(out, path, path_len + 1);
+        return A2_OK;
+    }
+
+    char path_buf[PATH_MAX];
+    memcpy(path_buf, path, path_len + 1);
+    if(util_path_root_len(path_buf) > 0) {
+        memcpy(out, path, path_len + 1);
+        return A2_OK;
+    }
+
+    size_t base_len = strlen(base_path);
+    if(base_len == 0 || base_len >= PATH_MAX || base_len >= out_sz) {
+        return A2_ERR;
+    }
+
+    char base_buf[PATH_MAX];
+    memcpy(base_buf, base_path, base_len + 1);
+
+    int base_root_len = util_path_root_len(base_buf);
+    if(base_root_len == 0) {
+        return A2_ERR;
+    }
+
+    char *base_ptr = base_buf + base_root_len;
+    char *rel_ptr = path_buf;
+
+    char *base_comps[PATH_MAX / 2];
+    char *rel_comps[PATH_MAX / 2];
+    char *stack[PATH_MAX / 2];
+    int base_count = util_path_split_components(base_ptr, base_comps, (int)(PATH_MAX / 2));
+    int rel_count = util_path_split_components(rel_ptr, rel_comps, (int)(PATH_MAX / 2));
+
+    int stack_count = 0;
+    for(int i = 0; i < base_count; i++) {
+        stack[stack_count++] = base_comps[i];
+    }
+
+    for(int i = 0; i < rel_count; i++) {
+        if(strcmp(rel_comps[i], ".") == 0) {
+            continue;
+        }
+        if(strcmp(rel_comps[i], "..") == 0) {
+            if(stack_count > 0) {
+                stack_count--;
+            }
+            continue;
+        }
+        if(stack_count >= (int)(PATH_MAX / 2)) {
+            return A2_ERR;
+        }
+        stack[stack_count++] = rel_comps[i];
+    }
+
+    size_t out_len = 0;
+    if((size_t)base_root_len >= out_sz) {
+        return A2_ERR;
+    }
+    memcpy(out, base_buf, (size_t)base_root_len);
+    out_len = (size_t)base_root_len;
+    if(out_len > 0 && !util_path_is_sep(out[out_len - 1])) {
+        if(out_len + 1 >= out_sz) {
+            return A2_ERR;
+        }
+        out[out_len++] = PATH_SEPARATOR;
+    }
+
+    for(int i = 0; i < stack_count; i++) {
+        size_t part_len = strlen(stack[i]);
+        if(out_len && !util_path_is_sep(out[out_len - 1])) {
+            if(out_len + 1 >= out_sz) {
+                return A2_ERR;
+            }
+            out[out_len++] = PATH_SEPARATOR;
+        }
+        if(out_len + part_len >= out_sz) {
+            return A2_ERR;
+        }
+        memcpy(out + out_len, stack[i], part_len);
+        out_len += part_len;
+    }
+
+    if(out_len == 0 || out_len >= out_sz) {
+        return A2_ERR;
+    }
+    out[out_len] = '\0';
+    return A2_OK;
+}
+
+void util_format_path(const char *base_path, const char *path, char *out, size_t out_sz) {
+    if(!out || out_sz == 0) {
+        return;
+    }
+    if(!path) {
+        out[0] = '\0';
+        return;
+    }
+    strncpy(out, path, out_sz - 1);
+    out[out_sz - 1] = '\0';
+    if(base_path && base_path[0]) {
+        char rel[PATH_MAX];
+        strncpy(rel, path, PATH_MAX - 1);
+        rel[PATH_MAX - 1] = '\0';
+        if(util_path_make_relative(base_path, rel) == A2_OK) {
+            strncpy(out, rel, out_sz - 1);
+            out[out_sz - 1] = '\0';
+        }
+    }
+}
+
 void *util_memset32(void *ptr, uint32_t value, size_t count) {
     uint32_t *p = ptr;
     while(count--) {

@@ -7,6 +7,8 @@
 typedef struct {
     FILE_INFO file_selected;
     FILE_INFO dir_selected;
+    char base_path[PATH_MAX];
+    char last_path_selected[PATH_MAX];
     int slot;
     int device;                                         // drive 0 or 1
     int device_type;                                    // SLOT_TYPE_SMARTPORT | SLOT_TYPE_DISKII

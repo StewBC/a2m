@@ -61,6 +61,7 @@ typedef struct UNK {
     RUNTIME *rt;
     INI_STORE *ini_store;
     FILE_BROWSER file_browser;
+    char start_path[PATH_MAX];
 
     // Shadow of machine states
     A2_STATE shadow_state;
