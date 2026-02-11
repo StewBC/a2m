@@ -877,13 +877,14 @@ const char *unk_help_text[] = {
 "Since the assembler is mapped to <#QU>CTRL+F4<#NM>, configuring the assembler settings in an <#QU>.ini<#NM> file makes it possible to assemble and run a program under development by pressing <#QU>CTRL+F4<#NM> after editing the assembly source, without having to restart or stop the emulator.\n"
 ,
 "<#H0>Version History<#NM>\n"
-"<#H2>31 Oct 2024<#NM> - <#BO>Initial release\n"
-"<#H2> 8 Dec 2024<#NM> - <#BO>Version 1.0 release\n"
-"<#H2>10 Dec 2024<#NM> - <#BO>Version 1.1 release\n"
-"<#H2>23 Dec 2025<#NM> - <#BO>Version 2.0 release<#NM>\n"
+"<#H2>31 Oct 2024<#NM> - <#BO>Initial release - made in London, UK.\n"
+"<#H2> 8 Dec 2024<#NM> - <#BO>Version 1.0 release.\n"
+"<#H2>10 Dec 2024<#NM> - <#BO>Version 1.1 release.\n"
+"<#H2>23 Dec 2025<#NM> - <#BO>Version 2.0 release.<#NM>\n"
 "    The version 2 release is a re-architecture of the entire code base, as well as a rewrite of the 6502 core, adding a 65C02 mode. The Apple //e is also supported, along with many new features such as a NIB Disk II, resizable window, window pane sliders, and many more.\n"
-"<#H2> 4 Feb 2026<#NM> - <#BO>Version 2.1 release<#NM>\n"
+"<#H2> 4 Feb 2026<#NM> - <#BO>Version 2.1 release.<#NM>\n"
 "    This version fixes bugs and has tweaks above the V2.0 release, and it enhances the built-in assembler allowing it to compile the bulk of ca65 assembler targeted sources with only some edits.\n"
-"\n"
+"<#H2>11 Feb 2026<#NM> - <#BO>Version 2.11 release.<#NM>\n"
+"    This version is mostly about UI; added an INI configuration dialog and load from within a2m as well as other tweaks. Breakpoints can now be set in any bank and will only break in that bank, not that PC in any bank.  Audio (speaker) also tweaked.\n"
 };
 
