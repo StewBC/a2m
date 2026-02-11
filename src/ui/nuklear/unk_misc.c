@@ -82,6 +82,27 @@ static void unk_misc_ini_update_diskii(INI_STORE *st, const char *base_path, int
     free(val);
 }
 
+static int unk_misc_load_ini(UNK *v, const char *ini_path) {
+    INI_STORE loaded;
+    if(!v || !v->ini_store || !ini_path || !ini_path[0]) {
+        return A2_ERR;
+    }
+
+    ini_init(&loaded);
+    if(A2_OK != util_ini_load_file(ini_path, ini_add, (void *)&loaded)) {
+        ini_shutdown(&loaded);
+        return A2_ERR;
+    }
+
+    // Keep track of the file that was just loaded so it becomes the active INI.
+    ini_set(&loaded, "Config", "ini_file", ini_path);
+
+    ini_shutdown(v->ini_store);
+    *v->ini_store = loaded;
+    v->request_reconfig = 1;
+    return A2_OK;
+}
+
 // Calculate the rect where the scrollbar lives
 static struct nk_rect nk_window_vscroll_rect(struct nk_context *ctx) {
     struct nk_rect bounds = nk_window_get_bounds(ctx);
@@ -272,14 +293,23 @@ void unk_misc_show(UNK *v) {
                     }
                 }
             }
-            nk_layout_row_dynamic(ctx, 22, 1);
+            nk_layout_row_dynamic(ctx, 22, 2);
             {
-                if(nk_button_label(ctx, "Configure") && !v->dlg_modal_active) {
+                if(nk_button_label(ctx, "Configure INI") && !v->dlg_modal_active) {
                     cmn_config_from_ini(mc, v->ini_store);
                     v->viewmisc.machine_config_original = *mc;
                     v->file_browser.dir_select_okay = 1;
                     v->dlg_machine_configure = 1;
                     v->dlg_modal_active = 1;
+                }
+                if(nk_button_label(ctx, "Load INI") && !v->dlg_modal_active) {
+                    fb->slot = -1;
+                    fb->device = -1;
+                    fb->device_type = SLOT_TYPE_EMPTY;
+                    fb->dir_select_okay = 0;
+                    fb->dir_contents.items = 0;
+                    v->dlg_modal_active = 1;
+                    v->dlg_filebrowser = 1;
                 }
             }
             nk_tree_pop(ctx); // Hardware
@@ -773,11 +803,12 @@ void unk_misc_show(UNK *v) {
                         util_file_discard(&m->sp_device[fb->slot].sp_files[fb->device]);
                     }
                     unk_misc_ini_update_smartport(v->ini_store, v->start_path, fb->slot, fb->device, &m->sp_device[fb->slot].sp_files[fb->device]);
-                } else {
-                    // SLOT_TYPE_DISKII
+                } else if(v->file_browser.device_type == SLOT_TYPE_DISKII) {
                     if(A2_OK == diskii_mount(m, fb->slot, fb->device, selected_path)) {
                         unk_misc_ini_update_diskii(v->ini_store, v->start_path, fb->slot, fb->device, &m->diskii_controller[fb->slot].diskii_drive[fb->device]);
                     }
+                } else if(v->file_browser.device_type == SLOT_TYPE_EMPTY) {
+                    unk_misc_load_ini(v, selected_path);
                 }
             }
         }
