@@ -32,8 +32,6 @@ The user manual is also available from within a2m, on the F1 key.  Tabs at the b
 Press F2 to reveal the interface to a2m - the debugger and access to disk drives, etc.  
   
 ## Known issues
-* Audio  
-  Audio quality could be improved, but playback timing is now stable and no longer drifts.
 * Disk II  
   Only, read-only, NIB file-type support.
 * SmartPort  
@@ -46,26 +44,27 @@ Press F2 to reveal the interface to a2m - the debugger and access to disk drives
 * Oliver Schmidt for, basically, teaching me all I know about the Apple II, but in this case showing me how easy it is to do SmartPort emulation.  
 * Zellyn Hunter for A2Audit.  That helped me identify and fix my Language Card bug.  (https://github.com/zellyn/a2audit)  
   
-## Initial release  
-The initial release was made in London, UK, on 31 October 2024.  
-
 ### Releases history:   
 31 Oct 2024
-:   Initial release
+:   Initial release - made in London, UK.
 
 8 Dec 2024
-:   Version 1.0 release
+:   Version 1.0 release.
 
 10 Dec 2024
-:   Version 1.1 release
+:   Version 1.1 release.
 
 23 Dec 2025
-:   Version 2.0 release  
+:   Version 2.0 release.
     The version 2 release is a re-architecture of the entire code base, as well as a rewrite of the 6502 core, adding a 65C02 mode. The Apple //e is also supported, along with many new features such as a NIB Disk II, resizable window, window pane sliders, and many more.
 
 4 Feb 2026
-:   Version 2.1 release  
+:   Version 2.1 release.
     This version fixes bugs and has tweaks above the V2.0 release, and it enhances the built-in assembler allowing it to compile the bulk of ca65 assembler targeted sources with only some edits.
+ 
+11 Feb 2026
+:   Version 2.11 release.
+    This version is mostly about UI; added an INI configuration dialog and load from within a2m as well as other tweaks. Breakpoints can now be set in any bank and will only break in that bank, not that PC in any bank.  Audio (speaker) also tweaked.
  
 ## Contact  
 Stefan Wessels  
