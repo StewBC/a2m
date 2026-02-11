@@ -296,15 +296,12 @@ The Slots view shows the hardware installed in the slots of the Apple 2. It is a
 
 \Needspace{7\baselineskip}
 With both SmartPort and floppy devices, there are a few buttons exposed. Next to Disk or Device 0, there is a button with the slot number, a dot, and a zero. Next to that is an Eject button, followed by an Insert button. The display looks something like this:
-
 ```
 Slot 5: Smartport  
 [5.0][Eject][Insert]  
 Slot 6: Disk II  
 [6.0][Eject][Insert]  
 ```
-
-
 Clicking Insert opens the file browser, and if an appropriate file is selected (NIB for Disk II and any file for SmartPort), the file name is shown to the right of the Insert button. For a Disk II device, more than one file can be inserted. When this is done, a new button appears, labelled Swap. The button also indicates which disk is currently inserted (from the sequence) and how many disks are in the sequence. This looks like:
 
 `[6.0][Eject][Insert][Swap (1/2)] This is disk 1.po`
@@ -316,6 +313,12 @@ The disk name, in this case, is "This is disk 1.po", and the button indicates th
 Clicking Eject removes the currently selected disk from the drive and from the queue.
 
 Clicking the button labelled `[Slot.0]` boots the disk in drive/device 0 of that slot.
+
+#### Configure INI
+The Configure INI button opens the `Machine Configuration Dialog`.  See the `Dialogs` section for more details.  Through this button, the startup `INI` files can be created and edited.
+
+#### Load INI
+This button opens a file browser that allows selection of a startup INI file.  Selection a new INI file will `reboot` the emulator and it will come up configured using the newly selected INI file.
 
 \Needspace{15\baselineskip}
 ### Debugger Misc View
