@@ -7,6 +7,7 @@
 typedef struct SCOPE SCOPE;
 
 typedef struct SCOPE {
+    int has_output_redirect;
     int scope_name_length;
     int scope_type;
     int anon_scope_id;
@@ -18,7 +19,6 @@ typedef struct SCOPE {
 
 // This should eventually live with an actual string pool
 char *set_name(char **s, const char *name, const int name_length);
-
 
 SCOPE *scope_add(ASSEMBLER *as, const char *name, const int name_length, SCOPE *parent, int type);
 SCOPE *scope_find_child(SCOPE *parent, const char *name, int name_length);

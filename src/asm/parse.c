@@ -830,18 +830,57 @@ void dot_segment(ASSEMBLER *as) {
 void dot_scope(ASSEMBLER *as) {
     const char *name;
     int name_length;
+    const char *file_name = NULL;
+    int file_name_length = 0;
+    const char *dest_name = NULL;
+    int dest_name_length = 0;
     char anon_name[11];
+    int has_output_redirect = 0;
     next_token(as);
     if(as->current_token.type == TOKEN_END) {
         name_length = snprintf(anon_name, 11, "anon_%04X", ++as->active_scope->anon_scope_id);
         name = anon_name;
     } else {
+        // This is a named scope - so it needs a file and/or dest
+        has_output_redirect = 1;
         name = as->current_token.name;
         name_length = as->current_token.name_length;
-
         if(symbol_has_scope_path(name, name_length)) {
             asm_err(as, ASM_ERR_DEFINE, "The name %.*s is scoped and not allowed as a scope name", name_length, name);
             return;
+        }
+        do {
+            next_token(as);
+            if(as->current_token.type == TOKEN_VAR) {
+                if(0 == strnicmp(as->token_start, "file", 4)) {
+                    next_token(as);
+                    expect_op(as, '=');
+                    if(as->current_token.type != TOKEN_STR) {
+                        asm_err(as, ASM_ERR_RESOLVE, "A named scope file= must be followed by a file name in quotes");
+                    } else {
+                        file_name = as->current_token.name;
+                        file_name_length = as->current_token.name_length;
+                    }
+                } else if(0 == strnicmp(as->token_start, "dest", 4)) {
+                    next_token(as);
+                    expect_op(as, '=');
+                    if(as->current_token.type != TOKEN_STR) {
+                        asm_err(as, ASM_ERR_RESOLVE, "A named scope must dest= must be followed by a name in quotes");
+                    } else {
+                        dest_name = as->current_token.name;
+                        dest_name_length = as->current_token.name_length;
+                    }
+                }
+            } else if(as->current_token.type != TOKEN_END) {
+                asm_err(as, ASM_ERR_RESOLVE, "A named scope must be followed by file=\"file name\" or dest=\"dest name\" or both");
+                break;
+            }
+        } while(as->current_token.type != TOKEN_END);
+        if(as->cb_assembler_ctx.output_redirect) {
+            as->cb_assembler_ctx.output_redirect(file_name, file_name_length, dest_name, dest_name_length);
+        } else {
+            asm_err(as, ASM_ERR_RESOLVE, "Named scope redirect not supported in this version of the assembler");
+            has_output_redirect = 0;
         }
     }
 
@@ -852,6 +891,7 @@ void dot_scope(ASSEMBLER *as) {
         SCOPE *s = scope_add(as, name, name_length, as->active_scope, GPERF_DOT_SCOPE);
         if(s) {
             scope_push(as, s);
+            s->has_output_redirect = has_output_redirect;
         }
     }
 }

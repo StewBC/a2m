@@ -6,10 +6,12 @@
 
 // Emit writes through an output function inside a conext
 typedef void (*output_byte)(void *user, uint16_t address, uint8_t byte_value);
+typedef void (*output_redirect)(const char *file_name, int file_name_length, const char *bank_name, int bank_name_length);
 
 typedef struct {
     void *user;
     output_byte output_byte;
+    output_redirect output_redirect;
 } CB_ASSEMBLER_CTX;
 
 
