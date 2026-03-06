@@ -456,8 +456,10 @@ void dot_endscope(ASSEMBLER *as) {
     if(as->active_scope->scope_type != GPERF_DOT_SCOPE) {
         asm_err(as, ASM_ERR_RESOLVE, ".endscope without a matching .scope");
     }
-    if(as->active_scope->has_output_redirect && as->cb_assembler_ctx.output_redirect_end) {
-        as->cb_assembler_ctx.output_redirect_end(as->cb_assembler_ctx.user, as->active_target->target_ctx);
+    if(as->active_scope->has_output_redirect) {
+        if(as->cb_assembler_ctx.output_redirect_end) {
+            as->cb_assembler_ctx.output_redirect_end(as->cb_assembler_ctx.user, as->active_target->target_ctx);
+        }
         as->active_target = as->active_target->prev_target;
     }
     if(!scope_pop(as)) {
