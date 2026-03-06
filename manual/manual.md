@@ -562,7 +562,8 @@ There is a set of directives that control how a 6502 source file is assembled. T
 | .include "f"    | Include a 6502 assembler file for assembly at this point                       |
 | .proc n         | Open a procedure (which behaves the same as a named scope)                     |
 | .endproc        | Closes the most recently opened named procedure                                |
-| .scope [n]      | Open a named (n) scope, or an anonymous scope if no name (n) provided          |
+| .scope          | Open an anonymous scope.  Useful in loops                                      |
+| .scope "n"      | Open a named scope, also known as a `Target`.  See `Targets` below             |
 | .endscope       | Closes the most recently opened scope                                          |
 | .segdef  "n",s[,e] | Define a named segment n, starting at s, and emit (default) or noemit       |
 | .segment "n"    | Activate the segment named n                                                   |
@@ -575,8 +576,29 @@ Notes:
 * The assembler runs in the folder of the input file, so includes must be relative to that folder.
 * .byte can take strings as well, but note that .strcode will not run on those strings.
 
+### Targets
+Using `.scope "name" [file="file name"[, dest="bank name"]]` it is possible to define new output targets.  A target is similar to a sub-project.  For example, you may use the following:
+```
+.scope "game_loader" file="loader.bin" dest="aux,lc2"
+; This is where the code that loads the rest of the executable goes
+; This scope can have .segdef's and .segments of its own
+.endscope
+.scope "exe" file="game.bin" dest="main"
+; This is another executable which could have a different set of .segdef's and .segments
+.endscope
+```
+The `file=` option is used by the command line assembler to write the generated output into the named file.  The `dest=` option is used by the assembler in the emulator to send the bytes to the named destination.  The destination is still subject to the output address specifiers (`.org` or `* =`), but it specifies which bank will be mapped when the address is written.  The names for `dest=` are:  
+```
+6502                - whatever memory is currently banked in in the emulator
+main                - the base 64K ram
+128K/aux            - AUX memory
+LC2/LC Bank/LCBank  - Language Card bank 2
+LC1                 - Language Card bank 1
+```
+These can be combined. For example `dest="aux,lc2"` will put the auxiliary `LC2` at `$D000`.  These words are all case-insensitive.
+
 \Needspace{11\baselineskip}
-The following dot directives work with dot commands:
+### The following dot directives work with dot commands:
 
 | Directive   | Meaning                                                                            |
 |:------------|:-----------------------------------------------------------------------------------|
