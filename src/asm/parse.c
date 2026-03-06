@@ -904,9 +904,13 @@ void dot_scope(ASSEMBLER *as) {
         void *target_ctx = as->cb_assembler_ctx.output_redirect_start(as->cb_assembler_ctx.user, file_name, file_name_length, dest_name, dest_name_length);
         if(target_ctx) {
             as->active_target = add_target(as, target_ctx);
-            as->active_target->name = name;
-            as->active_target->name_length = name_length;
-            has_output_redirect = 1;
+            if(as->active_target) {
+                as->active_target->name = name;
+                as->active_target->name_length = name_length;
+                has_output_redirect = 1;
+            } else {
+                as->cb_assembler_ctx.output_redirect_release_context(target_ctx);
+            }
         }
     }
 

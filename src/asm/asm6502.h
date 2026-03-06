@@ -11,11 +11,11 @@ typedef void (*output_redirect_end)(void *asm_ctx, void *target_ctx);
 typedef void (*output_redirect_release_context)(void *user);
 
 typedef struct {
-    void *user;
-    output_byte output_byte;
-    output_redirect_start output_redirect_start;
-    output_redirect_end output_redirect_end;
-    output_redirect_release_context output_redirect_release_context;
+    void *user;                                                         // *_REDIR_CTX - Almost certainly needed
+    output_byte output_byte;                                            // Must be provided
+    output_redirect_start output_redirect_start;                        // Must be provided
+    output_redirect_end output_redirect_end;                            // Can be NULL
+    output_redirect_release_context output_redirect_release_context;    // Must be provided
 } CB_ASSEMBLER_CTX;
 
 typedef struct ASSEMBLER {
