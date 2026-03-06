@@ -7,23 +7,14 @@
 //----------------------------------------------------------------------------
 // Output
 void emit_byte(ASSEMBLER *as, uint8_t byte_value) {
+    TARGET *target = as->active_target;
+    uint16_t address = target->active_segment->segment_output_address;
+
     if(as->pass == 2) {
-        if(as->active_segment) {
-            if(!as->active_segment->do_not_emit) {
-                as->cb_assembler_ctx.output_byte(as->cb_assembler_ctx.user, as->active_segment->segment_output_address, byte_value);
-            }
-            as->last_address = ++as->active_segment->segment_output_address;
-        } else {
-            as->cb_assembler_ctx.output_byte(as->cb_assembler_ctx.user, as->current_address, byte_value);
-            as->last_address = ++as->current_address;
-        }
-    } else {
-        if(as->active_segment) {
-            as->active_segment->segment_output_address++;
-        } else {
-            as->current_address++;
-        }
+        as->cb_assembler_ctx.output_byte(target->target_ctx, address, byte_value);
     }
+
+    target->active_segment->segment_output_address = address + 1;
 }
 
 void emit_opcode(ASSEMBLER *as) {

@@ -6,14 +6,17 @@
 
 // Emit writes through an output function inside a conext
 typedef void (*output_byte)(void *user, uint16_t address, uint8_t byte_value);
-typedef void (*output_redirect)(const char *file_name, int file_name_length, const char *bank_name, int bank_name_length);
+typedef void *(*output_redirect_start)(void *user, const char *file_name, int file_name_length, const char *bank_name, int bank_name_length);
+typedef void (*output_redirect_end)(void *asm_ctx, void *target_ctx);
+typedef void (*output_redirect_release_context)(void *user);
 
 typedef struct {
     void *user;
     output_byte output_byte;
-    output_redirect output_redirect;
+    output_redirect_start output_redirect_start;
+    output_redirect_end output_redirect_end;
+    output_redirect_release_context output_redirect_release_context;
 } CB_ASSEMBLER_CTX;
-
 
 typedef struct ASSEMBLER {
     CB_ASSEMBLER_CTX cb_assembler_ctx;                      // Emit uses this FNP to output the actual byte
@@ -23,7 +26,7 @@ typedef struct ASSEMBLER {
     DYNARRAY macros;                                        // Array of all macros
     DYNARRAY macro_buffers;                                 // Array of all buffers that macros expand into
     DYNARRAY macro_expand_stack;                            // Tracks macro renames per invocation
-    DYNARRAY segments;                                      // .segdef creates segment defenitions
+    DYNARRAY targets;                                       // Track TARGET*'s - default plus added with named .scope
     DYNARRAY scope_stack;                                   // Needed since scopes can be created outside parent
     INCLUDE_FILES include_files;                            // The arrays for files and stack for .include
     OPCODEINFO opcode_info;                                 // State of what is to be emitted in terms of 6502 opcodes
@@ -33,13 +36,9 @@ typedef struct ASSEMBLER {
     int macro_rename_id;                                    // Makes all .local's in macros unique
     int pass;                                               // 1 or 2 for 2 pass assembler
     int valid_opcodes;                                      // 0 = 65c02 (default), 1 = 6502
-    int verbose;                                            // cmd-line; 0 supress duplicates, 1 show all (up to 100)
     size_t current_line;                                    // for error reporting, line being processed
     size_t next_line_count;                                 // count of lines past last token
-    uint16_t current_address;                               // Address where next byte will be emitted
     uint16_t if_active;                                     // Count of if's (or else's) active
-    uint16_t last_address;                                  // Last address where the assembler put a byte
-    uint16_t start_address;                                 // First address where the assembler output a byte
     const char *current_file;                               // Points at a UTIL_FILE path_name
     const char *input;                                      // Points at the assembly language buffer (start through end)
     const char *line_start;                                 // Just past \n of line input is on
@@ -48,13 +47,13 @@ typedef struct ASSEMBLER {
     const char *token_start;                                // Points at the start of a token (and input the end)
     SCOPE *root_scope;
     SCOPE *active_scope;
-    SEGMENT *active_segment;
+    TARGET *active_target;
     DYNARRAY *symbol_table;                                 // Array of arrays of symbols
     ERRORLOG *errorlog;                                     // ptr to log that tracks errors
 } ASSEMBLER;
 
 static inline uint16_t current_output_address(ASSEMBLER *as) {
-        return as->active_segment ? as->active_segment->segment_output_address : as->current_address;
+        return as->active_target->active_segment->segment_output_address;
 }
 
 int is_label(ASSEMBLER *as);
@@ -62,6 +61,6 @@ int is_opcode(ASSEMBLER *as);
 int is_parse_dot_command(ASSEMBLER *as);
 int is_variable(ASSEMBLER *as);
 
-int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, void *user, output_byte ob);
+int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, CB_ASSEMBLER_CTX *cb_asm_ctx, void *initial_target_context);
 int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address);
 void assembler_shutdown(ASSEMBLER *as);

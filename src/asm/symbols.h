@@ -19,7 +19,7 @@ typedef struct {
     SYMBOL_TYPE symbol_type;
     const char *symbol_name;                                // Non-null-terminated name
     uint32_t symbol_length;                                 // Name length
-    uint64_t symbol_hash;
+    uint32_t symbol_hash;
     uint64_t symbol_value;
     uint32_t symbol_width;                                  // 0 - depends on value, 16 not 1 byte
 } SYMBOL_LABEL;

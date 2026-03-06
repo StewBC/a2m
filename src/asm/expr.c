@@ -153,10 +153,12 @@ static int64_t expr_primary(ASSEMBLER *as) {
                         // it resolves, if it ever resolves
                         SCOPE *s = as->active_scope->parent_scope;
                         while(s) {
-                            sl = symbol_lookup_chain(s, sl->symbol_hash, sl->symbol_name, sl->symbol_length);
-                            if(sl && sl->symbol_type != SYMBOL_UNKNOWN) {
+                            SYMBOL_LABEL *sl1 = symbol_lookup_chain(s, sl->symbol_hash, sl->symbol_name, sl->symbol_length);
+                            if(sl1 && sl1->symbol_type != SYMBOL_UNKNOWN) {
                                 // It resolved to not UNKNOWN
                                 as->expression_size = 16;
+                                sl->symbol_value = sl1->symbol_value;
+                                sl->symbol_type = sl1->symbol_type;
                                 break;
                             }
                             s = s->parent_scope;

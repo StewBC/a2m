@@ -17,10 +17,12 @@ typedef struct {                             // This is for the formal macro par
 //----------------------------------------------------------------------------
 // Parser static helpers
 static inline void set_current_output_address(ASSEMBLER *as, uint16_t address) {
-    if(as->active_segment) {
-        as->active_segment->segment_output_address = address;
+    if(address > as->active_target->active_segment->segment_output_address) {
+        as->active_target->active_segment->segment_output_address = address; 
     } else {
-        as->current_address = address;
+        // SQW - this means segment 50, .org 100, .res 1, .org 50 will error
+        // But unless I keep spans or masks I can't really do this differently, I think?
+        asm_err(as, ASM_ERR_RESOLVE, "Address set to $%04X but is already at $%04X", address, as->active_target->active_segment->segment_output_address);
     }
 }
 
@@ -451,9 +453,16 @@ bad_nesting:
 }
 
 void dot_endscope(ASSEMBLER *as) {
-    if(as->active_scope->scope_type != GPERF_DOT_SCOPE || !scope_pop(as)) {
+    if(as->active_scope->scope_type != GPERF_DOT_SCOPE) {
         asm_err(as, ASM_ERR_RESOLVE, ".endscope without a matching .scope");
-    }    
+    }
+    if(as->active_scope->has_output_redirect && as->cb_assembler_ctx.output_redirect_end) {
+        as->cb_assembler_ctx.output_redirect_end(as->cb_assembler_ctx.user, as->active_target->target_ctx);
+        as->active_target = as->active_target->prev_target;
+    }
+    if(!scope_pop(as)) {
+        asm_err(as, ASM_ERR_RESOLVE, ".endscope without a matching .scope");
+    }
 }
 
 void dot_for(ASSEMBLER *as) {
@@ -655,12 +664,15 @@ void dot_macro(ASSEMBLER *as) {
 
 void dot_org(ASSEMBLER *as) {
     uint64_t value = expr_full_evaluate(as);
-    if(as->current_address > value) {
-        asm_err(as, ASM_ERR_RESOLVE, "Assigning address %"PRIx64" when address is already %04X error", value, as->current_address);
+    SEGMENT *s = as->active_target->active_segment;
+    uint16_t *address = &s->segment_output_address;
+    if(*address > value) {
+        asm_err(as, ASM_ERR_RESOLVE, "Assigning address %"PRIx64" when address is already %04X error", value, *address);
     } else {
-        as->current_address = value;
-        if(value < as->start_address) {
-            as->start_address = value;
+        *address = value;
+        if(!s->segment_init) {
+            s->segment_start_address = value;
+            s->segment_init = 1;
         }
     }
 }
@@ -759,29 +771,36 @@ void dot_res(ASSEMBLER *as) {
 }
 
 void dot_segdef(ASSEMBLER *as) {
-    SEGMENT seg;
     int err = 0;
-    memset(&seg, 0, sizeof(SEGMENT));
+    SEGMENT *segment = (SEGMENT *)malloc(sizeof(SEGMENT));
+    if(!segment) {
+        asm_err(as, ASM_ERR_FATAL, "Out of memory");
+        return;
+    }
+    memset(segment, 0, sizeof(SEGMENT));
 
     next_token(as);
     if(as->current_token.type != TOKEN_STR) {
         asm_err(as, ASM_ERR_RESOLVE, ".segdef expects a quoted segment name");
         return;
     }
-    seg.segment_name = as->current_token.name;
-    seg.segment_name_length = as->current_token.name_length;
-    seg.segment_name_hash = as->current_token.name_hash;
-    if(segment_find(&as->segments, &seg)) {
-        asm_err(as, ASM_ERR_DEFINE, "Segment %.*s has already been defined", seg.segment_name_length, seg.segment_name);
+    segment->segment_name = as->current_token.name;
+    segment->segment_name_length = as->current_token.name_length;
+    segment->segment_name_hash = as->current_token.name_hash;
+    if(segment_find(&as->active_target->segments, segment)) {
+        asm_err(as, ASM_ERR_DEFINE, "Segment %.*s has already been defined", segment->segment_name_length, segment->segment_name);
+        free(segment);
         return;
     }
     next_token(as);
     if(as->current_token.type != TOKEN_END || as->current_token.op != ',') {
         asm_err(as, ASM_ERR_RESOLVE, ".segdef expects a comma then a start address after the name");
+        free(segment);
         return;
     }
-    seg.segment_start_address = expr_full_evaluate(as);
-    seg.segment_output_address = seg.segment_start_address;
+    segment->segment_start_address = expr_full_evaluate(as);
+    segment->segment_output_address = segment->segment_start_address;
+    segment->segment_init = 1;
     if(as->current_token.type != TOKEN_END || as->current_token.op == ',') {
         next_token(as);
         if(as->current_token.type != TOKEN_VAR) {
@@ -789,19 +808,20 @@ void dot_segdef(ASSEMBLER *as) {
         }
         if(!err) {
             if(as->current_token.name_length == 4 && 0 == strnicmp(as->current_token.name, "emit", 4)) {
-                seg.do_not_emit = 0;
+                segment->do_not_emit = 0;
             } else if(as->current_token.name_length == 6 && 0 == strnicmp(as->current_token.name, "noemit", 6)) {
-                seg.do_not_emit = 1;
+                segment->do_not_emit = 1;
             } else {
                 err = 1;
             }
         }
         if(err) {
             asm_err(as, ASM_ERR_RESOLVE, "The optional parameter to .segdef after the name and start is either emit or noemit");
+            free(segment);
             return;
         }
     }
-    ARRAY_ADD(&as->segments, seg);
+    ARRAY_ADD(&as->active_target->segments, segment);
 }
 
 void dot_segment(ASSEMBLER *as) {
@@ -817,14 +837,14 @@ void dot_segment(ASSEMBLER *as) {
     seg.segment_name_hash = as->current_token.name_hash;
     // Empty segment name "turns off" segments
     if(seg.segment_name_length) {
-        s = segment_find(&as->segments, &seg);
+        s = segment_find(&as->active_target->segments, &seg);
         if(!s) {
             asm_err(as, ASM_ERR_DEFINE, "Segment %.*s not defined", seg.segment_name_length, seg.segment_name);
             return;
         }
     }
     // Activate a segment
-    as->active_segment = s;
+    as->active_target->active_segment = s;
 }
 
 void dot_scope(ASSEMBLER *as) {
@@ -842,7 +862,6 @@ void dot_scope(ASSEMBLER *as) {
         name = anon_name;
     } else {
         // This is a named scope - so it needs a file and/or dest
-        has_output_redirect = 1;
         name = as->current_token.name;
         name_length = as->current_token.name_length;
         if(symbol_has_scope_path(name, name_length)) {
@@ -851,6 +870,10 @@ void dot_scope(ASSEMBLER *as) {
         }
         do {
             next_token(as);
+            // file="" dest="" and file="", dest="" are both acceptable
+            if(as->current_token.op == ',') {
+                next_token(as);
+            }
             if(as->current_token.type == TOKEN_VAR) {
                 if(0 == strnicmp(as->token_start, "file", 4)) {
                     next_token(as);
@@ -876,11 +899,12 @@ void dot_scope(ASSEMBLER *as) {
                 break;
             }
         } while(as->current_token.type != TOKEN_END);
-        if(as->cb_assembler_ctx.output_redirect) {
-            as->cb_assembler_ctx.output_redirect(file_name, file_name_length, dest_name, dest_name_length);
-        } else {
-            asm_err(as, ASM_ERR_RESOLVE, "Named scope redirect not supported in this version of the assembler");
-            has_output_redirect = 0;
+        void *target_ctx = as->cb_assembler_ctx.output_redirect_start(as->cb_assembler_ctx.user, file_name, file_name_length, dest_name, dest_name_length);
+        if(target_ctx) {
+            as->active_target = add_target(as, target_ctx);
+            as->active_target->name = name;
+            as->active_target->name_length = name_length;
+            has_output_redirect = 1;
         }
     }
 
@@ -961,16 +985,15 @@ void parse_address(ASSEMBLER *as) {
             break;
         case 2:
             address = value;
+            if(!as->active_target->active_segment->segment_init) {
+                as->active_target->active_segment->segment_init = 1;
+            }
             break;
     }
     if(current_output_address(as) > address) {
         asm_err(as, ASM_ERR_RESOLVE, "Assigning address %04X when address is already %04X error", address, current_output_address(as));
     } else {
         set_current_output_address(as, address);
-        // as->current_address = address;
-        if(address < as->start_address) {
-            as->start_address = address;
-        }
     }
 }
 

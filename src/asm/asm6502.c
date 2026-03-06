@@ -94,21 +94,26 @@ int is_variable(ASSEMBLER *as) {
 
 //----------------------------------------------------------------------------
 // Assembler start and end routines
-int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, void *user, output_byte ob) {
+int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, CB_ASSEMBLER_CTX *cb_asm_ctx, void *initial_target_context) {
 
     memset(as, 0, sizeof(ASSEMBLER));
     as->errorlog = errorlog;
-    as->cb_assembler_ctx.user = user;
-    as->cb_assembler_ctx.output_byte = ob;
+    as->cb_assembler_ctx = *cb_asm_ctx;
 
     ARRAY_INIT(&as->anon_symbols, uint16_t);
     ARRAY_INIT(&as->loop_stack, LOOP);
     ARRAY_INIT(&as->macros, MACRO);
     ARRAY_INIT(&as->macro_buffers, char *);
     ARRAY_INIT(&as->macro_expand_stack, MACRO_EXPAND);
-    ARRAY_INIT(&as->segments, SEGMENT);
+    ARRAY_INIT(&as->targets, TARGET*);
     ARRAY_INIT(&as->scope_stack, SCOPE*);
     ARRAY_INIT(&as->input_stack, INPUT_STACK);
+
+    as->active_target = add_target(as, initial_target_context);
+
+    if(!as->active_target) {
+        return A2_ERR;
+    }
 
     as->root_scope = (SCOPE*)malloc(sizeof(SCOPE));
     if(!as->root_scope || A2_OK != scope_init(as->root_scope, GPERF_DOT_SCOPE)) {
@@ -119,17 +124,72 @@ int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, void *user, output_byte ob
     }
     as->root_scope->scope_name_length = 4;
     scope_push(as, as->root_scope);
-
     include_files_init(as);
 
-    as->start_address = -1;
-    as->last_address = 0;
     as->pass = 0;
     return A2_OK;
 }
 
+static void assembler_reset_targets_and_scopes(ASSEMBLER *as) {
+    // Leave the original unnamed segment alive
+    for(size_t i = 1; i < as->targets.items; i++) {
+        TARGET *t = *ARRAY_GET(&as->targets, TARGET*, i);
+        for(size_t j = 0; j < t->segments.items; j++) {
+            SEGMENT *s = *ARRAY_GET(&t->segments, SEGMENT*, j);
+            free(s);
+        }
+        array_free(&t->segments);
+        as->cb_assembler_ctx.output_redirect_release_context(t->target_ctx);
+        free(t);
+    }
+    // And leave the original target alive as well
+    as->active_target = *ARRAY_GET(&as->targets, TARGET*, 0);
+    as->active_target->segments.items = 1;
+    as->active_target->active_segment = *ARRAY_GET(&as->active_target->segments, SEGMENT*, 0);
+    as->active_target->active_segment->segment_output_address = as->active_target->active_segment->segment_start_address;
+    as->targets.items = 1;
+    as->active_scope = as->root_scope;
+    scope_reset_ids(as->active_scope);       
+    as->macro_rename_id = 0;    // Reset the global macro unique making ID
+}
+
 static int assembler_segments_sort(const void *lhs, const void *rhs) {
-    return ((SEGMENT*)lhs)->segment_start_address >= ((SEGMENT*)rhs)->segment_start_address;
+    return (*(SEGMENT**)lhs)->segment_start_address >= (*(SEGMENT**)rhs)->segment_start_address;
+}
+
+static void assembler_segment_errors(ASSEMBLER *as) {
+    for(int i=0; i < as->targets.items; i++) {
+        TARGET *t = *ARRAY_GET(&as->targets, TARGET*, i);
+        if(t->segments.items) {
+            // Sort in ouput order
+            qsort(t->segments.data, t->segments.items, t->segments.element_size, assembler_segments_sort);
+            uint32_t emit = 0, issue = 0;
+            uint16_t emit_end;
+            // show errors for overlapping segments
+            for(int si = 0; si < t->segments.items; si++) {
+                SEGMENT *s = *ARRAY_GET(&t->segments, SEGMENT*, si);
+                if(s->do_not_emit) {
+                    continue;
+                }
+                if(!emit) {
+                    emit_end = s->segment_output_address;
+                    emit = 1;
+                } else {
+                    // There is no warning mechanism and I don't want intentional "growth gaps"
+                    // to stop the iteration process, so ignore gaps, just error overlaps
+                    if(s->segment_start_address < emit_end) {
+                        asm_err(as, ASM_ERR_RESOLVE, "Start Segment %.*s at $%04X*", s->segment_name_length, s->segment_name, emit_end);
+                        issue = 1;
+                    }
+                    uint16_t seg_size = s->segment_output_address - s->segment_start_address;
+                    emit_end += seg_size;
+                }
+            }
+            if(issue) {
+                asm_err(as, ASM_ERR_RESOLVE, "* Offsets may be slightly off, based on .align statement changing output size");
+            }
+        }
+    }
 }
 
 int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) {
@@ -152,7 +212,6 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
             return A2_ERR;
         }
         as->current_file = ARRAY_GET(&as->include_files.included_files, UTIL_FILE, 0)->file_display_name;
-        as->current_address = address;
         as->pass++;
         if(as->active_scope != as->root_scope) {
             asm_err(as, ASM_ERR_RESOLVE, "Scope error.  Open scope %.*s, or one of its children, was not closed", as->active_scope->scope_name_length, as->active_scope->scope_name);
@@ -162,10 +221,9 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
             scope_pop(as);
         }
         // Reset scopes (solves open scope isues and repeatability, of course)
-        as->active_scope = as->root_scope;
-        scope_reset_ids(as->active_scope);       
-        as->segments.items = 0;     // Reset segment defenitions (for pass 2, really)
-        as->macro_rename_id = 0;    // Reset the global macro unique making ID
+        if(as->pass == 2) {
+            assembler_reset_targets_and_scopes(as);
+        }
         while(as->pass < 3) {
             do {
                 // a newline returns an empty token so keep
@@ -218,38 +276,11 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
         flush_macros(as);
     }
     as->token_start = as->input = as->line_start = NULL;
-    if(as->segments.items) {
-        // Show all errors
-        as->error_log_level = 1;
-        // Sort in ouput order
-        qsort(as->segments.data, as->segments.items, as->segments.element_size, assembler_segments_sort);
-        uint32_t emit = 0, issue = 0;
-        uint16_t emit_end;
-        // show errors for overlapping segments
-        for(int si = 0; si < as->segments.items; si++) {
-            SEGMENT *s = ARRAY_GET(&as->segments, SEGMENT, si);
-            if(s->do_not_emit) {
-                continue;
-            }
-            if(!emit) {
-                emit_end = s->segment_output_address;
-                emit = 1;
-            } else {
-                // There is no warning mechanism and I don't want intentional "growth gaps"
-                // to stop the iteratioin process, so ignore gaps, just error overlaps
-                if(s->segment_start_address < emit_end) {
-                    asm_err(as, ASM_ERR_RESOLVE, "Start Segment %.*s at $%04X*", s->segment_name_length, s->segment_name, emit_end);
-                    issue = 1;
-                }
-                uint16_t seg_size = s->segment_output_address - s->segment_start_address;
-                emit_end += seg_size;
-            }
-        }
-        if(issue) {
-            asm_err(as, ASM_ERR_RESOLVE, "* Offsets may be slightly off, based on .align statement changing output size");
-        }
-    }
+    // Show all errors
+    as->error_log_level = 1;
+    assembler_segment_errors(as);
     if(name) {
+        // Go back to the start folder if it was changed
         util_dir_change(start_path);
     }
     return A2_OK;
@@ -267,8 +298,20 @@ void assembler_shutdown(ASSEMBLER *as) {
         free(buf);
         as->macro_buffers.items--;
     }
+
+    // Clean up the targets and the contexts within the targets
+    for(size_t i = 0; i < as->targets.items; i++) {
+        TARGET *t = *ARRAY_GET(&as->targets, TARGET*, i);
+        for(size_t j = 0; j < t->segments.items; j++) {
+            SEGMENT *s = *ARRAY_GET(&t->segments, SEGMENT*, j);
+            free(s);
+        }
+        array_free(&t->segments);
+        as->cb_assembler_ctx.output_redirect_release_context(t->target_ctx);
+        free(t);
+    }    
     array_free(&as->input_stack);
-    array_free(&as->segments);
+    array_free(&as->targets);
     array_free(&as->macros);
     array_free(&as->macro_buffers);
     array_free(&as->loop_stack);

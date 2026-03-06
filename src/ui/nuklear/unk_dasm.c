@@ -62,9 +62,14 @@ static const uint8_t valid_dasm_opcodes_65c02[256] = {
 
 // This is a user context for the in-memory assembler - contains flags for where to assemble to
 typedef struct {
+    APPLE2 *m;          // This is copied from MEM_REDIR_CTX.m
+    VIEW_FLAGS flags;
+} MEM_TARGET;
+
+typedef struct {
+    ASSEMBLER *as;
     APPLE2 *m;
-    VIEW_FLAGS asm_dst_flags;
-} MEM_ASM_CTX;
+} MEM_REDIR_CTX;
 
 static inline struct nk_color unk_dasm_blend(struct nk_color a, struct nk_color b, float t) {
     return nk_rgb(a.r * (1.0f - t) + b.r * t, a.g * (1.0f - t) + b.g * t, a.b * (1.0f - t) + b.b * t);
@@ -374,10 +379,42 @@ void unk_dasm_resize_view(UNK *v) {
 
 // This is an in-memory version - it writes to the selected banks based on the flags
 void output_byte_at_address(void *user, uint16_t address, uint8_t byte_value) {
-    MEM_ASM_CTX *asx = (MEM_ASM_CTX*)user;
-    APPLE2 *m = asx->m;
-    VIEW_FLAGS dest_flags = asx->asm_dst_flags;
-    write_to_memory_in_view(m, dest_flags, address, byte_value);
+    MEM_TARGET *mt = (MEM_TARGET*)user;
+    APPLE2 *m = mt->m;
+    VIEW_FLAGS flags = mt->flags;
+    write_to_memory_in_view(m, flags, address, byte_value);
+}
+
+void *output_redirect_start_mem(void *user, const char *file_name, int file_name_length, const char *bank_name, int bank_name_length) {
+    UNUSED(file_name);
+    UNUSED(file_name_length);
+    MEM_REDIR_CTX *asx = (MEM_REDIR_CTX*)user;
+    MEM_TARGET *target = NULL;
+    if(bank_name_length) {
+        char *str = malloc(bank_name_length+1);
+        if(!str) {
+            return NULL;
+        }
+        memcpy(str, bank_name, bank_name_length);
+        str[bank_name_length] = '\0';
+        target = malloc(sizeof(MEM_TARGET));
+        if(target) {
+            memset(target, 0, sizeof(MEM_TARGET));
+            target->m = asx->m;
+            target->flags = cmn_parse_mem_dest_string(str);
+        }
+        free(str);
+    }
+    return target;
+}
+
+void output_redirect_end_mem(void *asm_ctx_user, void *target_ctx) {
+    UNUSED(asm_ctx_user);
+    UNUSED(target_ctx);
+}
+
+void mem_target_release(void *user) {
+    free(user);
 }
 
 void unk_dasm_process_event(UNK *v, SDL_Event *e) {
@@ -444,8 +481,17 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
 
                         // Creat the assembler and init clears it to all 0's
                         ASSEMBLER as;
-                        MEM_ASM_CTX asx = {m, ac->flags};
-                        assembler_init(&as, &dv->errorlog, &asx, (output_byte)output_byte_at_address);
+                        MEM_REDIR_CTX mr_ctx = {&as, m};
+                        MEM_TARGET *mt = malloc(sizeof(MEM_TARGET));
+                        if(!mt) {
+                            // Out of memory
+                            return;
+                        }
+                        mt->m = m;
+                        mt->flags = ac->flags;
+                        CB_ASSEMBLER_CTX cba_mem_ctx = {&mr_ctx, output_byte_at_address, output_redirect_start_mem, NULL, mem_target_release};
+
+                        assembler_init(&as, &dv->errorlog, &cba_mem_ctx, mt);
                         // The assembler valid opcodes are 0 = 65c02, so opposite to this
                         as.valid_opcodes = MODEL_APPLE_IIEE - m->model;
                         if(A2_OK != assembler_assemble(&as, ac->file_browser.dir_selected.name, 0)) {
