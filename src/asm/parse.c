@@ -731,6 +731,9 @@ void dot_repeat(ASSEMBLER *as) {
         } else {
             asm_err(as, ASM_ERR_RESOLVE, ".repeat expects a variale after a comma, after the number of iterations");
         }
+    } else {
+        repeat_loop.variable_name = NULL;
+        repeat_loop.variable_name_lengt = 0;
     }
 
     // evaluate the condition
@@ -742,10 +745,12 @@ void dot_repeat(ASSEMBLER *as) {
             asm_err(as, ASM_ERR_RESOLVE, ".repeat without .endrepeat");
         }
     } else {
-        do {
-            get_token(as);
-        } while(*as->input && as->token_start != as->input);
-        // to find the loop body
+        if(as->token_start != as->input) {
+            do {
+                get_token(as);
+            } while(*as->input && as->token_start != as->input);
+        }
+        // found the loop body
         repeat_loop.loop_body_start = as->input;
         repeat_loop.body_line = as->current_line + as->next_line_count;
         ARRAY_ADD(&as->loop_stack, repeat_loop);

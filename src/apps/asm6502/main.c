@@ -268,6 +268,8 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
+    symbol_write(&fr_ctx.as, "_asm6502_tool", 13, SYMBOL_VARIABLE, 1);
+
     if(A2_OK != assembler_assemble(&fr_ctx.as, input_file, 0)) {
         fprintf(stderr, "File %s could not be opened\n", input_file);
         exit(1);

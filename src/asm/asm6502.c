@@ -232,20 +232,6 @@ int assembler_assemble(ASSEMBLER *as, const char *input_file, uint16_t address) 
             } while(as->token_start == as->input && *as->input);
 
             if(as->token_start == as->input) {
-                // Make sure all opened constructs were closed as well
-                if(as->if_active) {
-                    as->if_active = 0;
-                    asm_err(as, ASM_ERR_RESOLVE, ".if without .endif");
-                }
-                if(as->loop_stack.items) {
-                    LOOP *loop = ARRAY_GET(&as->loop_stack, LOOP, as->loop_stack.items - 1);
-                    if(loop->loop_type == LOOP_FOR) {
-                        asm_err(as, ASM_ERR_RESOLVE, ".for L:%05zu, without .endfor", loop->body_line - 1);
-                    } else {
-                        asm_err(as, ASM_ERR_RESOLVE, ".repeat L:%05zu, without .endrepeat", loop->body_line - 1);
-                    }
-                    as->loop_stack.items = 0;
-                }
                 // The end of the file has been reached so if it was an included file
                 // pop to the parent, or end
                 if(A2_OK == include_files_pop(as)) {

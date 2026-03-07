@@ -492,6 +492,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
                         CB_ASSEMBLER_CTX cba_mem_ctx = {&mr_ctx, output_byte_at_address, output_redirect_start_mem, NULL, mem_target_release};
 
                         assembler_init(&as, &dv->errorlog, &cba_mem_ctx, mt);
+                        symbol_write(&as, "_asm6502_tool", 13, SYMBOL_VARIABLE, 0);
                         // The assembler valid opcodes are 0 = 65c02, so opposite to this
                         as.valid_opcodes = MODEL_APPLE_IIEE - m->model;
                         if(A2_OK != assembler_assemble(&as, ac->file_browser.dir_selected.name, 0)) {
