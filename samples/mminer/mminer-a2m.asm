@@ -24,7 +24,7 @@
     bit MIXCLR
     bit HISCR
     bit HIRES
-    jmp $6000       ; Start the game, like the loader would
+    jmp game::main  ; Start the game, like the loader would
 .endif
 
 ; This is the Manic Miner Game.  The loader would load this from Floppy

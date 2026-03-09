@@ -142,6 +142,17 @@ static int64_t expr_primary(ASSEMBLER *as) {
                 if(!sl) {
                     // Make a symbol so that, in future, the 16-bit-ness is remembered
                     sl = symbol_write(as, as->current_token.name, as->current_token.name_length, SYMBOL_UNKNOWN, 0xFFFF);
+                    if(!sl) {
+                        // Forward ref of scoped path will fail
+                        if(symbol_has_scope_path(as->current_token.name, as->current_token.name_length)) {
+                            // But make it 16 bit - this could be wrong, but unlikely
+                            return 65535;
+                        } else {
+                            // Probably out of memory
+                            asm_err(as, ASM_ERR_RESOLVE, "Symbol %.*s could not be created/", as->current_token.name_length, as->current_token.name);
+                            return 0x0;
+                        }
+                    }
                 }
                 // Looking up an undefined makes it 16-bit - no choice
                 sl->symbol_width = 16;
