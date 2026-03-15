@@ -1030,6 +1030,8 @@ void io_setup(APPLE2 *m) {
     } else {
         // This allows the same io_slot handler for both models
         io_mem_bank_state_set(m, A2S_SLOT3ROM_MB_DISABLE);
+        // But m->rom_shadow_pages[3] is not yet set up, so map RAM
+        pages_map(&m->pages, PAGE_MAP_READ, 0xC300, 0x100, &m->ram);
     }
     // Set up the LC
     io_mem_bank_state_set(m, A2S_LC_BANK2 | A2S_LC_WRITE | A2S_LC_PRE_WRITE);
