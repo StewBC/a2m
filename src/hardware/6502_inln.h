@@ -4,7 +4,7 @@
 
 #pragma once
 
-#define CYCLE(m)     m->cpu.cycles++
+#define CYCLE(m)     do { m->cpu.cycles++; } while(0)
 
 // Memory access
 static inline uint8_t read_from_memory(APPLE2 *m, uint16_t address) {
@@ -13,6 +13,11 @@ static inline uint8_t read_from_memory(APPLE2 *m, uint16_t address) {
     assert(page < m->pages.num_pages);
     // RAM_WATCH is always a single 64K watch map, independent of banking
     uint8_t cb_mask = m->ram.RAM_WATCH[address];
+    // If ROM is mapped, the IO_PORTS are "hidden"
+    if((cb_mask & WATCH_IO_PORT) && (m->state_flags & A2S_CXSLOTROM_MB_ENABLE) &&
+            (address >= 0xC100 && address < 0xC800)) {
+        cb_mask &= ~WATCH_IO_PORT;
+    }
     uint8_t byte = m->pages.read_pages[page][offset];
     if(cb_mask) {
         // Want to do read before breakpoint is checked
@@ -30,12 +35,17 @@ static inline void write_to_memory(APPLE2 *m, uint16_t address, uint8_t value) {
     size_t page = address / PAGE_SIZE;
     size_t offset = address % PAGE_SIZE;
     assert(page < m->pages.num_pages);
-    // RAM_WATCH is always a single 64K watch map, independent of banking
-    uint8_t cb_mask = m->ram.RAM_WATCH[address];
     uint64_t last_write = m->pages.last_write_pages[page][offset];
     last_write <<= 16;
     last_write |= m->cpu.opcode_pc;
     m->pages.last_write_pages[page][offset] = last_write;
+    // RAM_WATCH is always a single 64K watch map, independent of banking
+    uint8_t cb_mask = m->ram.RAM_WATCH[address];
+    // If ROM is mapped, the IO_PORTS are "hidden"
+    if((cb_mask & WATCH_IO_PORT) && (m->state_flags & A2S_CXSLOTROM_MB_ENABLE) &&
+            (address >= 0xC100 && address < 0xC800)) {
+        cb_mask &= ~WATCH_IO_PORT;
+    }
     if(cb_mask) {
         if(cb_mask & WATCH_IO_PORT) {
             io_callback_w(m, address, value);
@@ -802,6 +812,51 @@ static inline void a2_brk(APPLE2 *m) {
     // m->a2out_cb.cb_brk_ctx.cb_breakpoint(m->a2out_cb.cb_brk_ctx.user, m->cpu.pc, 0);
 }
 
+static inline void a2_irq(APPLE2 *m) {
+    uint8_t old_flags = m->cpu.flags;
+    uint16_t vector_from = m->cpu.pc;
+
+    m->cpu.pc = 0xFFFE;
+    a(m);
+    m->cpu.pc = m->cpu.address_16;
+    m->cpu.I = 1;
+    if(m->cpu.class == CPU_65c02) {
+        m->cpu.D = 0;
+    }
+}
+
+static inline uint8_t a2_irq_pending(APPLE2 *m) {
+    return mockingboard_irq_pending(m);
+}
+
+static inline uint8_t a2_take_irq_if_pending(APPLE2 *m) {
+    uint8_t pending = a2_irq_pending(m);
+    uint8_t irq_disable = m->cpu.I;
+    if(m->cpu.irq_defer) {
+        irq_disable = m->cpu.irq_defer_i;
+    }
+    if(!pending || irq_disable) {
+        if(m->cpu.irq_defer) {
+            m->cpu.irq_defer = 0;
+        }
+        return 0;
+    }
+    if(m->cpu.irq_defer) {
+        m->cpu.irq_defer = 0;
+    }
+
+    m->cpu.opcode_pc = m->cpu.pc;
+    read_from_memory(m, m->cpu.pc);
+    CYCLE(m);
+    read_sp(m);
+    pc_hi_to_stack(m);
+    pc_lo_to_stack(m);
+    push(m, (m->cpu.flags & (uint8_t)~0b00010000) | 0b00100000);
+    CYCLE(m);
+    a2_irq(m);
+    return 1;
+}
+
 static inline void clc(APPLE2 *m) {
     read_from_memory(m, m->cpu.pc);
     m->cpu.C = 0;
@@ -816,6 +871,8 @@ static inline void cld(APPLE2 *m) {
 
 static inline void cli(APPLE2 *m) {
     read_from_memory(m, m->cpu.pc);
+    m->cpu.irq_defer = 1;
+    m->cpu.irq_defer_i = 1;
     m->cpu.I = 0;
     CYCLE(m);
 }
@@ -1134,6 +1191,8 @@ static inline void sed(APPLE2 *m) {
 
 static inline void sei(APPLE2 *m) {
     read_pc(m);
+    m->cpu.irq_defer = 1;
+    m->cpu.irq_defer_i = 0;
     m->cpu.I = 1;
 }
 

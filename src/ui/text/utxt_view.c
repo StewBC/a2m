@@ -269,7 +269,7 @@ int utxt_process_events(UI *ui, APPLE2 *m) {
                     v->ctrl ^= 1;
                     break;
                 case RTK_DEL:
-                    rt_machine_reset(rt);
+                    rt_machine_reset(rt, 1);
                     break;
                 case RTK_TURBO:
                     if(++rt->turbo_index >= rt->turbo_count) {

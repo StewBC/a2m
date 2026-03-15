@@ -27,6 +27,7 @@ typedef struct {
 
     // speaker state (+1/-1)
     float level;
+    float mockingboard_gain;
 
     // simple filter state (optional)
     float x_prev;

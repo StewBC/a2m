@@ -830,30 +830,36 @@ static inline uint8_t io_c0_diskii_helper(APPLE2 *m, uint16_t a, uint8_t slot) {
 uint8_t io_c0_read_slot(APPLE2 *m, uint16_t a) {
     // Device Select
     int slot = (a >> 4) & 0x7;
+    uint8_t value = floating_bus();
     switch(m->slot_cards[slot].slot_type) {
         case SLOT_TYPE_DISKII:
-            return io_c0_diskii_helper(m, a, slot);
+            value = io_c0_diskii_helper(m, a, slot);
+            break;
 
         case SLOT_TYPE_SMARTPORT:
             switch(a & 0x0f) {
                 case SP_DATA:
-                    return m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_read_offset++];
+                    value = m->sp_device[slot].sp_buffer[m->sp_device[slot].sp_read_offset++];
                     break;
 
                 case SP_STATUS:
-                    return m->sp_device[slot].sp_status;
+                    value = m->sp_device[slot].sp_status;
                     break;
             }
+            break;
+
+        case SLOT_TYPE_MOCKINGBOARD:
+            value = mockingboard_read(m, &m->mockingboard[slot], slot, a, (uint8_t)(a & 0x0F));
             break;
 
         case SLOT_TYPE_VIDEX_API: {
                 FRANKLIN_DISPLAY *fd80 = &m->franklin_display;
                 fd80->bank = (a & 0x0C) >> 2;
-                return fd80->registers[a & 0x0F];
+                value = fd80->registers[a & 0x0F];
             }
             break;
     }
-    return floating_bus();
+    return value;
 }
 
 void io_c0_write_slot(APPLE2 *m, uint16_t a, uint8_t v) {
@@ -887,6 +893,10 @@ void io_c0_write_slot(APPLE2 *m, uint16_t a, uint8_t v) {
                     m->sp_device[slot].sp_status = 0x80;
                     return;
             }
+            break;
+
+        case SLOT_TYPE_MOCKINGBOARD:
+            mockingboard_write(m, &m->mockingboard[slot], slot, a, (uint8_t)(a & 0x0F), v);
             break;
 
         case SLOT_TYPE_VIDEX_API:
@@ -993,11 +1003,17 @@ uint8_t io_callback_r(APPLE2 *m, uint16_t address) {
     if(address >= 0xC000 && address < 0xC100) {
         return io_c0_machine_table->r[address & 0xFF](m, address);
     } else if(address >= 0xc100 && address < 0xC800) {
+        int slot = (address >> 8) & 0x7;
         if(m->strobed_slot == C800_NONE) {
             io_slot_handler(m, address);
         }
+        if(m->slot_cards[slot].slot_type == SLOT_TYPE_MOCKINGBOARD) {
+            return mockingboard_read_cn(m, &m->mockingboard[slot], slot, address, (uint8_t)(address & 0xFF));
+        }
+        return m->pages.read_pages[address / PAGE_SIZE][address % PAGE_SIZE];
     } else if(address == CLRROM) {
         slot_clrrom(m, address);
+        return m->pages.read_pages[address / PAGE_SIZE][address % PAGE_SIZE];
     }
     // If nothing is strobed, this is floating bus which in my case is 0xA0
     return m->pages.read_pages[address / PAGE_SIZE][address % PAGE_SIZE];
@@ -1010,6 +1026,10 @@ void io_callback_w(APPLE2 *m, uint16_t address, uint8_t value) {
     } else if(address >= 0xc100 && address < 0xC800) {
         if(m->strobed_slot == C800_NONE) {
             io_slot_handler(m, address);
+        }
+        int slot = (address >> 8) & 0x7;
+        if(m->slot_cards[slot].slot_type == SLOT_TYPE_MOCKINGBOARD) {
+            mockingboard_write_cn(m, &m->mockingboard[slot], slot, address, (uint8_t)(address & 0xFF), value);
         }
     } else if(tst_flags(m->state_flags, A2S_FRANKLIN80INSTALLED) && address >= 0xCC00 && address < 0xCE00) {
         m->franklin_display.display_ram[(address & 0x01ff) + m->franklin_display.bank * 0x200] = value;

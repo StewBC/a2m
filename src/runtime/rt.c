@@ -274,6 +274,7 @@ int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
     const double clock_cycles_per_tick = CPU_FREQUENCY / (double)pfreq;
     const uint64_t ticks_per_frame = pfreq / TARGET_FPS;
     uint64_t overhead_ticks = 0; // Assume emulation and rendering fit in 1 frame's time
+
     while(!quit) {
         uint64_t frame_start_ticks = perf_counter();
         uint64_t desired_frame_end_ticks = frame_start_ticks + ticks_per_frame;
@@ -291,6 +292,7 @@ int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
                         break;
                     }
                     size_t opcode_cycles = machine_run_opcode(m);
+                    mockingboard_on_cycles(m, (uint32_t)opcode_cycles);
                     ui->ops->speaker_on_cycles(ui, opcode_cycles);
                     cycles += opcode_cycles;
                 }
@@ -302,9 +304,14 @@ int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
                         break;
                     }
                     size_t opcode_cycles = machine_run_opcode(m);
+                    mockingboard_on_cycles(m, (uint32_t)opcode_cycles);
                     ui->ops->speaker_on_cycles(ui, opcode_cycles);
                 }
             }
+        }
+
+        if(quit) {
+            break;
         }
 
         quit = ui->ops->process_events(ui, m);
@@ -338,7 +345,6 @@ int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
         while(perf_counter() < desired_frame_end_ticks) {
         }
     }
-
     return ret_val;
 }
 
@@ -353,11 +359,11 @@ void rt_shutdown(RUNTIME *rt) {
 }
 
 
-void rt_machine_reset(RUNTIME *rt) {
+void rt_machine_reset(RUNTIME *rt, int full) {
     APPLE2 *m = rt->m;
     rt->run = 1;
     rt->run_to_pc = 0;
-    apple2_machine_reset(m);
+    apple2_machine_reset(m, full);
     free(rt->clipboard_text);
     rt->clipboard_text = NULL;
     rt->clipboard_index = 0;

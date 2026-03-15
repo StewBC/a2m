@@ -74,17 +74,31 @@ static void apple2_slot_setup(APPLE2 *m, INI_STORE *ini_store) {
         }
     }
 
+    s = ini_find_section(ini_store, "mockingboard");
+    if(s) {
+        for(int i = 0; i < s->kv.items; i++) {
+            INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
+            int slot, device;
+
+            if(sscanf(kv->key, "%*1[Ss]%d%*1[Dd]%d", &slot, &device) == 2) {
+                if(!m->mb_slot && slot >= 1 && slot <= 7) {
+                    mockingboard_reset(&m->mockingboard[slot], 1);
+                    slot_add_card(m, slot, SLOT_TYPE_MOCKINGBOARD, &m->mockingboard[slot],
+                                  NULL, NULL);
+                    m->mb_slot = slot;
+                }
+            }
+        }
+    }
+
     s = ini_find_section(ini_store, "video");
     if(s) {
         for(int i = 0; i < s->kv.items; i++) {
             INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
-            const char *key = kv->key;
-            const char *val = kv->val;
-            int slot, n;
+            int slot, device;
 
-            if(!m->model && sscanf(key, "%*1[Ss]%d%n", &slot, &n) == 1 && n == 2 &&
-                    stricmp(&key[2], "dev") == 0) {
-                if(slot >= 1 && slot < 8) {
+            if(!m->model && sscanf(kv->key, "%*1[Ss]%d%*1[Dd]%d", &slot, &device) == 2) {
+                if(slot == 3 && !tst_flags(m->state_flags, A2S_FRANKLIN80INSTALLED)) {
                     if(A2_OK == franklin_display_init(&m->franklin_display)) {
                         slot_add_card(m, slot, SLOT_TYPE_VIDEX_API, &m->franklin_display,
                                       &m->roms.blocks[ROM_FRANKLIN_ACE_DISPLAY].bytes[0x600], franklin_display_map_cx_rom);
@@ -202,12 +216,16 @@ int apple2_init(APPLE2 *m, INI_STORE *ini_store) {
     return A2_OK;
 }
 
-void apple2_machine_reset(APPLE2 *m) {
+void apple2_machine_reset(APPLE2 *m, int full) {
     // Clear the screen
     memset(&m->ram.RAM_MAIN[0x0400], 0xA0, 0x400);
 
     // Select the io handlers for this model - and config banks 
     io_setup(m);
+
+    if(m->mb_slot) {
+        mockingboard_reset(&m->mockingboard[m->mb_slot], full);
+    }
 
     // Set up CPU
     cpu_init(m);

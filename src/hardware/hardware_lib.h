@@ -9,12 +9,15 @@
 
 // Machine
 #include "65x02.h"
+#include "ay38910.h"
 #include "io.h"
 #include "diskii.h"
 #include "frankdisp.h"
 #include "roms.h"
 #include "slot.h"
 #include "smrtprt.h"
+#include "via6522.h"
+#include "mboard.h"
 
 // It all comes together
 #include "apple2.h"

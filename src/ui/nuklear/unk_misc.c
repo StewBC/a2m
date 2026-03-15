@@ -191,7 +191,7 @@ void unk_misc_show(UNK *v) {
                                     char label[4];
                                     sprintf(label, "%d.%d", i, j);
                                     if(nk_button_label(ctx, label)) {
-                                        rt_machine_reset(rt);
+                                        rt_machine_reset(rt, 1);
                                         audio_prime_queue_and_start(&v->viewspeaker);
                                         m->cpu.pc = 0xc000 + i * 0x100;
                                     }
@@ -236,7 +236,7 @@ void unk_misc_show(UNK *v) {
                                     char label[4];
                                     sprintf(label, "%d.%d", i, j);
                                     if(nk_button_label(ctx, label)) {
-                                        rt_machine_reset(rt);
+                                        rt_machine_reset(rt, 1);
                                         audio_prime_queue_and_start(&v->viewspeaker);
                                         m->cpu.pc = 0xc000 + i * 0x100;
                                     }
@@ -284,6 +284,8 @@ void unk_misc_show(UNK *v) {
                             }
                             nk_layout_row_end(ctx);
                         }
+                    } else if(m->slot_cards[i].slot_type == SLOT_TYPE_MOCKINGBOARD) {
+                        nk_labelf(ctx, NK_TEXT_LEFT, "Slot %d: Mockingboard", i);
                     } else if(m->slot_cards[i].slot_type == SLOT_TYPE_VIDEX_API) {
                         // A3) The ][+ Video Ace display details
                         nk_labelf(ctx, NK_TEXT_LEFT, "Slot %d: Franklin Ace Display", i);

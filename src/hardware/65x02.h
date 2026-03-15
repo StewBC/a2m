@@ -87,6 +87,8 @@ typedef struct {
     struct {
         uint8_t page_fault: 1;                  // During stages where a page-fault could happen, denotes fault
     };
+    uint8_t irq_defer;                          // sample IRQs using irq_defer_i for one opcode boundary
+    uint8_t irq_defer_i;                        // previous I flag value to use while irq_defer is active
     uint32_t class;                             // CPU_6502 or CPU_65c02
     uint64_t cycles;                            // Total count of cycles the cpu has executed
 } CPU;

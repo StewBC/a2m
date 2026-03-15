@@ -413,8 +413,8 @@ int unk_dlg_machine_configure(struct nk_context *ctx, struct nk_rect r, MACHINE_
     static const char *tab_labels[] = {"Machine", "Emulator", "Assembler"};
     static const char *model_labels[] = {"Apple ][+", "Apple //e Enhanced"};
     static const char *ui_labels[] = {"Gui", "Text"};
-    static const char *slot_labels_all[] = {"Empty", "Disk II", "SmartPort", "Franklin Ace Display"};
-    static const char *slot_labels_std[] = {"Empty", "Disk II", "SmartPort"};
+    static const char *slot_labels_all[] = {"Empty", "Disk II", "SmartPort", "Mockingboard", "Franklin Ace Display"};
+    static const char *slot_labels_std[] = {"Empty", "Disk II", "SmartPort", "Mockingboard"};
 
     if(nk_begin_titled(ctx, "MachineConfig", "Configure", r, NK_WINDOW_BORDER | NK_WINDOW_TITLE | NK_WINDOW_NO_SCROLLBAR)) {
         const float row_gap = ctx->style.window.spacing.y;
@@ -456,18 +456,26 @@ int unk_dlg_machine_configure(struct nk_context *ctx, struct nk_rect r, MACHINE_
                 nk_layout_row_end(ctx);
 
                 // Slot selections
+                uint8_t mb_slot = 0;
                 for(int i = 0; i < 7; i++) {
                     char label[16];
                     int slot_index = i + 1;
                     int sel = mc->slot_sel[i];
                     const char *const *labels = slot_labels_std;
-                    int count = 3;
+                    int count = 4;
 
                     if(slot_index == 3 && mc->model == MODEL_APPLE_II_PLUS) {
                         labels = slot_labels_all;
-                        count = 4;
+                        count = 5;
                     } else if(sel == MACHINE_SLOT_FRANKLIN) {
                         sel = MACHINE_SLOT_EMPTY;
+                    } else if(sel == MACHINE_SLOT_MOCKINGBOARD) {
+                        // This turns off a later mb_slot if an earlier one selected
+                        if(mb_slot) {
+                            sel = MACHINE_SLOT_EMPTY;
+                        } else {
+                            mb_slot = slot_index;
+                        }
                     }
 
                     nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 2);
@@ -480,6 +488,14 @@ int unk_dlg_machine_configure(struct nk_context *ctx, struct nk_rect r, MACHINE_
                     }
                     nk_layout_row_end(ctx);
                     mc->slot_sel[i] = sel;
+                    // This makes sure the last selected MB is assigned
+                    if(sel == MACHINE_SLOT_MOCKINGBOARD && slot_index != mb_slot) {
+                        // If it's laterm, turn off the earlier one
+                        if(mb_slot) {
+                            mc->slot_sel[mb_slot - 1] = MACHINE_SLOT_EMPTY;
+                        }
+                        mb_slot = slot_index;
+                    }
                 }
             } else if(mc->active_tab == MACHINE_CONFIG_TAB_EMULATOR) {
                 // UI selection

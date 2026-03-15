@@ -634,8 +634,8 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
             break;
 
         case SDLK_F2:
-            if((mod & KMOD_CTRL) || (mod & KMOD_ALT)) {
-                rt_machine_reset(rt);
+            if(mod & (KMOD_ALT | KMOD_CTRL)) {
+                rt_machine_reset(rt, mod & KMOD_ALT);
                 audio_prime_queue_and_start(&v->viewspeaker);
                 v->prev_cycles = 0;     // So MHz doesn't jump massively
             } else {

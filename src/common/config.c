@@ -21,24 +21,6 @@ static int config_ini_section_has_slot(INI_STORE *st, const char *section, int s
     return 0;
 }
 
-static int config_ini_video_has_slot(INI_STORE *st, int slot) {
-    INI_SECTION *s = ini_find_section(st, "Video");
-    if(!s) {
-        return 0;
-    }
-    for(int i = 0; i < s->kv.items; i++) {
-        INI_KV *kv = ARRAY_GET(&s->kv, INI_KV, i);
-        int key_slot, n;
-        if(sscanf(kv->key, "%*1[Ss]%d%n", &key_slot, &n) == 1 && n == 2 && 0 == stricmp(&kv->key[2], "dev")) {
-            if(key_slot == slot) {
-                return 1;
-            }
-        }
-    }
-    return 0;
-}
-
-
 void cmn_config_from_ini(MACHINE_CONFIG *mc, INI_STORE *ini_store) {
     memset(mc, 0, sizeof(*mc));
     mc->active_tab = MACHINE_CONFIG_TAB_MACHINE;
@@ -57,8 +39,10 @@ void cmn_config_from_ini(MACHINE_CONFIG *mc, INI_STORE *ini_store) {
     for(int i = 0; i < 7; i++) {
         int slot = i + 1;
         int sel = MACHINE_SLOT_EMPTY;
-        if(slot == 3 && mc->model == MODEL_APPLE_II_PLUS && config_ini_video_has_slot(ini_store, slot)) {
+        if(slot == 3 && config_ini_section_has_slot(ini_store, "Video", slot)) {
             sel = MACHINE_SLOT_FRANKLIN;
+        } else if(slot == 4 && config_ini_section_has_slot(ini_store, "Mockingboard", slot)) {
+            sel = MACHINE_SLOT_MOCKINGBOARD;
         } else if(config_ini_section_has_slot(ini_store, "SmartPort", slot)) {
             sel = MACHINE_SLOT_SMARTPORT;
         } else if(config_ini_section_has_slot(ini_store, "DiskII", slot)) {
@@ -152,7 +136,11 @@ static void config_ini_slot_key(char *out, size_t out_len, int slot, int device)
 
 static void config_ini_ensure_slot(INI_STORE *ini_store, const char *section, int slot) {
     char key[8];
-    for(int device = 0; device < 2; device++) {
+    int max_devices = 2;
+    if(0 == stricmp(section, "Mockingboard") || 0 == stricmp(section, "Video")) {
+        max_devices = 1;
+    }
+    for(int device = 0; device < max_devices; device++) {
         config_ini_slot_key(key, sizeof(key), slot, device);
         if(!ini_get(ini_store, section, key)) {
             ini_set(ini_store, section, key, "");
@@ -162,7 +150,11 @@ static void config_ini_ensure_slot(INI_STORE *ini_store, const char *section, in
 
 static void config_ini_remove_slot(INI_STORE *ini_store, const char *section, int slot) {
     char key[8];
-    for(int device = 0; device < 2; device++) {
+    int max_devices = 2;
+    if(0 == stricmp(section, "Mockingboard") || 0 == stricmp(section, "Video")) {
+        max_devices = 1;
+    }
+    for(int device = 0; device < max_devices; device++) {
         config_ini_slot_key(key, sizeof(key), slot, device);
         ini_remove_key(ini_store, section, key);
     }
@@ -261,27 +253,30 @@ void cmn_config_apply(MACHINE_CONFIG *mc, INI_STORE *ini_store) {
         int sel = mc->slot_sel[i];
 
         if(sel == MACHINE_SLOT_DISKII) {
+            config_ini_remove_slot(ini_store, "Mockingboard", slot);
             config_ini_remove_slot(ini_store, "SmartPort", slot);
-            if(slot == 3) {
-                ini_remove_key(ini_store, "Video", "s3dev");
-            }
+            config_ini_remove_slot(ini_store, "Video", slot);
             config_ini_ensure_slot(ini_store, "DiskII", slot);
         } else if(sel == MACHINE_SLOT_SMARTPORT) {
             config_ini_remove_slot(ini_store, "DiskII", slot);
-            if(slot == 3) {
-                ini_remove_key(ini_store, "Video", "s3dev");
-            }
+            config_ini_remove_slot(ini_store, "Mockingboard", slot);
+            config_ini_remove_slot(ini_store, "Video", slot);
             config_ini_ensure_slot(ini_store, "SmartPort", slot);
-        } else if(sel == MACHINE_SLOT_FRANKLIN && slot == 3 && mc->model == MODEL_APPLE_II_PLUS) {
+        } else if(sel == MACHINE_SLOT_MOCKINGBOARD) {
             config_ini_remove_slot(ini_store, "DiskII", slot);
             config_ini_remove_slot(ini_store, "SmartPort", slot);
-            ini_set(ini_store, "Video", "s3dev", "Franklin Ace Display");
+            config_ini_remove_slot(ini_store, "Video", slot);
+            config_ini_ensure_slot(ini_store, "Mockingboard", slot);
+        } else if(sel == MACHINE_SLOT_FRANKLIN && slot == 3) {
+            config_ini_remove_slot(ini_store, "DiskII", slot);
+            config_ini_remove_slot(ini_store, "SmartPort", slot);
+            config_ini_remove_slot(ini_store, "Mockingboard", slot);
+            config_ini_ensure_slot(ini_store, "Video", slot);
         } else {
             config_ini_remove_slot(ini_store, "DiskII", slot);
             config_ini_remove_slot(ini_store, "SmartPort", slot);
-            if(slot == 3) {
-                ini_remove_key(ini_store, "Video", "s3dev");
-            }
+            config_ini_remove_slot(ini_store, "Mockingboard", slot);
+            config_ini_remove_slot(ini_store, "Video", slot);
         }
     }
 }

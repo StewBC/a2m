@@ -13,7 +13,9 @@ void slot_add_card(APPLE2 *m, uint8_t slot, int slot_type, void *slot_card, uint
     m->slot_cards[slot].slot_type = slot_type;
     m->slot_cards[slot].slot_card = slot_card;
     m->slot_cards[slot].slot_map_cx_rom = map_cx_rom;
-    pages_map_rom(&m->pages, (0xC000 + (slot * 0x100)), 0x100, card_rom);
+    if(card_rom) {
+        pages_map_rom(&m->pages, (0xC000 + (slot * 0x100)), 0x100, card_rom);
+    }
     m->rom_shadow_pages[slot] = card_rom;
     // map the device select range
     for(size_t i = 0xC080 + slot * 0x10; i <= 0xC08F + slot * 0x10; i++) {
@@ -30,6 +32,8 @@ void slot_remove_card(APPLE2 *m, uint8_t slot) {
     m->slot_cards[slot].slot_type = SLOT_TYPE_EMPTY;
     m->slot_cards[slot].slot_card = 0;
     m->slot_cards[slot].slot_map_cx_rom = 0;
+    // Just map to ram for safety
+    pages_map(&m->pages, PAGE_MAP_READ, (0xC000 + (slot * 0x100)), 0x100, &m->ram);
     for(size_t i = 0xC080 + slot * 0x10; i <= 0xC08F + slot * 0x10; i++) {
         m->ram.RAM_WATCH[i] &= ~WATCH_IO_PORT;
     }

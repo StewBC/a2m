@@ -10,9 +10,12 @@ size_t machine_run_opcode_65c02(APPLE2 *m) {
     if(m->a2out_cb.cb_trace_ctx.cb_trace) {
         m->a2out_cb.cb_trace_ctx.cb_trace(m->a2out_cb.cb_trace_ctx.user);
     }
+    size_t start_cycle = m->cpu.cycles;
+    if(a2_take_irq_if_pending(m)) {
+        return m->cpu.cycles - start_cycle;
+    }
     m->cpu.opcode_pc = m->cpu.pc;
     uint8_t opcode = read_from_memory(m, m->cpu.pc);
-    size_t start_cycle = m->cpu.cycles;
     CYCLE(m);
     m->cpu.pc++;
     switch(opcode) {

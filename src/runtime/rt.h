@@ -96,7 +96,7 @@ int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui);
 void rt_shutdown(RUNTIME *rt);
 
 // UI accesses rt through these calls
-void rt_machine_reset(RUNTIME *rt);
+void rt_machine_reset(RUNTIME *rt, int full);
 void rt_brk_callback(RUNTIME *rt, uint16_t address, uint8_t mask);
 int rt_disassemble_line(RUNTIME *rt, uint16_t *address, VIEW_FLAGS vf, int force_byte, char symbol_view, char *str_buf, int str_buf_len);
 

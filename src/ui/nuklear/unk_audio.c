@@ -10,11 +10,31 @@ static inline uint32_t unk_audio_speaker_ring_count(const VIEWSPEAKER *speaker) 
     return (speaker->wpos - speaker->rpos) & SOFT_RING_MASK;
 }
 
+static inline uint32_t unk_audio_speaker_ring_target_frames(const VIEWSPEAKER *speaker) {
+    const uint32_t channels = speaker->have.channels ? speaker->have.channels : 1u;
+    const uint32_t bytes_per_frame = channels * (uint32_t)sizeof(float);
+    uint32_t target_frames = speaker->target_q_bytes / bytes_per_frame;
+
+    if(target_frames == 0) {
+        target_frames = speaker->chunk_frames ? speaker->chunk_frames : 1u;
+    }
+    if(target_frames >= SOFT_RING_FRAMES) {
+        target_frames = SOFT_RING_FRAMES - 1u;
+    }
+    return target_frames;
+}
+
 static inline uint32_t unk_audio_speaker_ring_space(const VIEWSPEAKER *speaker) {
     return SOFT_RING_FRAMES - 1 - unk_audio_speaker_ring_count(speaker);
 }
 
 static inline void ring_push(VIEWSPEAKER *speaker, float s) {
+    uint32_t target_frames = unk_audio_speaker_ring_target_frames(speaker);
+
+    while(unk_audio_speaker_ring_count(speaker) >= target_frames) {
+        speaker->rpos = (speaker->rpos + 1) & SOFT_RING_MASK;
+    }
+
     if(unk_audio_speaker_ring_space(speaker) == 0) {           // drop oldest if full
         speaker->rpos = (speaker->rpos + 1) & SOFT_RING_MASK;
     }
@@ -51,6 +71,10 @@ static inline float dc_block(VIEWSPEAKER *s, float x) {
     return y;
 }
 
+static inline float clamp_audio_sample(float x) {
+    return x < -1.0f ? -1.0f : (x > 1.0f ? 1.0f : x);
+}
+
 void audio_prime_queue_and_start(VIEWSPEAKER *speaker) {
     if(!speaker || !speaker->dev) {
         return;
@@ -85,6 +109,7 @@ int unk_audio_speaker_init(VIEWSPEAKER *speaker, double cpu_hz, int sample_rate,
     memset(speaker, 0, sizeof(*speaker));
     speaker->cpu_hz = (cpu_hz > 0.0) ? cpu_hz : CPU_FREQUENCY;
     speaker->level  = -1.0f;
+    speaker->mockingboard_gain = 1.0f;
 
     SDL_AudioSpec want = {0}, have = {0};
     want.freq = (sample_rate > 0) ? sample_rate : 48000;
@@ -119,6 +144,7 @@ int unk_audio_speaker_init(VIEWSPEAKER *speaker, double cpu_hz, int sample_rate,
 void unk_audio_speaker_on_cycles(UI *ui, uint32_t cycles_executed) {
     UNK *v = (UNK *)ui->user;
     VIEWSPEAKER *speaker = &v->viewspeaker;
+    APPLE2 *m = v->rt ? v->rt->m : v->m;
 
     speaker->cycle_accum += (double)cycles_executed;
 
@@ -126,9 +152,18 @@ void unk_audio_speaker_on_cycles(UI *ui, uint32_t cycles_executed) {
     while(speaker->cycle_accum >= speaker->cycles_per_sample) {
         speaker->cycle_accum -= speaker->cycles_per_sample;
 
-        float x = speaker->level;   // -1 or +1
-        float y = dc_block(speaker, x);
-        ring_push(speaker, y);
+        float speaker_sample = dc_block(speaker, speaker->level);
+        float mixed = speaker_sample;
+
+        if(m) {
+            float mockingboard_sample = 0.0f;
+            if(m->mb_slot) {
+                mockingboard_sample += mockingboard_get_sample(&m->mockingboard[m->mb_slot]);
+            }
+            mixed += mockingboard_sample * speaker->mockingboard_gain;
+        }
+
+        ring_push(speaker, clamp_audio_sample(mixed));
         produced++;
     }
 

@@ -8,14 +8,17 @@ add_library(hardware STATIC
     6502_core.c
     6502.c
     65c02.c
+    ay38910.c
     io.c
     apple2.c
     diskii.c
     frankdisp.c
     image.c
+    mboard.c
     roms.c
     slot.c
     smrtprt.c
+    via6522.c
 )
 
 target_include_directories(hardware PUBLIC

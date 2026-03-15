@@ -140,4 +140,6 @@ void cpu_init(APPLE2 *m) {
 
     m->cpu.pc = read_from_memory_debug(m, 0xfffc) +  256 * read_from_memory_debug(m, 0xfffd);
     m->cpu.sp = 0x100;
+    m->cpu.irq_defer = 0;
+    m->cpu.irq_defer_i = 0;
 }

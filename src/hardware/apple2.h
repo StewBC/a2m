@@ -37,6 +37,7 @@ enum {
     SLOT_TYPE_EMPTY,
     SLOT_TYPE_DISKII,
     SLOT_TYPE_SMARTPORT,
+    SLOT_TYPE_MOCKINGBOARD,
     SLOT_TYPE_VIDEX_API,
 };
 
@@ -174,6 +175,7 @@ typedef struct APPLE2 {
     SLOT_CARDS slot_cards[8];                               // The 8 slots and their status and option ROMs
     DISKII_CONTROLLER diskii_controller[8];                 // Any slot can have a disk ii controller (and drives)
     SP_DEVICE sp_device[8];                                 // All slots could be made smartport
+    MOCKINGBOARD mockingboard[8];                           // Mockingboard card can be in any slot
     FRANKLIN_DISPLAY franklin_display;                      // Franklin Display 80 col card
     A2OUT_CB a2out_cb;                                      // Apple2->external callbacks
 
@@ -185,7 +187,8 @@ typedef struct APPLE2 {
     int strobed_slot;                                       // Contains the slot numbr for the card that is strobed
 
     // A2 Status
-    uint8_t key_held;
+    uint8_t key_held;                                       // SQW I wish I documented this...
+    uint8_t mb_slot;                                        // Only allow 1 MB at a time
     A2_STATE state_flags;
 
     // Trace
@@ -199,7 +202,7 @@ static inline uint8_t clamp_u8(uint32_t x, uint8_t lo, uint8_t hi) {
 }
 
 int apple2_init(APPLE2 *m, INI_STORE *ini_store);
-void apple2_machine_reset(APPLE2 *m);
+void apple2_machine_reset(APPLE2 *m, int full);
 void apple2_set_callbacks(APPLE2 *m, A2OUT_CB *cbp);
 void apple2_shutdown(APPLE2 *m);
 static inline void apple2_set_key_held(APPLE2 *m, uint8_t key) {
@@ -209,4 +212,3 @@ static inline void apple2_set_key_held(APPLE2 *m, uint8_t key) {
 static inline void apple2_clear_key_held(APPLE2 *m) {
     m->state_flags &= ~A2S_KEY_HELD;
 }
-

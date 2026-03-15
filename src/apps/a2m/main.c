@@ -83,7 +83,7 @@ void handle_franklin80(int num_params, const char **params, OPTS *opts) {
     UNUSED(num_params);
     int slot;
     if((sscanf(params[0], "%d", &slot) == 1) && slot >= 1 && slot <= 7) {
-        char key[] = "s3dev";
+        char key[] = "s3d0";
         key[1] = (char)('0' + slot);
         ini_set(&opts->ini_store, "Video", key, "Franklin Ace Display");
     }
@@ -413,7 +413,7 @@ int main(int argc, char **argv) {
         ini_set(&ini_store, "SmartPort", "s5d1", "");
         ini_set(&ini_store, "SmartPort", "s7d0", "");
         ini_set(&ini_store, "SmartPort", "s7d1", "");
-        ini_set(&ini_store, "Video", "s3dev", "Franklin Ace Display ; only for model = plus");
+        ini_set(&ini_store, "Video", "s3d0", "Franklin Ace Display ; only for model = plus");
         ini_set(&ini_store, "Config", "disk_leds", "on");
     }
 
