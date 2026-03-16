@@ -959,6 +959,7 @@ void unk_apl2_screen_txt80(UNK *v, int start, int end) {
     APPLE2 *m = v->m;
     SDL_Surface *surface = v->surface_wide;
     uint32_t *pixels = (uint32_t *) surface->pixels;
+    uint16_t page = tst_flags(v->shadow_state, A2S_PAGE2) ? 0x0800 : 0x0400;
     uint64_t now = perf_counter();
     double freq = (double)perf_frequency();
     // I got 3.7 from recording a flash on my Platinum //e - 0.17 to 0.44 for a change so 0.27
@@ -970,7 +971,7 @@ void unk_apl2_screen_txt80(UNK *v, int start, int end) {
     for(y = start; y < end; y++) {
         // Get the pointer to the start of the row in the SDL surface
         uint32_t *p = &pixels[y * 8 * surface->w];
-        int address = 0x0400 + apl2_txt_row_start[y];
+        int address = page + apl2_txt_row_start[y];
 
         // Loop through every col (byte)
         for(int x = 0; x < 80; x++) {

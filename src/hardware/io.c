@@ -534,7 +534,7 @@ void io_c0_a2speaker_w(APPLE2 *m, uint16_t a, uint8_t v) {
 // 0xC036
 uint8_t io_c0_cyareg_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    return floating_bus();
+    return 0x00; // floating_bus();
 }
 
 void io_c0_cyareg_w(APPLE2 *m, uint16_t a, uint8_t v) {
@@ -989,6 +989,7 @@ void io_c0_table_init(void) {
 
     // 20
     // 30 - Speaker
+    io_c0_iie.r[CYAREG & 0XFF] = io_c0_cyareg_r;
     // 40 - ?
     // 50 - DHGR toggles
     io_c0_iie.r[CLRAN3 & 0xFF] = io_c0_clran3_r;
