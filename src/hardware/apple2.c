@@ -169,9 +169,13 @@ int apple2_init(APPLE2 *m, INI_STORE *ini_store) {
     }
     rom_add(&m->roms, ROM_DISKII_13SECTOR, 0xC000, 256, disk2_rom[DSK_ENCODING_13SECTOR]);
     rom_add(&m->roms, ROM_DISKII_16SECTOR, 0xC000, 256, disk2_rom[DSK_ENCODING_16SECTOR]);
-    rom_add(&m->roms, ROM_SMARTPORT, 0xC000, smartport_rom_size, smartport_rom);
     rom_add(&m->roms, ROM_FRANKLIN_ACE_DISPLAY, 0x0000, franklin_ace_display_rom_size, franklin_ace_display_rom);
     rom_add(&m->roms, ROM_FRANKLIN_ACE_CHARACTER, 0x0000, franklin_ace_character_rom_size, franklin_ace_character_rom);
+    rom_add(&m->roms, ROM_SMARTPORT, 0xC000, smartport_rom_size, smartport_rom);
+    // Patch the ROM on the ][+ so that Autoboot works
+    for(int slot = 0; slot <= 7; slot++) {
+        smartport_rom[0x07+slot*0x100] = m->model ? 0xFF : 0x3C;
+    }
 
     // Create all the pages
     if(A2_OK != pages_init(&m->pages, BANK_SIZE)) {
