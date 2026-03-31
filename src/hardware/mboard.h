@@ -14,7 +14,7 @@ typedef struct {
 
 uint8_t mockingboard_read_via_port_a(const APPLE2 *m, uint8_t slot, uint8_t pair_index);
 float mockingboard_get_sample(const MOCKINGBOARD *mb);
-uint8_t mockingboard_irq_pending(const APPLE2 *m);
+uint8_t mockingboard_irq_pending(APPLE2 *m);
 void mockingboard_on_cycles(APPLE2 *m, uint32_t cycles);
 void mockingboard_reset(MOCKINGBOARD *mb, int full);
 void mockingboard_set_board_startup_timer_seed_enabled(MOCKINGBOARD *mb, uint8_t enabled);

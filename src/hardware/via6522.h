@@ -102,7 +102,7 @@ typedef struct {
 void via6522_reset(VIA6522 *via);
 void via6522_mockingboard_power_on_timer1(VIA6522 *via);
 void via6522_mockingboard_power_on_timer2(VIA6522 *via);
-uint8_t via6522_irq_pending(const VIA6522 *via);
+uint8_t via6522_irq_pending(VIA6522 *via);
 // void via6522_set_port_b_input(VIA6522 *via, uint8_t value);
 // void via6522_set_pb6_level(VIA6522 *via, uint8_t level);
 // void via6522_set_ca1_level(VIA6522 *via, uint8_t level);

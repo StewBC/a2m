@@ -5,6 +5,7 @@
 #include "hardware_lib.h"
 
 static uint8_t via6522_irq_active(const VIA6522 *via);
+static void via6522_reconcile_timer_observable_state(VIA6522 *via);
 
 static uint8_t via6522_read_port_a_pins(VIA6522 *via) {
     if(!via->owner) {
@@ -39,8 +40,11 @@ static uint8_t via6522_read_ifr(const VIA6522 *via) {
     return value;
 }
 
+static uint64_t via6522_current_cycle(const VIA6522 *via) {
+    return via->owner ? via->owner->cpu.cycles : via->timer_last_cycle;
+}
+
 static void via6522_set_ifr(VIA6522 *via, uint8_t bits) {
-    uint8_t before = via->ifr;
     via->ifr |= (bits & 0x7Fu);
 }
 
@@ -143,7 +147,7 @@ static void via6522_write_t1_latch_hi(VIA6522 *via, uint8_t value) {
 }
 
 static void via6522_load_timer1_counter(VIA6522 *via) {
-    uint64_t cycle = via->owner ? via->owner->cpu.cycles : 0;
+    uint64_t cycle = via6522_current_cycle(via);
     uint8_t had_t1 = via->ifr & VIA6522_IFR_T1;
     via->t1_counter = via->t1_latch;
     via6522_set_t1_running(via, 1);
@@ -160,20 +164,17 @@ static void via6522_load_timer1_counter(VIA6522 *via) {
     }
 }
 
-static void via6522_step_timer1(VIA6522 *via, uint32_t cycles) {
-    uint64_t cycle_cursor = 0;
-    uint64_t cycle_now = via->owner ? via->owner->cpu.cycles : (via->timer_last_cycle + cycles);
+static void via6522_reconcile_timer1(VIA6522 *via, uint64_t cycles) {
+    uint64_t cycle_cursor = via->timer_last_cycle;
 
     if(!via->t1_running) {
         return;
     }
 
-    cycle_cursor = via->timer_last_cycle;
-
-    if(via->t1_just_loaded && via->owner) {
+    if(via->t1_just_loaded) {
         uint64_t active_cycle = via->t1_load_cycle;
         uint64_t batch_start = cycle_cursor;
-        uint64_t batch_end = via->owner->cpu.cycles;
+        uint64_t batch_end = cycle_cursor + cycles;
 
         if(active_cycle >= batch_end) {
             via->t1_just_loaded = 0;
@@ -181,7 +182,7 @@ static void via6522_step_timer1(VIA6522 *via, uint32_t cycles) {
         }
 
         if(active_cycle > batch_start) {
-            uint32_t skipped = (uint32_t)(active_cycle - batch_start);
+            uint64_t skipped = active_cycle - batch_start;
             if(skipped >= cycles) {
                 via->t1_just_loaded = 0;
                 return;
@@ -193,64 +194,111 @@ static void via6522_step_timer1(VIA6522 *via, uint32_t cycles) {
         via->t1_just_loaded = 0;
     }
 
-    while(cycles > 0) {
-        if(via->t1_reload_pending) {
-            // For one-shot T1, the first post-underflow boundary still exposes
-            // $FFFF. The latch becomes visible on the following boundary,
-            // without decrementing again in that same cycle.
-            cycles--;
-            cycle_cursor++;
-            via->t1_counter = via->t1_latch;
-            via->t1_reload_pending = 0;
-            continue;
-        }
-
-        uint16_t old_counter = via->t1_counter;
+    if(via->t1_reload_pending && cycles > 0) {
+        // For one-shot T1, the first post-underflow boundary still exposes
+        // $FFFF. The latch becomes visible on the following boundary,
+        // without decrementing again in that same cycle.
         cycles--;
         cycle_cursor++;
-        via->t1_counter--;
+        via->t1_counter = via->t1_latch;
+        via->t1_reload_pending = 0;
+    }
 
-        if(old_counter != 0) {
-            continue;
+    if(cycles == 0) {
+        return;
+    }
+
+    if(via->acr & 0x40) {
+        uint64_t ticks_to_underflow = (uint64_t)via->t1_counter + 1u;
+
+        if(cycles < ticks_to_underflow) {
+            via->t1_counter = (uint16_t)(via->t1_counter - cycles);
+            return;
         }
 
-        if(via->t1_running) {
-            if(via->acr & 0x40) {
-                if(via->t1_irq_armed && !(via->ifr & VIA6522_IFR_T1)) {
-                    via6522_set_ifr(via, VIA6522_IFR_T1);
-                }
-                // PB7 output behavior remains deferred; current T1 timing work
-                // models reload/IRQ semantics only.
-                via->t1_counter = via->t1_latch;
-                via6522_set_t1_irq_armed(via, 1);
-                via6522_set_t1_fired(via, 0);
-            } else {
-                via->t1_reload_pending = 1;
-                if(via->t1_irq_armed && !(via->ifr & VIA6522_IFR_T1)) {
-                    via6522_set_ifr(via, VIA6522_IFR_T1);
-                    via->t1_irq_visible_cycle = cycle_cursor + 1;
-                    via6522_set_t1_irq_armed(via, 0);
-                }
-                via6522_set_t1_fired(via, 1);
-            }
-        } else {
+        cycles -= ticks_to_underflow;
+        cycle_cursor += ticks_to_underflow;
+        if(via->t1_irq_armed && !(via->ifr & VIA6522_IFR_T1)) {
+            via6522_set_ifr(via, VIA6522_IFR_T1);
+        }
+        via->t1_counter = via->t1_latch;
+        via6522_set_t1_irq_armed(via, 1);
+        via6522_set_t1_fired(via, 0);
+
+        if(cycles == 0) {
             return;
+        }
+
+        {
+            uint64_t period = (uint64_t)via->t1_latch + 1u;
+            uint64_t remainder = cycles % period;
+            via->t1_counter = (uint16_t)(via->t1_latch - remainder);
+        }
+        return;
+    }
+
+    {
+        uint64_t ticks_to_underflow = (uint64_t)via->t1_counter + 1u;
+
+        if(cycles < ticks_to_underflow) {
+            via->t1_counter = (uint16_t)(via->t1_counter - cycles);
+            return;
+        }
+
+        cycles -= ticks_to_underflow;
+        cycle_cursor += ticks_to_underflow;
+        via->t1_counter = 0xFFFF;
+        via->t1_reload_pending = 1;
+        if(via->t1_irq_armed && !(via->ifr & VIA6522_IFR_T1)) {
+            via6522_set_ifr(via, VIA6522_IFR_T1);
+            via->t1_irq_visible_cycle = cycle_cursor + 1;
+            via6522_set_t1_irq_armed(via, 0);
+        }
+        via6522_set_t1_fired(via, 1);
+
+        if(cycles == 0) {
+            return;
+        }
+
+        cycles--;
+        cycle_cursor++;
+        via->t1_counter = via->t1_latch;
+        via->t1_reload_pending = 0;
+
+        if(cycles == 0) {
+            return;
+        }
+
+        {
+            uint64_t period = (uint64_t)via->t1_latch + 2u;
+            uint64_t remainder = cycles % period;
+
+            if(remainder <= via->t1_latch) {
+                via->t1_counter = (uint16_t)(via->t1_latch - remainder);
+                via->t1_reload_pending = 0;
+            } else {
+                via->t1_counter = 0xFFFF;
+                via->t1_reload_pending = 1;
+            }
         }
     }
 }
 
-static void via6522_step_timer2(VIA6522 *via, uint32_t cycles) {
+static void via6522_reconcile_timer2(VIA6522 *via, uint64_t cycles) {
     uint64_t cycle_cursor = via->timer_last_cycle;
-    uint64_t cycle_now = via->owner ? via->owner->cpu.cycles : (via->timer_last_cycle + cycles);
+
+    if(!via->t2_running) {
+        return;
+    }
 
     if(via6522_t2_uses_pb6_pulse_count(via) && !via6522_t2_uses_board_startup_reload(via)) {
         return;
     }
 
-    if(via->t2_just_loaded && via->owner) {
+    if(via->t2_just_loaded) {
         uint64_t active_cycle = via->t2_load_cycle;
         uint64_t batch_start = cycle_cursor;
-        uint64_t batch_end = cycle_now;
+        uint64_t batch_end = cycle_cursor + cycles;
 
         if(active_cycle >= batch_end) {
             via->t2_just_loaded = 0;
@@ -258,7 +306,7 @@ static void via6522_step_timer2(VIA6522 *via, uint32_t cycles) {
         }
 
         if(active_cycle > batch_start) {
-            uint32_t skipped = (uint32_t)(active_cycle - batch_start);
+            uint64_t skipped = active_cycle - batch_start;
             if(skipped >= cycles) {
                 via->t2_just_loaded = 0;
                 return;
@@ -268,25 +316,49 @@ static void via6522_step_timer2(VIA6522 *via, uint32_t cycles) {
         via->t2_just_loaded = 0;
     }
 
-    while(cycles > 0) {
-        if(!via->t2_running) {
-            return;
-        }
+    {
+        uint64_t ticks_to_underflow = (uint64_t)via->t2_counter + 1u;
 
-        uint32_t ticks = (uint32_t)via->t2_counter + 1u;
-        if(cycles < ticks) {
+        if(cycles < ticks_to_underflow) {
             via->t2_counter = (uint16_t)(via->t2_counter - cycles);
             return;
         }
 
-        cycles -= ticks;
+        cycles -= ticks_to_underflow;
+
         if(via6522_t2_uses_board_startup_reload(via)) {
-            via6522_handle_t2_board_startup_underflow(via);
-        } else {
-            via6522_handle_t2_timeout(via, via->owner ? via->owner->cpu.cycles : 0, "T2_UNDERFLOW_CONTINUE");
+            via->t2_counter = via->t2_latch;
+            via->t2_fired = 0;
+
+            if(cycles == 0) {
+                return;
+            }
+
+            {
+                uint64_t period = (uint64_t)via->t2_latch + 1u;
+                uint64_t remainder = cycles % period;
+                via->t2_counter = (uint16_t)(via->t2_latch - remainder);
+            }
+            return;
+        }
+
+        via->t2_fired = 1;
+        if(via->t2_irq_armed && !(via->ifr & VIA6522_IFR_T2)) {
+            via6522_set_ifr(via, VIA6522_IFR_T2);
+        }
+        via->t2_counter = 0xFFFF;
+        via6522_set_t2_irq_armed(via, 0);
+
+        if(cycles == 0) {
+            return;
+        }
+
+        {
+            uint64_t period = 0x10000u;
+            uint64_t remainder = cycles % period;
+            via->t2_counter = (uint16_t)(0xFFFFu - remainder);
         }
     }
-    // Exact timeout-boundary timing remains part of the later timing pass.
 }
 
 static void via6522_reconcile_timer_observable_state(VIA6522 *via) {
@@ -303,13 +375,50 @@ static void via6522_reconcile_timer_observable_state(VIA6522 *via) {
     }
 
     delta = target_cycle - via->timer_last_cycle;
-    while(delta > 0) {
-        uint32_t step_cycles = delta > UINT32_MAX ? UINT32_MAX : (uint32_t)delta;
-        via6522_step_timer1(via, step_cycles);
-        via6522_step_timer2(via, step_cycles);
-        via->timer_last_cycle += step_cycles;
-        delta -= step_cycles;
+    via6522_reconcile_timer1(via, delta);
+    via6522_reconcile_timer2(via, delta);
+    via->timer_last_cycle = target_cycle;
+}
+
+static uint8_t via6522_write_requires_timer_freshness(uint8_t reg) {
+    switch(reg & 0x0F) {
+        case VIA6522_REG_T1CL:
+        case VIA6522_REG_T1CH:
+        case VIA6522_REG_T1LL:
+        case VIA6522_REG_T1LH:
+        case VIA6522_REG_T2CL:
+        case VIA6522_REG_T2CH:
+        case VIA6522_REG_ACR:
+        case VIA6522_REG_IFR:
+        case VIA6522_REG_IER:
+            return 1;
+
+        default:
+            return 0;
     }
+}
+
+static uint8_t via6522_timer_sources_can_irq(const VIA6522 *via) {
+    uint8_t enabled = via->ier & (VIA6522_IFR_T1 | VIA6522_IFR_T2);
+
+    if(!enabled) {
+        return 0;
+    }
+
+    if(via->ifr & enabled) {
+        return 1;
+    }
+
+    if((enabled & VIA6522_IFR_T1) && via->t1_running && via->t1_irq_armed) {
+        return 1;
+    }
+
+    if((enabled & VIA6522_IFR_T2) && via->t2_running && via->t2_irq_armed &&
+       (!via6522_t2_uses_pb6_pulse_count(via) || via6522_t2_uses_board_startup_reload(via))) {
+        return 1;
+    }
+
+    return 0;
 }
 
 void via6522_reset(VIA6522 *via) {
@@ -373,7 +482,16 @@ void via6522_mockingboard_power_on_timer2(VIA6522 *via) {
     via6522_clear_ifr(via, VIA6522_IFR_T2);
 }
 
-uint8_t via6522_irq_pending(const VIA6522 *via) {
+uint8_t via6522_irq_pending(VIA6522 *via) {
+    if(via6522_irq_active(via)) {
+        return 1;
+    }
+
+    if(!via6522_timer_sources_can_irq(via)) {
+        return 0;
+    }
+
+    via6522_reconcile_timer_observable_state(via);
     return via6522_irq_active(via);
 }
 
@@ -472,6 +590,10 @@ uint8_t via6522_read(VIA6522 *via, uint8_t reg) {
 }
 
 void via6522_write(VIA6522 *via, uint8_t reg, uint8_t value) {
+    if(via6522_write_requires_timer_freshness(reg)) {
+        via6522_reconcile_timer_observable_state(via);
+    }
+
     switch(reg & 0x0F) {
         case VIA6522_REG_ORB:
             via->orb = value;
@@ -520,7 +642,7 @@ void via6522_write(VIA6522 *via, uint8_t reg, uint8_t value) {
             via->t2_latch_hi = value;
             via->t2_latch = via6522_compose_latch(via->t2_latch_hi, via->t2_latch_lo);
             via->t2_counter = via->t2_latch;
-            via->t2_load_cycle = via->owner ? via->owner->cpu.cycles + 1 : 1;
+            via->t2_load_cycle = via6522_current_cycle(via) + 1;
             via->t2_just_loaded = 1;
             via->t2_running = 1;
             via6522_set_t2_irq_armed(via, 1);
@@ -559,28 +681,11 @@ void via6522_write(VIA6522 *via, uint8_t reg, uint8_t value) {
 }
 
 void via6522_step_cycles(VIA6522 *via, uint32_t cycles) {
-    uint64_t target_cycle;
-    uint32_t delta_cycles;
-
-    // The VIA is advanced at opcode-completion boundaries. `cycles` is the
-    // total cycle count consumed by the just-finished CPU opcode, not a
-    // sub-cycle stream. Timing-sensitive behavior below is therefore a
-    // deliberate opcode-batch approximation.
-    // Current batch order is part of the observable discrete model:
-    // timers first, then SR, then deferred pulse release.
     if(via->owner) {
-        target_cycle = via->owner->cpu.cycles;
-        if(target_cycle <= via->timer_last_cycle) {
-            return;
-        }
-        delta_cycles = (uint32_t)(target_cycle - via->timer_last_cycle);
-    } else {
-        target_cycle = via->timer_last_cycle + cycles;
-        delta_cycles = cycles;
+        return;
     }
 
-    via6522_step_timer1(via, delta_cycles);
-    via6522_step_timer2(via, delta_cycles);
-    via->timer_last_cycle = target_cycle;
+    via6522_reconcile_timer1(via, cycles);
+    via6522_reconcile_timer2(via, cycles);
+    via->timer_last_cycle += cycles;
 }
-

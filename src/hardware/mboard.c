@@ -127,16 +127,6 @@ static void mockingboard_bind_via_context(APPLE2 *m, MOCKINGBOARD *mb, int slot,
     // mb->via[via_index].compat_ier_readback_force_bit7 = mb->megaaudio_ier_bit7_clear ? 0 : 1;
 }
 
-static void mockingboard_ensure_via_context(APPLE2 *m, MOCKINGBOARD *mb, int slot) {
-    if(mb->via[0].owner == m && mb->via[0].slot == (uint8_t)slot && mb->via[0].pair_index == 0 &&
-       mb->via[1].owner == m && mb->via[1].slot == (uint8_t)slot && mb->via[1].pair_index == 1) {
-        return;
-    }
-
-    mockingboard_bind_via_context(m, mb, slot, 0);
-    mockingboard_bind_via_context(m, mb, slot, 1);
-}
-
 uint8_t mockingboard_read_via_port_a(const APPLE2 *m, uint8_t slot, uint8_t pair_index) {
     const MOCKINGBOARD *mb;
     const AY38910 *ay;
@@ -167,7 +157,7 @@ float mockingboard_get_sample(const MOCKINGBOARD *mb) {
     return (ay38910_get_sample(&mb->ay[0]) + ay38910_get_sample(&mb->ay[1])) * 0.5f;
 }
 
-uint8_t mockingboard_irq_pending(const APPLE2 *m) {
+uint8_t mockingboard_irq_pending(APPLE2 *m) {
     uint8_t slot = m->mb_slot;
 
     if(!slot || m->slot_cards[slot].slot_type != SLOT_TYPE_MOCKINGBOARD) {
@@ -184,9 +174,6 @@ void mockingboard_on_cycles(APPLE2 *m, uint32_t cycles) {
     }
 
     uint8_t slot = m->mb_slot;
-    mockingboard_ensure_via_context(m, &m->mockingboard[slot], slot);
-    via6522_step_cycles(&m->mockingboard[slot].via[0], cycles);
-    via6522_step_cycles(&m->mockingboard[slot].via[1], cycles);
     mockingboard_step_ay_devices(&m->mockingboard[slot], cycles);
 }
 
