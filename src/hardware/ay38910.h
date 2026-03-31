@@ -27,6 +27,7 @@ typedef struct {
     uint8_t regs[16];
     uint8_t selected_reg;
     uint8_t selected_reg_valid;
+    uint8_t active;
 
     double cpu_hz;
     double chip_hz;
@@ -55,6 +56,7 @@ void ay38910_reset(AY38910 *ay, double cpu_hz, double chip_hz);
 void ay38910_select_register(AY38910 *ay, uint8_t reg);
 uint8_t ay38910_read_selected(const AY38910 *ay);
 void ay38910_write_selected(AY38910 *ay, uint8_t value);
+uint8_t ay38910_is_active(const AY38910 *ay);
 uint8_t ay38910_get_channel_mixer_gate(const AY38910 *ay, int channel);
 uint8_t ay38910_get_channel_amplitude_level(const AY38910 *ay, int channel);
 float ay38910_get_channel_output_level(const AY38910 *ay, int channel);

@@ -240,6 +240,7 @@ void ay38910_select_register(AY38910 *ay, uint8_t reg) {
     assert((reg & 0x0F) == reg);
     ay->selected_reg = reg & 0x0F;
     ay->selected_reg_valid = 1;
+    ay->active = 1;
 }
 
 uint8_t ay38910_read_selected(const AY38910 *ay) {
@@ -260,6 +261,7 @@ void ay38910_write_selected(AY38910 *ay, uint8_t value) {
         return;
     }
     assert(ay->selected_reg < 16);
+    ay->active = 1;
     ay->regs[ay->selected_reg] = ay38910_mask_register_value(ay->selected_reg, value);
 
     switch(ay->selected_reg) {
@@ -303,6 +305,10 @@ void ay38910_write_selected(AY38910 *ay, uint8_t value) {
     if(refresh_sample) {
         ay38910_refresh_sample(ay);
     }
+}
+
+uint8_t ay38910_is_active(const AY38910 *ay) {
+    return ay->active;
 }
 
 void ay38910_step_cycles(AY38910 *ay, uint32_t cycles) {

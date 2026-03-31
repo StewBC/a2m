@@ -275,16 +275,7 @@ static void via6522_step_timer2(VIA6522 *via, uint32_t cycles) {
 
         uint32_t ticks = (uint32_t)via->t2_counter + 1u;
         if(cycles < ticks) {
-            uint16_t old_counter = via->t2_counter;
             via->t2_counter = (uint16_t)(via->t2_counter - cycles);
-            {
-                uint32_t i;
-                uint16_t counter = old_counter;
-                for(i = 0; i < cycles; ++i) {
-                    uint16_t next_counter = (uint16_t)(counter - 1);
-                    counter = next_counter;
-                }
-            }
             return;
         }
 
