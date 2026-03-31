@@ -33,6 +33,7 @@ static void mockingboard_apply_via_to_ay(APPLE2 *m, MOCKINGBOARD *mb, int slot,
     uint8_t bus_state = mockingboard_decode_ay_bus_state(via->orb);
     // Mockingboard wires ORB.b2 directly to the paired AY /RESET pin.
     if((via->orb & 0x04) == 0) {
+        mb->ay_pending_cycles[pair_index] = 0;
         ay38910_reset(ay, CPU_FREQUENCY, CPU_FREQUENCY);
         return;
     }
@@ -52,6 +53,10 @@ static void mockingboard_apply_via_to_ay(APPLE2 *m, MOCKINGBOARD *mb, int slot,
             // AY data writes apply to the currently selected register without
             // stepping time here; the chip itself is advanced in batches at
             // opcode boundaries.
+            if(mb->ay_pending_cycles[pair_index]) {
+                ay38910_step_cycles(ay, mb->ay_pending_cycles[pair_index]);
+                mb->ay_pending_cycles[pair_index] = 0;
+            }
             ay38910_write_selected(ay, data);
             break;
 
@@ -64,18 +69,22 @@ static void mockingboard_apply_via_to_ay(APPLE2 *m, MOCKINGBOARD *mb, int slot,
     }
 }
 
-static void mockingboard_step_ay_devices(MOCKINGBOARD *mb, uint32_t cycles) {
-    if(!ay38910_is_active(&mb->ay[0]) && !ay38910_is_active(&mb->ay[1])) {
+static void mockingboard_queue_ay_cycles(MOCKINGBOARD *mb, uint32_t cycles) {
+    if(ay38910_is_active(&mb->ay[0])) {
+        mb->ay_pending_cycles[0] += cycles;
+    }
+    if(ay38910_is_active(&mb->ay[1])) {
+        mb->ay_pending_cycles[1] += cycles;
+    }
+}
+
+static void mockingboard_reconcile_ay(MOCKINGBOARD *mb, uint8_t pair_index) {
+    if(!mb->ay_pending_cycles[pair_index]) {
         return;
     }
 
-    // Explicit AY batching policy:
-    // advance both PSGs once per completed CPU opcode using the elapsed opcode
-    // cycle count. AY-visible bus actions remain immediate register effects at
-    // access time; they do not reintroduce per-cycle stepping or separate
-    // access-time freshness work.
-    ay38910_step_cycles(&mb->ay[0], cycles);
-    ay38910_step_cycles(&mb->ay[1], cycles);
+    ay38910_step_cycles(&mb->ay[pair_index], mb->ay_pending_cycles[pair_index]);
+    mb->ay_pending_cycles[pair_index] = 0;
 }
 
 static int mockingboard_cn_decode(uint8_t slot_offset, uint8_t *via_index, uint8_t *via_reg) {
@@ -151,7 +160,10 @@ uint8_t mockingboard_read_via_port_a(const APPLE2 *m, uint8_t slot, uint8_t pair
     return value;
 }
 
-float mockingboard_get_sample(const MOCKINGBOARD *mb) {
+float mockingboard_get_sample(MOCKINGBOARD *mb) {
+    mockingboard_reconcile_ay(mb, 0);
+    mockingboard_reconcile_ay(mb, 1);
+
     // Board-level aggregation keeps the AY core's unipolar chip output intact
     // and averages the two PSG instances without centering them here.
     return (ay38910_get_sample(&mb->ay[0]) + ay38910_get_sample(&mb->ay[1])) * 0.5f;
@@ -174,10 +186,12 @@ void mockingboard_on_cycles(APPLE2 *m, uint32_t cycles) {
     }
 
     uint8_t slot = m->mb_slot;
-    mockingboard_step_ay_devices(&m->mockingboard[slot], cycles);
+    mockingboard_queue_ay_cycles(&m->mockingboard[slot], cycles);
 }
 
 void mockingboard_reset(MOCKINGBOARD *mb, int full) {
+    mb->ay_pending_cycles[0] = 0;
+    mb->ay_pending_cycles[1] = 0;
     mb->ay_bus_state[0] = MOCKINGBOARD_AY_BUS_INACTIVE;
     mb->ay_bus_state[1] = MOCKINGBOARD_AY_BUS_INACTIVE;
     via6522_reset(&mb->via[0]);
