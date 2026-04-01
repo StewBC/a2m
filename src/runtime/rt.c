@@ -47,6 +47,24 @@ static const uint8_t addr_mode[256] = {
 /*F*/  10, 9, 0, 0, 0,12,12, 0, 6, 4, 0, 0, 0, 3, 3, 0,
 };
 
+// Update the MB or speaker as needed
+static void rt_audio_update(APPLE2 *m, UI *ui, uint32_t opcode_cycles) {
+    if(!opcode_cycles) {
+        return;
+    }
+
+    // Service Mockingboard
+    uint8_t slot = m->mb_slot;
+    if(slot) {
+        mockingboard_queue_ay_cycles(&m->mockingboard[slot], opcode_cycles);
+    }
+
+    // Service Speaker
+    if(ui->ops->speaker_on_cycles) {
+        ui->ops->speaker_on_cycles(ui, opcode_cycles);
+    }
+}
+
 // This is the code that checks breakpoints and controls flow and marks cycle counts
 // It's okay to return 1, but not 0 at any point before the end (so not to skip cycle marking)
 static int rt_step_okay(RUNTIME *rt) {
@@ -264,23 +282,6 @@ int rt_init(RUNTIME *rt, INI_STORE *ini_store) {
     rt->run = 1;
 
     return A2_OK;
-}
-
-void rt_audio_update(APPLE2 *m, UI *ui, uint32_t opcode_cycles) {
-    if(!opcode_cycles) {
-        return;
-    }
-
-    // Service Mockingboard
-    uint8_t slot = m->mb_slot;
-    if(slot) {
-        mockingboard_queue_ay_cycles(&m->mockingboard[slot], opcode_cycles);
-    }
-
-    // Service Speaker
-    if(ui->ops->speaker_on_cycles) {
-        ui->ops->speaker_on_cycles(ui, opcode_cycles);
-    }
 }
 
 int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
