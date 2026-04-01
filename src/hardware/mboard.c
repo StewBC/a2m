@@ -69,7 +69,7 @@ static void mockingboard_apply_via_to_ay(APPLE2 *m, MOCKINGBOARD *mb, int slot,
     }
 }
 
-static void mockingboard_queue_ay_cycles(MOCKINGBOARD *mb, uint32_t cycles) {
+void mockingboard_queue_ay_cycles(MOCKINGBOARD *mb, uint32_t cycles) {
     if(ay38910_is_active(&mb->ay[0])) {
         mb->ay_pending_cycles[0] += cycles;
     }
@@ -178,15 +178,6 @@ uint8_t mockingboard_irq_pending(APPLE2 *m) {
 
     return (uint8_t)(via6522_irq_pending(&m->mockingboard[slot].via[0]) ||
                      via6522_irq_pending(&m->mockingboard[slot].via[1]));
-}
-
-void mockingboard_on_cycles(APPLE2 *m, uint32_t cycles) {
-    if(!cycles) {
-        return;
-    }
-
-    uint8_t slot = m->mb_slot;
-    mockingboard_queue_ay_cycles(&m->mockingboard[slot], cycles);
 }
 
 void mockingboard_reset(MOCKINGBOARD *mb, int full) {

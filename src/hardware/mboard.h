@@ -9,14 +9,13 @@ typedef struct {
     AY38910 ay[2];
     uint32_t ay_pending_cycles[2];
     uint8_t ay_bus_state[2];
-    // uint8_t megaaudio_ier_bit7_clear;
     uint8_t board_startup_timer_seed_disabled;
 } MOCKINGBOARD;
 
 uint8_t mockingboard_read_via_port_a(const APPLE2 *m, uint8_t slot, uint8_t pair_index);
 float mockingboard_get_sample(MOCKINGBOARD *mb);
 uint8_t mockingboard_irq_pending(APPLE2 *m);
-void mockingboard_on_cycles(APPLE2 *m, uint32_t cycles);
+void mockingboard_queue_ay_cycles(MOCKINGBOARD *mb, uint32_t cycles);
 void mockingboard_reset(MOCKINGBOARD *mb, int full);
 void mockingboard_set_board_startup_timer_seed_enabled(MOCKINGBOARD *mb, uint8_t enabled);
 uint8_t mockingboard_read_cn(APPLE2 *m, MOCKINGBOARD *mb, int slot, uint16_t address, uint8_t slot_offset);

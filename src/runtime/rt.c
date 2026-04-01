@@ -266,6 +266,23 @@ int rt_init(RUNTIME *rt, INI_STORE *ini_store) {
     return A2_OK;
 }
 
+void rt_audio_update(APPLE2 *m, UI *ui, uint32_t opcode_cycles) {
+    if(!opcode_cycles) {
+        return;
+    }
+
+    // Service Mockingboard
+    uint8_t slot = m->mb_slot;
+    if(slot) {
+        mockingboard_queue_ay_cycles(&m->mockingboard[slot], opcode_cycles);
+    }
+
+    // Service Speaker
+    if(ui->ops->speaker_on_cycles) {
+        ui->ops->speaker_on_cycles(ui, opcode_cycles);
+    }
+}
+
 int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
     int ret_val = A2_OK;
     int quit = 0;
@@ -292,8 +309,7 @@ int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
                         break;
                     }
                     size_t opcode_cycles = machine_run_opcode(m);
-                    mockingboard_on_cycles(m, (uint32_t)opcode_cycles);
-                    ui->ops->speaker_on_cycles(ui, opcode_cycles);
+                    rt_audio_update(m, ui, opcode_cycles);
                     cycles += opcode_cycles;
                 }
             } else {
@@ -304,8 +320,7 @@ int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
                         break;
                     }
                     size_t opcode_cycles = machine_run_opcode(m);
-                    mockingboard_on_cycles(m, (uint32_t)opcode_cycles);
-                    ui->ops->speaker_on_cycles(ui, opcode_cycles);
+                    rt_audio_update(m, ui, opcode_cycles);
                 }
             }
         }
