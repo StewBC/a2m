@@ -70,6 +70,9 @@ static void mockingboard_apply_via_to_ay(APPLE2 *m, MOCKINGBOARD *mb, int slot,
 }
 
 void mockingboard_queue_ay_cycles(MOCKINGBOARD *mb, uint32_t cycles) {
+    // AY chip time is batched by opcode and only stepped later when the audio mixer asks for a sample.
+    // This keeps cycle accounting simple but couples audible update cadence to the later sampling
+    // path rather than to the moment cycles are queued.
     if(ay38910_is_active(&mb->ay[0])) {
         mb->ay_pending_cycles[0] += cycles;
     }
@@ -160,13 +163,18 @@ uint8_t mockingboard_read_via_port_a(const APPLE2 *m, uint8_t slot, uint8_t pair
     return value;
 }
 
-float mockingboard_get_sample(MOCKINGBOARD *mb) {
+MOCKINGBOARD_SAMPLE mockingboard_get_stereo_sample(MOCKINGBOARD *mb) {
     mockingboard_reconcile_ay(mb, 0);
     mockingboard_reconcile_ay(mb, 1);
 
-    // Board-level aggregation keeps the AY core's unipolar chip output intact
-    // and averages the two PSG instances without centering them here.
-    return (ay38910_get_sample(&mb->ay[0]) + ay38910_get_sample(&mb->ay[1])) * 0.5f;
+    // Current stereo mapping for the board:
+    // - AY #0 is routed to the left channel
+    // - AY #1 is routed to the right channel
+    MOCKINGBOARD_SAMPLE sample = {
+        .left = ay38910_get_sample(&mb->ay[0]),
+        .right = ay38910_get_sample(&mb->ay[1]),
+    };
+    return sample;
 }
 
 uint8_t mockingboard_irq_pending(APPLE2 *m) {

@@ -47,7 +47,9 @@ static const uint8_t addr_mode[256] = {
 /*F*/  10, 9, 0, 0, 0,12,12, 0, 6, 4, 0, 0, 0, 3, 3, 0,
 };
 
-// Update the MB or speaker as needed
+// Opcode cycle counts are the only timing input forwarded to the active UI audio path
+// Mockingboard time is queued here, then reconciled later when a sample is pulled
+// the UI "speaker" callback is also the current system mixer entry point
 static void rt_audio_update(APPLE2 *m, UI *ui, uint32_t opcode_cycles) {
     if(!opcode_cycles) {
         return;
@@ -302,6 +304,9 @@ int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
             dirty_view = 1;
             // If not going at max speed, or stepping the debugger
             if(rt->turbo_active > 0.0) {
+                // Emulation, including audio production, currently happens in bursts inside the
+                // frame loop. Once this work completes, the runtime may sleep/spin until the next
+                // frame boundary, so audio submission is indirectly shaped by the 60 FPS pacing.
                 double cycles_per_frame = max(1, (CPU_FREQUENCY * rt->turbo_active) / TARGET_FPS - (overhead_ticks * clock_cycles_per_tick));
                 uint64_t cycles = 0;
                 while(cycles < cycles_per_frame) {

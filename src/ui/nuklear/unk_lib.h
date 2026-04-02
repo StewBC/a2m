@@ -69,4 +69,5 @@ typedef enum {
 #include "unk_help.h"
 #include "unk_mem.h"
 #include "unk_misc.h"
+#include "unk_mixer.h"
 #include "unk_view.h"

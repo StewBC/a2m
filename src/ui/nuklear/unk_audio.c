@@ -2,72 +2,14 @@
 // Stefan Wessels, 2025
 // This is free and unencumbered software released into the public domain.
 
-#include "common.h"
-#include "hardware_lib.h"
-#include "unk_audio.h"
+#include "unk_lib.h"
 
-static inline uint32_t unk_audio_speaker_ring_count(const VIEWSPEAKER *speaker) {
-    return (speaker->wpos - speaker->rpos) & SOFT_RING_MASK;
-}
-
-static inline uint32_t unk_audio_speaker_ring_target_frames(const VIEWSPEAKER *speaker) {
-    const uint32_t channels = speaker->have.channels ? speaker->have.channels : 1u;
-    const uint32_t bytes_per_frame = channels * (uint32_t)sizeof(float);
-    uint32_t target_frames = speaker->target_q_bytes / bytes_per_frame;
-
-    if(target_frames == 0) {
-        target_frames = speaker->chunk_frames ? speaker->chunk_frames : 1u;
-    }
-    if(target_frames >= SOFT_RING_FRAMES) {
-        target_frames = SOFT_RING_FRAMES - 1u;
-    }
-    return target_frames;
-}
-
-static inline uint32_t unk_audio_speaker_ring_space(const VIEWSPEAKER *speaker) {
-    return SOFT_RING_FRAMES - 1 - unk_audio_speaker_ring_count(speaker);
-}
-
-static inline void ring_push(VIEWSPEAKER *speaker, float s) {
-    uint32_t target_frames = unk_audio_speaker_ring_target_frames(speaker);
-
-    while(unk_audio_speaker_ring_count(speaker) >= target_frames) {
-        speaker->rpos = (speaker->rpos + 1) & SOFT_RING_MASK;
-    }
-
-    if(unk_audio_speaker_ring_space(speaker) == 0) {           // drop oldest if full
-        speaker->rpos = (speaker->rpos + 1) & SOFT_RING_MASK;
-    }
-    speaker->ring[speaker->wpos & SOFT_RING_MASK] = s;
-    speaker->wpos = (speaker->wpos + 1) & SOFT_RING_MASK;
-}
-
-// Pops up to max_frames mono frames or returns immediately if empty
-static inline uint32_t unk_audio_speaker_ring_pop_frames(VIEWSPEAKER *speaker, float *dst, uint32_t max_frames) {
-    uint32_t have = unk_audio_speaker_ring_count(speaker);
-    if(have == 0) {
-        return 0;
-    }
-    if(have > max_frames) {
-        have = max_frames;
-    }
-    uint32_t first = SOFT_RING_FRAMES - (speaker->rpos & SOFT_RING_MASK);
-    if(have <= first) {
-        memcpy(dst, &speaker->ring[speaker->rpos & SOFT_RING_MASK], have * sizeof(float));
-    } else {
-        memcpy(dst, &speaker->ring[speaker->rpos & SOFT_RING_MASK], first * sizeof(float));
-        memcpy(dst + first, &speaker->ring[0], (have - first) * sizeof(float));
-    }
-    speaker->rpos = (speaker->rpos + have) & SOFT_RING_MASK;
-    return have;
-}
-
-static inline float dc_block(VIEWSPEAKER *s, float x) {
+static inline float dc_block(VIEWAUDIO *audio, float x) {
     const float R = 0.995f;
 
-    float y = x - s->x_prev + R * s->y_prev;
-    s->x_prev = x;
-    s->y_prev = y;
+    float y = x - audio->x_prev + R * audio->y_prev;
+    audio->x_prev = x;
+    audio->y_prev = y;
     return y;
 }
 
@@ -75,153 +17,79 @@ static inline float clamp_audio_sample(float x) {
     return x < -1.0f ? -1.0f : (x > 1.0f ? 1.0f : x);
 }
 
-void audio_prime_queue_and_start(VIEWSPEAKER *speaker) {
-    if(!speaker || !speaker->dev) {
-        return;
-    }
-
-    SDL_PauseAudioDevice(speaker->dev, 1);
-    SDL_ClearQueuedAudio(speaker->dev);
-
-    const int ch = speaker->have.channels;
-    const uint32_t bytes_per_frame = (uint32_t)(ch * sizeof(float));
-
-    uint32_t want_bytes = speaker->target_q_bytes;
-    want_bytes -= (want_bytes % bytes_per_frame); // whole frames
-    uint32_t want_frames = want_bytes / bytes_per_frame;
-
-    while(want_frames > 0) {
-        uint32_t n = (want_frames > 4096) ? 4096 : want_frames;
-        if(ch == 1) {
-            float silence_mono[4096] = {0};
-            SDL_QueueAudio(speaker->dev, silence_mono, n * bytes_per_frame);
-        } else {
-            float silence_stereo[2 * 4096] = {0};
-            SDL_QueueAudio(speaker->dev, silence_stereo, n * bytes_per_frame);
-        }
-        want_frames -= n;
-    }
-
-    SDL_PauseAudioDevice(speaker->dev, 0);
+static inline UNKAUDIOFRAME unk_audio_centered_frame(float sample) {
+    UNKAUDIOFRAME frame = {
+        .left = sample,
+        .right = sample,
+    };
+    return frame;
 }
 
-int unk_audio_speaker_init(VIEWSPEAKER *speaker, double cpu_hz, int sample_rate, int channels, float target_latency_ms, uint32_t chunk_frames) {
-    memset(speaker, 0, sizeof(*speaker));
-    speaker->cpu_hz = (cpu_hz > 0.0) ? cpu_hz : CPU_FREQUENCY;
-    speaker->level  = -1.0f;
-    speaker->mockingboard_gain = 1.0f;
+static inline UNKAUDIOFRAME unk_audio_clamp_frame(UNKAUDIOFRAME frame) {
+    frame.left = clamp_audio_sample(frame.left);
+    frame.right = clamp_audio_sample(frame.right);
+    return frame;
+}
 
-    SDL_AudioSpec want = {0}, have = {0};
-    want.freq = (sample_rate > 0) ? sample_rate : 48000;
-    want.format = AUDIO_F32SYS;
-    want.channels = (uint8_t)((channels == 1 || channels == 2) ? channels : 2);
-    want.samples = 256;
-    want.callback = NULL;            // push model
-    speaker->dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
-    if(!speaker->dev) {
+void unk_audio_restart_output(VIEWAUDIO *audio) {
+    unk_mixer_prime_queue_and_start(&audio->mixer);
+}
+
+int unk_audio_init(VIEWAUDIO *audio, double cpu_hz, int sample_rate, int channels, float target_latency_ms, uint32_t chunk_frames) {
+    memset(audio, 0, sizeof(*audio));
+    audio->cpu_hz = (cpu_hz > 0.0) ? cpu_hz : CPU_FREQUENCY;
+    audio->speaker_level = -1.0f;
+    audio->mockingboard_gain = 1.0f;
+
+    if(A2_OK != unk_mixer_init(&audio->mixer, sample_rate, channels, target_latency_ms, chunk_frames)) {
         return A2_ERR;
     }
-    if(have.format != AUDIO_F32SYS) {
-        SDL_CloseAudioDevice(speaker->dev);
-        return A2_ERR;
-    }
-    speaker->have = have;
-
-    speaker->cycles_per_sample = speaker->cpu_hz / (double)have.freq;
-    speaker->cycle_accum = 0.0;
-
-    speaker->chunk_frames = (chunk_frames ? chunk_frames : 256);
-    double bytes_per_frame = have.channels * sizeof(float);
-    double target_ms = (target_latency_ms > 0.0f) ? target_latency_ms : 40.0;
-    speaker->target_q_bytes = (uint32_t)((double)have.freq * bytes_per_frame * target_ms / 1000.0);
-
-    audio_prime_queue_and_start(speaker);
-    
+    audio->cycles_per_sample = audio->cpu_hz / (double)audio->mixer.have.freq;
+    audio->cycle_accum = 0.0;
     return A2_OK;
 }
 
-// Produce mono audio at exact emulated sample clock and push into ring
-void unk_audio_speaker_on_cycles(UI *ui, uint32_t cycles_executed) {
+// Output sample times are derived from accumulated emulated CPU cycles
+// Speaker and Mockingboard sources are sampled here
+// Speaker is centered, while Mockingboard is stereo
+// Final queue/ring/SDL output handling lives in the mixer module
+void unk_audio_on_cycles(UI *ui, uint32_t cycles_executed) {
     UNK *v = (UNK *)ui->user;
-    VIEWSPEAKER *speaker = &v->viewspeaker;
+    VIEWAUDIO *audio = &v->viewaudio;
     APPLE2 *m = v->rt ? v->rt->m : v->m;
 
-    speaker->cycle_accum += (double)cycles_executed;
+    audio->cycle_accum += (double)cycles_executed;
 
     uint32_t produced = 0;
-    while(speaker->cycle_accum >= speaker->cycles_per_sample) {
-        speaker->cycle_accum -= speaker->cycles_per_sample;
+    while(audio->cycle_accum >= audio->cycles_per_sample) {
+        audio->cycle_accum -= audio->cycles_per_sample;
 
-        float speaker_sample = dc_block(speaker, speaker->level);
-        float mixed = speaker_sample;
+        float speaker_sample = dc_block(audio, audio->speaker_level);
+        UNKAUDIOFRAME mixed = unk_audio_centered_frame(speaker_sample);
 
         if(m) {
-            float mockingboard_sample = 0.0f;
             if(m->mb_slot) {
-                mockingboard_sample += mockingboard_get_sample(&m->mockingboard[m->mb_slot]);
+                MOCKINGBOARD_SAMPLE mockingboard_sample = mockingboard_get_stereo_sample(&m->mockingboard[m->mb_slot]);
+                mixed.left += mockingboard_sample.left * audio->mockingboard_gain;
+                mixed.right += mockingboard_sample.right * audio->mockingboard_gain;
             }
-            mixed += mockingboard_sample * speaker->mockingboard_gain;
         }
 
-        ring_push(speaker, clamp_audio_sample(mixed));
+        unk_mixer_push_frame(&audio->mixer, unk_audio_clamp_frame(mixed));
         produced++;
     }
 
-    // Pump once for all pushes
     if(produced) {
-        unk_audio_speaker_pump(speaker);
+        unk_mixer_pump(&audio->mixer);
     }
 }
-
-void unk_audio_speaker_shutdown(VIEWSPEAKER *speaker) {
-    if(speaker->dev) {
-        SDL_ClearQueuedAudio(speaker->dev);
-        SDL_CloseAudioDevice(speaker->dev);
-        speaker->dev = 0;
-    }
-}
-
 
 void unk_audio_speaker_toggle(UI *ui) {
     UNK *v = (UNK *)ui->user;
-    VIEWSPEAKER *speaker = &v->viewspeaker;
-    speaker->level = -speaker->level;
+    VIEWAUDIO *audio = &v->viewaudio;
+    audio->speaker_level = -audio->speaker_level;
 }
 
-// Feed SDL from ring, but cap queue to target latency
-void unk_audio_speaker_pump(VIEWSPEAKER *speaker) {
-    const int ch = speaker->have.channels;
-    const uint32_t bytes_per_frame = (uint32_t)(ch * sizeof(float));
-
-    float mono[4096];
-    static float stereo[2 * 4096];
-
-    uint32_t want_frames = speaker->chunk_frames;
-    if(want_frames > 4096) want_frames = 4096;
-
-    for(;;) {
-        uint32_t queued = SDL_GetQueuedAudioSize(speaker->dev);
-        if(queued >= speaker->target_q_bytes) {
-            return;
-        }
-
-        uint32_t got = unk_audio_speaker_ring_pop_frames(speaker, mono, want_frames);
-        if(got == 0) {
-            return; // nothing to feed SDL
-        }
-
-        int gave;
-        if(ch == 1) {
-            gave = SDL_QueueAudio(speaker->dev, mono, got * bytes_per_frame);
-        } else {
-            for(uint32_t i = 0; i < got; ++i) {
-                stereo[2 * i + 0] = mono[i];
-                stereo[2 * i + 1] = mono[i];
-            }
-            gave = SDL_QueueAudio(speaker->dev, stereo, got * bytes_per_frame);
-        }
-        if(gave < 0) {
-            return;
-        }
-    }
+void unk_audio_shutdown(VIEWAUDIO *audio) {
+    unk_mixer_shutdown(&audio->mixer);
 }

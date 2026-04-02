@@ -192,7 +192,7 @@ void unk_misc_show(UNK *v) {
                                     sprintf(label, "%d.%d", i, j);
                                     if(nk_button_label(ctx, label)) {
                                         rt_machine_reset(rt, 1);
-                                        audio_prime_queue_and_start(&v->viewspeaker);
+                                        unk_audio_restart_output(&v->viewaudio);
                                         m->cpu.pc = 0xc000 + i * 0x100;
                                     }
                                 } else {
@@ -237,7 +237,7 @@ void unk_misc_show(UNK *v) {
                                     sprintf(label, "%d.%d", i, j);
                                     if(nk_button_label(ctx, label)) {
                                         rt_machine_reset(rt, 1);
-                                        audio_prime_queue_and_start(&v->viewspeaker);
+                                        unk_audio_restart_output(&v->viewaudio);
                                         m->cpu.pc = 0xc000 + i * 0x100;
                                     }
                                 } else {

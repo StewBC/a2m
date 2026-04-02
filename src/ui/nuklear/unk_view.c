@@ -28,7 +28,7 @@ const UI_OPS unk_ops = {
     .read_button       = unk_joy_read_button,
     .read_axis         = unk_joy_read_axis,
     .speaker_toggle    = unk_audio_speaker_toggle,
-    .speaker_on_cycles = unk_audio_speaker_on_cycles,
+    .speaker_on_cycles = unk_audio_on_cycles,
     .render            = unk_render_frame,
     .set_runtime       = unk_set_runtime,
     .set_shadow_state  = unk_set_shadow_state,
@@ -559,7 +559,7 @@ int unk_init(UNK *v, int model, INI_STORE *ini_store) {
     }
 
     // Do this late since this also starts the audio rolling - consuming the queue
-    if(A2_OK != unk_audio_speaker_init(&v->viewspeaker, CPU_FREQUENCY, 48000, 2, 32.0f, 256)) {
+    if(A2_OK != unk_audio_init(&v->viewaudio, CPU_FREQUENCY, 48000, 2, 32.0f, 256)) {
         return A2_ERR;
     }
 
@@ -687,7 +687,7 @@ void unk_shutdown(UNK *v) {
     // Then the views
     unk_dasm_shutdown(&v->viewdasm);
     unk_mem_shutdown(&v->viewmem);
-    unk_audio_speaker_shutdown(&v->viewspeaker);
+    unk_audio_shutdown(&v->viewaudio);
 
     // Shut down the dialog
     array_free(&v->file_browser.dir_contents);

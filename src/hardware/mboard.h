@@ -5,6 +5,11 @@
 #pragma once
 
 typedef struct {
+    float left;
+    float right;
+} MOCKINGBOARD_SAMPLE;
+
+typedef struct {
     VIA6522 via[2];
     AY38910 ay[2];
     uint32_t ay_pending_cycles[2];
@@ -13,7 +18,7 @@ typedef struct {
 } MOCKINGBOARD;
 
 uint8_t mockingboard_read_via_port_a(const APPLE2 *m, uint8_t slot, uint8_t pair_index);
-float mockingboard_get_sample(MOCKINGBOARD *mb);
+MOCKINGBOARD_SAMPLE mockingboard_get_stereo_sample(MOCKINGBOARD *mb);
 uint8_t mockingboard_irq_pending(APPLE2 *m);
 void mockingboard_queue_ay_cycles(MOCKINGBOARD *mb, uint32_t cycles);
 void mockingboard_reset(MOCKINGBOARD *mb, int full);

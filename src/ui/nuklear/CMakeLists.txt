@@ -10,6 +10,7 @@ add_library(unk STATIC
     unk_leds.c
     unk_apl2.c
     unk_audio.c
+    unk_mixer.c
     unk_cpu.c
     unk_dlg.c
     unk_dasm.c

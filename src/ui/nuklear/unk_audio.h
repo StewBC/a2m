@@ -4,43 +4,27 @@
 
 #pragma once
 
-#define SOFT_RING_FRAMES   16384  // 16384 mono frames (~341ms at 48k)
-#define SOFT_RING_MASK     (SOFT_RING_FRAMES - 1)
+#include "unk_mixer.h"
 
 typedef struct {
-    SDL_AudioDeviceID dev;
-    SDL_AudioSpec have;
-
-    // software ring buffer (mono)
-    float ring[SOFT_RING_FRAMES];
-    uint32_t rpos;      // frame indices (mono) read and write
-    uint32_t wpos;
-
-    // queue control
-    uint32_t chunk_frames;    // e.g., 256
-    uint32_t target_q_bytes;  // e.g., 40 ms of audio
+    UNKMIXER mixer;
 
     // audio clock
-    double cpu_hz;              // e.g., 1020484.4 (NTSC)
-    double cycles_per_sample;   // = cpu_hz / have.freq
-    double cycle_accum;         // cycles accumulated toward next sample
+    double cpu_hz;
+    double cycles_per_sample;
+    double cycle_accum;
 
-    // speaker state (+1/-1)
-    float level;
+    // speaker source state (+1/-1)
+    float speaker_level;
     float mockingboard_gain;
 
-    // simple filter state (optional)
+    // speaker filter state
     float x_prev;
     float y_prev;
-    float prev_sample;
-} VIEWSPEAKER;
+} VIEWAUDIO;
 
-void audio_prime_queue_and_start(VIEWSPEAKER *speaker);
-int  unk_audio_speaker_init(VIEWSPEAKER *sp, double cpu_hz, int sample_rate, int channels, float target_latency_ms, uint32_t chunk_frames);
-void unk_audio_speaker_on_cycles(UI *ui, uint32_t cycles_executed);
-// void unk_audio_speaker_pump(VIEWSPEAKER *sp);
-void unk_audio_speaker_shutdown(VIEWSPEAKER *sp);
+void unk_audio_restart_output(VIEWAUDIO *audio);
+int  unk_audio_init(VIEWAUDIO *audio, double cpu_hz, int sample_rate, int channels, float target_latency_ms, uint32_t chunk_frames);
+void unk_audio_on_cycles(UI *ui, uint32_t cycles_executed);
+void unk_audio_shutdown(VIEWAUDIO *audio);
 void unk_audio_speaker_toggle(UI *ui);
-
-void unk_audio_speaker_pump(VIEWSPEAKER *sp);
-void unk_spkr_shutdown();

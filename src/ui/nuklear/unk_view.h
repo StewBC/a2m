@@ -40,7 +40,7 @@ typedef struct UNK {
     VIEWMEM viewmem;
     VIEWCPU viewcpu;
     VIEWMISC viewmisc;
-    VIEWSPEAKER viewspeaker;
+    VIEWAUDIO viewaudio;
 
     // Shared symbol lookup struct for API
     SYMBOL_LOOKUP symbol_lookup;

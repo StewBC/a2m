@@ -636,7 +636,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
         case SDLK_F2:
             if(mod & (KMOD_ALT | KMOD_CTRL)) {
                 rt_machine_reset(rt, mod & KMOD_ALT);
-                audio_prime_queue_and_start(&v->viewspeaker);
+                unk_audio_restart_output(&v->viewaudio);
                 v->prev_cycles = 0;     // So MHz doesn't jump massively
             } else {
                 unk_toggle_debug(v);    // Open or close the debug window
