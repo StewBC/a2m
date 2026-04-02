@@ -47,9 +47,11 @@ static const uint8_t addr_mode[256] = {
 /*F*/  10, 9, 0, 0, 0,12,12, 0, 6, 4, 0, 0, 0, 3, 3, 0,
 };
 
-// Opcode cycle counts are the only timing input forwarded to the active UI audio path
-// Mockingboard time is queued here, then reconciled later when a sample is pulled
-// the UI "speaker" callback is also the current system mixer entry point
+// Opcode cycle counts are the only timing input forwarded to the active UI audio path.
+// This layer does not synthesize Mockingboard audio; it only hands elapsed Apple II time
+// to the card/audio layers. Hardware-visible behavior must stay defined below this point.
+// Mockingboard time is queued here, then reconciled later when a sample is pulled.
+// The UI "speaker" callback is also the current system mixer entry point.
 static void rt_audio_update(APPLE2 *m, UI *ui, uint32_t opcode_cycles) {
     if(!opcode_cycles) {
         return;

@@ -5,10 +5,10 @@
 #include "hardware_lib.h"
 
 static const float ay38910_volume_table[16] = {
-    0.000f, 0.004f, 0.008f, 0.011f,
-    0.016f, 0.023f, 0.033f, 0.047f,
-    0.067f, 0.094f, 0.134f, 0.188f,
-    0.268f, 0.379f, 0.537f, 1.000f,
+    0.000000f, 0.007813f, 0.011049f, 0.015625f,
+    0.022097f, 0.031250f, 0.044194f, 0.062500f,
+    0.088388f, 0.125000f, 0.176777f, 0.250000f,
+    0.353553f, 0.500000f, 0.707107f, 1.000000f,
 };
 
 static uint8_t ay38910_mask_register_value(uint8_t reg, uint8_t value) {
@@ -192,24 +192,26 @@ float ay38910_get_channel_output_level(const AY38910 *ay, int channel) {
     return ay38910_volume_table[level];
 }
 
-static void ay38910_channel_reason(const AY38910 *ay, int channel, float *sample_out) {
-    float sample = ay38910_get_channel_output_level(ay, channel);
-
-    if(sample_out) {
-        *sample_out = sample;
-    }
-}
-
-static float ay38910_channel_sample(const AY38910 *ay, int channel) {
-    float sample = 0.0f;
-    ay38910_channel_reason(ay, channel, &sample);
-    return sample;
-}
-
 static void ay38910_refresh_sample(AY38910 *ay) {
+    // This core computes the chip's current logical output level from already-modeled AY
+    // state. Treat this as a chip-state generator, not as the final host reconstruction
+    // stage. Fidelity work above this layer must not rewrite AY register semantics in order
+    // to "improve" the sound.
     float mixed = 0.0f;
+
+    uint8_t mixer = ay->regs[AY38910_REG_MIXER];
+    uint8_t noise_output = ay->noise_output;
+    uint8_t env_level = ay->env_level & 0x0F;
+
     for(int ch = 0; ch < 3; ch++) {
-        mixed += ay38910_channel_sample(ay, ch);
+        uint8_t tone_gate = (uint8_t)((mixer & (1u << ch)) ? 1u : ay->tone_output[ch]);
+        uint8_t noise_gate = (uint8_t)((mixer & (1u << (ch + 3))) ? 1u : noise_output);
+
+        if(tone_gate & noise_gate) {
+            uint8_t volume_reg = ay->regs[AY38910_REG_VOLUME_A + ch];
+            uint8_t level = (uint8_t)((volume_reg & 0x10) ? env_level : (volume_reg & 0x0F));
+            mixed += ay38910_volume_table[level];
+        }
     }
     ay->sample = mixed / 3.0f;
 }
@@ -223,6 +225,7 @@ void ay38910_reset(AY38910 *ay, double cpu_hz, double chip_hz) {
     // a fixed ratio. No board-level divider is modeled here yet.
     ay->chip_hz = (chip_hz > 0.0) ? chip_hz : ay->cpu_hz;
     ay->chip_cycles_per_cpu_cycle = ay->chip_hz / ay->cpu_hz;
+    ay->chip_rate_identity = (uint8_t)(ay->chip_hz == ay->cpu_hz);
 
     for(int ch = 0; ch < 3; ch++) {
         ay->tone_output[ch] = 1;
@@ -234,6 +237,152 @@ void ay38910_reset(AY38910 *ay, double cpu_hz, double chip_hz) {
     ay38910_refresh_env_period(ay);
     ay38910_restart_envelope(ay);
     ay38910_refresh_sample(ay);
+}
+
+void ay38910_render_accum_reset(AY38910_RENDER_ACCUM *accum) {
+    if(!accum) {
+        return;
+    }
+
+    accum->weighted_sum = 0.0;
+    accum->weight = 0;
+}
+
+void ay38910_render_accum_add_current(const AY38910 *ay, AY38910_RENDER_ACCUM *accum, uint32_t chip_cycles) {
+    if(!ay || !accum || !chip_cycles) {
+        return;
+    }
+
+    // This accumulation API is intentionally separate from chip stepping. It lets higher
+    // layers build integrated or sub-sampled renders from already-emulated chip state
+    // without redefining AY register/timer behavior.
+    accum->weighted_sum += (double)ay->sample * (double)chip_cycles;
+    accum->weight += chip_cycles;
+}
+
+float ay38910_render_accum_output(const AY38910_RENDER_ACCUM *accum) {
+    if(!accum || !accum->weight) {
+        return 0.0f;
+    }
+
+    return (float)(accum->weighted_sum / (double)accum->weight);
+}
+
+static uint32_t ay38910_next_event_chip_cycles(const AY38910 *ay) {
+    uint32_t next = ay->env_counter;
+
+    if(ay->tone_counter[0] < next) {
+        next = ay->tone_counter[0];
+    }
+    if(ay->tone_counter[1] < next) {
+        next = ay->tone_counter[1];
+    }
+    if(ay->tone_counter[2] < next) {
+        next = ay->tone_counter[2];
+    }
+    if(ay->noise_counter < next) {
+        next = ay->noise_counter;
+    }
+
+    return next ? next : 1u;
+}
+
+static inline void ay38910_advance_no_event(AY38910 *ay, uint32_t chip_cycles, AY38910_RENDER_ACCUM *accum) {
+    if(accum) {
+        ay38910_render_accum_add_current(ay, accum, chip_cycles);
+    }
+
+    ay->tone_counter[0] = (uint16_t)(ay->tone_counter[0] - chip_cycles);
+    ay->tone_counter[1] = (uint16_t)(ay->tone_counter[1] - chip_cycles);
+    ay->tone_counter[2] = (uint16_t)(ay->tone_counter[2] - chip_cycles);
+    ay->env_counter -= chip_cycles;
+    ay->noise_counter -= chip_cycles;
+}
+
+static void ay38910_advance_chip_cycles(AY38910 *ay, uint32_t chip_cycles, AY38910_RENDER_ACCUM *accum) {
+    while(chip_cycles > 0) {
+        uint32_t step = ay38910_next_event_chip_cycles(ay);
+        uint8_t changed = 0;
+
+        if(chip_cycles < step) {
+            ay38910_advance_no_event(ay, chip_cycles, accum);
+            return;
+        }
+
+        if(step > chip_cycles) {
+            step = chip_cycles;
+        }
+
+        if(accum) {
+            ay38910_render_accum_add_current(ay, accum, step);
+        }
+
+        if(step < ay->tone_counter[0]) {
+            ay->tone_counter[0] = (uint16_t)(ay->tone_counter[0] - step);
+        } else {
+            ay->tone_counter[0] = ay->tone_period[0];
+            ay->tone_output[0] ^= 1;
+            changed = 1;
+        }
+
+        if(step < ay->tone_counter[1]) {
+            ay->tone_counter[1] = (uint16_t)(ay->tone_counter[1] - step);
+        } else {
+            ay->tone_counter[1] = ay->tone_period[1];
+            ay->tone_output[1] ^= 1;
+            changed = 1;
+        }
+
+        if(step < ay->tone_counter[2]) {
+            ay->tone_counter[2] = (uint16_t)(ay->tone_counter[2] - step);
+        } else {
+            ay->tone_counter[2] = ay->tone_period[2];
+            ay->tone_output[2] ^= 1;
+            changed = 1;
+        }
+
+        if(step < ay->env_counter) {
+            ay->env_counter -= step;
+        } else {
+            ay->env_counter = ay->env_period;
+            ay38910_step_envelope_level(ay);
+            changed = 1;
+        }
+
+        if(step < ay->noise_counter) {
+            ay->noise_counter -= step;
+        } else {
+            uint32_t feedback = (ay->noise_lfsr ^ (ay->noise_lfsr >> 3)) & 0x01u;
+            ay->noise_counter = ay->noise_period;
+            ay->noise_lfsr = (ay->noise_lfsr >> 1) | (feedback << 16);
+            ay->noise_output = (uint8_t)(ay->noise_lfsr & 0x01u);
+            changed = 1;
+        }
+
+        chip_cycles -= step;
+
+        if(changed) {
+            ay38910_refresh_sample(ay);
+        }
+    }
+}
+
+void ay38910_step_cycles_render(AY38910 *ay, uint32_t cycles, AY38910_RENDER_ACCUM *accum) {
+    uint32_t chip_cycles;
+
+    if(ay->chip_rate_identity) {
+        chip_cycles = cycles;
+    } else {
+        ay->chip_cycle_accum += (double)cycles * ay->chip_cycles_per_cpu_cycle;
+        chip_cycles = (uint32_t)ay->chip_cycle_accum;
+        ay->chip_cycle_accum -= (double)chip_cycles;
+    }
+
+    if(!chip_cycles) {
+        return;
+    }
+
+    ay38910_advance_chip_cycles(ay, chip_cycles, accum);
 }
 
 void ay38910_select_register(AY38910 *ay, uint8_t reg) {
@@ -312,66 +461,7 @@ uint8_t ay38910_is_active(const AY38910 *ay) {
 }
 
 void ay38910_step_cycles(AY38910 *ay, uint32_t cycles) {
-    ay->chip_cycle_accum += (double)cycles * ay->chip_cycles_per_cpu_cycle;
-
-    uint32_t chip_cycles = (uint32_t)ay->chip_cycle_accum;
-    ay->chip_cycle_accum -= (double)chip_cycles;
-
-    if(!chip_cycles) {
-        return;
-    }
-
-    for(int ch = 0; ch < 3; ch++) {
-        uint32_t remaining = chip_cycles;
-        while(remaining > 0) {
-            if(remaining < ay->tone_counter[ch]) {
-                ay->tone_counter[ch] = (uint16_t)(ay->tone_counter[ch] - remaining);
-                remaining = 0;
-            } else {
-                remaining -= ay->tone_counter[ch];
-                ay->tone_counter[ch] = ay->tone_period[ch];
-                ay->tone_output[ch] ^= 1;
-            }
-        }
-    }
-
-    {
-        uint32_t remaining = chip_cycles;
-        while(remaining > 0) {
-            if(remaining < ay->env_counter) {
-                ay->env_counter -= remaining;
-                remaining = 0;
-            } else {
-                remaining -= ay->env_counter;
-                ay->env_counter = ay->env_period;
-                ay38910_step_envelope_level(ay);
-            }
-        }
-    }
-
-    {
-        uint32_t remaining = chip_cycles;
-        while(remaining > 0) {
-            if(remaining < ay->noise_counter) {
-                ay->noise_counter -= remaining;
-                remaining = 0;
-            } else {
-                uint32_t feedback;
-
-                remaining -= ay->noise_counter;
-                ay->noise_counter = ay->noise_period;
-                // The manual defines the noise source as a single pseudo-random output
-                // clocked from the input clock / 16 and the 5-bit noise period. The
-                // internal sequence details are not tightened here beyond preserving
-                // the existing generator and updating it only at those period boundaries.
-                feedback = (ay->noise_lfsr ^ (ay->noise_lfsr >> 3)) & 0x01u;
-                ay->noise_lfsr = (ay->noise_lfsr >> 1) | (feedback << 16);
-                ay->noise_output = (uint8_t)(ay->noise_lfsr & 0x01u);
-            }
-        }
-    }
-
-    ay38910_refresh_sample(ay);
+    ay38910_step_cycles_render(ay, cycles, NULL);
 }
 
 float ay38910_get_sample(const AY38910 *ay) {

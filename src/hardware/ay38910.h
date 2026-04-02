@@ -24,10 +24,16 @@ enum {
 };
 
 typedef struct {
+    double weighted_sum;
+    uint32_t weight;
+} AY38910_RENDER_ACCUM;
+
+typedef struct {
     uint8_t regs[16];
     uint8_t selected_reg;
     uint8_t selected_reg_valid;
     uint8_t active;
+    uint8_t chip_rate_identity;
 
     double cpu_hz;
     double chip_hz;
@@ -60,5 +66,9 @@ uint8_t ay38910_is_active(const AY38910 *ay);
 uint8_t ay38910_get_channel_mixer_gate(const AY38910 *ay, int channel);
 uint8_t ay38910_get_channel_amplitude_level(const AY38910 *ay, int channel);
 float ay38910_get_channel_output_level(const AY38910 *ay, int channel);
+void ay38910_render_accum_reset(AY38910_RENDER_ACCUM *accum);
+void ay38910_render_accum_add_current(const AY38910 *ay, AY38910_RENDER_ACCUM *accum, uint32_t chip_cycles);
+float ay38910_render_accum_output(const AY38910_RENDER_ACCUM *accum);
+void ay38910_step_cycles_render(AY38910 *ay, uint32_t cycles, AY38910_RENDER_ACCUM *accum);
 void ay38910_step_cycles(AY38910 *ay, uint32_t cycles);
 float ay38910_get_sample(const AY38910 *ay);

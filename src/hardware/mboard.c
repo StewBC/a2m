@@ -4,6 +4,13 @@
 
 #include "hardware_lib.h"
 
+// Ownership boundary:
+// - This file is responsible for Mockingboard bus/register behavior and for advancing the
+//   paired AY chips in Apple II time.
+// - Fidelity work here may improve how elapsed time is handed to the audio renderer, but
+//   it must not change VIA-visible bus semantics, register behavior, or other software-
+//   observable hardware effects.
+
 enum {
     MOCKINGBOARD_AY_BUS_INACTIVE = 0,
     MOCKINGBOARD_AY_BUS_LATCH_ADDRESS = 1,
@@ -54,7 +61,8 @@ static void mockingboard_apply_via_to_ay(APPLE2 *m, MOCKINGBOARD *mb, int slot,
             // stepping time here; the chip itself is advanced in batches at
             // opcode boundaries.
             if(mb->ay_pending_cycles[pair_index]) {
-                ay38910_step_cycles(ay, mb->ay_pending_cycles[pair_index]);
+                AY38910_RENDER_ACCUM *accum = pair_index == 0 ? &mb->render_accum.left : &mb->render_accum.right;
+                ay38910_step_cycles_render(ay, mb->ay_pending_cycles[pair_index], accum);
                 mb->ay_pending_cycles[pair_index] = 0;
             }
             ay38910_write_selected(ay, data);
@@ -70,9 +78,10 @@ static void mockingboard_apply_via_to_ay(APPLE2 *m, MOCKINGBOARD *mb, int slot,
 }
 
 void mockingboard_queue_ay_cycles(MOCKINGBOARD *mb, uint32_t cycles) {
-    // AY chip time is batched by opcode and only stepped later when the audio mixer asks for a sample.
-    // This keeps cycle accounting simple but couples audible update cadence to the later sampling
-    // path rather than to the moment cycles are queued.
+    // This queues elapsed Apple II time for the AY chips without changing any register semantics.
+    // AY chip time is currently batched by opcode and only stepped later when audio is sampled.
+    // Fidelity changes may refine how this queued time is rendered, but must preserve the same
+    // hardware state progression seen by Apple II software.
     if(ay38910_is_active(&mb->ay[0])) {
         mb->ay_pending_cycles[0] += cycles;
     }
@@ -86,8 +95,99 @@ static void mockingboard_reconcile_ay(MOCKINGBOARD *mb, uint8_t pair_index) {
         return;
     }
 
-    ay38910_step_cycles(&mb->ay[pair_index], mb->ay_pending_cycles[pair_index]);
+    ay38910_step_cycles_render(&mb->ay[pair_index],
+                               mb->ay_pending_cycles[pair_index],
+                               pair_index == 0 ? &mb->render_accum.left : &mb->render_accum.right);
     mb->ay_pending_cycles[pair_index] = 0;
+}
+
+static void mockingboard_consume_ay_cycles(MOCKINGBOARD *mb, uint8_t pair_index, uint32_t cpu_cycles) {
+    uint32_t consume;
+
+    if(!cpu_cycles) {
+        return;
+    }
+
+    consume = cpu_cycles;
+    if(consume > mb->ay_pending_cycles[pair_index]) {
+        consume = mb->ay_pending_cycles[pair_index];
+    }
+    if(!consume) {
+        return;
+    }
+
+    ay38910_step_cycles_render(&mb->ay[pair_index],
+                               consume,
+                               pair_index == 0 ? &mb->render_accum.left : &mb->render_accum.right);
+    mb->ay_pending_cycles[pair_index] -= consume;
+}
+
+static inline void mockingboard_finalize_rendered_sample(MOCKINGBOARD *mb) {
+    if(mb->render_accum.left.weight) {
+        mb->rendered_sample.left = (float)(mb->render_accum.left.weighted_sum /
+                                           (double)mb->render_accum.left.weight);
+        mb->render_accum.left.weighted_sum = 0.0;
+        mb->render_accum.left.weight = 0;
+    } else {
+        mb->rendered_sample.left = mb->ay[0].sample;
+    }
+
+    if(mb->render_accum.right.weight) {
+        mb->rendered_sample.right = (float)(mb->render_accum.right.weighted_sum /
+                                            (double)mb->render_accum.right.weight);
+        mb->render_accum.right.weighted_sum = 0.0;
+        mb->render_accum.right.weight = 0;
+    } else {
+        mb->rendered_sample.right = mb->ay[1].sample;
+    }
+}
+
+uint8_t mockingboard_is_audibly_idle(const MOCKINGBOARD *mb) {
+    if(!mb) {
+        return 1;
+    }
+
+    if(mb->ay_pending_cycles[0] || mb->ay_pending_cycles[1]) {
+        return 0;
+    }
+    if(mb->render_accum.left.weight || mb->render_accum.right.weight) {
+        return 0;
+    }
+    if(ay38910_is_active(&mb->ay[0]) || ay38910_is_active(&mb->ay[1])) {
+        return 0;
+    }
+    if(mb->rendered_sample.left != 0.0f || mb->rendered_sample.right != 0.0f) {
+        return 0;
+    }
+
+    return 1;
+}
+
+void mockingboard_reconcile_audio_state(MOCKINGBOARD *mb) {
+    if(!mb) {
+        return;
+    }
+
+    mockingboard_reconcile_ay(mb, 0);
+    mockingboard_reconcile_ay(mb, 1);
+
+    mockingboard_finalize_rendered_sample(mb);
+}
+
+MOCKINGBOARD_SAMPLE mockingboard_render_audio_sample(MOCKINGBOARD *mb, uint32_t cpu_cycles) {
+    if(!mb) {
+        MOCKINGBOARD_SAMPLE empty = {0};
+        return empty;
+    }
+
+    // This is the internal higher-rate render path. It consumes only the CPU time assigned
+    // to this subframe, advances chip state over that interval, and returns the averaged
+    // board output for the interval without changing hardware-visible semantics.
+    mockingboard_consume_ay_cycles(mb, 0, cpu_cycles);
+    mockingboard_consume_ay_cycles(mb, 1, cpu_cycles);
+
+    mockingboard_finalize_rendered_sample(mb);
+    return mb->rendered_sample;
 }
 
 static int mockingboard_cn_decode(uint8_t slot_offset, uint8_t *via_index, uint8_t *via_reg) {
@@ -164,16 +264,53 @@ uint8_t mockingboard_read_via_port_a(const APPLE2 *m, uint8_t slot, uint8_t pair
 }
 
 MOCKINGBOARD_SAMPLE mockingboard_get_stereo_sample(MOCKINGBOARD *mb) {
-    mockingboard_reconcile_ay(mb, 0);
-    mockingboard_reconcile_ay(mb, 1);
+    // Compatibility helper: keep the existing "advance then sample" behavior while newer
+    // code paths move toward explicit separation between chip-state stepping and host-audio
+    // reconstruction.
+    mockingboard_reconcile_audio_state(mb);
+    return mockingboard_peek_stereo_sample(mb);
+}
 
+MOCKINGBOARD_SAMPLE mockingboard_peek_stereo_sample(const MOCKINGBOARD *mb) {
     // Current stereo mapping for the board:
     // - AY #0 is routed to the left channel
     // - AY #1 is routed to the right channel
+    // Keep this routing discrete. Cross-channel mixing was a known issue on some
+    // Mockingboard clone revisions, not the fidelity target for a clean stereo board.
     MOCKINGBOARD_SAMPLE sample = {
-        .left = ay38910_get_sample(&mb->ay[0]),
-        .right = ay38910_get_sample(&mb->ay[1]),
+        .left = mb ? mb->rendered_sample.left : 0.0f,
+        .right = mb ? mb->rendered_sample.right : 0.0f,
     };
+    return sample;
+}
+
+void mockingboard_render_accum_reset(MOCKINGBOARD_RENDER_ACCUM *accum) {
+    if(!accum) {
+        return;
+    }
+
+    ay38910_render_accum_reset(&accum->left);
+    ay38910_render_accum_reset(&accum->right);
+}
+
+void mockingboard_render_accum_add_current(const MOCKINGBOARD *mb, MOCKINGBOARD_RENDER_ACCUM *accum, uint32_t chip_cycles) {
+    if(!mb || !accum || !chip_cycles) {
+        return;
+    }
+
+    ay38910_render_accum_add_current(&mb->ay[0], &accum->left, chip_cycles);
+    ay38910_render_accum_add_current(&mb->ay[1], &accum->right, chip_cycles);
+}
+
+MOCKINGBOARD_SAMPLE mockingboard_render_accum_output(const MOCKINGBOARD_RENDER_ACCUM *accum) {
+    MOCKINGBOARD_SAMPLE sample = {0};
+
+    if(!accum) {
+        return sample;
+    }
+
+    sample.left = ay38910_render_accum_output(&accum->left);
+    sample.right = ay38910_render_accum_output(&accum->right);
     return sample;
 }
 
@@ -193,6 +330,9 @@ void mockingboard_reset(MOCKINGBOARD *mb, int full) {
     mb->ay_pending_cycles[1] = 0;
     mb->ay_bus_state[0] = MOCKINGBOARD_AY_BUS_INACTIVE;
     mb->ay_bus_state[1] = MOCKINGBOARD_AY_BUS_INACTIVE;
+    mockingboard_render_accum_reset(&mb->render_accum);
+    mb->rendered_sample.left = 0.0f;
+    mb->rendered_sample.right = 0.0f;
     via6522_reset(&mb->via[0]);
     via6522_reset(&mb->via[1]);
     ay38910_reset(&mb->ay[0], CPU_FREQUENCY, CPU_FREQUENCY);

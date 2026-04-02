@@ -13,14 +13,22 @@ typedef struct {
     double cpu_hz;
     double cycles_per_sample;
     double cycle_accum;
+    double mockingboard_cycles_per_render;
+    double mockingboard_render_cpu_budget;
+    uint32_t mockingboard_render_oversample;
 
     // speaker source state (+1/-1)
     float speaker_level;
     float mockingboard_gain;
+    float mockingboard_mix_scale;
+    float mockingboard_filter_alpha;
+    float mockingboard_filter_left;
+    float mockingboard_filter_right;
 
     // speaker filter state
     float x_prev;
     float y_prev;
+
 } VIEWAUDIO;
 
 void unk_audio_restart_output(VIEWAUDIO *audio);
