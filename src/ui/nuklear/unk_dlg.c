@@ -75,6 +75,27 @@ static void file_browser_set_last_path_from_file(FILE_BROWSER *fb, const char *a
     }
 }
 
+static void file_browser_activate_selection(FILE_BROWSER *fb, const FILE_INFO *fi, int *ret) {
+    if(!fb || !fi || !ret) {
+        return;
+    }
+
+    if(!fi->is_directory) {
+        fb->file_selected = *fi;
+        *ret = 1;
+    } else {
+        char abs_path[PATH_MAX];
+        fb->dir_contents.items = 0;
+        // Ignore navigation failures and leave the dialog open.
+        util_dir_change(fi->name);
+        if(A2_OK == util_dir_get_current(abs_path, PATH_MAX)) {
+            file_browser_set_last_path(fb, abs_path);
+        }
+        fb->cursor_line = 0;
+        fb->cursor_offset = 0;
+    }
+}
+
 int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
     int ret = -1;
     const int row_h = 18;
@@ -233,26 +254,19 @@ int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
                     // A) The row with the file/dir name details
                     nk_layout_row_begin(ctx, NK_DYNAMIC, row_h, 3);
                     {
+                        nk_bool selected;
+                        struct nk_rect row_bounds;
                         nk_layout_row_push(ctx, 0.8f);
-                        if(nk_select_label(ctx, fi->name, NK_TEXT_ALIGN_LEFT, 0)) {
-                            if(!fi->is_directory) {
-                                // A file to load has been selected
-                                fb->file_selected = *fi;
-                                ret = 1;
-                            } else {
-                                char abs_path[PATH_MAX];
-                                // A folder was selected, so dump current and change to selected
-                                fb->dir_contents.items = 0;
-                                // Not checking for success as the options are to close the dialog (bad) or ignore error.
-                                util_dir_change(fi->name);
-                                if(A2_OK == util_dir_get_current(abs_path, PATH_MAX)) {
-                                    file_browser_set_last_path(fb, abs_path);
-                                }
-                                fb->cursor_line = 0;
-                                fb->cursor_offset = 0;
+                        row_bounds = nk_widget_bounds(ctx);
+                        selected = i == fb->cursor_line;
+                        if(nk_selectable_label(ctx, fi->name, NK_TEXT_ALIGN_LEFT, &selected)) {
+                            fb->cursor_line = i;
+                            cursor_fi = fi;
+                            if(nk_input_is_mouse_click_down_in_rect(&ctx->input, NK_BUTTON_DOUBLE, row_bounds, nk_true)) {
+                                file_browser_activate_selection(fb, fi, &ret);
+                                ctx->style.selectable.normal.data.color = ob;
+                                break;
                             }
-                            ctx->style.selectable.normal.data.color = ob;
-                            break;
                         }
                         nk_layout_row_push(ctx, 0.1f);
                         nk_labelf(ctx, NK_TEXT_LEFT, "%zd", fi->size);
@@ -272,19 +286,7 @@ int unk_dlg_file_browser(struct nk_context *ctx, FILE_BROWSER *fb) {
             }
 
             if(!ctx->active->edit.active && nk_input_is_key_pressed(&ctx->input, NK_KEY_ENTER) && cursor_fi) {
-                if(!cursor_fi->is_directory) {
-                    fb->file_selected = *cursor_fi;
-                    ret = 1;
-                } else {
-                    char abs_path[PATH_MAX];
-                    fb->dir_contents.items = 0;
-                    util_dir_change(cursor_fi->name);
-                    if(A2_OK == util_dir_get_current(abs_path, PATH_MAX)) {
-                        file_browser_set_last_path(fb, abs_path);
-                    }
-                    fb->cursor_line = 0;
-                    fb->cursor_offset = 0;
-                }
+                file_browser_activate_selection(fb, cursor_fi, &ret);
             }
         }
 
@@ -1136,11 +1138,17 @@ int unk_dlg_symbol_lookup(struct nk_context *ctx, struct nk_rect r, SYMBOL_LOOKU
                         }
                         nk_layout_row_begin(ctx, NK_DYNAMIC, row_h, 3);
                         {
+                            nk_bool selected;
+                            struct nk_rect row_bounds;
                             nk_layout_row_push(ctx, 0.64f);
-                            if(nk_select_label(ctx, s->symbol_name, NK_TEXT_ALIGN_LEFT, 0)) {
-                                // Click address isn't necessarily the cursor address
+                            row_bounds = nk_widget_bounds(ctx);
+                            selected = inserted_line == sl->cursor_line;
+                            if(nk_selectable_label(ctx, s->symbol_name, NK_TEXT_ALIGN_LEFT, &selected)) {
+                                sl->cursor_line = inserted_line;
                                 sl->symbol_address = s->pc;
-                                ret = 1;
+                                if(nk_input_is_mouse_click_down_in_rect(&ctx->input, NK_BUTTON_DOUBLE, row_bounds, nk_true)) {
+                                    ret = 1;
+                                }
                             }
                             nk_layout_row_push(ctx, 0.15f);
                             nk_labelf(ctx, NK_TEXT_LEFT, "$%04X", s->pc);
