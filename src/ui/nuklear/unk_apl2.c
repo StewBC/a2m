@@ -271,8 +271,8 @@ void unk_apl2_init_color_table(UNK *v) {
         for(int phase = 0; phase < 4; phase++) {
             // Check for 4 bits in a row (0-3 or 1-4) to force white or black
             int color_idx;
-            bool force_white = ((pattern & 0x1E) == 0x1E) || ((pattern & 0x0F) == 0x0F);
-            bool force_black  = ((pattern & 0x1E) == 0x00) || ((pattern & 0x0F) == 0x00);
+            int force_white = ((pattern & 0x1E) == 0x1E) || ((pattern & 0x0F) == 0x0F);
+            int force_black  = ((pattern & 0x1E) == 0x00) || ((pattern & 0x0F) == 0x00);
             if (force_white) {
                 color_idx = 15;
             } else if (force_black) {
