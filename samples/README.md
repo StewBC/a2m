@@ -66,7 +66,7 @@ Press `CTRL + F4`.  Pretty much immediately Manic Miner should be running.
 You can now open the debugger with `F2` and stop with `F11`, open the source, modify it and press `CTRL-B` (when stopped) or `CTRL+F4` at any time, to instantly see the changes.  You can also un-check the box to auto-run, in which case you could press `CTRL-A` to jump to an address (say 6000).  Then press `CTRL-P` to set the program counter to the address of the cursor.  Now pressing `F5` will run the code from that address.  You can also, with the mouse over the dissasembly window and the debugger stopped, press `CTRL+S` to open the symbols view, and type `main` to show only symbols that match `main`.  Click on the `main` symbol itself and you should be at the place where `main` is compiled to.  Press `CTRL+left cursor` to set the PC to the disassembly cursor (from clicking on `main`).  Press `F5` to run or `F10` to step over or `F11` to step into.
   
 History:
-:   29 November 2024
-:   Updated 24 Nov 2025
-:   Updated  4 Feb 2026
-:   Updated  5 Apr 2026
+-  29 November 2024
+-  Updated 24 Nov 2025
+-  Updated  4 Feb 2026
+-  Updated  5 Apr 2026
