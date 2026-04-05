@@ -10,8 +10,19 @@ number-sections: true
 
 variables:
   geometry: "margin=1in"
-  mainfont: "TeX Gyre Pagella"
-  monofont: "Inconsolata"
+  mainfont: "texgyrepagella"
+  mainfontoptions:
+    - Path=/usr/local/texlive/2026basic/texmf-dist/fonts/opentype/public/tex-gyre/
+    - Extension=.otf
+    - UprightFont=*-regular
+    - BoldFont=*-bold
+    - ItalicFont=*-italic
+    - BoldItalicFont=*-bolditalic
+  monofont: "lmmono10-regular"
+  monofontoptions:
+    - Path=/usr/local/texlive/2026basic/texmf-dist/fonts/opentype/public/lm/
+    - Extension=.otf
+    - UprightFont=*
 
 metadata:
   lang: en-US

@@ -463,7 +463,7 @@ Using `[Cancel]` will not apply any changes to the breakpoint, but pressing `[Ap
 The Machine Configuration dialog allows common emulator settings to be edited without manually editing the INI file. It has three tabs: `Machine`, `Emulator`, and `Assembler`.
 
 #### Machine tab
-Select the model (`Apple ][+` or `Apple //e Enhanced`) and the device installed in slots 1-7. On the `Apple ][+` model, Slot 3 also allows a `Franklin Ace Display` card.
+Select the model (`Apple ][+` or `Apple //e Enhanced`) and the device installed in slots 1-7. On the `Apple ][+` model, Slot 3 also allows a `Franklin Ace Display` card.  A `Mockingboard` sound card can be added to any slot.  Currently, only one Mockingboard is allowed in a machine.
 
 #### Emulator tab
 Configure the UI (`GUI` or `Text`), the scroll wheel speed, and symbol files (a comma-separated list). The symbol files row includes a `[Browse]` button. Each file selected through the Browse button is added to the list in the symbol files field. To remove a file, edit the field manually.
@@ -572,9 +572,10 @@ There is a set of directives that control how a 6502 source file is assembled. T
 
 Notes:
 
-* Text in `[]` means optional and `[]*` means none or more
+* Text in `[]` means optional and `[]*` means none or more.
 * The assembler runs in the folder of the input file, so includes must be relative to that folder.
 * .byte can take strings as well, but note that .strcode will not run on those strings.
+* For conditional assembly in emulator vs. command line, see `_asm6502_tool` below.
 
 ### Targets
 Using `.scope "name" [file="file name"[, dest="bank name"]]` it is possible to define new output targets.  A target is similar to a sub-project.  For example, you may use the following:
@@ -596,6 +597,17 @@ LC2/LC Bank/LCBank  - Language Card bank 2
 LC1                 - Language Card bank 1
 ```
 These can be combined. For example `dest="aux,lc2"` will put the auxiliary `LC2` at `$D000`.  These words are all case-insensitive.
+
+### _asm6502_tool
+The variable `_asm6502_tool` is set to `1` when using the command-line assembler, allowing conditional behavior between emulator and command-line assembly:
+```
+.if _asm6502_tool .eq 1
+; Only in command line
+.else
+; Only in emulator
+.endif
+```
+Using conditional assembly together with `.scope "name"` allows optional inclusion of components (e.g., disk loaders).
 
 \Needspace{11\baselineskip}
 ### The following dot directives work with dot commands:
@@ -873,7 +885,7 @@ The Video section has only one valid variable, and it is only used to configure 
 
 | Variable | Value                                                                                 |
 |:---------|:--------------------------------------------------------------------------------------|
-| sNdev    | Franklin Ace Display. The `N` in `sNdev` is a slot number, usually 3                  |
+| sNdX     | Franklin Ace Display. The `N` in `sNdX` is a slot number, usually 3. `X` is `0`       |
 
 \Needspace{6\baselineskip}
 ## DiskII Section
@@ -900,6 +912,14 @@ The SmartPort section configures a slot for use as a SmartPort block device. The
 | bs       | A value of `1` will force-boot that device                                            |
 
 As with the Disk II section, the values for `N` and `X` are a valid, unused slot number and device number, where device numbers are `0` or `1`. Usually the slot numbers are `5` or `7`. The Apple //e will try to boot from a SmartPort device `0` in slot `7`. The `bs` setting can be used to force an Apple 2 to boot a SmartPort device `0` in a slot other than slot `7`, or to boot an Apple ][+ from a SmartPort device instead of the Disk II device.
+
+\Needspace{8\baselineskip}
+## Mockingboard Section
+The Mockingboard section adds a Mockingboard card, with two AY-3-8910 sound chips, to an Apple II as a slot card. Simply enabling the card incurs a performance penalty. At the BASIC prompt, an M2 Mac Mini achieves 160 MHz without a Mockingboard, but only 110 MHz with one configured.
+
+| Variable | Value                                                                                 |
+|:---------|:--------------------------------------------------------------------------------------|
+| sNdX     | Adds a Mockingboard audio card to slot `N`.  `X` is `0`                               |
 
 ## Debug Section
 The Debug section is not a normal INI section. Normally, a variable (or key, in INI parlance) must have a unique name. In the Debug section, the `break` variable is used repeatedly.
@@ -979,3 +999,7 @@ Since the assembler is mapped to `CTRL+F4`, configuring the assembler settings i
 11 Feb 2026
 :   Version 2.11 release.
     This version is mostly about UI; added an INI configuration dialog and load from within a2m as well as other tweaks. Breakpoints can now be set in any bank and will only break in that bank, not that PC in any bank.  Audio (speaker) also tweaked.
+
+5 April 2026
+:   Version 2.2 release.
+    This version has some assembler inprovements (multi-target support), and added the Mockingboard.  Dialogs now also use a double-click, not a single click as it did before.
