@@ -24,7 +24,13 @@ typedef struct DISKII_DRIVE {
     uint8_t q6;
     uint8_t q7;
     uint8_t sensor_protect;                     // 0 = enabled / 1 = write protected (notch)
-    uint64_t q6_last_read_cycles;
+    double q6_last_read_cycles;
+    uint8_t write_latch;
+    uint8_t write_latch_valid;
+    uint8_t write_active;
+    uint32_t write_track;
+    uint32_t write_start_pos;
+    uint32_t write_byte_count;
 
     // Media
     // DISKII_IMAGE image;                    // mounted disk image
@@ -46,8 +52,10 @@ void diskii_motor(APPLE2 *m, const int slot, int soft_switch);
 int diskii_eject(APPLE2 *m, const int slot, const int device, int mount_next);
 int diskii_mount(APPLE2 *m, const int slot, const int device, const char *file_name);
 uint8_t diskii_mount_image(APPLE2 *m, const int slot, const int device, const int index);
+int diskii_save(APPLE2 *m, const int slot, const int device);
 uint8_t diskii_q6_access(APPLE2 *m, int slot, uint8_t on_off);
 uint8_t diskii_q7_access(APPLE2 *m, int slot, uint8_t on_off);
+void diskii_write_access(APPLE2 *m, int slot, uint8_t value);
 void diskii_reset(APPLE2 *m);
 void diskii_shutdown(APPLE2 *m);
 void diskii_step_head(APPLE2 *m, const int slot, int soft_switch);

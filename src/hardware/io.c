@@ -799,8 +799,9 @@ void io_c0_write_lc(APPLE2 *m, uint16_t a, uint8_t v) {
 }
 
 // 0xC90-0xCFF
-static inline uint8_t io_c0_diskii_helper(APPLE2 *m, uint16_t a, uint8_t slot) {
+static inline uint8_t io_c0_diskii_helper(APPLE2 *m, uint16_t a, uint8_t slot, int write_access, uint8_t write_value) {
     uint8_t soft_switch = a & 0x0f;
+    uint8_t value = floating_bus();
     if(soft_switch <= IWM_PH3_ON) {
         diskii_step_head(m, slot, soft_switch);
     } else {
@@ -817,14 +818,19 @@ static inline uint8_t io_c0_diskii_helper(APPLE2 *m, uint16_t a, uint8_t slot) {
 
             case IWM_Q6_OFF:
             case IWM_Q6_ON:
-                return diskii_q6_access(m, slot, soft_switch & 1);
+                value = diskii_q6_access(m, slot, soft_switch & 1);
+                break;
 
             case IWM_Q7_OFF:
             case IWM_Q7_ON:
-                return diskii_q7_access(m, slot, soft_switch & 1);
+                value = diskii_q7_access(m, slot, soft_switch & 1);
+                break;
         }
     }
-    return floating_bus();
+    if(write_access) {
+        diskii_write_access(m, slot, write_value);
+    }
+    return value;
 }
 
 uint8_t io_c0_read_slot(APPLE2 *m, uint16_t a) {
@@ -833,7 +839,7 @@ uint8_t io_c0_read_slot(APPLE2 *m, uint16_t a) {
     uint8_t value = floating_bus();
     switch(m->slot_cards[slot].slot_type) {
         case SLOT_TYPE_DISKII:
-            value = io_c0_diskii_helper(m, a, slot);
+            value = io_c0_diskii_helper(m, a, slot, 0, 0);
             break;
 
         case SLOT_TYPE_SMARTPORT:
@@ -866,7 +872,7 @@ void io_c0_write_slot(APPLE2 *m, uint16_t a, uint8_t v) {
     int slot = (a >> 4) & 0x7;
     switch(m->slot_cards[slot].slot_type) {
         case SLOT_TYPE_DISKII:
-            io_c0_diskii_helper(m, a, slot);
+            io_c0_diskii_helper(m, a, slot, 1, v);
             break;
 
         case SLOT_TYPE_SMARTPORT:

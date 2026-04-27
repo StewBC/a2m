@@ -228,7 +228,7 @@ void unk_misc_show(UNK *v) {
                         for(int j = 0; j < 2; j++) {
 
                             // A2) The DiskII Details
-                            nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 5);
+                            nk_layout_row_begin(ctx, NK_DYNAMIC, 18, 6);
                             {
                                 float w = 1.0f - 0.08f;
                                 nk_layout_row_push(ctx, 0.08f);
@@ -248,6 +248,11 @@ void unk_misc_show(UNK *v) {
                                 if(nk_button_label(ctx, "Eject")) {
                                     diskii_eject(m, i, j, 1);
                                     unk_misc_ini_update_diskii(v->ini_store, v->start_path, i, j, &d[i].diskii_drive[j]);
+                                }
+                                w -= 0.08f;
+                                nk_layout_row_push(ctx, 0.08f);
+                                if(nk_button_label(ctx, "Save")) {
+                                    diskii_save(m, i, j);
                                 }
                                 w -= 0.1f;
                                 nk_layout_row_push(ctx, 0.1f);

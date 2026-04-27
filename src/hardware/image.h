@@ -33,10 +33,15 @@ typedef enum {
 // NIB file specific data
 typedef struct {
     uint32_t writable;        // 0 = no
+    uint32_t file_backed;     // 1 = flush dirty tracks as raw NIB to the source file
+    uint32_t dsk_backed;      // 1 = decode dirty tracks back to 256-byte sectors
+    uint32_t dirty;           // 1 = at least one track changed
     uint32_t track_size;      // 6656 or 6384 bytes
     uint32_t num_tracks;      // Typically 35
+    DISKII_SECTOR_ORDER sector_order;
     uint32_t track_index_pos; // byte offset into file for current track start
     uint32_t track_read_pos;  // "head" offset from track start to byte
+    uint8_t *dirty_tracks;    // per-track dirty flags
 } IMAGE_NIB;
 
 // The file that's loaded
@@ -48,6 +53,11 @@ typedef struct {
 } DISKII_IMAGE;
 
 uint8_t image_get_byte(APPLE2 *m, DISKII_DRIVE *d);
+int image_put_byte(APPLE2 *m, DISKII_DRIVE *d, uint8_t byte);
+int image_finish_write(DISKII_DRIVE *d);
+int image_save(DISKII_IMAGE *image);
+int image_is_dirty(DISKII_IMAGE *image);
+double image_cycles_per_byte(DISKII_IMAGE *image);
 void image_head_position(DISKII_IMAGE *image, uint32_t quater_track);
 int image_load_dsk(APPLE2 *m, DISKII_IMAGE *image, const char *ext);
 int image_load_nib(APPLE2 *m, DISKII_IMAGE *image);
