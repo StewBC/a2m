@@ -73,7 +73,6 @@ typedef struct UNK {
     uint64_t ptrig_cycle;
 
     // State Flags
-    uint32_t clear_a2_view: 1;
     uint32_t debug_view: 1;
     uint32_t dirty_view: 1;
     uint32_t disk_activity_read: 1;

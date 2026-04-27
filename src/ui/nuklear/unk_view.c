@@ -616,7 +616,6 @@ int unk_process_events(UI *ui, APPLE2 *m) {
                 v->full_screen_rect = nk_to_sdl_rect(nk_rect_fit_4x3_center(v->nk_os_rect));
                 unk_mem_resize_view(v);
                 unk_dasm_resize_view(v);
-                v->clear_a2_view = 1;
             }
         }
 
@@ -712,25 +711,19 @@ void unk_toggle_debug(UNK *v) {
     if(v->debug_view) {
         v->draw_rect = &v->target_rect;
         v->dirty_view = 1;
-        v->clear_a2_view = 1;
     } else {
         v->draw_rect = &v->full_screen_rect;
-        v->clear_a2_view = 1;
     }
 }
 
 void unk_present(UNK *v) {
     RUNTIME *rt = v->rt;
     APPLE2 *m = v->m;
-    // Commit changes to the texture And update renderer with the texture
-    if(v->clear_a2_view) {
-        // Clear the background that prev may have contained the texture to gray
-        // If managing clear_a2_view becomes an issue, just always do this - makes little difference
-        SDL_SetRenderDrawColor(v->renderer, 0X2D, 0X2D, 0X2D, 0xFF);
-        SDL_RenderClear(v->renderer);
-        v->clear_a2_view = 0;
-    }
+    // Clear the background that prev may have contained the texture to gray
+    SDL_SetRenderDrawColor(v->renderer, 0X2D, 0X2D, 0X2D, 0xFF);
+    SDL_RenderClear(v->renderer);
 
+    // Commit changes to the texture and update renderer with the texture
     if(tst_flags(m->state_flags, A2S_FRANKLIN80ACTIVE) || tst_flags(v->shadow_state, A2S_COL80)) {
         SDL_UpdateTexture(v->texture_wide, NULL, v->surface_wide->pixels, v->surface_wide->pitch);
         SDL_RenderCopy(v->renderer, v->texture_wide, NULL, v->draw_rect);
@@ -802,7 +795,6 @@ void unk_render_frame(UI *ui, APPLE2 *m, int dirty) {
                 v->target_rect = nk_to_sdl_rect(tr);
                 unk_mem_resize_view(v);
                 unk_dasm_resize_view(v);
-                v->clear_a2_view = 1;
             }
 
             dirty |= v->dirty_view;
