@@ -59,7 +59,6 @@ typedef struct {
     uint32_t bit_position;
     uint8_t latch;
     uint8_t head_window;
-    uint8_t zero_count;
     IMAGE_WOZ_TRACK tracks[160];
 } IMAGE_WOZ;
 

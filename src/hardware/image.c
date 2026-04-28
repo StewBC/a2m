@@ -102,6 +102,10 @@ static uint32_t image_woz_track_length(IMAGE_WOZ *woz, uint8_t track_id) {
     return woz->tracks[track_id].bit_count;
 }
 
+static uint8_t image_woz_fake_bit(void) {
+    return (uint8_t)(rand() % 10 < 3);
+}
+
 static uint8_t image_woz_resolve_track(IMAGE_WOZ *woz, uint32_t quater_track) {
     if(!woz || quater_track >= sizeof(woz->tmap)) {
         return 0xff;
@@ -126,12 +130,12 @@ static uint8_t image_woz_resolve_track(IMAGE_WOZ *woz, uint32_t quater_track) {
 
 static uint8_t image_woz_next_bit(IMAGE_WOZ *woz) {
     if(!woz || woz->current_track == 0xff) {
-        return (uint8_t)(rand() % 10 < 3);
+        return image_woz_fake_bit();
     }
 
     IMAGE_WOZ_TRACK *track = &woz->tracks[woz->current_track];
     if(!track->data || !track->byte_count || !track->bit_count) {
-        return (uint8_t)(rand() & 1);
+        return image_woz_fake_bit();
     }
 
     uint32_t bit_pos = woz->bit_position % track->bit_count;
@@ -139,23 +143,15 @@ static uint8_t image_woz_next_bit(IMAGE_WOZ *woz) {
     uint8_t bit = (byte >> (7 - (bit_pos & 7))) & 1;
     woz->bit_position = (bit_pos + 1) % track->bit_count;
 
-    if(woz->cleaned) {
-        if(bit) {
-            woz->zero_count = 0;
-            return 1;
-        }
-
-        woz->zero_count++;
-        return woz->zero_count > 3 ? (uint8_t)(rand() & 1) : 0;
+    if(!woz->cleaned) {
+        return bit;
     }
 
-    if(bit) {
-        woz->zero_count = 0;
-        return 1;
+    woz->head_window = (uint8_t)((woz->head_window << 1) | bit);
+    if((woz->head_window & 0x0f) == 0) {
+        return image_woz_fake_bit();
     }
-
-    woz->zero_count++;
-    return 0;
+    return (uint8_t)((woz->head_window >> 1) & 1);
 }
 
 static uint8_t image_woz_advance_bits(IMAGE_WOZ *woz, uint64_t bits) {
@@ -552,7 +548,6 @@ void image_reset_latch(DISKII_IMAGE *image) {
     IMAGE_WOZ *woz = (IMAGE_WOZ *)image->image_specifics;
     woz->latch = 0;
     woz->head_window = 0;
-    woz->zero_count = 0;
 }
 
 int image_is_dirty(DISKII_IMAGE *image) {
@@ -674,7 +669,6 @@ void image_head_position(DISKII_IMAGE *image, uint32_t quater_track) {
                     woz->current_track = new_track;
                     woz->latch = 0;
                     woz->head_window = 0;
-                    woz->zero_count = 0;
                 }
             }
             break;
