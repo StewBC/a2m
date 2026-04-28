@@ -123,11 +123,6 @@ foreach(tgt IN ITEMS a2m asm6502)
       target_link_options(${tgt} PRIVATE
         $<$<CONFIG:RelWithDebInfo>:/DEBUG>
       )
-
-    elseif(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
-      target_compile_options(${tgt} PRIVATE
-        $<$<CONFIG:RelWithDebInfo>:-O2;-g;-fno-omit-frame-pointer;-fno-optimize-sibling-calls>
-      )
     endif()
   endif()
 endforeach()

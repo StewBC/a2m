@@ -44,6 +44,25 @@ typedef struct {
     uint8_t *dirty_tracks;    // per-track dirty flags
 } IMAGE_NIB;
 
+typedef struct {
+    uint8_t *data;
+    uint32_t byte_count;
+    uint32_t bit_count;
+} IMAGE_WOZ_TRACK;
+
+typedef struct {
+    uint8_t disk_type;
+    uint8_t write_protected;
+    uint8_t cleaned;
+    uint8_t current_track;
+    uint8_t tmap[160];
+    uint32_t bit_position;
+    uint8_t latch;
+    uint8_t head_window;
+    uint8_t zero_count;
+    IMAGE_WOZ_TRACK tracks[160];
+} IMAGE_WOZ;
+
 // The file that's loaded
 typedef struct {
     UTIL_FILE file;
@@ -55,9 +74,11 @@ typedef struct {
 uint8_t image_get_byte(APPLE2 *m, DISKII_DRIVE *d);
 int image_put_byte(APPLE2 *m, DISKII_DRIVE *d, uint8_t byte);
 int image_finish_write(DISKII_DRIVE *d);
+void image_reset_latch(DISKII_IMAGE *image);
 int image_save(DISKII_IMAGE *image);
 int image_is_dirty(DISKII_IMAGE *image);
 double image_cycles_per_byte(DISKII_IMAGE *image);
+void image_advance_position(APPLE2 *m, DISKII_DRIVE *d);
 void image_head_position(DISKII_IMAGE *image, uint32_t quater_track);
 int image_load_dsk(APPLE2 *m, DISKII_IMAGE *image, const char *ext);
 int image_load_nib(APPLE2 *m, DISKII_IMAGE *image);

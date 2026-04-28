@@ -818,7 +818,7 @@ static inline uint8_t io_c0_diskii_helper(APPLE2 *m, uint16_t a, uint8_t slot, i
 
             case IWM_Q6_OFF:
             case IWM_Q6_ON:
-                value = diskii_q6_access(m, slot, soft_switch & 1);
+                value = diskii_q6_access(m, slot, soft_switch & 1, write_access);
                 break;
 
             case IWM_Q7_OFF:

@@ -10,6 +10,7 @@
 typedef struct DISKII_DRIVE {
     // Spindle Motor
     uint64_t motor_event_cycles;                // when motor was turned on/off
+    uint64_t motor_off_delay_cycles;            // delay before motor-off starts spinning down
     double motor_rpm;                           // 0..300
     uint8_t motor_on;                           // 1 = spindle motor energised; 0 = not
 
@@ -25,6 +26,7 @@ typedef struct DISKII_DRIVE {
     uint8_t q7;
     uint8_t sensor_protect;                     // 0 = enabled / 1 = write protected (notch)
     double q6_last_read_cycles;
+    uint8_t read_latch;
     uint8_t write_latch;
     uint8_t write_latch_valid;
     uint8_t write_active;
@@ -53,8 +55,9 @@ int diskii_eject(APPLE2 *m, const int slot, const int device, int mount_next);
 int diskii_mount(APPLE2 *m, const int slot, const int device, const char *file_name);
 uint8_t diskii_mount_image(APPLE2 *m, const int slot, const int device, const int index);
 int diskii_save(APPLE2 *m, const int slot, const int device);
-uint8_t diskii_q6_access(APPLE2 *m, int slot, uint8_t on_off);
+uint8_t diskii_q6_access(APPLE2 *m, int slot, uint8_t on_off, int write_access);
 uint8_t diskii_q7_access(APPLE2 *m, int slot, uint8_t on_off);
+uint8_t diskii_latch_read(APPLE2 *m, int slot);
 void diskii_write_access(APPLE2 *m, int slot, uint8_t value);
 void diskii_reset(APPLE2 *m);
 void diskii_shutdown(APPLE2 *m);

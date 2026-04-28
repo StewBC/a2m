@@ -18,6 +18,7 @@
 #define DISKII_READABLE_RPM     200
 #define DISKII_SPINUP_TIME      ms_to_cycles(400)
 #define DISKII_SPINDOWN_TIME    ms_to_cycles(1000)
+#define DISKII_MOTOR_OFF_DELAY  ms_to_cycles(1000)
 #define DISKII_SPINUP_RATE      (double)DISKII_NORMAL_RPM / (double)DISKII_SPINUP_TIME    // RPM per cycle
 #define DISKII_SPINDOWN_RATE    (double)DISKII_NORMAL_RPM / (double)DISKII_SPINDOWN_TIME
 
@@ -27,7 +28,14 @@ static inline double clamp(double v, double lo, double hi) {
 
 static inline double rpm_now(uint64_t now, DISKII_DRIVE *d) {
     double dt = now - d->motor_event_cycles;
-    double rate = d->motor_on ? DISKII_SPINUP_RATE : -DISKII_SPINDOWN_RATE;
+    double rate = DISKII_SPINUP_RATE;
+    if(!d->motor_on) {
+        if(dt < d->motor_off_delay_cycles) {
+            return clamp(d->motor_rpm, 0.0, DISKII_NORMAL_RPM);
+        }
+        dt -= d->motor_off_delay_cycles;
+        rate = -DISKII_SPINDOWN_RATE;
+    }
     double rpm  = d->motor_rpm + rate * dt;
     return clamp(rpm, 0.0, DISKII_NORMAL_RPM);
 }
@@ -36,6 +44,10 @@ static inline void diskii_timer_update(uint64_t now, uint64_t *anchor, uint64_t 
     uint64_t delta = now - *anchor;
     *anchor = now;
     *timer = *timer > delta ? *timer - delta : 0;
+}
+
+static inline double diskii_readable_rpm(DISKII_IMAGE *image) {
+    return image && image->kind == IMG_WOZ ? 1.0 : DISKII_READABLE_RPM;
 }
 
 static uint8_t diskii_register_read(APPLE2 *m, DISKII_DRIVE *d) {
@@ -53,14 +65,18 @@ static uint8_t diskii_register_read(APPLE2 *m, DISKII_DRIVE *d) {
 
     diskii_timer_update(m->cpu.cycles, &d->head_event_cycles, &d->head_settle_cycles);
     if((double)m->cpu.cycles - d->q6_last_read_cycles < image_cycles_per_byte(d->active_image) ||
-            rpm_now(m->cpu.cycles, d) < DISKII_READABLE_RPM || d->head_settle_cycles) {
+            rpm_now(m->cpu.cycles, d) < diskii_readable_rpm(d->active_image) || d->head_settle_cycles) {
         return 0x7f;
     }
 
     if(m->a2out_cb.cb_diskactivity_ctx.cb_diskread) {
         m->a2out_cb.cb_diskactivity_ctx.cb_diskread(m->a2out_cb.cb_diskactivity_ctx.user);
     }
-    return image_get_byte(m, d);
+    uint8_t value = image_get_byte(m, d);
+    if(value & 0x80) {
+        d->read_latch = value;
+    }
+    return value;
 }
 
 static void diskii_write_latch_to_disk(APPLE2 *m, DISKII_DRIVE *d) {
@@ -95,6 +111,8 @@ void diskii_motor(APPLE2 *m, const int slot, int soft_switch) {
     d->motor_rpm = current_rpm;
     d->motor_event_cycles = now;
     d->motor_on = soft_switch & 1;
+    d->motor_off_delay_cycles = d->motor_on ? 0 : DISKII_MOTOR_OFF_DELAY;
+    d->q6_last_read_cycles = (double)now;
     if(!d->motor_on && d->write_active) {
         image_finish_write(d);
         d->write_active = 0;
@@ -191,6 +209,7 @@ uint8_t diskii_mount_image(APPLE2 *m, const int slot, const int device, const in
     dd->quarter_track_pos = rand() % DISKII_QUATERTRACKS;
     dd->image_index = index;
     dd->write_latch_valid = 0;
+    dd->read_latch = 0x7f;
     dd->write_active = 0;
     dd->write_track = 0;
     dd->write_start_pos = 0;
@@ -219,10 +238,14 @@ int diskii_save(APPLE2 *m, const int slot, const int device) {
     return image_save(dd->active_image);
 }
 
-uint8_t diskii_q6_access(APPLE2 *m, int slot, uint8_t on_off) {
+uint8_t diskii_q6_access(APPLE2 *m, int slot, uint8_t on_off, int write_access) {
     DISKII_DRIVE *d = &m->diskii_controller[slot].diskii_drive[m->diskii_controller[slot].active];
     uint8_t old_q6 = d->q6;
     d->q6 = on_off;
+    if(!write_access && d->q6) {
+        image_reset_latch(d->active_image);
+        d->read_latch = 0x7f;
+    }
     if(d->q7 && old_q6 && !d->q6) {
         diskii_write_latch_to_disk(m, d);
     }
@@ -237,6 +260,11 @@ uint8_t diskii_q7_access(APPLE2 *m, int slot, uint8_t on_off) {
     }
     d->q7 = on_off;
     return diskii_register_read(m, d);
+}
+
+uint8_t diskii_latch_read(APPLE2 *m, int slot) {
+    DISKII_DRIVE *d = &m->diskii_controller[slot].diskii_drive[m->diskii_controller[slot].active];
+    return d->read_latch;
 }
 
 void diskii_write_access(APPLE2 *m, int slot, uint8_t value) {
@@ -302,6 +330,7 @@ void diskii_step_head(APPLE2 *m, int slot, int soft_switch) {
         return;                                          // no change
     }
 
+    int prev_n = count_phases(d->phase_mask);
     int n = count_phases(curr);
     if(n == 0 || n > 2) {                                // invalid holding pattern
         d->phase_mask  = curr;
@@ -309,7 +338,7 @@ void diskii_step_head(APPLE2 *m, int slot, int soft_switch) {
     }
 
     // Determine direction relative to previous on mask.
-    int step_qtr = (n == 1) ? 2 : 1;                     // 1-phase=1/2 track, 2-phase=1/4 track
+    int step_qtr = (n == 1 && prev_n != 2) ? 2 : 1;       // 2-phase transitions move a single quarter-track
     if(curr & ROL4(prev_on)) {
         // forward
     } else if(curr & ROR4(prev_on)) {
@@ -324,7 +353,7 @@ void diskii_step_head(APPLE2 *m, int slot, int soft_switch) {
 
     d->head_settle_cycles = ms_to_cycles(3);
     d->quarter_track_pos += step_qtr;
-    if(n == 1) {
+    if(n == 1 && prev_n != 2) {
         d->quarter_track_pos &= ~1;                       // snap single-phase to even qtracks
     }
     if(d->quarter_track_pos < 0) {
@@ -334,6 +363,7 @@ void diskii_step_head(APPLE2 *m, int slot, int soft_switch) {
     }
 
     if(d->active_image) {
+        image_advance_position(m, d);
         image_head_position(d->active_image, d->quarter_track_pos);
     }
 
