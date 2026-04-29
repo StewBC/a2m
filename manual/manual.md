@@ -12,7 +12,7 @@ Some of the key features include:
 * 60 FPS video display (not cycle-accurate)
 * Built-in debugger with stepping modes, symbols, breakpoints, soft-switch overrides, and more
 * Built-in macro assembler (assembles 12,000+ lines across 32 Manic Miner source files in tens of milliseconds)
-* Disk II NIB read support
+* Disk II NIB and DSK read/write support. WOZ read support.
 * SmartPort block read/write
 * SDL joystick support
 * Partial Franklin 80-column card emulation for the Apple ][+ model
@@ -302,7 +302,7 @@ Slot 5: Smartport
 Slot 6: Disk II  
 [6.0][Eject][Insert]  
 ```
-Clicking Insert opens the file browser, and if an appropriate file is selected (NIB for Disk II and any file for SmartPort), the file name is shown to the right of the Insert button. For a Disk II device, more than one file can be inserted. When this is done, a new button appears, labelled Swap. The button also indicates which disk is currently inserted (from the sequence) and how many disks are in the sequence. This looks like:
+Clicking Insert opens the file browser, and if an appropriate file is selected (NIB, DSK, or WOZ for Disk II and any file for SmartPort), the file name is shown to the right of the Insert button. For a Disk II device, more than one file can be inserted. When this is done, a new button appears, labelled Swap. The button also indicates which disk is currently inserted (from the sequence) and how many disks are in the sequence. This looks like:
 
 `[6.0][Eject][Insert][Swap (1/2)] This is disk 1.po`
 
@@ -890,6 +890,8 @@ The Video section has only one valid variable, and it is only used to configure 
 \Needspace{6\baselineskip}
 ## DiskII Section
 The Disk II section configures an Apple Disk II floppy drive.
+
+Disk II supports NIB and DSK for reading and writing, and WOZ for reading.
 
 | Variable | Value                                                                                 |
 |:---------|:--------------------------------------------------------------------------------------|

@@ -4,7 +4,7 @@ Some of the key features of a2m include:
 * 60 FPS video display (not cycle-accurate by design, favoring performance and responsiveness)
 * Built-in debugger with stepping modes, symbols, breakpoints, soft-switch overrides, and more
 * Built-in macro assembler (assembles 12,000+ lines across 24 Manic Miner source files in milliseconds)
-* Disk II NIB (read only) support. DSK and other formats not supported.
+* Disk II NIB and DSK read/write support. WOZ read support.
 * ProDOS block read/write
 * SDL joystick support
 * Partial Franklin 80-column card emulation for the Apple ][+ model
@@ -34,7 +34,7 @@ Press F2 to reveal the interface to a2m - the debugger and access to disk drives
   
 ## Known issues
 * Disk II  
-  - Only, read-only, NIB file-type support.
+  - WOZ file-type support is read-only.
 * SmartPort  
   - Airheart & Archon both crash. I think they rely on SmartPort functionality beyond simple block read/write, but I haven't fully investigated.
 * Mockingboard  
