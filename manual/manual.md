@@ -295,22 +295,22 @@ Each of these is discussed in more detail below.
 The Slots view shows the hardware installed in the slots of the Apple 2. It is also the panel used for working with disks, both SmartPort and floppy.
 
 \Needspace{7\baselineskip}
-With both SmartPort and floppy devices, there are a few buttons exposed. Next to Disk or Device 0, there is a button with the slot number, a dot, and a zero. Next to that is an Eject button, followed by an Insert button. The display looks something like this:
+With both SmartPort and floppy devices, there are a few buttons exposed. Next to Disk or Device 0, there is a button with the slot number, a dot, and a zero. Next to that is an Eject button, followed by (a [Save] button on Disk II and) an Insert button. The display looks something like this:
 ```
 Slot 5: Smartport  
 [5.0][Eject][Insert]  
 Slot 6: Disk II  
-[6.0][Eject][Insert]  
+[6.0][Eject][Save][Insert]  
 ```
 Clicking Insert opens the file browser, and if an appropriate file is selected (NIB, DSK, or WOZ for Disk II and any file for SmartPort), the file name is shown to the right of the Insert button. For a Disk II device, more than one file can be inserted. When this is done, a new button appears, labelled Swap. The button also indicates which disk is currently inserted (from the sequence) and how many disks are in the sequence. This looks like:
 
-`[6.0][Eject][Insert][Swap (1/2)] This is disk 1.po`
+`[6.0][Eject][Save][Insert][Swap (1/2)] This is disk 1.po`
 
 The disk name, in this case, is "This is disk 1.po", and the button indicates that it is the first disk of two disks in the queue. Clicking the Swap button switches to the second disk, and the display might then look like this if the second disk is called "This is disk 2.po":
 
-`[6.0][Eject][Insert][Swap (2/2)] This is disk 2.po`
+`[6.0][Eject][Save][Insert][Swap (2/2)] This is disk 2.po`
 
-Clicking Eject removes the currently selected disk from the drive and from the queue.
+Clicking Eject removes the currently selected disk from the drive and from the queue.  Clicking Save will write back changes to a .dsk or .nib file.  This should always be automatic and Save may be removed in a future version.
 
 Clicking the button labelled `[Slot.0]` boots the disk in drive/device 0 of that slot.
 
