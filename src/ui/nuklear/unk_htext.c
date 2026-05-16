@@ -929,5 +929,7 @@ const char *unk_help_text[] = {
 "    This version is mostly about UI; added an INI configuration dialog and load from within a2m as well as other tweaks. Breakpoints can now be set in any bank and will only break in that bank, not that PC in any bank.  Audio (speaker) also tweaked.\n"
 "<#H2> 5 Apr 2026<#NM> - <#BO>Version 2.2 release.<#NM>\n"
 "    This version has some assembler inprovements (multi-target support), and added the Mockingboard.  Dialogs now also use a double-click, not a single click as it did before.\n"
+"<#H2>16 May 2026<#NM> - <#BO>Version 2.3 release.<#NM>\n"
+"    This version adds .dsk RW and .WOZ ro support and fixes a background clear bug.\n"
 };
 

@@ -1005,3 +1005,7 @@ Since the assembler is mapped to `CTRL+F4`, configuring the assembler settings i
 5 April 2026
 :   Version 2.2 release.
     This version has some assembler inprovements (multi-target support), and added the Mockingboard.  Dialogs now also use a double-click, not a single click as it did before.
+
+16 May 2026
+:   Version 2.2 release.
+    This version adds .dsk RW and .WOZ ro support and fixes a background clear bug.
