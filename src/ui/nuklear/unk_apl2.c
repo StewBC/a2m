@@ -889,7 +889,7 @@ void unk_apl2_screen_txt80(UNK *v, int start, int end) {
     APPLE2 *m = v->m;
     SDL_Surface *surface = v->surface_wide;
     uint32_t *pixels = (uint32_t *) surface->pixels;
-    uint16_t page = tst_flags(v->shadow_state, A2S_PAGE2) ? 0x0800 : 0x0400;
+    uint16_t page = 0x0400;
     uint64_t now = perf_counter();
     double freq = (double)perf_frequency();
     // I got 3.7 from recording a flash on my Platinum //e - 0.17 to 0.44 for a change so 0.27
