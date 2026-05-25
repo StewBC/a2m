@@ -842,13 +842,15 @@ void dot_segment(ASSEMBLER *as) {
     seg.segment_name = as->current_token.name;
     seg.segment_name_length = as->current_token.name_length;
     seg.segment_name_hash = as->current_token.name_hash;
-    // Empty segment name "turns off" segments
+    // Empty segment name returns to the target's native segment
     if(seg.segment_name_length) {
         s = segment_find(&as->active_target->segments, &seg);
         if(!s) {
             asm_err(as, ASM_ERR_DEFINE, "Segment %.*s not defined", seg.segment_name_length, seg.segment_name);
             return;
         }
+    } else {
+        s = *ARRAY_GET(&as->active_target->segments, SEGMENT*, 0);
     }
     // Activate a segment
     as->active_target->active_segment = s;
@@ -1018,8 +1020,14 @@ void parse_dot_command(ASSEMBLER *as) {
             break;
         case GPERF_DOT_ALIGN: {
                 uint64_t value = expr_full_evaluate(as);
-                // as->current_address = (as->current_address + (value - 1)) & ~(value - 1);
-                set_current_output_address(as, (current_output_address(as) + (value - 1)) & ~(value - 1));
+                if(!value) {
+                    asm_err(as, ASM_ERR_RESOLVE, ".align value must be greater than zero");
+                    break;
+                }
+                uint16_t aligned_address = (current_output_address(as) + (value - 1)) & ~(value - 1);
+                while(current_output_address(as) < aligned_address) {
+                    emit_byte(as, 0);
+                }
             }
             break;
         case GPERF_DOT_ASCIIZ:

@@ -32,7 +32,7 @@ void emit_opcode(ASSEMBLER *as) {
     switch(as->opcode_info.width) {
         case 1: {                                               // Relative - 1 byte
                 int32_t delta = as->opcode_info.value - 1 - current_output_address(as);
-                if(delta > 128 || delta < -128) {
+                if(delta > 127 || delta < -128) {
                     asm_err(as, ASM_ERR_RESOLVE, "Relative branch out of range $%X", delta);
                 }
                 emit_byte(as, delta);
