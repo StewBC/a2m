@@ -368,6 +368,10 @@ double image_cycles_per_byte(DISKII_IMAGE *image) {
 
     switch(image->kind) {
         case IMG_NIB: {
+                IMAGE_NIB *nib = (IMAGE_NIB *)image->image_specifics;
+                if(nib->track_size) {
+                    return (CPU_FREQUENCY * 60.0) / (300.0 * (double)nib->track_size);
+                }
                 return 32.0;
             }
             break;
