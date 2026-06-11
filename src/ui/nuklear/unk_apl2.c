@@ -333,11 +333,9 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
                     break;
 
                 case SDLK_BACKSPACE:
-                    // SQW - Add UI/INI toggle
-                    if(v->original_del) {                       // Apple ][ key for del
+                    if(v->original_del) {                       // Apple ][ DEL
                         active_key = 0x80 + 127;
-                    } else {                                    // CRSR left on del
-                        // This just works so much nicer normally
+                    } else {                                    // Modern backspace/cursor-left behavior
                         active_key = 0x80 | e->key.keysym.sym;
                     }
                     break;
@@ -345,7 +343,6 @@ void unk_apl2_process_event(UNK *v, SDL_Event *e) {
                 case SDLK_RETURN:
                 case SDLK_ESCAPE:
                 case SDLK_TAB:
-                    // SQW - Maybe reactivate?  Kill the paste from the clipboard
                     active_key = 0x80 | e->key.keysym.sym;
                     break;
 
@@ -537,7 +534,6 @@ void unk_apl2_screen_apple2(UNK *v) {
 void unk_apl2_screen_dlores(UNK *v, int start, int end) {
     APPLE2 *m = v->m;
     if(v->monitor_type & MONITOR_MONO) {
-        // SQW
         unk_apl2_screen_dlores_mono(v, start, end);
         return;
     }

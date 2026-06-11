@@ -214,13 +214,6 @@ void rt_apply_ini(RUNTIME *rt, INI_STORE *ini_store) {
                         bp.device = parsed_line.device;
                         bp.selected_bank = parsed_line.view_flags_set ? (VIEW_FLAGS)parsed_line.view_flags : 0;
                         ARRAY_ADD(&rt->breakpoints, bp);
-                        // SQW temp solution
-                        if(parsed_line.action == ACTION_TRON) {
-                            if(!rt->trace_log.file.is_file_open) {
-                                // Assume average 2 cycle opcodes and 1 seconds of capture
-                                rt_trace_init(rt, "./trace.txt", 1 * (int)CPU_FREQUENCY / 2);
-                            }
-                        }
                     } else {
                         free(parsed_line.type_text);
                     }
@@ -242,7 +235,7 @@ void rt_bind(RUNTIME *rt, APPLE2 *m, UI *ui) {
         .cb_speaker_ctx =       {(void *)ui, (cb_speaker)ui->ops->speaker_toggle},
         .cb_inputdevice_ctx =   {(void *)ui, (cb_ptrig)ui->ops->ptrig, (cb_read_button)ui->ops->read_button, (cb_read_axis)ui->ops->read_axis}, // user, ptrig, button, axis
         .cb_clipboard_ctx =     {(void *)rt, (cb_clipboard)rt_feed_clipboard_key},
-        .cb_trace_ctx =         {(void *)rt, (cb_trace)rt_trace},
+        .cb_trace_ctx =         {(void *)rt, NULL},
     };
 
     // Set up the access helpers
@@ -347,7 +340,7 @@ int rt_run(RUNTIME *rt, APPLE2 *m, UI *ui) {
         // Delay to get the MHz emulation right for the desired FPS - no vsync
         if(frame_end_ticks < desired_frame_end_ticks) {
             uint32_t sleep_ms = (desired_frame_end_ticks - frame_end_ticks) / ticks_per_ms;
-            // SQW Debug fix
+            // If the frame target is off (Debug sitting idle), skip the long sleep and resync on the next loop.
             if(sleep_ms > (1000 / TARGET_FPS)) {
                 sleep_ms = (1000 / TARGET_FPS) - 1;
                 desired_frame_end_ticks = perf_counter();

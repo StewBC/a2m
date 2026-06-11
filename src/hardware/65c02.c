@@ -7,14 +7,14 @@
 #include "6502_inln.h"
 
 size_t machine_run_opcode_65c02(APPLE2 *m) {
-    if(m->a2out_cb.cb_trace_ctx.cb_trace) {
-        m->a2out_cb.cb_trace_ctx.cb_trace(m->a2out_cb.cb_trace_ctx.user);
-    }
     size_t start_cycle = m->cpu.cycles;
     if(a2_take_irq_if_pending(m)) {
         return m->cpu.cycles - start_cycle;
     }
     m->cpu.opcode_pc = m->cpu.pc;
+    if(m->a2out_cb.cb_trace_ctx.cb_trace) {
+        m->a2out_cb.cb_trace_ctx.cb_trace(m->a2out_cb.cb_trace_ctx.user);
+    }
     uint8_t opcode = read_from_memory(m, m->cpu.pc);
     CYCLE(m);
     m->cpu.pc++;
@@ -23,7 +23,7 @@ size_t machine_run_opcode_65c02(APPLE2 *m) {
         case ORA_X_ind: { mixa(m); ora_a16(m); } break;                          // 01
         case UND_02:    { al_read_pc(m); } break;                                // 02
         case UND_03:    { ; } break;                                             // 03
-        case TSB_zpg:   { mrw(m); tsb(m); } break;                               // 04 SQW
+        case TSB_zpg:   { mrw(m); tsb(m); } break;                               // 04
         case ORA_zpg:   { al_read_pc(m); ora_a16(m); } break;                    // 05
         case ASL_zpg:   { mrw(m); asl_a16(m); } break;                           // 06
         case UND_07:    { mix(m); } break;                                       // 07

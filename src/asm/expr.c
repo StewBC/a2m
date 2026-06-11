@@ -211,9 +211,6 @@ static int64_t expr_primary(ASSEMBLER *as) {
                 if(op == *as->token_start) {
                     next_token(as);
                     next_token(as);
-                    // SQW At this point I can know, in pass 1, that an uninitialized variable
-                    // is going to get used with ++ or -- but since pass 1 errors are
-                    // ignored, I can't log it :(
                     if(sl->symbol_type == SYMBOL_ADDRESS) {
                         op = 0;
                     } else {

@@ -109,7 +109,6 @@ void unk_cpu_show(UNK *v, int dirty) {
     nk_end(ctx);
 }
 
-// SQW make sure this is called where needed only
 void unk_cpu_update(UNK *v) {
     APPLE2 *m = v->m;
     VIEWCPU *vcpu = &v->viewcpu;

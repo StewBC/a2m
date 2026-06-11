@@ -708,6 +708,7 @@ void unk_misc_show(UNK *v) {
                 if(changed) {
                     // Apply the changes no matter what changed
                     cmn_config_apply(mc, v->ini_store);
+                    v->original_del = mc->original_del;
                     if(changed & CNF_CNG_RESTART) {
                         // Config invalidated
                         v->request_reconfig = 1;

@@ -273,7 +273,7 @@ SYMBOL_LABEL *symbol_write(ASSEMBLER *as, const char *sym, uint32_t sym_len, SYM
     }
 
     if(ref.is_qualified) {
-        // SQW - I may want to stop this from being possible; ::a = 1 maybe but ::a::b::c = 1 maybe not
+        // Qualified writes are allowed, but only into scopes that already exist.
         return symbol_store_in_scope(as, ref.scope, ref.name, ref.name_length, symbol_type, value);
     }
 

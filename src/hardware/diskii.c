@@ -5,9 +5,6 @@
 #include "common.h"
 #include "hardware_lib.h"
 
-// SQW
-// cycles_per_byte = (CPU_FREQUENCY * 60 / target_RPM) / track_bytes
-
 #define ms_to_cycles(x) (((x) * (uint64_t)CPU_FREQUENCY) / 1000)
 #define us_to_cycles(x) (((x) * (uint64_t)CPU_FREQUENCY) / 1000000)
 #define count_phases(x) ((x & 1) + ((x >> 1) & 1) + ((x >> 2) & 1) + ((x >> 3) & 1))
@@ -26,6 +23,7 @@ static inline double clamp(double v, double lo, double hi) {
     return v < lo ? lo : v > hi ? hi : v;
 }
 
+// Only gates readability during spin-up/down
 static inline double rpm_now(uint64_t now, DISKII_DRIVE *d) {
     double dt = now - d->motor_event_cycles;
     double rate = DISKII_SPINUP_RATE;
@@ -169,7 +167,6 @@ int diskii_mount(APPLE2 *m, const int slot, const int device, const char *file_n
 
     const char *ext = strrchr(file_name, '.');
     int load;
-    // SQW - Write a better image type detect
     if(file->file_size == 143360 || (ext && (0 == stricmp(ext, ".dsk") || 0 == stricmp(ext, ".do") || 0 == stricmp(ext, ".po")))) {
         // DSK file
         load = image_load_dsk(m, image, ext);

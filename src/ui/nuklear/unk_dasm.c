@@ -444,7 +444,7 @@ void unk_dasm_process_event(UNK *v, SDL_Event *e) {
             address |= (key << shift);
             dv->cursor_address = address;
             if(dv->cursor_line < 0 || dv->cursor_line > dv->rows - 1) {
-                unk_dasm_cursor_on_screen(v, dv); // SQW - not sure this can be hit
+                unk_dasm_cursor_on_screen(v, dv);
             }
             unk_dasm_put_address_on_line(dv, m, dv->cursor_address, dv->cursor_line);
             unk_dasm_cursor_right(v, dv, 0);
@@ -784,7 +784,7 @@ void unk_dasm_show(UNK *v, int dirty) {
                 nk_layout_row_dynamic(ctx, ROW_H, 1);
                 {
                     struct nk_rect r = nk_widget_bounds(ctx);
-                    int cursor_y = 0; // SQW Because the PC is sometimes not on col 0 (asm didn't work out) this remains unset
+                    int cursor_y = 0; // Because the PC is sometimes not on col 0 (asm didn't work out) this remains unset
                     struct nk_color ob = ctx->style.window.background;
                     // This has gotten a bit messey.  I am fixing a bug where the line address changes
                     // due to data typed in, in the mem-view.  This catches the bug with the contol_pc
@@ -812,8 +812,7 @@ void unk_dasm_show(UNK *v, int dirty) {
                             fg = unk_dasm_blend(fg, nk_rgb(0, 0, 0), 0.5f);
                         }
                         BREAKPOINT *bp = rt_find_breakpoint(rt, current_pc);
-                        // SQW - Only exec breakpoints show up - I could make different bachground colours
-                        // for read/write and cover the range also...
+                        // Only exec breakpoints show up; read/write and ranges could use different background colors.
                         if(bp && !(bp->access_mask & WATCH_EXEC_BREAKPOINT)) {
                             bp = NULL;
                         }

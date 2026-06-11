@@ -6,6 +6,7 @@
 
 typedef struct {
     CPU cpu;
+    A2_STATE state_flags;
     uint8_t b0;
     uint8_t b1;
     uint8_t b2;
@@ -16,14 +17,14 @@ typedef struct {
     size_t trace_max_entries;
     uint32_t trace_on: 1;
     uint32_t trace_wrapped: 1;
-    uint32_t pad: 30;
+    uint32_t trace_dirty: 1;
+    uint32_t pad: 29;
     UTIL_FILE file;
     TRACE_DATA *trace_buffer;
 } TRACE_LOG;
 
-void rt_trace(RUNTIME *rt);
-int trace_write(RUNTIME *rt, TRACE_DATA *trace_data);
+int rt_trace(RUNTIME *rt);
 void rt_trace_off(RUNTIME *rt);
-void rt_trace_init(RUNTIME *rt, const char *filename, size_t transaction);
+int rt_trace_init(RUNTIME *rt, const char *filename, size_t transaction);
 void rt_trace_on(RUNTIME *rt);
 void rt_trace_shutdown(RUNTIME *rt);

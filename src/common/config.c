@@ -26,6 +26,7 @@ void cmn_config_from_ini(MACHINE_CONFIG *mc, INI_STORE *ini_store) {
     mc->active_tab = MACHINE_CONFIG_TAB_MACHINE;
     mc->model = MODEL_APPLE_IIEE;
     mc->ui_sel = 0;
+    mc->original_del = 0;
     mc->disk_leds = 0;
     mc->remember_ini = 0;
     mc->save_ini = 0;
@@ -63,6 +64,15 @@ void cmn_config_from_ini(MACHINE_CONFIG *mc, INI_STORE *ini_store) {
         mc->wheel_speed_text[sizeof(mc->wheel_speed_text) - 1] = '\0';
     } else {
         mc->wheel_speed_text_len = snprintf(mc->wheel_speed_text, sizeof(mc->wheel_speed_text), "%d", 4);
+    }
+
+    val = ini_get(ini_store, "Config", "original_del");
+    if(val) {
+        int state = 0;
+        sscanf(val, "%d", &state);
+        if(0 == stricmp(val, "on") || state == 1) {
+            mc->original_del = 1;
+        }
     }
 
     val = ini_get(ini_store, "Config", "disk_leds");
@@ -172,6 +182,7 @@ void cmn_config_apply(MACHINE_CONFIG *mc, INI_STORE *ini_store) {
     }
 
     ini_set(ini_store, "Config", "ui", mc->ui_sel ? "text" : "gui");
+    ini_set(ini_store, "Config", "original_del", mc->original_del ? "on" : "off");
 
     if(mc->wheel_speed_text_len > 0) {
         int speed = 0;
@@ -316,6 +327,9 @@ int cmn_config_changed(const MACHINE_CONFIG *a, const MACHINE_CONFIG *b) {
     }
     if(a->ui_sel != b->ui_sel) {
         return ret | CNF_CNG_RESTART;
+    }
+    if(a->original_del != b->original_del) {
+        ret |= CNF_CNG_SAVE_ON_EXIT;
     }
     if(a->disk_leds != b->disk_leds) {
         return ret | CNF_CNG_RESTART;

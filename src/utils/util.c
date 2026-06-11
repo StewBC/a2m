@@ -343,7 +343,7 @@ int util_file_stat_regular_utf8(const char *path, uint64_t *size_out, uint64_t *
     return 0;
 }
 
-// ini file helpers (SQW Make an ini object)
+// ini file helpers
 char *util_ini_find_character(char **start, char character) {
     char *old_start = *start;
     while(**start && **start != character && **start != ';') {

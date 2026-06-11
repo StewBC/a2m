@@ -425,51 +425,51 @@ void io_c0_kbdstrb_w(APPLE2 *m, uint16_t a, uint8_t v) {
 }
 
 // 0xC011
-uint8_t io_c0_hramrd_r(APPLE2 *m, uint16_t a) {
+uint8_t io_c0_hram_bank2_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    return tst_flags(m->state_flags, A2S_LC_BANK2) ? 0x80 : 0x00;;
+    return tst_flags(m->state_flags, A2S_LC_BANK2) ? 0x80 : 0x00;
 }
 
 // 0xC012
-uint8_t io_c0_hramwrt_r(APPLE2 *m, uint16_t a) {
+uint8_t io_c0_hramrd_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    return tst_flags(m->state_flags, A2S_LC_READ) ? 0x80 : 0x00;;
+    return tst_flags(m->state_flags, A2S_LC_READ) ? 0x80 : 0x00;
 }
 
 // 0xC013
 uint8_t io_c0_rdramrd_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    return tst_flags(m->state_flags, A2S_RAMRD) ? 0x80 : 0x00;;
+    return tst_flags(m->state_flags, A2S_RAMRD) ? 0x80 : 0x00;
 }
 
 // 0xC014
 uint8_t io_c0_rdramwrt_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    return tst_flags(m->state_flags, A2S_RAMWRT) ? 0x80 : 0x00;;
+    return tst_flags(m->state_flags, A2S_RAMWRT) ? 0x80 : 0x00;
 }
 
 // 0xC015
 uint8_t io_c0_rdcxrom_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    return tst_flags(m->state_flags, A2S_CXSLOTROM_MB_ENABLE) ? 0x80 : 0x00;;
+    return tst_flags(m->state_flags, A2S_CXSLOTROM_MB_ENABLE) ? 0x80 : 0x00;
 }
 
 // 0xC016
 uint8_t io_c0_rdaltzp_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    return tst_flags(m->state_flags, A2S_ALTZP) ? 0x80 : 0x00;;
+    return tst_flags(m->state_flags, A2S_ALTZP) ? 0x80 : 0x00;
 }
 
 // 0xc017
 uint8_t io_c0_rdc3rom_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    return tst_flags(m->state_flags, A2S_SLOT3ROM_MB_DISABLE) ? 0x80 : 0x00;;
+    return tst_flags(m->state_flags, A2S_SLOT3ROM_MB_DISABLE) ? 0x80 : 0x00;
 }
 
 // 0xC018
 uint8_t io_c0_rd80store_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    return tst_flags(m->state_flags, A2S_80STORE) ? 0x80 : 0x00;;
+    return tst_flags(m->state_flags, A2S_80STORE) ? 0x80 : 0x00;
 }
 
 // 0xC019
@@ -481,37 +481,37 @@ uint8_t io_c0_rdvbl_r(APPLE2 *m, uint16_t a) {
 // 0xC01A
 uint8_t io_c0_rdtext_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    return tst_flags(m->state_flags, A2S_TEXT) ? 0x80 : 0x00;;
+    return tst_flags(m->state_flags, A2S_TEXT) ? 0x80 : 0x00;
 }
 
 // 0xC01B
 uint8_t io_c0_rdmixed_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    return tst_flags(m->state_flags, A2S_MIXED) ? 0x80 : 0x00;;
+    return tst_flags(m->state_flags, A2S_MIXED) ? 0x80 : 0x00;
 }
 
 // 0xC01C
 uint8_t io_c0_rdpage2_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    return tst_flags(m->state_flags, A2S_PAGE2) ? 0x80 : 0x00;;
+    return tst_flags(m->state_flags, A2S_PAGE2) ? 0x80 : 0x00;
 }
 
 // 0xC01D
 uint8_t io_c0_rdhires_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    return tst_flags(m->state_flags, A2S_HIRES) ? 0x80 : 0x00;;
+    return tst_flags(m->state_flags, A2S_HIRES) ? 0x80 : 0x00;
 }
 
 // 0xC01E
 uint8_t io_c0_rdaltchar_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    return tst_flags(m->state_flags, A2S_ALTCHARSET) ? 0x80 : 0x00;;
+    return tst_flags(m->state_flags, A2S_ALTCHARSET) ? 0x80 : 0x00;
 }
 
 // 0xC01F
 uint8_t io_c0_rd80col_r(APPLE2 *m, uint16_t a) {
     UNUSED(a);
-    return tst_flags(m->state_flags, A2S_COL80) ? 0x80 : 0x00;;
+    return tst_flags(m->state_flags, A2S_COL80) ? 0x80 : 0x00;
 }
 
 // 0xC030
@@ -977,8 +977,8 @@ void io_c0_table_init(void) {
     io_c0_iie.w[SETALTCHAR & 0xFF] = io_c0_setaltchar_w;
 
     // 10 - these all call kbdstrb as well, and write did already
+    io_c0_iie.r[HRAM_BANK2 & 0xFF] = io_c0_hram_bank2_r;
     io_c0_iie.r[HRAMRD & 0xFF] = io_c0_hramrd_r;
-    io_c0_iie.r[HRAMWRT & 0xFF] = io_c0_hramwrt_r;
     io_c0_iie.r[RDRAMRD & 0xFF] = io_c0_rdramrd_r;
     io_c0_iie.r[RDRAMWRT & 0xFF] = io_c0_rdramwrt_r;
     io_c0_iie.r[RDCXROM & 0xFF] = io_c0_rdcxrom_r;

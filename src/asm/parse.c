@@ -20,8 +20,8 @@ static inline void set_current_output_address(ASSEMBLER *as, uint16_t address) {
     if(address > as->active_target->active_segment->segment_output_address) {
         as->active_target->active_segment->segment_output_address = address; 
     } else {
-        // SQW - this means segment 50, .org 100, .res 1, .org 50 will error
-        // But unless I keep spans or masks I can't really do this differently, I think?
+        // A segment only moves forward. Moving back would need per-address span
+        // tracking to tell gaps from overwrites; use another segment instead.
         asm_err(as, ASM_ERR_RESOLVE, "Address set to $%04X but is already at $%04X", address, as->active_target->active_segment->segment_output_address);
     }
 }

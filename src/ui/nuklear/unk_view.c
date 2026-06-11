@@ -399,6 +399,14 @@ void unk_config_ui(UNK *v, INI_STORE *ini_store) {
             v->scroll_wheel_lines = state;
         }
     }
+    val = ini_get(ini_store, "Config", "original_del");
+    if(val) {
+        int state = 0;
+        sscanf(val, "%d", &state);
+        if(0 == stricmp(val, "on") || state == 1) {
+            v->original_del = 1;
+        }
+    }
     // Assembler variables
     val = ini_get(ini_store, "Assembler", "source");
     if(val) {
@@ -592,12 +600,6 @@ int unk_process_events(UI *ui, APPLE2 *m) {
                     v->sdl_os_rect.w = e.window.data1;
                     v->sdl_os_rect.h = e.window.data2;
                     break;
-
-                // SQW I don't think this added value but before I take it out and forget
-                // I'll just comment it out till I test this more...
-                // case SDL_WINDOWEVENT_RESIZED:
-                //     SDL_GetWindowSize(v->window, &v->sdl_os_rect.w, &v->sdl_os_rect.h);
-                //     break;
 
                 case SDL_WINDOWEVENT_SHOWN:
                     break;

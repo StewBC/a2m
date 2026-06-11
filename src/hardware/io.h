@@ -19,8 +19,8 @@ enum {
     CLRALTCHAR      = 0xC00E, // primary/standard character set
     SETALTCHAR      = 0xC00F, // alternate character set
     KBDSTRB         = 0xC010, // Port where the Apple II acknowledges a key press (clears it)
-    HRAMRD          = 0xC011, // 1 = HRAMRD // SQW - need to understand
-    HRAMWRT         = 0xC012, // 1 = HRAMWRT // SQW - need to understand
+    HRAM_BANK2      = 0xC011, // 1 = LC bank 2 selected, 0 = bank 1
+    HRAMRD          = 0xC012, // 1 = LC RAM readable, 0 = ROM readable
     RDRAMRD         = 0xC013, // 1 = RAMRD on (reads from aux), 0 = off
     RDRAMWRT        = 0xC014, // 1 = RAMWRT on (writes to aux), 0 = off
     RDCXROM         = 0xC015,

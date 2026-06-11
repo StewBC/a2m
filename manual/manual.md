@@ -466,7 +466,7 @@ The Machine Configuration dialog allows common emulator settings to be edited wi
 Select the model (`Apple ][+` or `Apple //e Enhanced`) and the device installed in slots 1-7. On the `Apple ][+` model, Slot 3 also allows a `Franklin Ace Display` card.  A `Mockingboard` sound card can be added to any slot.  Currently, only one Mockingboard is allowed in a machine.
 
 #### Emulator tab
-Configure the UI (`GUI` or `Text`), the scroll wheel speed, and symbol files (a comma-separated list). The symbol files row includes a `[Browse]` button. Each file selected through the Browse button is added to the list in the symbol files field. To remove a file, edit the field manually.
+Configure the UI (`GUI` or `Text`), original Delete behavior, scroll wheel speed, and symbol files (a comma-separated list). The symbol files row includes a `[Browse]` button. Each file selected through the Browse button is added to the list in the symbol files field. To remove a file, edit the field manually.
 The `Turbo Speeds` field accepts comma-separated multipliers such as `1, 8, max`.  There are also Disk LEDs, and Remember INI settings checkboxes. Selecting the `Remember INI settings` option always saves the INI file when the emulator exits. 
 
 #### Assembler tab
@@ -873,6 +873,7 @@ The Config section is mostly UI configuration. Variables are:
 | Variable     | Value                                                                             |
 |:-------------|:----------------------------------------------------------------------------------|
 | disk_leds    | Value `on` or `1` shows disk activity LEDs in the lower right of the UI           |
+| original_del | Value `on` or `1` makes Backspace send Apple II DEL                               |
 | save         | `yes` means save the INI file on exit                                             |
 | symbols      | Comma-separated files that contain symbol information                             |
 | symbol_view  | In disassembler `0`: lookup, syms & labels, `1`: syms & labels, `2`: labels, `3`: raw   |

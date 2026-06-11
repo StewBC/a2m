@@ -510,6 +510,12 @@ int unk_dlg_machine_configure(struct nk_context *ctx, struct nk_rect r, MACHINE_
                 }
                 nk_layout_row_end(ctx);
 
+                // Original Delete behavior
+                nk_layout_row_dynamic(ctx, 22, 1);
+                {
+                    nk_checkbox_label_align(ctx, "Original Delete Behavior", &mc->original_del, 0, NK_TEXT_LEFT);
+                }
+
                 // Scroll wheel speed
                 nk_layout_row_begin(ctx, NK_DYNAMIC, 22, 2);
                 {

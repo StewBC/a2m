@@ -187,7 +187,7 @@ typedef struct APPLE2 {
     int strobed_slot;                                       // Contains the slot numbr for the card that is strobed
 
     // A2 Status
-    uint8_t key_held;                                       // SQW I wish I documented this...
+    uint8_t key_held;                                       // Key currently held; lets KBDSTRB return it while clearing the KBD latch
     uint8_t mb_slot;                                        // Only allow 1 MB at a time
     A2_STATE state_flags;
 

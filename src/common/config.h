@@ -36,6 +36,7 @@ typedef struct {
     int model;
     int slot_sel[7];
     int ui_sel;
+    int original_del;
     int disk_leds;
     int remember_ini;
     int save_ini;
