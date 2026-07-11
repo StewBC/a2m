@@ -11,19 +11,32 @@ typedef struct {
 
     // audio clock
     double cpu_hz;
-    double cycles_per_sample;
+    double cycles_per_sample_base;   // nominal CPU cycles per host sample
+    double cycles_per_sample;        // base with gentle drift correction
     double cycle_accum;
     double mockingboard_cycles_per_render;
     double mockingboard_render_cpu_budget;
     uint32_t mockingboard_render_oversample;
+    uint32_t drift_sample_counter;
+    uint8_t was_turbo;               // last-seen turbo (non-1x) state for resync
 
     // speaker source state (+1/-1)
     float speaker_level;
+    float speaker_gain;
     float mockingboard_gain;
     float mockingboard_mix_scale;
     float mockingboard_filter_alpha;
+    // Cascaded one-pole LPF state (pole 1 / pole 2) per channel
     float mockingboard_filter_left;
     float mockingboard_filter_right;
+    float mockingboard_filter2_left;
+    float mockingboard_filter2_right;
+
+    // Mockingboard DC blocker (unipolar AY levels -> bipolar host PCM)
+    float mockingboard_dc_x_left;
+    float mockingboard_dc_y_left;
+    float mockingboard_dc_x_right;
+    float mockingboard_dc_y_right;
 
     // speaker filter state
     float x_prev;

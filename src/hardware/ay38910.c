@@ -4,11 +4,14 @@
 
 #include "hardware_lib.h"
 
+// AY-3-8910 DAC amplitudes (normalized to level 15 = 1.0).
+// Geometric -3 dB steps are a poor match for the real ladder; this curve is the
+// common measured/resistor-derived table used by many AY cores (non-uniform log steps).
 static const float ay38910_volume_table[16] = {
-    0.000000f, 0.007813f, 0.011049f, 0.015625f,
-    0.022097f, 0.031250f, 0.044194f, 0.062500f,
-    0.088388f, 0.125000f, 0.176777f, 0.250000f,
-    0.353553f, 0.500000f, 0.707107f, 1.000000f,
+    0.000000f, 0.013702f, 0.020508f, 0.029106f,
+    0.042348f, 0.061820f, 0.084725f, 0.136901f,
+    0.169148f, 0.264718f, 0.352709f, 0.449876f,
+    0.570427f, 0.687307f, 0.848206f, 1.000000f,
 };
 
 static uint8_t ay38910_mask_register_value(uint8_t reg, uint8_t value) {
@@ -39,12 +42,14 @@ static uint32_t ay38910_noise_period_from_regs(const AY38910 *ay) {
 }
 
 static uint32_t ay38910_env_period_from_regs(const AY38910 *ay) {
+    // Datasheet f_env = fCLOCK / (256 * EP) is the full 16-step ramp rate, so
+    // one amplitude level advances every 16 * EP chip clocks.
     uint32_t period = (uint32_t)(((uint32_t)ay->regs[AY38910_REG_ENV_COARSE] << 8) |
                                  ay->regs[AY38910_REG_ENV_FINE]);
     if(!period) {
         period = 1;
     }
-    return period * 256u;
+    return period * 16u;
 }
 
 static uint16_t ay38910_tone_period_from_regs(const AY38910 *ay, int channel) {
@@ -68,9 +73,12 @@ static void ay38910_refresh_tone_periods(AY38910 *ay) {
 }
 
 static void ay38910_reload_tone_period(AY38910 *ay, int channel) {
+    // Period register writes update the divisor for the next half-cycle without
+    // forcing a phase reset or output high (which clicks on vibrato/slides).
     ay->tone_period[channel] = ay38910_tone_period_from_regs(ay, channel);
-    ay->tone_counter[channel] = ay->tone_period[channel];
-    ay->tone_output[channel] = 1;
+    if(ay->tone_counter[channel] == 0 || ay->tone_counter[channel] > ay->tone_period[channel]) {
+        ay->tone_counter[channel] = ay->tone_period[channel];
+    }
 }
 
 static void ay38910_refresh_noise_period(AY38910 *ay) {
@@ -81,9 +89,11 @@ static void ay38910_refresh_noise_period(AY38910 *ay) {
 }
 
 static void ay38910_reload_noise_period(AY38910 *ay) {
+    // Same continuity rule as tone: new period only; leave LFSR and phase alone.
     ay->noise_period = ay38910_noise_period_from_regs(ay);
-    ay->noise_counter = ay->noise_period;
-    ay->noise_lfsr = 0x1FFFFu;
+    if(!ay->noise_counter || ay->noise_counter > ay->noise_period) {
+        ay->noise_counter = ay->noise_period;
+    }
 }
 
 static void ay38910_refresh_env_period(AY38910 *ay) {
@@ -197,7 +207,10 @@ static void ay38910_refresh_sample(AY38910 *ay) {
     // state. Treat this as a chip-state generator, not as the final host reconstruction
     // stage. Fidelity work above this layer must not rewrite AY register semantics in order
     // to "improve" the sound.
-    float mixed = 0.0f;
+    float ch_level[3] = {0.0f, 0.0f, 0.0f};
+    float sum;
+    float mixed;
+    float over;
 
     uint8_t mixer = ay->regs[AY38910_REG_MIXER];
     uint8_t noise_output = ay->noise_output;
@@ -210,10 +223,23 @@ static void ay38910_refresh_sample(AY38910 *ay) {
         if(tone_gate & noise_gate) {
             uint8_t volume_reg = ay->regs[AY38910_REG_VOLUME_A + ch];
             uint8_t level = (uint8_t)((volume_reg & 0x10) ? env_level : (volume_reg & 0x0F));
-            mixed += ay38910_volume_table[level];
+            ch_level[ch] = ay38910_volume_table[level];
         }
     }
-    ay->sample = mixed / 3.0f;
+
+    // Soft-saturating mix instead of a pure /3 average. One full channel stays near the
+    // old mono level; multi-voice stacks get a mild cross-term lift so chords sound fuller,
+    // then a soft ceiling keeps peaks in [0, 1].
+    sum = ch_level[0] + ch_level[1] + ch_level[2];
+    mixed = sum * (1.0f / 3.0f);
+    mixed += 0.08f * (ch_level[0] * ch_level[1] +
+                      ch_level[1] * ch_level[2] +
+                      ch_level[2] * ch_level[0]);
+    if(mixed > 0.92f) {
+        over = mixed - 0.92f;
+        mixed = 0.92f + 0.08f * (over / (over + 0.12f));
+    }
+    ay->sample = mixed;
 }
 
 void ay38910_reset(AY38910 *ay, double cpu_hz, double chip_hz) {
