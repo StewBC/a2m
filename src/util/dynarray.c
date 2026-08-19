@@ -1,6 +1,7 @@
 #include "dynarray.h"
 #include "a2_status.h"
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
