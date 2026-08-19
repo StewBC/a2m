@@ -18,11 +18,14 @@
 #include <windows.h>
 #define A2M_STAT_ISDIR(mode) (((mode) & _S_IFDIR) != 0)
 #define hostfs_ftruncate(fd, sz) _chsize_s(fd, (long long)(sz))
+#define hostfs_stricmp _stricmp
 #else
 #include <dirent.h>
+#include <strings.h>
 #include <unistd.h>
 #define A2M_STAT_ISDIR(mode) S_ISDIR(mode)
 #define hostfs_ftruncate(fd, sz) ftruncate(fd, (off_t)(sz))
+#define hostfs_stricmp strcasecmp
 #endif
 
 enum {
@@ -31,7 +34,8 @@ enum {
     HOSTFS_BITMAP_BLOCKS = 16,
     HOSTFS_ACCESS_FILE = 0xC3u,
     HOSTFS_ACCESS_VOL = 0xC3u,
-    HOSTFS_POLL_PERIOD = 1000000u /* ~1s at 1 MHz */
+    HOSTFS_POLL_PERIOD = 1000000u, /* ~1s at 1 MHz */
+    HOSTFS_BASENAME_MAX = 256
 };
 
 typedef enum {
@@ -87,6 +91,9 @@ struct hostfs_volume {
     int guest_write_depth;
     bool dirty;
     bool dir_full_warned;
+    /* Last persisted catalog order (host basenames); used to avoid needless rewrites. */
+    char order_basenames[HOSTFS_MAX_FILES][256];
+    int order_count;
 };
 
 /* ---- small helpers ---- */
@@ -970,16 +977,47 @@ static int hostfs_build_bitmap(hostfs_volume *vol)
     return hostfs_sync_bitmap_to_map(vol);
 }
 
-/* ---- scan / mount ---- */
+/* ---- scan / mount / order manifest ---- */
 
 typedef struct {
     char prodos[HOSTFS_NAME_MAX];
     uint8_t type;
     uint16_t aux;
     char host_path[HOSTFS_PATH_MAX];
+    char basename[HOSTFS_BASENAME_MAX];
     uint64_t size;
     time_t mtime;
 } hostfs_scan_ent;
+
+static const char *hostfs_path_basename(const char *path)
+{
+    const char *slash;
+    if (path == NULL) {
+        return "";
+    }
+    slash = strrchr(path, '/');
+#ifdef _WIN32
+    {
+        const char *b = strrchr(path, '\\');
+        if (b != NULL && (slash == NULL || b > slash)) {
+            slash = b;
+        }
+    }
+#endif
+    return slash != NULL ? slash + 1 : path;
+}
+
+static int hostfs_basename_cmp(const char *a, const char *b)
+{
+    return hostfs_stricmp(a != NULL ? a : "", b != NULL ? b : "");
+}
+
+static int hostfs_scan_ent_basename_cmp(const void *pa, const void *pb)
+{
+    const hostfs_scan_ent *a = (const hostfs_scan_ent *)pa;
+    const hostfs_scan_ent *b = (const hostfs_scan_ent *)pb;
+    return hostfs_basename_cmp(a->basename, b->basename);
+}
 
 static int hostfs_collect_scans(hostfs_volume *vol, hostfs_scan_ent *out, int max_out)
 {
@@ -998,6 +1036,9 @@ static int hostfs_collect_scans(hostfs_volume *vol, hostfs_scan_ent *out, int ma
         if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
             continue;
         }
+        if (hostfs_basename_cmp(data.cFileName, HOSTFS_ORDER_FILENAME) == 0) {
+            continue;
+        }
         if (count >= max_out) {
             break;
         }
@@ -1011,6 +1052,7 @@ static int hostfs_collect_scans(hostfs_volume *vol, hostfs_scan_ent *out, int ma
         if (stat(out[count].host_path, &st) != 0) {
             continue;
         }
+        snprintf(out[count].basename, sizeof(out[count].basename), "%s", data.cFileName);
         out[count].size = st.st_size < 0 ? 0u : (uint64_t)st.st_size;
         out[count].mtime = st.st_mtime;
         count++;
@@ -1024,6 +1066,9 @@ static int hostfs_collect_scans(hostfs_volume *vol, hostfs_scan_ent *out, int ma
     }
     while ((entry = readdir(dir)) != NULL) {
         struct stat st;
+        if (hostfs_basename_cmp(entry->d_name, HOSTFS_ORDER_FILENAME) == 0) {
+            continue;
+        }
         if (count >= max_out) {
             break;
         }
@@ -1037,6 +1082,7 @@ static int hostfs_collect_scans(hostfs_volume *vol, hostfs_scan_ent *out, int ma
         if (stat(out[count].host_path, &st) != 0 || A2M_STAT_ISDIR(st.st_mode)) {
             continue;
         }
+        snprintf(out[count].basename, sizeof(out[count].basename), "%s", entry->d_name);
         out[count].size = st.st_size < 0 ? 0u : (uint64_t)st.st_size;
         out[count].mtime = st.st_mtime;
         count++;
@@ -1046,17 +1092,243 @@ static int hostfs_collect_scans(hostfs_volume *vol, hostfs_scan_ent *out, int ma
     return count;
 }
 
+static int hostfs_load_order_file(
+    const char *root_path, char names[][HOSTFS_BASENAME_MAX], int max_names)
+{
+    char path[HOSTFS_PATH_MAX];
+    FILE *fp;
+    char line[HOSTFS_BASENAME_MAX + 32];
+    int count = 0;
+
+    hostfs_path_join(path, sizeof(path), root_path, HOSTFS_ORDER_FILENAME);
+    fp = fopen(path, "r");
+    if (fp == NULL) {
+        return 0;
+    }
+    while (count < max_names && fgets(line, (int)sizeof(line), fp) != NULL) {
+        size_t len;
+        char *p = line;
+        while (*p == ' ' || *p == '\t') {
+            p++;
+        }
+        if (*p == '\0' || *p == '#' || *p == '\n' || *p == '\r') {
+            continue;
+        }
+        len = strlen(p);
+        while (len > 0 && (p[len - 1] == '\n' || p[len - 1] == '\r' || p[len - 1] == ' ' ||
+                           p[len - 1] == '\t')) {
+            p[--len] = '\0';
+        }
+        if (len == 0 || len >= HOSTFS_BASENAME_MAX) {
+            continue;
+        }
+        /* Only NAPS basenames belong in the order list. */
+        {
+            char prodos[HOSTFS_NAME_MAX];
+            uint8_t type;
+            uint16_t aux;
+            if (!hostfs_naps_parse_name(p, prodos, sizeof(prodos), &type, &aux)) {
+                continue;
+            }
+        }
+        snprintf(names[count], HOSTFS_BASENAME_MAX, "%s", p);
+        count++;
+    }
+    fclose(fp);
+    return count;
+}
+
+static void hostfs_apply_order_to_scans(
+    hostfs_scan_ent *scans, int n, const char names[][HOSTFS_BASENAME_MAX], int name_count)
+{
+    hostfs_scan_ent *ordered;
+    hostfs_scan_ent *rest;
+    bool used[HOSTFS_MAX_FILES];
+    int out = 0;
+    int rest_n = 0;
+    int i;
+    int k;
+
+    if (n <= 0) {
+        return;
+    }
+    ordered = (hostfs_scan_ent *)malloc((size_t)n * sizeof(hostfs_scan_ent));
+    rest = (hostfs_scan_ent *)malloc((size_t)n * sizeof(hostfs_scan_ent));
+    if (ordered == NULL || rest == NULL) {
+        free(ordered);
+        free(rest);
+        return;
+    }
+    memset(used, 0, sizeof(used));
+
+    for (k = 0; k < name_count; ++k) {
+        for (i = 0; i < n; ++i) {
+            if (used[i]) {
+                continue;
+            }
+            if (hostfs_basename_cmp(scans[i].basename, names[k]) == 0) {
+                ordered[out++] = scans[i];
+                used[i] = true;
+                break;
+            }
+        }
+    }
+
+    for (i = 0; i < n; ++i) {
+        if (!used[i]) {
+            rest[rest_n++] = scans[i];
+        }
+    }
+    if (rest_n > 1) {
+        qsort(rest, (size_t)rest_n, sizeof(rest[0]), hostfs_scan_ent_basename_cmp);
+    }
+    for (i = 0; i < rest_n; ++i) {
+        ordered[out++] = rest[i];
+    }
+
+    memcpy(scans, ordered, (size_t)out * sizeof(scans[0]));
+    free(ordered);
+    free(rest);
+}
+
+static int hostfs_catalog_basenames(
+    hostfs_volume *vol, char names[][HOSTFS_BASENAME_MAX], int max_names)
+{
+    int count = 0;
+    uint16_t d;
+
+    for (d = 0; d < vol->dir_block_count && count < max_names; ++d) {
+        uint8_t *dir = hostfs_map_ram_ptr(vol, (uint16_t)(2u + d));
+        int slot;
+        int start = (d == 0u) ? 1 : 0;
+        if (dir == NULL) {
+            continue;
+        }
+        for (slot = start; slot < HOSTFS_ENTRIES_PER_BLOCK && count < max_names; ++slot) {
+            uint8_t *e = dir + 4 + slot * HOSTFS_ENTRY_LENGTH;
+            uint8_t st;
+            uint8_t nl;
+            char nm[HOSTFS_NAME_MAX];
+            int fi;
+            if (e[0] == 0) {
+                continue;
+            }
+            st = (uint8_t)(e[0] >> 4);
+            if (st < 1u || st > 3u) {
+                continue;
+            }
+            nl = (uint8_t)(e[0] & 0x0Fu);
+            memcpy(nm, e + 1, nl);
+            nm[nl] = '\0';
+            fi = hostfs_find_by_name(vol, nm);
+            if (fi < 0) {
+                uint16_t key = hostfs_read_u16(e + 0x11);
+                fi = hostfs_find_by_key(vol, key);
+            }
+            if (fi < 0 || !vol->files[fi].active) {
+                continue;
+            }
+            snprintf(
+                names[count], HOSTFS_BASENAME_MAX, "%s",
+                hostfs_path_basename(vol->files[fi].host_path));
+            count++;
+        }
+    }
+    return count;
+}
+
+static bool hostfs_order_lists_equal(
+    const char a[][HOSTFS_BASENAME_MAX],
+    int a_count,
+    const char b[][HOSTFS_BASENAME_MAX],
+    int b_count)
+{
+    int i;
+    if (a_count != b_count) {
+        return false;
+    }
+    for (i = 0; i < a_count; ++i) {
+        if (hostfs_basename_cmp(a[i], b[i]) != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static int hostfs_persist_order_manifest(hostfs_volume *vol)
+{
+    char (*current)[HOSTFS_BASENAME_MAX];
+    int count;
+    char path[HOSTFS_PATH_MAX];
+    FILE *fp;
+    int i;
+
+    if (vol == NULL) {
+        return A2_ERR;
+    }
+    current = (char (*)[HOSTFS_BASENAME_MAX])calloc(
+        (size_t)HOSTFS_MAX_FILES, HOSTFS_BASENAME_MAX);
+    if (current == NULL) {
+        return A2_ERR;
+    }
+    count = hostfs_catalog_basenames(vol, current, HOSTFS_MAX_FILES);
+    if (hostfs_order_lists_equal(current, count, vol->order_basenames, vol->order_count)) {
+        free(current);
+        return A2_OK;
+    }
+
+    hostfs_path_join(path, sizeof(path), vol->root_path, HOSTFS_ORDER_FILENAME);
+    fp = fopen(path, "w");
+    if (fp == NULL) {
+        free(current);
+        return A2_ERR;
+    }
+    fprintf(fp, "# a2m HostFS catalog order (one NAPS basename per line)\n");
+    for (i = 0; i < count; ++i) {
+        fprintf(fp, "%s\n", current[i]);
+    }
+    fclose(fp);
+
+    vol->order_count = count;
+    for (i = 0; i < count; ++i) {
+        snprintf(vol->order_basenames[i], HOSTFS_BASENAME_MAX, "%s", current[i]);
+    }
+    free(current);
+    return A2_OK;
+}
+
 static int hostfs_scan_into_files(hostfs_volume *vol)
 {
-    hostfs_scan_ent scans[HOSTFS_MAX_FILES];
+    hostfs_scan_ent *scans;
+    char (*order_names)[HOSTFS_BASENAME_MAX];
+    int order_count;
     int n;
     int i;
+    int rc = A2_ERR;
+
+    scans = (hostfs_scan_ent *)calloc((size_t)HOSTFS_MAX_FILES, sizeof(hostfs_scan_ent));
+    order_names =
+        (char (*)[HOSTFS_BASENAME_MAX])calloc((size_t)HOSTFS_MAX_FILES, HOSTFS_BASENAME_MAX);
+    if (scans == NULL || order_names == NULL) {
+        free(scans);
+        free(order_names);
+        return A2_ERR;
+    }
 
     n = hostfs_collect_scans(vol, scans, HOSTFS_MAX_FILES);
     if (n < 0) {
-        return A2_ERR;
+        goto done;
     }
+    order_count = hostfs_load_order_file(vol->root_path, order_names, HOSTFS_MAX_FILES);
+    if (order_count > 0) {
+        hostfs_apply_order_to_scans(scans, n, order_names, order_count);
+    } else if (n > 1) {
+        /* No manifest: deterministic alpha by basename (not readdir order). */
+        qsort(scans, (size_t)n, sizeof(scans[0]), hostfs_scan_ent_basename_cmp);
+    }
+
     vol->file_slots = 0;
+    vol->order_count = 0;
     for (i = 0; i < n; ++i) {
         hostfs_file *file;
         int j;
@@ -1081,8 +1353,19 @@ static int hostfs_scan_into_files(hostfs_volume *vol)
         file->host_size = scans[i].size;
         file->host_mtime = scans[i].mtime;
         snprintf(file->host_path, sizeof(file->host_path), "%s", scans[i].host_path);
+        if (vol->order_count < HOSTFS_MAX_FILES) {
+            snprintf(
+                vol->order_basenames[vol->order_count], HOSTFS_BASENAME_MAX, "%s",
+                scans[i].basename);
+            vol->order_count++;
+        }
     }
-    return A2_OK;
+    rc = A2_OK;
+
+done:
+    free(scans);
+    free(order_names);
+    return rc;
 }
 
 void hostfs_eject(hostfs_volume *vol)
@@ -1107,6 +1390,7 @@ int hostfs_flush(hostfs_volume *vol)
     if (vol == NULL) {
         return A2_ERR;
     }
+    (void)hostfs_persist_order_manifest(vol);
     vol->dirty = false;
     return A2_OK;
 }
@@ -1471,6 +1755,7 @@ static int hostfs_reconcile_directory(hostfs_volume *vol)
 
     (void)hostfs_patch_volume_file_count(vol);
     (void)hostfs_sync_bitmap_to_map(vol);
+    (void)hostfs_persist_order_manifest(vol);
     return A2_OK;
 }
 
@@ -1627,7 +1912,7 @@ static int hostfs_add_file_from_scan(hostfs_volume *vol, const hostfs_scan_ent *
 
 int hostfs_rescan(hostfs_volume *vol)
 {
-    hostfs_scan_ent scans[HOSTFS_MAX_FILES];
+    hostfs_scan_ent *scans;
     int n;
     int i;
     bool matched[HOSTFS_MAX_FILES];
@@ -1639,8 +1924,13 @@ int hostfs_rescan(hostfs_volume *vol)
         return A2_OK;
     }
 
+    scans = (hostfs_scan_ent *)calloc((size_t)HOSTFS_MAX_FILES, sizeof(hostfs_scan_ent));
+    if (scans == NULL) {
+        return A2_ERR;
+    }
     n = hostfs_collect_scans(vol, scans, HOSTFS_MAX_FILES);
     if (n < 0) {
+        free(scans);
         return A2_ERR;
     }
     memset(matched, 0, sizeof(matched));
@@ -1699,6 +1989,8 @@ int hostfs_rescan(hostfs_volume *vol)
     }
     (void)hostfs_patch_volume_file_count(vol);
     (void)hostfs_sync_bitmap_to_map(vol);
+    (void)hostfs_persist_order_manifest(vol);
+    free(scans);
     return A2_OK;
 }
 

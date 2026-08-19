@@ -269,6 +269,7 @@ checked-in or generated boot/PRODOS bytes — do not require a 32 MB file).
 | Phase 3 DESTROY | **`unlink`** host file |
 | Phase 3 EOF shrink | **Truncate** host file |
 | Phase 3 catalog sync | Dir-diff reconcile after directory block WRITEs |
+| Catalog order | Optional `hostfs.order` in the folder (one NAPS basename per line). Mount applies listed order then appends unlisted NAPS files (alpha). Guest reorder (e.g. CAT.DOCTOR) or rescan composition change rewrites the file. Missing entries skipped. |
 
 ---
 
@@ -279,3 +280,4 @@ checked-in or generated boot/PRODOS bytes — do not require a 32 MB file).
 | 2026-08-19 | Plan written; implementation not started. |
 | 2026-08-19 | Phase 0 + Phase 1 implemented: `hostfs.c`, SmartPort backend dispatch, fixtures, `ctest` `hostfs`. |
 | 2026-08-19 | Phase 2 + Phase 3: live host rescan/poll, write-through, dir-diff CREATE/DESTROY/RENAME. |
+| 2026-08-19 | Optional `hostfs.order` manifest preserves ProDOS catalog order across remount. |

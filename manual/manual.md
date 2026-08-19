@@ -114,6 +114,13 @@ rename in the catalog create, remove, or rename NAPS files in the folder. Extern
 edits to files already on the volume are picked up by a periodic rescan (remount if
 the directory was full when new files appeared).
 
+ProDOS catalog **order** (which `.SYSTEM` file comes first, and so on) is remembered in
+an optional `hostfs.order` text file in the folder — one NAPS basename per line, `#`
+comments allowed. If the file is present at mount, those names are added in that
+order and any other NAPS files are appended. Reordering the catalog in ProDOS (for
+example with CAT.DOCTOR) rewrites `hostfs.order` automatically so the next launch
+keeps that order. The file is not itself a ProDOS volume entry.
+
 HostFS is selected by path kind only (directory vs file). Mount it from the command
 line or `[SmartPort]` in the INI. The Machine **[Insert]** browser still selects
 image files; folder insert from the UI is not provided yet.

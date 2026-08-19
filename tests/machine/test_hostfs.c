@@ -469,6 +469,7 @@ static void test_write_through_and_rescan(void)
     hostfs_eject(vol);
     remove("test_hostfs_rw_dir/HELLO#060800");
     remove("test_hostfs_rw_dir/NEW#040000");
+    remove("test_hostfs_rw_dir/" HOSTFS_ORDER_FILENAME);
     rmdir(dir);
 }
 
@@ -535,6 +536,151 @@ static void test_create_reconcile(void)
     hostfs_eject(vol);
     remove("test_hostfs_create_dir/SEED#060000");
     remove("test_hostfs_create_dir/GAME#060800");
+    remove("test_hostfs_create_dir/" HOSTFS_ORDER_FILENAME);
+    rmdir(dir);
+}
+
+static void read_catalog_names(hostfs_volume *vol, char names[][16], int *count, int max)
+{
+    uint8_t dirblk[512];
+    int i;
+    *count = 0;
+    if (hostfs_read_block(vol, 2, dirblk) != 0) {
+        fail("read catalog");
+    }
+    for (i = 1; i < 13 && *count < max; ++i) {
+        uint8_t *e = dirblk + 4 + i * 39;
+        uint8_t nl;
+        if (e[0] == 0) {
+            continue;
+        }
+        nl = e[0] & 0x0Fu;
+        memcpy(names[*count], e + 1, nl);
+        names[*count][nl] = '\0';
+        (*count)++;
+    }
+}
+
+static void test_order_manifest(void)
+{
+    const char *dir = "test_hostfs_order_dir";
+    char path[512];
+    hostfs_volume *vol;
+    char names[8][16];
+    int count = 0;
+    FILE *fp;
+    uint8_t dirblk[512];
+    int i;
+    uint8_t *slot_a = NULL;
+    uint8_t *slot_c = NULL;
+    uint8_t tmp[39];
+
+    HOSTFS_MKDIR(dir);
+    write_file("test_hostfs_order_dir/ALPHA#060000", "a", 1);
+    write_file("test_hostfs_order_dir/BETA#060000", "b", 1);
+    write_file("test_hostfs_order_dir/GAMMA#060000", "c", 1);
+
+    /* Manifest forces GAMMA, ALPHA, then unlisted BETA appends. */
+    snprintf(path, sizeof(path), "%s/%s", dir, HOSTFS_ORDER_FILENAME);
+    fp = fopen(path, "w");
+    if (fp == NULL) {
+        fail("write order file");
+    }
+    fprintf(fp, "# comment\nGAMMA#060000\nALPHA#060000\nMISSING#040000\n");
+    fclose(fp);
+
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL) {
+        fail("mount order dir");
+    }
+    read_catalog_names(vol, names, &count, 8);
+    if (count != 3 || strcmp(names[0], "GAMMA") != 0 || strcmp(names[1], "ALPHA") != 0 ||
+        strcmp(names[2], "BETA") != 0) {
+        fprintf(stderr, "order got");
+        for (i = 0; i < count; ++i) {
+            fprintf(stderr, " %s", names[i]);
+        }
+        fprintf(stderr, "\n");
+        fail("manifest mount order");
+    }
+
+    /* Swap ALPHA and GAMMA in the directory (CAT.DOCTOR-style) and write back. */
+    if (hostfs_read_block(vol, 2, dirblk) != 0) {
+        fail("read dir for swap");
+    }
+    for (i = 1; i < 13; ++i) {
+        uint8_t *e = dirblk + 4 + i * 39;
+        uint8_t nl = e[0] & 0x0Fu;
+        char nm[16];
+        if (e[0] == 0) {
+            continue;
+        }
+        memcpy(nm, e + 1, nl);
+        nm[nl] = '\0';
+        if (strcmp(nm, "GAMMA") == 0) {
+            slot_c = e;
+        }
+        if (strcmp(nm, "ALPHA") == 0) {
+            slot_a = e;
+        }
+    }
+    if (slot_a == NULL || slot_c == NULL) {
+        fail("swap slots");
+    }
+    memcpy(tmp, slot_a, 39);
+    memcpy(slot_a, slot_c, 39);
+    memcpy(slot_c, tmp, 39);
+    if (hostfs_write_block(vol, 2, dirblk) != 0) {
+        fail("write swapped dir");
+    }
+
+    fp = fopen(path, "r");
+    if (fp == NULL) {
+        fail("order file missing after reorder");
+    }
+    {
+        char got[3][64];
+        int n = 0;
+        char line[128];
+        while (n < 3 && fgets(line, sizeof(line), fp) != NULL) {
+            size_t len;
+            if (line[0] == '#' || line[0] == '\n' || line[0] == '\r') {
+                continue;
+            }
+            len = strlen(line);
+            while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
+                line[--len] = '\0';
+            }
+            snprintf(got[n], sizeof(got[n]), "%s", line);
+            n++;
+        }
+        fclose(fp);
+        if (n != 3 || strcmp(got[0], "ALPHA#060000") != 0 ||
+            strcmp(got[1], "GAMMA#060000") != 0 || strcmp(got[2], "BETA#060000") != 0) {
+            fprintf(stderr, "manifest lines: %s / %s / %s\n",
+                n > 0 ? got[0] : "", n > 1 ? got[1] : "", n > 2 ? got[2] : "");
+            fail("manifest not updated on reorder");
+        }
+    }
+
+    hostfs_eject(vol);
+
+    /* Remount must keep the new order from hostfs.order. */
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL) {
+        fail("remount order dir");
+    }
+    read_catalog_names(vol, names, &count, 8);
+    if (count != 3 || strcmp(names[0], "ALPHA") != 0 || strcmp(names[1], "GAMMA") != 0 ||
+        strcmp(names[2], "BETA") != 0) {
+        fail("remount preserved order");
+    }
+    hostfs_eject(vol);
+
+    remove("test_hostfs_order_dir/ALPHA#060000");
+    remove("test_hostfs_order_dir/BETA#060000");
+    remove("test_hostfs_order_dir/GAMMA#060000");
+    remove("test_hostfs_order_dir/" HOSTFS_ORDER_FILENAME);
     rmdir(dir);
 }
 
@@ -545,6 +691,7 @@ int main(void)
     test_smartport_hostfs_and_mixed();
     test_write_through_and_rescan();
     test_create_reconcile();
+    test_order_manifest();
     printf("hostfs tests ok\n");
     return 0;
 }

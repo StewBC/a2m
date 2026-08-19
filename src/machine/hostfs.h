@@ -12,6 +12,8 @@
 #define HOSTFS_MAX_FILES 256
 #define HOSTFS_PATH_MAX 1024
 #define HOSTFS_NAME_MAX 16 /* ProDOS name + NUL */
+/* Optional catalog-order manifest in the HostFS folder (non-NAPS; not mounted). */
+#define HOSTFS_ORDER_FILENAME "hostfs.order"
 
 typedef struct hostfs_volume hostfs_volume;
 
