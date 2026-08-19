@@ -1,6 +1,6 @@
 # HostFS — SmartPort folder volume
 
-**Status:** Phase 0 + Phase 1 done (read-only NAPS HostFS). Phase 2+ not started.  
+**Status:** Phase 0–3 done (read/write NAPS HostFS + live host refresh). Phase 4 optional.  
 **Related:** [`disk.md`](disk.md) · [`machine.md`](machine.md) · [`rules.md`](rules.md) · [`testing.md`](testing.md).
 
 HostFS mounts a **host directory** as a ProDOS 8 volume on an existing
@@ -255,15 +255,20 @@ checked-in or generated boot/PRODOS bytes — do not require a 32 MB file).
 
 ---
 
-## Choices made (Phase 1)
+## Choices made
 
 | Choice | Decision |
 |--------|----------|
 | `total_blocks` | **65535** |
 | Volume name | **`HOSTFS.SNdM`** (e.g. `HOSTFS.S7D0`) so `/PREFIX` is unique per unit |
-| Guest WRITE | **`$2B` write-protect** |
+| Phase 1 Guest WRITE | Was **`$2B` write-protect**; superseded by Phase 3 write-through |
 | Boot block 0 | Embedded from **`disks/dos.po`** (HD/SmartPort loader) and embedded in `hostfs_boot.h`. *Not* `ProDOS_2_4_2.po` — that floppy boot uses Disk II and cannot boot a SmartPort unit. |
 | `PRODOS#FF0000` fixture | Extracted SYS payload from `disks/ProDOS_2_4_2.po` into `tests/fixtures/hostfs/` |
+| Phase 2 poll | ~1e6 Φ0 via `apple2_peripherals_step` → `hostfs_poll`; suppressed while guest write-through is active |
+| Phase 3 CREATE name | Always host `NAME#ttxxxx`; if the name is already NAPS-tagged (assembler), observe the stem and do not double-tag; reuse existing host file with matching stem |
+| Phase 3 DESTROY | **`unlink`** host file |
+| Phase 3 EOF shrink | **Truncate** host file |
+| Phase 3 catalog sync | Dir-diff reconcile after directory block WRITEs |
 
 ---
 
@@ -273,3 +278,4 @@ checked-in or generated boot/PRODOS bytes — do not require a 32 MB file).
 |------|------|
 | 2026-08-19 | Plan written; implementation not started. |
 | 2026-08-19 | Phase 0 + Phase 1 implemented: `hostfs.c`, SmartPort backend dispatch, fixtures, `ctest` `hostfs`. |
+| 2026-08-19 | Phase 2 + Phase 3: live host rescan/poll, write-through, dir-diff CREATE/DESTROY/RENAME. |

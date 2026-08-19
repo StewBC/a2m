@@ -26,7 +26,7 @@ Expect **51** green. Run from repo root.
 | `video_block_paint` | full-frame block paint (text/hgr/lores/dlores) |
 | `diskii` | NIB mount + boot free-run |
 | `peripherals` | Mockingboard + SmartPort unit |
-| `hostfs` | HostFS NAPS parse, ProDOS map, mixed HostFS+image mount |
+| `hostfs` | HostFS NAPS parse/map, write-through, rescan add, CREATE reconcile, mixed mount |
 | `cxxx_map` | CXXX / SETC3ROM / INTCXROM / MB hide / C800 latch |
 | `memview` | VIEW_FLAGS memory windows |
 | `apple2_snapshot` | Machine `.a2state` serialize round-trip |

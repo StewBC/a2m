@@ -1409,9 +1409,7 @@ static void runtime_publish_machine(runtime *rt)
                 SP_DEVICE *spd = &rt->machine.sp_device[slot];
                 const char *display;
                 media->mounted = sp_unit_mounted(spd, device) ? 1u : 0u;
-                media->writable =
-                    (spd->backend[device] == SP_BACKEND_IMAGE && sp_unit_mounted(spd, device))
-                        ? 1u : 0u;
+                media->writable = sp_unit_mounted(spd, device) ? 1u : 0u;
                 media->queue_count = media->mounted;
                 display = sp_unit_display_name(spd, device);
                 if (display != NULL) {

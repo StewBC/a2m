@@ -15,14 +15,15 @@
 
 typedef struct hostfs_volume hostfs_volume;
 
-/* True if path exists and is a directory. */
 bool hostfs_path_is_dir(const char *path);
 
-/* Build a read-only ProDOS map for root_path. volume_name is typically
-   HOSTFS.SNdM (slot/unit). Returns NULL on failure. */
+/* Build a ProDOS map for root_path. volume_name is typically HOSTFS.SNdM. */
 hostfs_volume *hostfs_mount(const char *root_path, const char *volume_name);
 
 void hostfs_eject(hostfs_volume *vol);
+
+/* Flush dirty host file state (no-op if clean). */
+int hostfs_flush(hostfs_volume *vol);
 
 uint16_t hostfs_total_blocks(const hostfs_volume *vol);
 const char *hostfs_root_path(const hostfs_volume *vol);
@@ -32,7 +33,30 @@ int hostfs_file_count(const hostfs_volume *vol);
 /* Fill out[512]. Returns 0 on success, non-zero on I/O error. */
 int hostfs_read_block(hostfs_volume *vol, uint32_t block, uint8_t *out);
 
-/* Test helpers (also used by unit tests). */
+/* Write 512 bytes. Data blocks pwrite the host file; meta stays in RAM.
+   Directory writes trigger host CREATE/DESTROY/RENAME reconcile. */
+int hostfs_write_block(hostfs_volume *vol, uint32_t block, const uint8_t *data);
+
+/*
+ * Phase 2: poll host folder for mtime/size / add / delete / rename.
+ * cycles is a monotonic machine-cycle counter used to rate-limit.
+ * Skipped while guest write-through is active.
+ */
+void hostfs_poll(hostfs_volume *vol, uint64_t cycles);
+
+/* Force a host rescan now (ignores rate limit; still skips during guest write). */
+int hostfs_rescan(hostfs_volume *vol);
+
+/* Compose host basename NAME#ttxxxx. If name is already NAPS-tagged (assembler),
+   the stem is observed and type/aux from the args form the tag (no double #). */
+bool hostfs_compose_naps_filename(
+    const char *name,
+    uint8_t file_type,
+    uint16_t aux_type,
+    char *out,
+    size_t out_size);
+
+/* Test helpers. */
 bool hostfs_naps_parse_name(
     const char *filename,
     char *prodos_name,

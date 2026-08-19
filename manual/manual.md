@@ -77,9 +77,9 @@ successfully mounted.
 ### HostFS (folder as a ProDOS volume)
 
 If the SmartPort mount path is a **directory**, a2m treats it as **HostFS**: a
-read-only ProDOS volume built from files in that folder. No `.po` / `.hdv` image is
-required for that unit. Image-backed and HostFS units can share the same card
-(for example `s7d0=./host` and `s7d1=disk.po`).
+ProDOS volume built from files in that folder. No `.po` / `.hdv` image is required
+for that unit. Image-backed and HostFS units can share the same card (for example
+`s7d0=./host` and `s7d1=disk.po`).
 
 Prepare the folder yourself. Only **NAPS**-tagged names are mounted:
 
@@ -89,7 +89,9 @@ NAME#ttxxxx
 
 `tt` is the ProDOS file type (two hex digits) and `xxxx` is the aux type (four hex
 digits). The ProDOS name is the stem, uppercased and limited to 15 legal characters
-(`A–Z`, `0–9`, `.`). Non-NAPS names and subdirectories are skipped.
+(`A–Z`, `0–9`, `.`). Non-NAPS names and subdirectories are skipped. If a tool (for
+example the built-in assembler) already supplies a NAPS name, HostFS observes the
+stem and does not append a second `#ttxxxx`.
 
 A bootable volume needs at least a ProDOS system file:
 
@@ -97,8 +99,7 @@ A bootable volume needs at least a ProDOS system file:
 PRODOS#FF0000
 ```
 
-Optional later: `BASIC.SYSTEM#FF2000`. Phase-1 success is ProDOS starting from the
-folder; a full BASIC prompt is not required.
+Optional: `BASIC.SYSTEM#FF2000`.
 
 ```sh
 ./a2m --noini --smart s7d0=./hostfs/d0
@@ -106,7 +107,12 @@ folder; a full BASIC prompt is not required.
 
 The emulated volume is advertised as about 32 MB (`65535` blocks). Its ProDOS volume
 name is `HOSTFS.SNdM` (slot and unit), so `/PREFIX` stays unique when more than one
-HostFS unit is mounted. Guest writes are rejected as write-protected (`$2B`).
+HostFS unit is mounted.
+
+HostFS is read/write: ProDOS data writes update the host files, and create / delete /
+rename in the catalog create, remove, or rename NAPS files in the folder. External
+edits to files already on the volume are picked up by a periodic rescan (remount if
+the directory was full when new files appeared).
 
 HostFS is selected by path kind only (directory vs file). Mount it from the command
 line or `[SmartPort]` in the INI. The Machine **[Insert]** browser still selects
@@ -1475,8 +1481,8 @@ Each key is `sNdX` where `N` is the slot and `X` is the unit (`0` or `1`).
 | `s7d0`, `s5d0`, ... | Path to a block-device image **or** a HostFS directory |
 | `boot_slot` | Force startup through SmartPort unit 0 in this slot |
 
-A directory path mounts HostFS (read-only NAPS folder volume). A file path mounts
-the usual image backend. See **HostFS (folder as a ProDOS volume)**.
+A directory path mounts HostFS (NAPS folder volume with write-through). A file path
+mounts the usual image backend. See **HostFS (folder as a ProDOS volume)**.
 
 Legacy `[disk] hd=` is still accepted as Slot 7 Device 0.
 
@@ -1994,7 +2000,8 @@ an ordered multi-image queue; only one image is mounted at a time.
 A SmartPort card exposes two block units. ProDOS `$C0s4` / `$C0s5` and the `$C800`
 trap handle the common read/write/status commands. `boot_slot` starts execution at
 `$CN00` after unit 0 of that slot has mounted. Each unit is either an image file or
-a HostFS directory (read-only ProDOS map over NAPS-tagged host files).
+a HostFS directory (ProDOS map over NAPS-tagged host files, with live refresh and
+write-through).
 
 ### Mockingboard
 

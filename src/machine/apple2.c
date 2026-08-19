@@ -530,6 +530,15 @@ void apple2_peripherals_step(apple2_t *m, uint32_t cycles)
             via6522_step_cycles(&mb->via[1], cycles);
             mockingboard_queue_ay_cycles(mb, cycles);
         }
+        if (m->slot_type[slot] == SLOT_TYPE_SMARTPORT) {
+            int device;
+            for (device = 0; device < 2; ++device) {
+                if (m->sp_device[slot].backend[device] == SP_BACKEND_HOSTFS &&
+                    m->sp_device[slot].hostfs[device] != NULL) {
+                    hostfs_poll(m->sp_device[slot].hostfs[device], m->cpu.cpu.cycles);
+                }
+            }
+        }
     }
 }
 

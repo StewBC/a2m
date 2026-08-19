@@ -1,4 +1,4 @@
-/* HostFS unit tests — NAPS parse, ProDOS map, SmartPort mount/read. */
+/* HostFS unit tests — NAPS parse, ProDOS map, SmartPort mount/read/write. */
 #include "apple2.h"
 #include "hostfs.h"
 #include "smrtprt.h"
@@ -6,6 +6,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+
+#if defined(_WIN32)
+#include <direct.h>
+#define HOSTFS_MKDIR(path) _mkdir(path)
+#else
+#include <unistd.h>
+#define HOSTFS_MKDIR(path) mkdir(path, 0755)
+#endif
 
 #ifndef A2M_FIXTURE_DIR
 #define A2M_FIXTURE_DIR "tests/fixtures"
@@ -20,6 +29,7 @@ static void fail(const char *msg)
 static void test_naps_and_mangle(void)
 {
     char name[16];
+    char naps[64];
     uint8_t type = 0;
     uint16_t aux = 0;
 
@@ -44,6 +54,20 @@ static void test_naps_and_mangle(void)
     }
     if (hostfs_mangle_prodos_name("123bad", name, sizeof(name))) {
         fail("name must start with letter");
+    }
+
+    /* Assembler-style already-tagged name must not double-tag. */
+    if (!hostfs_compose_naps_filename("GAME#060800", 0x06u, 0x0800u, naps, sizeof(naps)) ||
+        strcmp(naps, "GAME#060800") != 0) {
+        fail("compose already-tagged");
+    }
+    if (!hostfs_compose_naps_filename("GAME#060800", 0xFCu, 0x0801u, naps, sizeof(naps)) ||
+        strcmp(naps, "GAME#FC0801") != 0) {
+        fail("compose retag from NAPS stem");
+    }
+    if (!hostfs_compose_naps_filename("PLAIN", 0x06u, 0x2000u, naps, sizeof(naps)) ||
+        strcmp(naps, "PLAIN#062000") != 0) {
+        fail("compose plain name");
     }
 }
 
@@ -274,14 +298,17 @@ static void test_smartport_hostfs_and_mixed(void)
         fail("hostfs boot bytes");
     }
 
-    /* WRITE → write-protect */
+    /* WRITE boot block (RAM meta) must succeed now. */
     m.sp_device[7].sp_buffer[1] = 0;
     m.sp_device[7].sp_buffer[2] = 0;
     m.sp_device[7].sp_buffer[3] = 0;
     memset(&m.sp_device[7].sp_buffer[4], 0xA5, 512);
+    /* Restore a valid boot signature so later reads still look sane if needed. */
+    m.sp_device[7].sp_buffer[4] = 0x01;
+    m.sp_device[7].sp_buffer[5] = 0x38;
     sp_write(&m, 7);
-    if (m.sp_device[7].sp_buffer[0] != SP_WRITE_PROTECT) {
-        fail("hostfs write protect");
+    if (m.sp_device[7].sp_buffer[0] != SP_SUCCESS) {
+        fail("hostfs write meta");
     }
 
     /* Image unit still works. */
@@ -307,11 +334,217 @@ static void test_smartport_hostfs_and_mixed(void)
     remove(img_path);
 }
 
+static void write_file(const char *path, const void *data, size_t len)
+{
+    FILE *fp = fopen(path, "wb");
+    if (fp == NULL || fwrite(data, 1, len, fp) != len) {
+        fail("write_file");
+    }
+    fclose(fp);
+}
+
+static void test_write_through_and_rescan(void)
+{
+    const char *dir = "test_hostfs_rw_dir";
+    char path[512];
+    hostfs_volume *vol;
+    uint8_t block[512];
+    uint8_t hello_key_payload[3] = {0xA9, 0x01, 0x60};
+    uint16_t key = 0;
+    int i;
+    FILE *fp;
+    uint8_t got[8];
+
+    HOSTFS_MKDIR(dir);
+    snprintf(path, sizeof(path), "%s/HELLO#060800", dir);
+    write_file(path, hello_key_payload, sizeof(hello_key_payload));
+
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL) {
+        fail("mount rw dir");
+    }
+
+    if (hostfs_read_block(vol, 2, block) != 0) {
+        fail("read dir for HELLO key");
+    }
+    for (i = 1; i < 13; ++i) {
+        uint8_t *e = block + 4 + i * 39;
+        uint8_t nl = e[0] & 0x0Fu;
+        char nm[16];
+        if (e[0] == 0) {
+            continue;
+        }
+        memcpy(nm, e + 1, nl);
+        nm[nl] = '\0';
+        if (strcmp(nm, "HELLO") == 0) {
+            key = (uint16_t)(e[0x11] | (e[0x12] << 8));
+            break;
+        }
+    }
+    if (key == 0) {
+        fail("HELLO key missing");
+    }
+
+    memset(block, 0, sizeof(block));
+    block[0] = 0xEA;
+    block[1] = 0xEA;
+    block[2] = 0x60;
+    if (hostfs_write_block(vol, key, block) != 0) {
+        fail("write HELLO data");
+    }
+
+    fp = fopen(path, "rb");
+    if (fp == NULL || fread(got, 1, 3, fp) != 3) {
+        fail("reread HELLO host");
+    }
+    fclose(fp);
+    if (got[0] != 0xEA || got[1] != 0xEA || got[2] != 0x60) {
+        fail("host write-through bytes");
+    }
+
+    /* Phase 2: grow host file and rescan EOF. */
+    {
+        uint8_t bigger[20];
+        uint8_t dirblk[512];
+        uint32_t eof = 0;
+        memset(bigger, 0x55, sizeof(bigger));
+        write_file(path, bigger, sizeof(bigger));
+        if (hostfs_rescan(vol) != 0) {
+            fail("rescan after grow");
+        }
+        if (hostfs_read_block(vol, 2, dirblk) != 0) {
+            fail("read dir after rescan");
+        }
+        for (i = 1; i < 13; ++i) {
+            uint8_t *e = dirblk + 4 + i * 39;
+            uint8_t nl = e[0] & 0x0Fu;
+            char nm[16];
+            if (e[0] == 0) {
+                continue;
+            }
+            memcpy(nm, e + 1, nl);
+            nm[nl] = '\0';
+            if (strcmp(nm, "HELLO") == 0) {
+                eof = (uint32_t)e[0x15] | ((uint32_t)e[0x16] << 8) |
+                      ((uint32_t)e[0x17] << 16);
+                break;
+            }
+        }
+        if (eof != 20u) {
+            fprintf(stderr, "eof=%u\n", eof);
+            fail("rescan EOF");
+        }
+    }
+
+    /* Phase 2 add: new NAPS file appears. */
+    snprintf(path, sizeof(path), "%s/NEW#040000", dir);
+    write_file(path, "hi", 2);
+    if (hostfs_rescan(vol) != 0) {
+        fail("rescan add");
+    }
+    {
+        int found = 0;
+        uint8_t dirblk[512];
+        if (hostfs_read_block(vol, 2, dirblk) != 0) {
+            fail("dir after add");
+        }
+        for (i = 1; i < 13; ++i) {
+            uint8_t *e = dirblk + 4 + i * 39;
+            uint8_t nl = e[0] & 0x0Fu;
+            char nm[16];
+            if (e[0] == 0) {
+                continue;
+            }
+            memcpy(nm, e + 1, nl);
+            nm[nl] = '\0';
+            if (strcmp(nm, "NEW") == 0) {
+                found = 1;
+            }
+        }
+        if (!found) {
+            fail("NEW not in catalog after rescan");
+        }
+    }
+
+    hostfs_eject(vol);
+    remove("test_hostfs_rw_dir/HELLO#060800");
+    remove("test_hostfs_rw_dir/NEW#040000");
+    rmdir(dir);
+}
+
+static void test_create_reconcile(void)
+{
+    const char *dir = "test_hostfs_create_dir";
+    hostfs_volume *vol;
+    uint8_t dirblk[512];
+    uint8_t data[512];
+    uint16_t new_key;
+    char path[512];
+    struct stat st;
+    int i;
+
+    HOSTFS_MKDIR(dir);
+    /* Seed with one file so mount builds a writable volume with spare dir slots. */
+    snprintf(path, sizeof(path), "%s/SEED#060000", dir);
+    write_file(path, "x", 1);
+
+    vol = hostfs_mount(dir, "HOSTFS.S5D0");
+    if (vol == NULL) {
+        fail("mount create dir");
+    }
+
+    /* Allocate an orphan data block via write, then publish a dir entry for it. */
+    new_key = 100;
+    memset(data, 0xCC, sizeof(data));
+    if (hostfs_write_block(vol, new_key, data) != 0) {
+        fail("orphan data write");
+    }
+
+    if (hostfs_read_block(vol, 2, dirblk) != 0) {
+        fail("read dir for create");
+    }
+    /* Find a free entry slot (skip volume header). */
+    for (i = 1; i < 13; ++i) {
+        uint8_t *e = dirblk + 4 + i * 39;
+        if (e[0] != 0) {
+            continue;
+        }
+        memset(e, 0, 39);
+        e[0] = (uint8_t)((1u << 4) | 4u); /* seedling, name len 4 */
+        memcpy(e + 1, "TEST", 4);
+        e[0x10] = 0x06;
+        e[0x11] = (uint8_t)(new_key & 0xFFu);
+        e[0x12] = (uint8_t)((new_key >> 8) & 0xFFu);
+        e[0x13] = 1;
+        e[0x15] = 3; /* eof 3 */
+        e[0x1E] = 0xC3;
+        e[0x1F] = 0x00;
+        e[0x20] = 0x08; /* aux $0800 */
+        e[0x25] = 2; /* header pointer */
+        break;
+    }
+    if (hostfs_write_block(vol, 2, dirblk) != 0) {
+        fail("dir write create");
+    }
+
+    snprintf(path, sizeof(path), "%s/TEST#060800", dir);
+    if (stat(path, &st) != 0) {
+        fail("CREATE did not make NAPS host file");
+    }
+
+    hostfs_eject(vol);
+    remove("test_hostfs_create_dir/SEED#060000");
+    remove("test_hostfs_create_dir/GAME#060800");
+    rmdir(dir);
+}
+
 int main(void)
 {
     test_naps_and_mangle();
     test_volume_map();
     test_smartport_hostfs_and_mixed();
+    test_write_through_and_rescan();
+    test_create_reconcile();
     printf("hostfs tests ok\n");
     return 0;
 }

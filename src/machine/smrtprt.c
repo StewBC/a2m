@@ -184,7 +184,10 @@ int sp_flush_all(apple2_t *m) {
         for(device = 0; device < 2; ++device) {
             UTIL_FILE *f;
             if(m->sp_device[slot].backend[device] == SP_BACKEND_HOSTFS) {
-                continue; /* Phase 1 read-only */
+                if(hostfs_flush(m->sp_device[slot].hostfs[device]) != A2_OK) {
+                    return A2_ERR;
+                }
+                continue;
             }
             f = &m->sp_device[slot].sp_files[device];
             if(f->is_file_open && fflush(f->fp) != 0) {
@@ -275,10 +278,12 @@ void sp_write(apple2_t *m, int slot) {
     }
 
     if(spd->backend[device] == SP_BACKEND_HOSTFS) {
-        /* Phase 1: read-only HostFS. */
-        (void)block;
-        (void)data;
-        spd->sp_buffer[0] = SP_WRITE_PROTECT;
+        if(spd->hostfs[device] == NULL ||
+           hostfs_write_block(spd->hostfs[device], block, data) != A2_OK) {
+            spd->sp_buffer[0] = SP_IO_ERROR;
+            return;
+        }
+        spd->sp_buffer[0] = SP_SUCCESS;
         return;
     }
 
@@ -420,8 +425,7 @@ static uint8_t sp_do_status(apple2_t *m, int slot, uint8_t unit, uint16_t list,
 
         if (spd->backend[device] == SP_BACKEND_HOSTFS) {
             blocks = hostfs_total_blocks(spd->hostfs[device]);
-            /* Block device, read, online, write-protected (no write/format). */
-            gen = 0xB4u;
+            gen = 0xF0u; /* block, write, read, online (no format) */
         } else {
             UTIL_FILE *f = &spd->sp_files[device];
             blocks = (uint32_t)(f->file_size / SP_BLOCK_SIZE);
