@@ -4,9 +4,11 @@
 
 #include "a2_status.h"
 #include "apple2.h"
+#include "hostfs.h"
 #include "periph_lib.h"
 #include "smrtprt.h"
 
+#include <stdio.h>
 #include <string.h>
 
 /* SmartPort protocol command numbers (standard, non-extended). */
@@ -23,7 +25,62 @@ enum {
     SP_ENTRY_C9AA = 0xC9AAu
 };
 
+bool sp_unit_mounted(const SP_DEVICE *spd, int device)
+{
+    if (spd == NULL || device < 0 || device > 1) {
+        return false;
+    }
+    if (spd->backend[device] == SP_BACKEND_HOSTFS) {
+        return spd->hostfs[device] != NULL;
+    }
+    return spd->sp_files[device].is_file_open != 0;
+}
+
+const char *sp_unit_path(const SP_DEVICE *spd, int device)
+{
+    if (spd == NULL || device < 0 || device > 1) {
+        return NULL;
+    }
+    if (spd->backend[device] == SP_BACKEND_HOSTFS && spd->hostfs[device] != NULL) {
+        return hostfs_root_path(spd->hostfs[device]);
+    }
+    if (spd->sp_files[device].is_used) {
+        return spd->sp_files[device].file_path;
+    }
+    return NULL;
+}
+
+const char *sp_unit_display_name(const SP_DEVICE *spd, int device)
+{
+    const char *path;
+    const char *slash;
+
+    if (spd == NULL || device < 0 || device > 1) {
+        return NULL;
+    }
+    if (spd->backend[device] == SP_BACKEND_IMAGE &&
+        spd->sp_files[device].file_display_name != NULL) {
+        return spd->sp_files[device].file_display_name;
+    }
+    path = sp_unit_path(spd, device);
+    if (path == NULL || path[0] == '\0') {
+        return NULL;
+    }
+    slash = strrchr(path, '/');
+#ifdef _WIN32
+    {
+        const char *b = strrchr(path, '\\');
+        if (b != NULL && (slash == NULL || b > slash)) {
+            slash = b;
+        }
+    }
+#endif
+    return slash != NULL ? slash + 1 : path;
+}
+
 int sp_mount(apple2_t *m, int slot, int device, const char *file_name) {
+    char vol_name[16];
+
     if(m == NULL || slot < 1 || slot > 7 || device < 0 || device > 1 ||
             file_name == NULL || file_name[0] == '\0') {
         return A2_ERR;
@@ -33,21 +90,49 @@ int sp_mount(apple2_t *m, int slot, int device, const char *file_name) {
         return A2_ERR;
     }
 
-    UTIL_FILE *f = &spd->sp_files[device];
-    if(f->is_used) {
+    if(sp_unit_mounted(spd, device)) {
         if(sp_eject(m, slot, device) != A2_OK) {
             return A2_ERR;
         }
     }
+
+    if(hostfs_path_is_dir(file_name)) {
+        hostfs_volume *vol;
+
+        snprintf(vol_name, sizeof(vol_name), "HOSTFS.S%uD%u",
+            (unsigned)slot, (unsigned)device);
+        vol = hostfs_mount(file_name, vol_name);
+        if(vol == NULL) {
+            return A2_ERR;
+        }
+        spd->backend[device] = SP_BACKEND_HOSTFS;
+        spd->hostfs[device] = vol;
+        spd->file_header_size[device] = 0;
+
+        spd->sp_buffer[1] = (uint8_t)(device << 7);
+        spd->sp_buffer[2] = spd->sp_buffer[3] = 0;
+        sp_read(m, slot);
+        if(spd->sp_buffer[0] != SP_SUCCESS) {
+            hostfs_eject(vol);
+            spd->hostfs[device] = NULL;
+            spd->backend[device] = SP_BACKEND_NONE;
+            return A2_ERR;
+        }
+        return A2_OK;
+    }
+
+    UTIL_FILE *f = &spd->sp_files[device];
     if(A2_OK != util_file_open(f, file_name, "rb+")) {
         return A2_ERR;
     }
+    spd->backend[device] = SP_BACKEND_IMAGE;
     // Force a block 0 read on the correct device
-    spd->sp_buffer[1] = device << 7;
+    spd->sp_buffer[1] = (uint8_t)(device << 7);
     spd->sp_buffer[2] = spd->sp_buffer[3] = 0;
     sp_read(m, slot);
     if(spd->sp_buffer[0] != SP_SUCCESS) {
         util_file_discard(f);
+        spd->backend[device] = SP_BACKEND_NONE;
         return A2_ERR;
     }
 
@@ -63,16 +148,26 @@ int sp_mount(apple2_t *m, int slot, int device, const char *file_name) {
 
 int sp_eject(apple2_t *m, int slot, int device) {
     UTIL_FILE *f;
+    SP_DEVICE *spd;
     if(m == NULL || slot < 1 || slot > 7 || device < 0 || device > 1 ||
             m->slot_type[slot] != SLOT_TYPE_SMARTPORT) {
         return A2_ERR;
     }
-    f = &m->sp_device[slot].sp_files[device];
+    spd = &m->sp_device[slot];
+    if(spd->backend[device] == SP_BACKEND_HOSTFS) {
+        hostfs_eject(spd->hostfs[device]);
+        spd->hostfs[device] = NULL;
+        spd->backend[device] = SP_BACKEND_NONE;
+        spd->file_header_size[device] = 0;
+        return A2_OK;
+    }
+    f = &spd->sp_files[device];
     if(f->is_file_open && fflush(f->fp) != 0) {
         return A2_ERR;
     }
     util_file_discard(f);
-    m->sp_device[slot].file_header_size[device] = 0;
+    spd->file_header_size[device] = 0;
+    spd->backend[device] = SP_BACKEND_NONE;
     return A2_OK;
 }
 
@@ -87,7 +182,11 @@ int sp_flush_all(apple2_t *m) {
             continue;
         }
         for(device = 0; device < 2; ++device) {
-            UTIL_FILE *f = &m->sp_device[slot].sp_files[device];
+            UTIL_FILE *f;
+            if(m->sp_device[slot].backend[device] == SP_BACKEND_HOSTFS) {
+                continue; /* Phase 1 read-only */
+            }
+            f = &m->sp_device[slot].sp_files[device];
             if(f->is_file_open && fflush(f->fp) != 0) {
                 return A2_ERR;
             }
@@ -100,30 +199,59 @@ void sp_read(apple2_t *m, int slot) {
     SP_DEVICE *spd = &m->sp_device[slot];
     int device = spd->sp_buffer[1] >> 7;
     uint16_t block = *(uint16_t *) & spd->sp_buffer[2];
-    UTIL_FILE *f = &spd->sp_files[device];
 
-    if(!f->is_file_open || block > f->file_size / SP_BLOCK_SIZE) {
-        spd->sp_buffer[0] = SP_IO_ERROR;
-        return;
-    }
-    if(fseek(f->fp, spd->file_header_size[device] + (block * SP_BLOCK_SIZE), SEEK_SET) != 0) {
+    if(device < 0 || device > 1) {
         spd->sp_buffer[0] = SP_IO_ERROR;
         return;
     }
 
-    size_t bread = fread(&(spd->sp_buffer[1]), 1, SP_BLOCK_SIZE, spd->sp_files[device].fp);
-    if(SP_BLOCK_SIZE != bread) {
-        spd->sp_buffer[0] = SP_IO_ERROR;
+    if(spd->backend[device] == SP_BACKEND_HOSTFS) {
+        hostfs_volume *vol = spd->hostfs[device];
+        if(vol == NULL ||
+           hostfs_read_block(vol, block, &spd->sp_buffer[1]) != A2_OK) {
+            spd->sp_buffer[0] = SP_IO_ERROR;
+            return;
+        }
+        spd->sp_buffer[0] = SP_SUCCESS;
         return;
     }
-    spd->sp_buffer[0] = SP_SUCCESS;
+
+    {
+        UTIL_FILE *f = &spd->sp_files[device];
+
+        if(!f->is_file_open || block > f->file_size / SP_BLOCK_SIZE) {
+            spd->sp_buffer[0] = SP_IO_ERROR;
+            return;
+        }
+        if(fseek(f->fp, spd->file_header_size[device] + (block * SP_BLOCK_SIZE), SEEK_SET) != 0) {
+            spd->sp_buffer[0] = SP_IO_ERROR;
+            return;
+        }
+
+        size_t bread = fread(&(spd->sp_buffer[1]), 1, SP_BLOCK_SIZE, spd->sp_files[device].fp);
+        if(SP_BLOCK_SIZE != bread) {
+            spd->sp_buffer[0] = SP_IO_ERROR;
+            return;
+        }
+        spd->sp_buffer[0] = SP_SUCCESS;
+    }
 }
 
 void sp_status(apple2_t *m, int slot) {
     int device = m->sp_device[slot].sp_buffer[1] >> 7;
     SP_DEVICE *spd = &m->sp_device[slot];
-    UTIL_FILE *f = &spd->sp_files[device];
-    uint16_t blocks = f->file_size / SP_BLOCK_SIZE;
+    uint16_t blocks;
+
+    if(device < 0 || device > 1 || !sp_unit_mounted(spd, device)) {
+        spd->sp_buffer[0] = SP_IO_ERROR;
+        return;
+    }
+
+    if(spd->backend[device] == SP_BACKEND_HOSTFS) {
+        blocks = hostfs_total_blocks(spd->hostfs[device]);
+    } else {
+        blocks = (uint16_t)(spd->sp_files[device].file_size / SP_BLOCK_SIZE);
+    }
 
     if(!blocks) {
         spd->sp_buffer[0] = SP_IO_ERROR;
@@ -131,36 +259,52 @@ void sp_status(apple2_t *m, int slot) {
     }
 
     spd->sp_buffer[0] = SP_SUCCESS;
-    spd->sp_buffer[1] = blocks % 0x100;
-    spd->sp_buffer[2] = blocks / 0x100;
+    spd->sp_buffer[1] = (uint8_t)(blocks % 0x100);
+    spd->sp_buffer[2] = (uint8_t)(blocks / 0x100);
 }
 
 void sp_write(apple2_t *m, int slot) {
     int device = m->sp_device[slot].sp_buffer[1] >> 7;
     SP_DEVICE *spd = &m->sp_device[slot];
     uint16_t block = *(uint16_t *) & spd->sp_buffer[2];
-    UTIL_FILE *f = &spd->sp_files[device];
     const uint8_t *data = (uint8_t *) & m->sp_device[slot].sp_buffer[4];
 
-    if(!(f->is_file_open && block < spd->sp_files[device].file_size / SP_BLOCK_SIZE &&
-            fseek(spd->sp_files[device].fp, spd->file_header_size[device] + (block * SP_BLOCK_SIZE), SEEK_SET) == 0)) {
+    if(device < 0 || device > 1) {
         spd->sp_buffer[0] = SP_IO_ERROR;
         return;
     }
 
-    if(SP_BLOCK_SIZE != fwrite(data, 1, SP_BLOCK_SIZE, spd->sp_files[device].fp)) {
-        spd->sp_buffer[0] = SP_IO_ERROR;
+    if(spd->backend[device] == SP_BACKEND_HOSTFS) {
+        /* Phase 1: read-only HostFS. */
+        (void)block;
+        (void)data;
+        spd->sp_buffer[0] = SP_WRITE_PROTECT;
         return;
     }
-    spd->sp_buffer[0] = SP_SUCCESS;
+
+    {
+        UTIL_FILE *f = &spd->sp_files[device];
+
+        if(!(f->is_file_open && block < spd->sp_files[device].file_size / SP_BLOCK_SIZE &&
+                fseek(spd->sp_files[device].fp, spd->file_header_size[device] + (block * SP_BLOCK_SIZE), SEEK_SET) == 0)) {
+            spd->sp_buffer[0] = SP_IO_ERROR;
+            return;
+        }
+
+        if(SP_BLOCK_SIZE != fwrite(data, 1, SP_BLOCK_SIZE, spd->sp_files[device].fp)) {
+            spd->sp_buffer[0] = SP_IO_ERROR;
+            return;
+        }
+        spd->sp_buffer[0] = SP_SUCCESS;
+    }
 }
 
 void sp_shutdown(apple2_t *m) {
     (void)sp_flush_all(m);
     for(int slot = 1; slot <= 7; slot++) {
         if(m->slot_type[slot] == SLOT_TYPE_SMARTPORT) {
-            util_file_discard(&m->sp_device[slot].sp_files[0]);
-            util_file_discard(&m->sp_device[slot].sp_files[1]);
+            (void)sp_eject(m, slot, 0);
+            (void)sp_eject(m, slot, 1);
         }
     }
 }
@@ -198,10 +342,10 @@ static int sp_slot_for_trap(const apple2_t *m)
     if (slot >= 1 && slot <= 7 && m->slot_type[slot] == SLOT_TYPE_SMARTPORT) {
         return slot;
     }
-    /* Fallback: first SmartPort with a mounted image (rare unlatched call). */
+    /* Fallback: first SmartPort with mounted media (rare unlatched call). */
     for (slot = 1; slot <= 7; slot++) {
         if (m->slot_type[slot] == SLOT_TYPE_SMARTPORT &&
-            m->sp_device[slot].sp_files[0].is_file_open) {
+            sp_unit_mounted(&m->sp_device[slot], 0)) {
             return slot;
         }
     }
@@ -248,10 +392,10 @@ static uint8_t sp_do_status(apple2_t *m, int slot, uint8_t unit, uint16_t list,
 
     if (unit == 0u) {
         uint8_t n = 0;
-        if (spd->sp_files[0].is_file_open) {
+        if (sp_unit_mounted(spd, 0)) {
             n++;
         }
-        if (spd->sp_files[1].is_file_open) {
+        if (sp_unit_mounted(spd, 1)) {
             n++;
         }
         sp_cpu_write(m, list, n);
@@ -266,14 +410,23 @@ static uint8_t sp_do_status(apple2_t *m, int slot, uint8_t unit, uint16_t list,
     }
 
     device = sp_unit_to_device(unit);
-    if (device < 0 || device > 1 || !spd->sp_files[device].is_file_open) {
+    if (device < 0 || device > 1 || !sp_unit_mounted(spd, device)) {
         return SP_IO_ERROR;
     }
 
     {
-        UTIL_FILE *f = &spd->sp_files[device];
-        uint32_t blocks = (uint32_t)(f->file_size / SP_BLOCK_SIZE);
-        uint8_t gen = 0xF8u; /* block, write, read, online, format */
+        uint32_t blocks;
+        uint8_t gen;
+
+        if (spd->backend[device] == SP_BACKEND_HOSTFS) {
+            blocks = hostfs_total_blocks(spd->hostfs[device]);
+            /* Block device, read, online, write-protected (no write/format). */
+            gen = 0xB4u;
+        } else {
+            UTIL_FILE *f = &spd->sp_files[device];
+            blocks = (uint32_t)(f->file_size / SP_BLOCK_SIZE);
+            gen = 0xF8u; /* block, write, read, online, format */
+        }
 
         sp_cpu_write(m, list, gen);
         sp_cpu_write(m, (uint16_t)(list + 1u), (uint8_t)(blocks & 0xFFu));

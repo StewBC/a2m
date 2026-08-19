@@ -30,7 +30,7 @@ Siblings (not submodules): `../a2m` (Apple domain / paint reference),
 Open the component note only when the task touches that area:
 [`video.md`](video.md) · [`video-paint.md`](video-paint.md) ·
 [`machine.md`](machine.md) · [`frontend.md`](frontend.md) · [`runtime.md`](runtime.md) ·
-[`disk.md`](disk.md) · [`breakpoints.md`](breakpoints.md) ·
+[`disk.md`](disk.md) · [`hostfs.md`](hostfs.md) · [`breakpoints.md`](breakpoints.md) ·
 [`snapshots.md`](snapshots.md) ·
 [`remote-debug.md`](remote-debug.md) · [`control-tools.md`](control-tools.md) ·
 [`turbo-zip.md`](turbo-zip.md).
@@ -53,6 +53,7 @@ Open the component note only when the task touches that area:
 | `frontend.md` | Host keys + frontend files |
 | `runtime.md` | Runtime client / turbo / frames |
 | `disk.md` | Disk II + SmartPort mount surface |
+| `hostfs.md` | Phase 1 done: SmartPort directory volume (HostFS, read-only NAPS) |
 
 ## Manual (users, not agents)
 

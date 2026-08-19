@@ -200,6 +200,16 @@ target_compile_features(test_peripherals PRIVATE c_std_99)
 target_link_libraries(test_peripherals PRIVATE machine)
 add_test(NAME peripherals COMMAND test_peripherals)
 
+add_executable(test_hostfs
+    tests/machine/test_hostfs.c
+)
+target_compile_features(test_hostfs PRIVATE c_std_99)
+target_compile_definitions(test_hostfs PRIVATE
+    A2M_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
+)
+target_link_libraries(test_hostfs PRIVATE machine)
+add_test(NAME hostfs COMMAND test_hostfs)
+
 add_executable(test_cxxx_map
     tests/machine/test_cxxx_map.c
 )

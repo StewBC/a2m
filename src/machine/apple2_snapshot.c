@@ -3,6 +3,7 @@
 #include "a2_status.h"
 #include "diskii.h"
 #include "image.h"
+#include "smrtprt.h"
 #include "softswitch.h"
 
 #include <stdio.h>
@@ -332,8 +333,8 @@ static uint32_t snapshot_flags_for_machine(const apple2_t *m)
             }
         }
         if (m->slot_type[slot] == SLOT_TYPE_SMARTPORT) {
-            if (m->sp_device[slot].sp_files[0].is_used ||
-                m->sp_device[slot].sp_files[1].is_used) {
+            if (sp_unit_mounted(&m->sp_device[slot], 0) ||
+                sp_unit_mounted(&m->sp_device[slot], 1)) {
                 flags |= A2_SNAPSHOT_FLAG_EXTERNAL_MEDIA_REFERENCES;
             }
         }
@@ -562,8 +563,10 @@ static void write_sprt(snapshot_writer *w, const apple2_t *m)
         w_u64(w, (uint64_t)m->sp_device[slot].sp_write_offset);
         w_bytes(w, m->sp_device[slot].sp_buffer, sizeof(m->sp_device[slot].sp_buffer));
         for (dev = 0; dev < 2; ++dev) {
-            const UTIL_FILE *f = &m->sp_device[slot].sp_files[dev];
-            const char *path = (f->is_used && f->file_path != NULL) ? f->file_path : "";
+            const char *path = sp_unit_path(&m->sp_device[slot], dev);
+            if (path == NULL) {
+                path = "";
+            }
             w_path(w, path);
             w_u64(w, (uint64_t)m->sp_device[slot].file_header_size[dev]);
         }

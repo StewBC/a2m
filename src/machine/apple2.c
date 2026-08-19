@@ -427,8 +427,8 @@ void apple2_detach_slot_card(apple2_t *m, int slot)
         return;
     }
     if (m->slot_type[slot] == SLOT_TYPE_SMARTPORT) {
-        util_file_discard(&m->sp_device[slot].sp_files[0]);
-        util_file_discard(&m->sp_device[slot].sp_files[1]);
+        (void)sp_eject(m, slot, 0);
+        (void)sp_eject(m, slot, 1);
     }
     if (m->slot_type[slot] == SLOT_TYPE_MOCKINGBOARD && m->mb_slot == (uint8_t)slot) {
         m->mb_slot = 0;

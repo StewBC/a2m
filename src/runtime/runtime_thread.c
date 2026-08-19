@@ -1406,13 +1406,17 @@ static void runtime_publish_machine(runtime *rt)
                         drive->active_image->file.file_display_name);
                 }
             } else if (out->card_type == RUNTIME_SLOT_CARD_SMARTPORT) {
-                UTIL_FILE *file = &rt->machine.sp_device[slot].sp_files[device];
-                media->mounted = file->is_file_open ? 1u : 0u;
-                media->writable = file->is_file_open ? 1u : 0u;
-                media->queue_count = file->is_file_open ? 1u : 0u;
-                if (file->file_display_name != NULL) {
+                SP_DEVICE *spd = &rt->machine.sp_device[slot];
+                const char *display;
+                media->mounted = sp_unit_mounted(spd, device) ? 1u : 0u;
+                media->writable =
+                    (spd->backend[device] == SP_BACKEND_IMAGE && sp_unit_mounted(spd, device))
+                        ? 1u : 0u;
+                media->queue_count = media->mounted;
+                display = sp_unit_display_name(spd, device);
+                if (display != NULL) {
                     snprintf(media->display_name, sizeof(media->display_name), "%s",
-                        file->file_display_name);
+                        display);
                 }
             }
         }
@@ -3931,7 +3935,7 @@ int runtime_thread_main(void *userdata)
         int slot = rt->config.smartport_boot_slot;
         if (rt->machine.slot_type[slot] != SLOT_TYPE_SMARTPORT) {
             runtime_publish_error(rt, "configured SmartPort boot slot has no SmartPort card");
-        } else if (!rt->machine.sp_device[slot].sp_files[0].is_file_open) {
+        } else if (!sp_unit_mounted(&rt->machine.sp_device[slot], 0)) {
             runtime_publish_error(rt, "configured SmartPort boot slot has no mounted unit 0");
         } else {
             rt->machine.cpu.cpu.pc = (uint16_t)(0xC000u + ((uint16_t)slot << 8));

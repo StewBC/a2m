@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "hostfs.h"
 #include "util_file.h"
 
 #include <stdbool.h>
@@ -12,6 +13,12 @@
 
 struct apple2;
 
+typedef enum {
+    SP_BACKEND_NONE = 0,
+    SP_BACKEND_IMAGE = 1,
+    SP_BACKEND_HOSTFS = 2
+} sp_backend_kind;
+
 typedef struct {
     uint8_t sp_status;
     size_t sp_read_offset;
@@ -19,6 +26,8 @@ typedef struct {
     uint8_t sp_buffer[512 + 4];
     UTIL_FILE sp_files[2];
     size_t file_header_size[2];
+    sp_backend_kind backend[2];
+    hostfs_volume *hostfs[2];
 } SP_DEVICE;
 
 #define SP_BLOCK_SIZE       512
@@ -37,6 +46,11 @@ void sp_status(struct apple2 *m, int slot);
 void sp_read(struct apple2 *m, int slot);
 void sp_write(struct apple2 *m, int slot);
 void sp_shutdown(struct apple2 *m);
+
+/* True if the unit has image or HostFS media attached. */
+bool sp_unit_mounted(const SP_DEVICE *spd, int device);
+const char *sp_unit_path(const SP_DEVICE *spd, int device);
+const char *sp_unit_display_name(const SP_DEVICE *spd, int device);
 
 /*
  * Pure SmartPort entry host trap (no $C800 card firmware in tree).

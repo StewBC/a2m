@@ -8,7 +8,7 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-Expect **49** green. Run from repo root.
+Expect **51** green. Run from repo root.
 
 ## Registered tests (product gate)
 
@@ -26,6 +26,7 @@ Expect **49** green. Run from repo root.
 | `video_block_paint` | full-frame block paint (text/hgr/lores/dlores) |
 | `diskii` | NIB mount + boot free-run |
 | `peripherals` | Mockingboard + SmartPort unit |
+| `hostfs` | HostFS NAPS parse, ProDOS map, mixed HostFS+image mount |
 | `cxxx_map` | CXXX / SETC3ROM / INTCXROM / MB hide / C800 latch |
 | `memview` | VIEW_FLAGS memory windows |
 | `apple2_snapshot` | Machine `.a2state` serialize round-trip |
@@ -62,6 +63,7 @@ Expect **49** green. Run from repo root.
 ## Fixtures
 
 - `tests/fixtures/Apple DOS 3.3 January 1983.nib` — `diskii` + manual boot
+- `tests/fixtures/hostfs/` — NAPS-tagged files + `PRODOS#FF0000` for HostFS (`hostfs` ctest + manual `--smart s7d0=...`)
 
 ## Perf smoke
 

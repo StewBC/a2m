@@ -8,7 +8,7 @@ developing or exploring Apple II software.
 - Built-in debugger: stepping, symbols, breakpoints, watchpoints, soft-switch overrides
 - Built-in two-pass 6502 / 65C02 assembler
 - Disk II: NIB and DSK read/write; WOZ read
-- SmartPort / ProDOS block read/write
+- SmartPort / ProDOS block devices (image files, or a host folder as a ~32 MB volume)
 - Mockingboard
 - SDL joystick / gameport
 - Machine snapshots (`.a2state`)

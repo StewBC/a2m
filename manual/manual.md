@@ -1,9 +1,9 @@
 # a2m - An Apple II emulator written by Stefan Wessels with AI assistance, 2024-2026
 
 a2m is an Apple ][+ and Apple //e Enhanced emulator. It runs on Windows, Linux, and
-macOS. It boots Disk II floppy images and SmartPort block devices, can save and
-restore full machine snapshots (`.a2state`), and includes a debugger and assembler
-for Apple II development.
+macOS. It boots Disk II floppy images and SmartPort block devices (including a host
+folder as a ProDOS volume), can save and restore full machine snapshots
+(`.a2state`), and includes a debugger and assembler for Apple II development.
 
 System ROMs are embedded. No separate ROM files are required.
 
@@ -26,7 +26,7 @@ Useful flags:
 | `--defaults` / `-f` | Start from built-in defaults |
 | `--model enh\|plus` / `-m` | `enh` is Apple //e Enhanced (default); `plus` is Apple ][+ |
 | `--disk <spec>` / `-d` | Mount a Disk II image; `path` or `s6d0=path` (repeatable) |
-| `--hd <spec>` / `--smart` | Mount a SmartPort image; `path` or `s7d0=path` (repeatable) |
+| `--hd <spec>` / `--smart` | Mount SmartPort media; image file or host folder; `path` or `s7d0=path` (repeatable) |
 | `--mb-slot N` | Mockingboard slot `1..7`; `0` disables (default slot 4) |
 | `--turbo <list>` / `-t` | Turbo ladder, e.g. `1,max` or `1,4,8,max` |
 | `--sna <file>` | Load a machine snapshot (`.a2state`) at startup |
@@ -73,6 +73,44 @@ An INI-only `[SmartPort] boot_slot = N` setting forces startup through SmartPort
 in slot `N`. This is useful for booting an Apple ][+ or a SmartPort installed outside
 slot 7. The setting is ignored unless that slot contains a SmartPort card with unit 0
 successfully mounted.
+
+### HostFS (folder as a ProDOS volume)
+
+If the SmartPort mount path is a **directory**, a2m treats it as **HostFS**: a
+read-only ProDOS volume built from files in that folder. No `.po` / `.hdv` image is
+required for that unit. Image-backed and HostFS units can share the same card
+(for example `s7d0=./host` and `s7d1=disk.po`).
+
+Prepare the folder yourself. Only **NAPS**-tagged names are mounted:
+
+```text
+NAME#ttxxxx
+```
+
+`tt` is the ProDOS file type (two hex digits) and `xxxx` is the aux type (four hex
+digits). The ProDOS name is the stem, uppercased and limited to 15 legal characters
+(`A–Z`, `0–9`, `.`). Non-NAPS names and subdirectories are skipped.
+
+A bootable volume needs at least a ProDOS system file:
+
+```text
+PRODOS#FF0000
+```
+
+Optional later: `BASIC.SYSTEM#FF2000`. Phase-1 success is ProDOS starting from the
+folder; a full BASIC prompt is not required.
+
+```sh
+./a2m --noini --smart s7d0=./hostfs/d0
+```
+
+The emulated volume is advertised as about 32 MB (`65535` blocks). Its ProDOS volume
+name is `HOSTFS.SNdM` (slot and unit), so `/PREFIX` stays unique when more than one
+HostFS unit is mounted. Guest writes are rejected as write-protected (`$2B`).
+
+HostFS is selected by path kind only (directory vs file). Mount it from the command
+line or `[SmartPort]` in the INI. The Machine **[Insert]** browser still selects
+image files; folder insert from the UI is not provided yet.
 
 ### Machine Snapshots
 
@@ -1434,8 +1472,11 @@ Each key is `sNdX` where `N` is the slot and `X` is the unit (`0` or `1`).
 
 | Key | Value |
 |-----|-------|
-| `s7d0`, `s5d0`, ... | Path to a block-device image |
+| `s7d0`, `s5d0`, ... | Path to a block-device image **or** a HostFS directory |
 | `boot_slot` | Force startup through SmartPort unit 0 in this slot |
+
+A directory path mounts HostFS (read-only NAPS folder volume). A file path mounts
+the usual image backend. See **HostFS (folder as a ProDOS volume)**.
 
 Legacy `[disk] hd=` is still accepted as Slot 7 Device 0.
 
@@ -1952,7 +1993,8 @@ an ordered multi-image queue; only one image is mounted at a time.
 
 A SmartPort card exposes two block units. ProDOS `$C0s4` / `$C0s5` and the `$C800`
 trap handle the common read/write/status commands. `boot_slot` starts execution at
-`$CN00` after unit 0 of that slot has mounted.
+`$CN00` after unit 0 of that slot has mounted. Each unit is either an image file or
+a HostFS directory (read-only ProDOS map over NAPS-tagged host files).
 
 ### Mockingboard
 

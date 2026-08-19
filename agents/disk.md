@@ -62,6 +62,13 @@ card or missing-media selections publish a runtime error and keep normal startup
 Slot configuration UI and broader write fidelity remain open.
 SP trap: min cmds only (STATUS/READ/WRITE); no full DIB / extended SP.
 
+**HostFS** (mount a host folder as a read-only ProDOS SmartPort volume):
+Phase 1 done — directory path → NAPS flat volume; see [`hostfs.md`](hostfs.md).
+
+```bash
+./build/a2m --noini --smart s7d0=./tests/fixtures/hostfs
+```
+
 ## Tests
 
 `diskii` (incl. multi-image swap), `app_options_mounts` (queue append),  

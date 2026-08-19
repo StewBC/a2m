@@ -5,6 +5,7 @@ add_library(machine STATIC
     cpu65.c
     diskii.c
     diskii_rom.c
+    hostfs.c
     image.c
     mboard.c
     rom_data.c
