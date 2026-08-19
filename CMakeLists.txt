@@ -11,6 +11,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 if(MSVC)
     add_compile_options($<$<COMPILE_LANGUAGE:C>:/experimental:c11atomics>)
+    add_compile_definitions(SDL_MAIN_HANDLED)
     add_link_options(/STACK:8388608)
 endif()
 

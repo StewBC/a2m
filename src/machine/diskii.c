@@ -8,7 +8,11 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(_WIN32)
+#define strcasecmp _stricmp
+#else
 #include <strings.h>
+#endif
 #include <time.h>
 
 

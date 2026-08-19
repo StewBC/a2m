@@ -33,9 +33,11 @@
 #include <direct.h>
 #include <io.h>
 #include <windows.h>
+#define A2M_STAT_ISREG(mode) (((mode) & _S_IFREG) != 0)
 #else
 #include <dirent.h>
 #include <unistd.h>
+#define A2M_STAT_ISREG(mode) S_ISREG(mode)
 #endif
 
 /* ---- Apple gameport host (2 sticks × analog X/Y + buttons) -------------- */
@@ -925,7 +927,7 @@ static bool find_newest_state_file(
             if (!join_path_local(candidate, sizeof(candidate), folder, entry->d_name)) {
                 continue;
             }
-            if (stat(candidate, &st) != 0 || !S_ISREG(st.st_mode)) {
+            if (stat(candidate, &st) != 0 || !A2M_STAT_ISREG(st.st_mode)) {
                 continue;
             }
             if (!found || st.st_mtime > newest_mtime ||

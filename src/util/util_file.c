@@ -5,6 +5,12 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#if defined(_WIN32)
+#define A2M_STAT_ISREG(mode) (((mode) & _S_IFREG) != 0)
+#else
+#define A2M_STAT_ISREG(mode) S_ISREG(mode)
+#endif
+
 void util_file_close(UTIL_FILE *f)
 {
     if (f && f->is_used && f->is_file_open && f->fp) {
@@ -68,7 +74,7 @@ int util_file_open(UTIL_FILE *f, const char *file_name, const char *file_mode)
     f->file_display_name = slash ? slash + 1 : f->file_path;
     f->is_used = 1;
 
-    if (stat(file_name, &st) == 0 && S_ISREG(st.st_mode)) {
+    if (stat(file_name, &st) == 0 && A2M_STAT_ISREG(st.st_mode)) {
         f->file_size = (int64_t)st.st_size;
     } else if (file_mode[0] != 'w') {
         util_file_discard(f);

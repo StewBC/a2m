@@ -4,13 +4,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 #include <sys/stat.h>
 #if defined(_WIN32)
 #include <direct.h>
 #include <windows.h>
+#define strcasecmp _stricmp
 #else
 #include <dirent.h>
+#include <strings.h>
 #include <unistd.h>
 #endif
 
