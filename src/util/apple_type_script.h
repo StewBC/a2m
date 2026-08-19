@@ -2,7 +2,8 @@
 
 /* Apple TYPE / script language for breakpoint Type actions (not clipboard).
  *
- * Plain text → $C000 keys (newlines → Return). Escapes use \[…]:
+ * Plain text → $C000 keys (newlines → Return). `\r` / `\n` are Return;
+ * `\t` is a space. Other escapes use \[…]:
  *   \[OA] \[OA+] \[OA-]   Open-Apple pulse / hold / release
  *   \[CA] \[CA+] \[CA-]   Closed-Apple
  *   \[B0] \[B0+] \[B0-]   BUTN0; same for B1

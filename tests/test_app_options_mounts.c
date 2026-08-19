@@ -1,9 +1,12 @@
 #include "app_options.h"
 #include "config.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 static void expect_true(const char *name, int v)
 {
@@ -245,6 +248,120 @@ int main(void)
             &options, 2, 1, "/tmp/live.po"));
         app_options_smartport_clear_path(&options, 2, 1);
         app_options_destroy(&options);
+    }
+
+    /* INI [DiskII] comma-separated (and quoted) lists build a multi-image queue.
+       Relative paths resolve against the INI file's directory, not cwd.
+       apply_convenience_paths must not collapse that queue to the first path. */
+    {
+        const char *dir = "/tmp/a2m-test-ini-rel";
+        const char *media_dir = "/tmp/media";
+        const char *path = "/tmp/a2m-test-ini-rel/game.ini";
+        FILE *file;
+        expect_true("mkdir INI-relative dir", mkdir(dir, 0755) == 0 || errno == EEXIST);
+        expect_true("mkdir media dir", mkdir(media_dir, 0755) == 0 || errno == EEXIST);
+        file = fopen("/tmp/media/side A.nib", "wb");
+        expect_true("touch side A", file != NULL && fclose(file) == 0);
+        file = fopen("/tmp/media/side B.nib", "wb");
+        expect_true("touch side B", file != NULL && fclose(file) == 0);
+        file = fopen(path, "w");
+        expect_true("create DiskII queue INI", file != NULL);
+        fputs(
+            "[DiskII]\n"
+            "s6d0 = \"../media/side A.nib\",\"../media/side B.nib\"\n"
+            "s6d1 = /tmp/util.dsk\n",
+            file);
+        expect_true("close DiskII queue INI", fclose(file) == 0);
+
+        app_options_init(&options);
+        expect_true("load DiskII queue INI", app_options_apply_ini_file(&options, path));
+        expect_true("queue INI three mounts", options.diskii_count == 3);
+        expect_true("queue INI d0 count",
+            app_options_diskii_queue(&options, 6, 0)->count == 2);
+        expect_true("queue INI d0[0] resolved vs INI",
+            options.diskii[0].path != NULL &&
+                strstr(options.diskii[0].path, "/media/side A.nib") != NULL &&
+                strstr(options.diskii[0].path, "../media/") == NULL);
+        expect_true("queue INI d0[1] resolved vs INI",
+            options.diskii[1].path != NULL &&
+                strstr(options.diskii[1].path, "/media/side B.nib") != NULL);
+        expect_true("queue INI d1 stays absolute",
+            options.diskii[2].path != NULL &&
+                strstr(options.diskii[2].path, "/tmp/util.dsk") != NULL);
+
+        app_options_sync_convenience_paths(&options);
+        expect_true(
+            "convenience joined",
+            options.disk_s6d0 != NULL &&
+                strstr(options.disk_s6d0, "side A.nib") != NULL &&
+                strstr(options.disk_s6d0, "side B.nib") != NULL);
+        expect_true("apply convenience keeps queue",
+            app_options_apply_convenience_paths(&options));
+        expect_true("queue still two after convenience",
+            app_options_diskii_queue(&options, 6, 0)->count == 2);
+
+        set_ini_path(&options, path);
+        expect_true("save DiskII queue INI", app_options_save_shutdown(&options));
+        app_options_destroy(&options);
+
+        app_options_init(&options);
+        expect_true("reload saved DiskII queue INI",
+            app_options_apply_ini_file(&options, path));
+        expect_true("reload queue count 2",
+            app_options_diskii_queue(&options, 6, 0)->count == 2);
+        expect_true("reload still has A",
+            options.diskii[0].path != NULL &&
+                strstr(options.diskii[0].path, "side A.nib") != NULL);
+        expect_true("reload still has B",
+            options.diskii[1].path != NULL &&
+                strstr(options.diskii[1].path, "side B.nib") != NULL);
+        app_options_destroy(&options);
+        expect_true("remove DiskII queue INI", remove(path) == 0);
+        (void)remove("/tmp/media/side A.nib");
+        (void)remove("/tmp/media/side B.nib");
+        (void)rmdir(media_dir);
+        (void)rmdir(dir);
+    }
+
+    /* samples/golf.ini: ../disks/... is relative to the INI, not the process cwd. */
+    {
+        const char *golf_paths[] = {
+            "../samples/golf.ini",
+            "samples/golf.ini",
+            NULL,
+        };
+        const char *golf = NULL;
+        int g;
+        for (g = 0; golf_paths[g] != NULL; ++g) {
+            FILE *probe = fopen(golf_paths[g], "r");
+            if (probe != NULL) {
+                fclose(probe);
+                golf = golf_paths[g];
+                break;
+            }
+        }
+        if (golf != NULL) {
+            app_options_init(&options);
+            expect_true("load samples/golf.ini", app_options_apply_ini_file(&options, golf));
+            expect_true("golf two Disk II mounts", options.diskii_count == 2);
+            expect_true("golf side A resolved",
+                options.diskii[0].path != NULL &&
+                    strstr(options.diskii[0].path,
+                           "World Class Leader Board (1987)(Access)(Side A).do") != NULL &&
+                    strstr(options.diskii[0].path, "../disks/") == NULL);
+            expect_true("golf side B resolved",
+                options.diskii[1].path != NULL &&
+                    strstr(options.diskii[1].path,
+                           "World Class Leader Board (1987)(Access)(Side B).do") != NULL);
+            {
+                FILE *media = fopen(options.diskii[0].path, "rb");
+                expect_true("golf side A exists after resolve", media != NULL);
+                if (media != NULL) {
+                    expect_true("close golf side A", fclose(media) == 0);
+                }
+            }
+            app_options_destroy(&options);
+        }
     }
 
     printf("OK app_options_mounts\n");

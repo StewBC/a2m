@@ -131,7 +131,7 @@ int main(void)
     /* Seed INI with one exec break at $E000 (map). */
     write_ini(
         ini_path,
-        "[DEBUG]\n"
+        "[Debug]\n"
         "break.E000=execute,map,break\n"
         "break.C000-C001=write,main,c100rom,lc1,break,swap-slot=5,swap=+1\n");
 

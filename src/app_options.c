@@ -296,6 +296,18 @@ static bool add_diskii_mount(app_options *options, int slot, int drive, const ch
     return true;
 }
 
+static bool add_diskii_mounts_from_list(
+    app_options *options,
+    int slot,
+    int drive,
+    const char *spec);
+static bool format_diskii_mount_list(
+    const app_options *options,
+    int slot,
+    int drive,
+    char *out,
+    size_t out_size);
+
 static bool add_smartport_mount(app_options *options, int slot, int unit, const char *path)
 {
     int i;
@@ -478,20 +490,6 @@ static bool add_smartport_spec(app_options *options, const char *spec)
     return add_smartport_mount(options, slot, unit, path);
 }
 
-static const char *find_diskii_path(const app_options *options, int slot, int drive)
-{
-    int i;
-    if (options == NULL) {
-        return NULL;
-    }
-    for (i = 0; i < options->diskii_count; i++) {
-        if (options->diskii[i].slot == slot && options->diskii[i].drive == drive) {
-            return options->diskii[i].path;
-        }
-    }
-    return NULL;
-}
-
 static const char *find_smartport_path(const app_options *options, int slot, int unit)
 {
     int i;
@@ -508,14 +506,17 @@ static const char *find_smartport_path(const app_options *options, int slot, int
 
 void app_options_sync_convenience_paths(app_options *options)
 {
+    char list[8192];
     const char *p;
     if (options == NULL) {
         return;
     }
-    p = find_diskii_path(options, 6, 0);
-    (void)replace_string(&options->disk_s6d0, p != NULL ? p : "");
-    p = find_diskii_path(options, 6, 1);
-    (void)replace_string(&options->disk_s6d1, p != NULL ? p : "");
+    if (format_diskii_mount_list(options, 6, 0, list, sizeof(list))) {
+        (void)replace_string(&options->disk_s6d0, list);
+    }
+    if (format_diskii_mount_list(options, 6, 1, list, sizeof(list))) {
+        (void)replace_string(&options->disk_s6d1, list);
+    }
     p = find_smartport_path(options, 7, 0);
     (void)replace_string(&options->hd_s7d0, p != NULL ? p : "");
     p = find_smartport_path(options, 5, 0);
@@ -527,16 +528,17 @@ bool app_options_apply_convenience_paths(app_options *options)
     if (options == NULL) {
         return false;
     }
-    /* Convenience buffers replace the whole queue for that drive (single image). */
+    /* Convenience buffers replace the whole queue for that drive. Values may
+       be a single path or a comma-separated multi-image list. */
     if (options->disk_s6d0 != NULL && options->disk_s6d0[0] != '\0') {
         remove_diskii_mounts_for(options, 6, 0);
-        if (!add_diskii_mount(options, 6, 0, options->disk_s6d0)) {
+        if (!add_diskii_mounts_from_list(options, 6, 0, options->disk_s6d0)) {
             return false;
         }
     }
     if (options->disk_s6d1 != NULL && options->disk_s6d1[0] != '\0') {
         remove_diskii_mounts_for(options, 6, 1);
-        if (!add_diskii_mount(options, 6, 1, options->disk_s6d1)) {
+        if (!add_diskii_mounts_from_list(options, 6, 1, options->disk_s6d1)) {
             return false;
         }
     }
@@ -1178,6 +1180,69 @@ static bool disk_slot_format_writable_list(
 }
 
 /*
+ * Consume the next comma-separated path from *cursor into out.
+ * Quoted tokens ("..." or '...') may contain commas; surrounding quotes
+ * are stripped. Returns false at end of string. Empty tokens are skipped
+ * by the caller when out is empty.
+ */
+static bool disk_slot_next_path(const char **cursor, char *out, size_t out_size)
+{
+    const char *s;
+    size_t n = 0;
+
+    if (cursor == NULL || *cursor == NULL || out == NULL || out_size == 0) {
+        return false;
+    }
+    s = *cursor;
+    while (isspace((unsigned char)*s)) {
+        s++;
+    }
+    if (*s == '\0') {
+        *cursor = s;
+        out[0] = '\0';
+        return false;
+    }
+
+    if (*s == '"' || *s == '\'') {
+        char quote = *s++;
+        while (*s != '\0' && *s != quote) {
+            if (n + 1u >= out_size) {
+                out[0] = '\0';
+                return false;
+            }
+            out[n++] = *s++;
+        }
+        if (*s == quote) {
+            s++;
+        }
+        while (isspace((unsigned char)*s)) {
+            s++;
+        }
+        if (*s == ',') {
+            s++;
+        }
+    } else {
+        while (*s != '\0' && *s != ',') {
+            if (n + 1u >= out_size) {
+                out[0] = '\0';
+                return false;
+            }
+            out[n++] = *s++;
+        }
+        while (n > 0u && isspace((unsigned char)out[n - 1u])) {
+            n--;
+        }
+        if (*s == ',') {
+            s++;
+        }
+    }
+
+    out[n] = '\0';
+    *cursor = s;
+    return true;
+}
+
+/*
  * Parse a comma-separated list of paths into slot (replacing any prior
  * contents).  When resolve_options is non-NULL each path is resolved
  * relative to the INI directory; otherwise paths are kept as-is.
@@ -1190,41 +1255,19 @@ static bool disk_slot_parse_list(
     const char *cursor = spec;
 
     disk_slot_free(slot);
+    if (spec == NULL) {
+        return true;
+    }
 
     while (*cursor != '\0') {
-        const char *start;
-        const char *end;
         char path[PATH_MAX];
-        size_t len;
 
-        while (*cursor == ' ') {
-            cursor++;
-        }
-        if (*cursor == '\0') {
+        if (!disk_slot_next_path(&cursor, path, sizeof(path))) {
             break;
         }
-
-        start = cursor;
-        while (*cursor != '\0' && *cursor != ',') {
-            cursor++;
-        }
-        end = cursor;
-        while (end > start && end[-1] == ' ') {
-            end--;
-        }
-
-        len = (size_t)(end - start);
-        if (len == 0) {
-            if (*cursor == ',') {
-                cursor++;
-            }
+        if (path[0] == '\0') {
             continue;
         }
-        if (len >= sizeof(path)) {
-            return false;
-        }
-        memcpy(path, start, len);
-        path[len] = '\0';
 
         if (resolve_options != NULL) {
             char abs_path[PATH_MAX];
@@ -1232,22 +1275,85 @@ static bool disk_slot_parse_list(
                 if (!disk_slot_append(slot, abs_path)) {
                     return false;
                 }
-            } else {
-                if (!disk_slot_append(slot, path)) {
-                    return false;
-                }
-            }
-        } else {
-            if (!disk_slot_append(slot, path)) {
+            } else if (!disk_slot_append(slot, path)) {
                 return false;
             }
-        }
-
-        if (*cursor == ',') {
-            cursor++;
+        } else if (!disk_slot_append(slot, path)) {
+            return false;
         }
     }
 
+    return true;
+}
+
+/* Append each comma-separated path in spec as a Disk II mount. */
+static bool add_diskii_mounts_from_list(
+    app_options *options,
+    int slot,
+    int drive,
+    const char *spec)
+{
+    app_disk_slot parsed;
+    int i;
+    bool ok = true;
+
+    memset(&parsed, 0, sizeof(parsed));
+    /* INI (and convenience) media paths are relative to the INI directory. */
+    if (!disk_slot_parse_list(&parsed, options, spec)) {
+        disk_slot_free(&parsed);
+        return false;
+    }
+    for (i = 0; i < parsed.count; ++i) {
+        if (!add_diskii_mount(options, slot, drive, parsed.paths[i])) {
+            ok = false;
+            break;
+        }
+    }
+    disk_slot_free(&parsed);
+    return ok;
+}
+
+/* Join diskii[] paths for slot+drive; rewrite each as INI-relative when possible. */
+static bool format_diskii_mount_list(
+    const app_options *options,
+    int slot,
+    int drive,
+    char *out,
+    size_t out_size)
+{
+    size_t used = 0;
+    int i;
+
+    if (out == NULL || out_size == 0) {
+        return false;
+    }
+    out[0] = '\0';
+    if (options == NULL) {
+        return true;
+    }
+    for (i = 0; i < options->diskii_count; ++i) {
+        const char *path;
+        char rel[PATH_MAX];
+        int written;
+
+        if (options->diskii[i].slot != slot || options->diskii[i].drive != drive) {
+            continue;
+        }
+        path = options->diskii[i].path;
+        if (path == NULL || path[0] == '\0') {
+            continue;
+        }
+        if (!app_options_path_relative_to_ini(options, path, rel, sizeof(rel))) {
+            if (!copy_path(rel, sizeof(rel), path)) {
+                return false;
+            }
+        }
+        written = snprintf(out + used, out_size - used, "%s%s", used > 0 ? "," : "", rel);
+        if (written < 0 || (size_t)written >= out_size - used) {
+            return false;
+        }
+        used += (size_t)written;
+    }
     return true;
 }
 
@@ -1550,21 +1656,27 @@ static void config_write_rom_config(config *cfg, const app_options *options)
 
     config_remove_prefix(cfg, "DiskII", "");
     config_remove_prefix(cfg, "SmartPort", "");
-    for (i = 0; i < options->diskii_count; i++) {
-        if (options->diskii[i].path == NULL || options->diskii[i].path[0] == '\0') {
-            continue;
+    for (i = 1; i <= 7; ++i) {
+        for (device = 0; device < 2; ++device) {
+            char list[8192];
+
+            if (!format_diskii_mount_list(options, i, device, list, sizeof(list)) ||
+                list[0] == '\0') {
+                continue;
+            }
+            snprintf(key, sizeof(key), "s%dd%d", i, device);
+            config_set(cfg, "DiskII", key, list);
         }
-        snprintf(
-            key,
-            sizeof(key),
-            "s%dd%d",
-            options->diskii[i].slot,
-            options->diskii[i].drive);
-        config_set(cfg, "DiskII", key, options->diskii[i].path);
     }
     for (i = 0; i < options->smartport_count; i++) {
+        char rel[PATH_MAX];
+        const char *path;
         if (options->smartport[i].path == NULL || options->smartport[i].path[0] == '\0') {
             continue;
+        }
+        path = options->smartport[i].path;
+        if (app_options_path_relative_to_ini(options, path, rel, sizeof(rel))) {
+            path = rel;
         }
         snprintf(
             key,
@@ -1572,7 +1684,7 @@ static void config_write_rom_config(config *cfg, const app_options *options)
             "s%dd%d",
             options->smartport[i].slot,
             options->smartport[i].unit);
-        config_set(cfg, "SmartPort", key, options->smartport[i].path);
+        config_set(cfg, "SmartPort", key, path);
     }
     if (options->smartport_boot_slot >= 1 && options->smartport_boot_slot <= 7) {
         config_set_int(cfg, "SmartPort", "boot_slot", options->smartport_boot_slot);
@@ -1708,14 +1820,19 @@ static void apply_config(app_options *options, config *cfg)
     options->history_off_on_max = config_get_bool(
         cfg, "config", "history_off_on_max", options->history_off_on_max);
 
-    /* Legacy single-path keys. */
+    /* Legacy single-path keys (also accept a comma-separated queue). */
     value = config_get(cfg, "disk", "path");
     if (value != NULL && value[0] != '\0') {
-        (void)add_diskii_mount(options, 6, 0, value);
+        (void)add_diskii_mounts_from_list(options, 6, 0, value);
     }
     value = config_get(cfg, "disk", "hd");
     if (value != NULL && value[0] != '\0') {
-        (void)add_smartport_mount(options, 7, 0, value);
+        char abs_path[PATH_MAX];
+        if (path_absolute_from_ini(options, value, abs_path, sizeof(abs_path))) {
+            (void)add_smartport_mount(options, 7, 0, abs_path);
+        } else {
+            (void)add_smartport_mount(options, 7, 0, value);
+        }
     }
 
     /* a2m-style [DiskII] s6d0=path / [SmartPort] s7d0=path */
@@ -1736,12 +1853,17 @@ static void apply_config(app_options *options, config *cfg)
         if (section_is(section, "diskii") || section_is(section, "DiskII")) {
             (void)app_options_set_slot_card(options, slot, APP_SLOT_CARD_DISKII);
             if (val != NULL && val[0] != '\0' && val[0] != ';') {
-                (void)add_diskii_mount(options, slot, unit, val);
+                (void)add_diskii_mounts_from_list(options, slot, unit, val);
             }
         } else if (section_is(section, "smartport") || section_is(section, "SmartPort")) {
             (void)app_options_set_slot_card(options, slot, APP_SLOT_CARD_SMARTPORT);
             if (val != NULL && val[0] != '\0' && val[0] != ';') {
-                (void)add_smartport_mount(options, slot, unit, val);
+                char abs_path[PATH_MAX];
+                if (path_absolute_from_ini(options, val, abs_path, sizeof(abs_path))) {
+                    (void)add_smartport_mount(options, slot, unit, abs_path);
+                } else {
+                    (void)add_smartport_mount(options, slot, unit, val);
+                }
             }
         }
     }
@@ -2195,6 +2317,12 @@ bool app_options_apply_ini_file(app_options *options, const char *path)
 
     cfg = config_load(path);
     if (cfg == NULL) {
+        return false;
+    }
+
+    /* Media paths in this file are relative to it, not to a previous ini_path. */
+    if (!replace_string(&options->ini_path, path)) {
+        config_destroy(cfg);
         return false;
     }
 

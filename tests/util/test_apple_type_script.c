@@ -86,6 +86,15 @@ int main(void)
     expect_true("mixed has run", n >= 6u);
 
     n = 0;
+    expect_true(
+        "escaped cr",
+        apple_type_script_parse("1\\rO", ev, APPLE_TYPE_EVENTS_MAX, &n, &err));
+    expect_true("escaped cr count", n == 3u);
+    expect_true("escaped cr 1", ev[0].kind == APPLE_TYPE_EV_CHAR && ev[0].value == (uint8_t)'1');
+    expect_true("escaped cr ret", ev[1].kind == APPLE_TYPE_EV_CHAR && ev[1].value == 0x0du);
+    expect_true("escaped cr O", ev[2].kind == APPLE_TYPE_EV_CHAR && ev[2].value == (uint8_t)'O');
+
+    n = 0;
     err.offset = -1;
     expect_true(
         "bad token fails",

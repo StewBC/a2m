@@ -501,7 +501,7 @@ bool runtime_load_breakpoints_from_ini(runtime *rt) {
             continue;
         }
 
-        if (strcmp(section, "DEBUG") != 0 || strncmp(key, "break.", 6) != 0) {
+        if (!runtime_ini_streq(section, "DEBUG") || strncmp(key, "break.", 6) != 0) {
             continue;
         }
 
@@ -698,7 +698,32 @@ bool runtime_save_breakpoints_to_ini(runtime *rt) {
         return false;
     }
 
-    config_remove_prefix(cfg, "DEBUG", "break.");
+    /* Load accepts any case of [DEBUG]. Wipe break.* from every matching
+       section so a leftover [Debug] file cannot accumulate duplicates. */
+    for (;;) {
+        int n = config_entry_count(cfg);
+        char section_copy[64];
+        int found = 0;
+        int j;
+
+        for (j = 0; j < n; ++j) {
+            const char *section = NULL;
+            const char *key = NULL;
+            const char *value = NULL;
+            if (!config_entry_at(cfg, j, &section, &key, &value)) {
+                continue;
+            }
+            if (runtime_ini_streq(section, "DEBUG") && strncmp(key, "break.", 6) == 0) {
+                snprintf(section_copy, sizeof(section_copy), "%s", section);
+                found = 1;
+                break;
+            }
+        }
+        if (!found) {
+            break;
+        }
+        config_remove_prefix(cfg, section_copy, "break.");
+    }
     for (i = 0; i < rt->breakpoint_count; ++i) {
         char key[RUNTIME_BREAKPOINT_KEY_MAX];
         char value[RUNTIME_BREAKPOINT_VALUE_MAX];

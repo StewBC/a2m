@@ -401,6 +401,29 @@ bool apple_type_script_parse(
                 i++;
                 continue;
             }
+            if (text[i] == 'r' || text[i] == 'R' ||
+                text[i] == 'n' || text[i] == 'N') {
+                apple_type_event ev;
+                memset(&ev, 0, sizeof(ev));
+                ev.kind = (uint8_t)APPLE_TYPE_EV_CHAR;
+                ev.value = 0x0du;
+                if (!emit(out, out_max, &n, ev, esc, error)) {
+                    return false;
+                }
+                i++;
+                continue;
+            }
+            if (text[i] == 't' || text[i] == 'T') {
+                apple_type_event ev;
+                memset(&ev, 0, sizeof(ev));
+                ev.kind = (uint8_t)APPLE_TYPE_EV_CHAR;
+                ev.value = (uint8_t)' ';
+                if (!emit(out, out_max, &n, ev, esc, error)) {
+                    return false;
+                }
+                i++;
+                continue;
+            }
             if (text[i] != '[') {
                 /* Literal backslash + char */
                 apple_type_event ev;
