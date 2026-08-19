@@ -1,1 +1,0 @@
-The runtime folder holds the implementation for a library that sits between the hardware library and the UI library.  It can work with different UI implementations linking those with the hardware.

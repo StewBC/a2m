@@ -1,26 +1,32 @@
-# Stefan Wessels, November 2025
-# Builds an Apple 2 emulator runtime (hardware <-runtime-> ui)
-# This is free and unencumbered software released into the public domain.
-
-cmake_minimum_required(VERSION 3.16)
+# Apple-backed runtime. History + frame ring are product remote-debug paths.
 
 add_library(runtime STATIC
-    breakprs.c
-    rt_bp.c
-    rt.c
-    rt_sym.c
-    rt_trace.c
+    runtime_client.c
+    runtime_breakpoint_condition.c
+    runtime_breakpoint_ini.c
+    runtime_command.c
+    runtime_event.c
+    runtime_frame_ring.c
+    runtime_history.c
+    runtime_history_wire.c
+    runtime_assembler.c
+    runtime.c
+    runtime_thread.c
 )
 
 target_include_directories(runtime PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../debug
 )
 
 target_compile_features(runtime PUBLIC c_std_99)
 
-target_precompile_headers(runtime PUBLIC "rt_lib.h")
-
-target_link_libraries(runtime PUBLIC
-    hardware
+# machine already PUBLIC-links util; listing util here again puts it twice on
+# consumer link lines (Apple ld: "ignoring duplicate libraries").
+target_link_libraries(runtime
+    PUBLIC
+        machine
+        symbols
+    PRIVATE
+        SDL2::SDL2
+        assembler
 )

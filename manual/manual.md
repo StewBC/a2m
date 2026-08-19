@@ -1,746 +1,1030 @@
-# Introduction
-a2m began as a small experiment after I discovered the Harte 6502 CPU tests. I wanted to see if I could write a cycle-accurate 6502 CPU emulator, just for fun. Once that worked, it became obvious that it wouldn't take much more code to wrap a minimal Apple 2 environment around it and run the Manic Miner clone I had written. That led to MMM (The Manic Miner Machine - https://github.com/StewBC/mminer-apple2/tree/master/src/mmm). Things escalated from there, and a2m V1.0 was done by the end of 2024. About a year later I started work on V2.0. Apparently, the emulation hook never really let go of me.
+# a2m - An Apple II emulator written by Stefan Wessels with AI assistance, 2024-2026
 
-a2m is released under the Unlicense, meaning it is free and unencumbered software placed in the public domain.
+a2m is an Apple ][+ and Apple //e Enhanced emulator. It runs on Windows, Linux, and
+macOS. It boots Disk II floppy images and SmartPort block devices, can save and
+restore full machine snapshots (`.a2state`), and includes a debugger and assembler
+for Apple II development.
 
-# Overview
-a2m V2.0 emulates either an NTSC Apple ][+ or an Apple //e Enhanced. It runs on Windows, Linux, and macOS, with binaries available on the project's GitHub page (https://github.com/StewBC/a2m).
+System ROMs are embedded. No separate ROM files are required.
 
-Some of the key features include:
+## Overview
 
-* Fast, cycle-accurate CPU emulation (around 140-170 MHz at approx. 60 FPS on an M2 Mac Mini)
-* 60 FPS video display (not cycle-accurate)
-* Built-in debugger with stepping modes, symbols, breakpoints, soft-switch overrides, and more
-* Built-in macro assembler (assembles 12,000+ lines across 32 Manic Miner source files in tens of milliseconds)
-* Disk II NIB and DSK read/write support. WOZ read support.
-* SmartPort block read/write
-* SDL joystick support
-* Partial Franklin 80-column card emulation for the Apple ][+ model
+### Running a2m
 
-a2m is designed for people who enjoy developing or exploring Apple 2 software.
+Launch a2m from the command line or as a GUI application. Use `--help` or `-h` for the
+full command-line reference.
 
-\Needspace{11\baselineskip}
-## Quick Key Reference
-In both Normal and Debug Mode, these keys have the listed meanings:
+Useful flags:
 
-| Key           | Action                  | Key               | Action                              |
-|:--------------|:------------------------|:------------------|:------------------------------------|
-| F1            | Show Help               | F2                | Toggle Debug Mode View              |
-| F3            | Toggle Turbo Mode       | F4                |                                     |
-| F5            | Run                     | F6                | Run to cursor                       |
-| F7            |                         | F8                |                                     |
-| F9            | Toggle Breakpoint       | F10               | Step                                |
-| F11           | Break                   | F12               | Monitor Select                      |
-| CTRL+F2       | CTRL+Reset              | ALT+F2            | CTRL+OpenApple+Reset                |
-| CTRL+SHIFT+F4 | Configure Assembler     | CTRL+F4           | Run Assembler                       |
-| CTRL+F5       | Insert from clipboard   | SHIFT+F11         | Step Out                            |
-|               |                         | SHIFT+F12         | Toggle Franklin Ace Diplay on `][+` |
-| CTRL+Pause    | CTRL+Reset              | CTRL+SHIFT+Pause  | CTRL+OpenApple+Reset                |
+| Flag | Effect |
+|------|--------|
+| `--inifile <file>` / `-i` | Load a specific INI file at startup |
+| `--noini` / `-n` | Skip INI file loading entirely |
+| `--nosaveini` | Disable INI save on quit, regardless of other flags |
+| `--saveini` / `-v` | Save INI on quit (one-time override) |
+| `--remember` / `-r` | Force save-on-quit into the INI file |
+| `--defaults` / `-f` | Start from built-in defaults |
+| `--model enh\|plus` / `-m` | `enh` is Apple //e Enhanced (default); `plus` is Apple ][+ |
+| `--disk <spec>` / `-d` | Mount a Disk II image; `path` or `s6d0=path` (repeatable) |
+| `--hd <spec>` / `--smart` | Mount a SmartPort image; `path` or `s7d0=path` (repeatable) |
+| `--mb-slot N` | Mockingboard slot `1..7`; `0` disables (default slot 4) |
+| `--turbo <list>` / `-t` | Turbo ladder, e.g. `1,max` or `1,4,8,max` |
+| `--sna <file>` | Load a machine snapshot (`.a2state`) at startup |
+| `--kbdjoy <0\|1\|2>` | Keyboard joystick on gameport stick `1` or `2` (`0` disables) |
+| `--kbdjoy-layout <numpad\|wasd>` | Keyboard joystick layout |
+| `--break <addr>` / `-b` | Install an execute breakpoint at a hex address |
+| `--symbols <file>` | Load a simple symbol file (`NAME` hex per line) |
+| `--headless` | No window; short smoke exit unless `--control-port` is set |
+| `--control-port N` | Listen on localhost TCP for A2M/6 remote control (`0`=off) |
+| `--audio-smoke` | Emit a 440 Hz test tone to verify audio output |
 
-Debug Mode (`F2`) also reveals the Miscellaneous view, and it is here where disks can be inserted, making the Apple 2 really useful.
+By default, a2m loads `a2m.ini` from the current directory. The INI file stores
+configuration, window size, debugger layout, media mounts, and breakpoints.
 
-# Running a2m
-a2m can be launched from the command line or as a GUI application without a console window.
+The Apple 2 attempts to boot from Slot 6 Drive 0 (Disk II) or Slot 7 Device 0
+(SmartPort). Those defaults can be changed in Configure or in the INI file.
 
-## Command Line
-Running a2m is as simple as executing the program with any desired switches.  
-Use `--help` (or `-h`) to view the full command-line reference.
+### Disk Images
 
-## INI Files
-a2m supports configuration through INI files. They are optional but handy for storing common setups (for example, per-game configurations).
+Disk II supports `.nib` and `.dsk` / `.do` / `.po` for reading and writing, and `.woz`
+for reading. A controller can occupy any slot 1-7; the usual slot is 6. Each
+controller has two drives (`d0` and `d1`).
 
-Use `--inifile <file>` (or `-i <file>`) to load a specific INI file at launch.  
-By default, a2m loads `a2m.ini` from the current directory.
+Repeat `--disk` on the same drive to build a multi-image queue:
 
-See **INI Files in Depth** for full details.
+```sh
+./a2m -d s6d0=sideA.nib -d s6d0=sideB.nib -d s6d1=util.dsk
+```
 
-# User Interface
-a2m is primarily a GUI-based Apple 2 emulator. It also supports a text-based mode, enabled with `--ui text` (or `-u text`). This mode exists mostly as a demonstration of the cleaner architecture introduced after v1.0.
+A bare path mounts Slot 6 Drive 0. The first image in a queue is mounted at startup.
+Swap from the Machine tab or from a breakpoint Swap action.
 
-The text mode emulator runs Apple 2 text-based software in 40 or 80 columns in a terminal window. On Windows it opens a new terminal window (I could not get curses input connected to the existing terminal if launched that way) but on a Unix-style OS it runs in the launch terminal.
+### Hard Disk Images
 
-Should the Apple 2 enable a graphics mode, the text-based emulator will simply draw a box and label it as LOWRES, HGR, DOUBLE LOWRES or DOUBLE HIRES. For mixed modes you will see the box in the upper portion of the screen and the normal text in the lower portion.
+SmartPort is a block device, usually a ProDOS volume. Typical images are `.po`,
+`.hdv`, or `.2mg`. A controller can occupy any slot 1-7; the usual slot is 7, and
+the Apple //e tries to boot device 0 in that slot.
 
-This mode works well when booting ProDOS with Bitsy Bye, for example.
+```sh
+./a2m --hd s7d0=prodos.po --hd s5d0=other.po
+```
 
-On a Unix-style OS, CTRL-C will quit the emulator, so there are meta-keys to press for CTRL and Open- and Close-Apple. Press F1 in the emulator to see a Key Quick Reference. Note that the debugger is not available in the text mode emulator. It is only for running text-based Apple 2 applications.
+An INI-only `[SmartPort] boot_slot = N` setting forces startup through SmartPort unit 0
+in slot `N`. This is useful for booting an Apple ][+ or a SmartPort installed outside
+slot 7. The setting is ignored unless that slot contains a SmartPort card with unit 0
+successfully mounted.
 
-The text mode emulator will not be discussed any further.
+### Machine Snapshots
 
-# Normal Mode
-When launched normally, a2m displays the Apple 2's video output in the full application window. It behaves like a ][+ or //e.  
-The Apple 2 will attempt to boot from:
+`--sna <file>` loads a machine snapshot (`.a2state`) at startup. Disks from `--disk`
+and `--hd` are mounted first; then the snapshot is restored after the runtime is
+running.
 
-* **Slot 6 Drive 0** (floppy), or
-* **Slot 7 Device 0** (hard-disk image)
+You can also restore or write snapshots while the emulator is running:
 
-These defaults can be overridden in an INI file.
+- UI: Misc -> Machine **[Load...]** and **[Save...]** (see **Machine**)
+- Drag and drop a `.a2state` file onto the window
+- Quickload / quicksave: **Shift+Opt+<** / **Shift+Opt+>**
+- Control port: `load-state <path>` and `save-state <path>` (see **Remote**)
 
-## Keyboard Usage
-Regular keys are sent directly to the emulated Apple 2. Function keys control the debugger, which is always running "behind the scenes" even when the Apple 2 display fills the window.
+Example:
 
-On the //e model:
+```sh
+./a2m --sna demos/midload.a2state
+./a2m --headless --control-port 6510 --sna demos/midload.a2state
+```
 
-* **Open-Apple** - joystick button A or Left-ALT
-* **Closed-Apple** - joystick button B or Right-ALT  
+### Drag and Drop
 
-To paste text into the Apple 2, use **SHIFT+INSERT**.  
-**PAUSE** acts as RESET. Some laptops require combinations such as **Fn+B** or **Fn+P**.
+Files can be dragged onto the a2m window while the emulator is running.
+The file extension determines how the file is handled:
 
-**F1** opens a help screen and pauses emulation.  
-All other function keys remain debugger controls even while in Normal Mode.
+| Extension | Action |
+|-----------|--------|
+| `.nib` `.dsk` `.do` `.po` `.woz` | Add the image to the Disk II queue on slot 6 drive 0 |
+| `.a2state` | Load a saved machine state snapshot |
+| `.hdv` `.2mg` | Remember the path as SmartPort `s7d0` for the next launch |
+| anything else | Ignored |
 
-## Resizing
-The window can be resized using standard OS controls.  
-The Apple 2 display is always drawn within the largest 4:3 region that fits inside the window's client area.
+Extension matching is case-insensitive.
 
-# Debug Mode
-Debug Mode is where a2m really shines. Every part of the emulated Apple 2 can be inspected, and many parts can be modified.
+### Audio
 
-Although Debug Mode is often described as a separate mode, it is always active. All function keys route to the debugger even when only the Apple 2 display is visible. Once the debugger views are shown, the full set of tools becomes available.
+The Apple speaker is a 1-bit click path mixed to both host channels. A Mockingboard
+(two AY-3-8910 chips) in any slot produces stereo: left chip on the left, right chip
+on the right, speaker centered. Windowed host audio is 48 kHz stereo through SDL.
 
-\Needspace{10\baselineskip}
-## Opening the Debugger
-Press **F2** to open the Debug Mode View. Press **F2** again to hide it. The following table represents the layout of the Debugger Views, when opened. 
+At turbo `max`, AY chip time still advances so music stays aligned when you return to
+1 MHz, but host PCM is not generated at free-run speed.
 
-| Position             | View                                                                      |
-|:---------------------|:--------------------------------------------------------------------------|
-|Upper left:           | Apple 2 display                                                           |
-|Upper right:          | CPU view                                                                  |
-|Right, below CPU:     | Disassembly view                                                          |
-|Lower left:           | Memory view (hex + text; any bank can be inspected)                       |
-|Lower right:          | Miscellaneous view (slot configuration, disks, soft-switches, breakpoints, etc.) |
+`--audio-smoke` emits a 440 Hz tone through the same path so you can confirm that
+samples reach the host device.
 
-## Basic UI Philosophy
-a2m uses the **Nuklear** immediate-mode GUI library. Nuklear uses a *hover-active* model: when the CPU is stopped, whichever view the mouse is over becomes active and receives input. Active views have a green header; inactive ones use grey.
+## Interface
 
-When the emulator is running, all keys except function keys and SHIFT+INSERT go to the Apple 2.
+### Display
 
-In the rest of this manual, "in Debug Mode" is omitted for brevity-assume Debug Mode unless noted.
+When launched, a2m shows the Apple 2 display filling the window. Regular keys are
+forwarded to the emulated Apple 2. The window can be resized; the display always
+scales to fit the available area. Whether it keeps a classic 4:3 monitor shape, or
+simply stretches to fill, is the **True Aspect Ratio** setting. See **Display and
+Scaling**.
 
-The debugger layout is resizable:
+The framebuffer is 560 x 192. 40-column text, LORES, and HGR are pixel-doubled
+horizontally; 80-column text and DHGR use the full width.
 
-* a **vertical slider** between the Apple 2 and the CPU/Disassembly views
-* a **horizontal slider** between the Apple 2 and the Memory/Misc views  
+Painted modes:
 
-Dragging these sliders resizes the layout.  
-A "hot spot" in the lower-right corner of the Apple 2 view moves both sliders together, scaling the layout proportionally.  
-If the Apple 2 view is letterboxed, clicking this hot spot snaps it back to a perfect 4:3 region.
+| Mode | What you see |
+|------|----------------|
+| 40-column text | Flash and inverse; white on black |
+| 80-column text | Main/aux interleave |
+| LORES | 16-colour cells |
+| Double LORES | 80 half-columns from aux then main; 16-colour cells |
+| HGR | Colour from neighbouring bits (green, violet, orange, blue, black, white) |
+| DHGR | 16-colour lookup from a 5-bit window |
+| Mixed | Graphics with four text lines at the bottom |
 
-## Apple 2 View
-As in Normal Mode, the Apple 2 display is always shown in a 4:3 region inside the largest area available.
+HGR and DHGR are shown in colour using a digital lookup of neighbouring bits (the usual
+Apple II green, violet, orange, blue, black, and white). This is not a composite NTSC
+simulation, so fringe colours, chroma bleed, and effects that depend on a real TV
+decoder will not match hardware.
 
-### Keyboard controls
-When the emulator is running, regular keys go to the Apple 2, while function keys and SHIFT+INSERT always go to the debugger.
+Double low-resolution graphics use the same 16-colour cells as LORES, but each
+scanner column is two 7-pixel half-cells (auxiliary RAM, then main). Mixed
+double LORES keeps 80-column text in the bottom four lines.
 
-See **Disassembly View - Keyboard controls** for details on function-key behaviour.
+Press **F9** to open or close Debug Mode. Press **Opt+H** to open or close the
+in-emulator help. On macOS, **Cmd+Q** quits; on Windows and Linux, **Opt+Q** quits.
+
+### Window Title
+
+The OS window title shows the model, active turbo mode, and runtime state,
+even when Debug Mode is closed and no other indicator is visible:
+
+| Title | Meaning |
+|-------|---------|
+| `a2m - //e Enhanced - 1 MHz - Running` | //e Enhanced at real-time speed, executing normally |
+| `a2m - ][+ - max - Paused (reason)` | ][+ in max free-run; execution has stopped. `reason` is one of `breakpoint`, `BRK`, `step`, `reset`, `pause`, or `run complete` |
+| `a2m - //e Enhanced - 8 MHz - Running` | Zip-class finite MHz, still live paint |
+| `a2m - //e Enhanced - 1 MHz - Error` | The runtime hit an error and stopped |
+
+This lets you tell whether the emulator is paused or running without opening the debugger.
+
+### Debug Mode
+
+In Debug Mode, the window is divided into four main areas:
+
+| Area | Contents |
+|------|----------|
+| Upper left | Apple 2 display (scaled to fit its region) |
+| Upper right | CPU register view |
+| Right, below | Disassembly view |
+| Lower left | Memory view |
+| Lower right | Misc panel (Machine, Debugger, Breakpoints, Hardware, Assembler tabs) |
+
+a2m tracks an active view for keyboard input. When no modal dialog is open, the active
+Apple 2 display, Disassembly, Misc, or Memory view has a neutral gray outline. Click a
+view to make it active, or press **Opt+Tab** to cycle Apple 2 -> Disassembly -> Misc ->
+Memory. Press **Shift+Opt+Tab** to cycle in reverse. Modal dialogs keep input to
+themselves, so these view-cycling keys do not work while a dialog is open.
+
+### Layout
+
+Two splitters divide the debug layout:
+
+- A **vertical splitter** between the Apple 2 display region and the CPU/Disassembly pane.
+- A **horizontal splitter** between the upper and lower halves.
+
+Drag the splitters to resize the panes. A **corner handle** at the bottom-right of the
+Apple 2 display region moves both splitters together; clicking it without dragging snaps
+the display region to the true aspect (see **Display and Scaling**). The window size and
+splitter positions are saved to the INI file on quit.
+
+### Turbo Mode
+
+**Opt+T** cycles through the configured turbo ladder (default `1,max`). The list is
+stored in the INI file.
+
+Turbo is a list of MHz targets for the whole emulated machine (CPU, video beam,
+peripherals, and Mockingboard stay in lock-step):
+
+| Entry | Title | Behaviour |
+|-------|-------|-----------|
+| `1` | `1 MHz` | Real-time Apple pace (about 1.02 MHz), live paint |
+| `4`, `8`, ... | `4 MHz`, `8 MHz`, ... | Zip-class finite MHz (best-effort), live paint |
+| `max` or `-1` | `max` | Free-run as fast as the host allows, still full live paint |
+
+The first entry is the startup speed. Paste does not change turbo. By default the CPU
+flight recorder is paused while turbo is `max` (Configure -> Machine, or
+`--history-off-on-max` / `--no-history-off-on-max`); recording resumes when you leave
+`max`.
+
+### Help
+
+Press **Opt+H** or **ESC** to open or close the in-emulator help overlay. The Apple 2
+pauses while the overlay is open and resumes when it is dismissed.
+
+The overlay shows one section of the manual at a time in a scrollable content area. A
+navigation bar along the bottom of the overlay contains:
+
+| Control | Action |
+|---------|--------|
+| **Prev** | Go to the previous section. Inert when already on the first section. |
+| *Section name* (centre) | Shows the current section. Click to open a pop-up index of all sections; click any entry to jump directly to it. |
+| **Next** | Go to the next section. Inert when already on the last section. |
+| **Search:** field | Type a search term and press **Enter**, **->**, or **<-** to search. Supports regular expressions. |
+| **<-** | Find the previous match, searching backward from the current match. |
+| **->** | Find the next match, searching forward from the current match. |
+
+Search is case-insensitive. When no match exists the search text turns red; it returns
+to normal as soon as the term is changed. Both directions wrap around the full document.
+Navigating to a new section via **Prev**, **Next**, or the index resets the search
+starting point to the top of that section.
+
+Matches are highlighted. The match you jumped to is drawn in black on a yellow band, and
+every other match in the section on screen is underlined in yellow. The highlight follows
+whatever is in the **Search:** field, so matches light up as you type and disappear when
+the field is cleared. The view scrolls so the current match sits about a third of the way
+down the content area. A match that falls across a line break is still found, but is not
+highlighted.
+
+Keyboard shortcuts active while the help overlay is open:
+
+| Key | Action |
+|-----|--------|
+| **Left / Right** | Previous / next section |
+| **PageUp / PageDown** | Scroll content up / down by one page |
+| **Home** | Scroll to top of the current section |
+| **End** | Scroll to bottom of the current section |
+| **ESC** | Close the help overlay |
 
 ## CPU View
-The CPU view shows the program counter (PC), stack pointer (SP), registers, and flags.  
-When the emulator is stopped, these can be edited by typing new values:
 
-* PC and SP: 16-bit hex
-* Registers: 8-bit hex
-* Flags: 0 (off) or 1 (on)
+The CPU view shows the current state of the 6502 (Apple ][+) or 65C02 (Apple //e
+Enhanced) as reported by the most recent runtime snapshot:
 
-Flags are:
+| Field | Width | Description |
+|-------|-------|-------------|
+| PC | 16-bit | Program counter |
+| SP | 8-bit | Stack pointer (page 1 offset) |
+| A | 8-bit | Accumulator |
+| X | 8-bit | X index register |
+| Y | 8-bit | Y index register |
+| N V - B D I Z C | 1-bit each | Processor status flags |
 
-* **N** – Negative
-* **V** – oVerflow
-* **E** – ignorEd
-* **B** – Break
-* **D** – Decimal mode
-* **I** – Interrupt
-* **Z** – Zero
-* **C** – Carry
+When the CPU is paused, all fields are editable:
+
+- PC: four hex digits.
+- SP, A, X, Y: two hex digits.
+- Flags: `0` (clear) or `1` (set).
+
+The `-` position in the flag row represents the unused bit; it is always 1 and cannot
+be modified.
 
 ## Disassembly View
-The disassembly view shows the code being executed by the CPU. When running or stepping, the current instruction (at the PC) is highlighted. Other highlighted lines include:
 
-* the cursor
-* any addresses with a **stop** breakpoint  
-  (breakpoints with non-stop actions do not appear highlighted)
+The Disassembly view shows the code at and around the program counter. While running,
+the current instruction (the PC line) scrolls into view. While paused, the cursor is
+independent of the PC.
 
-\Needspace{11\baselineskip}
+### Line Format
+
 Each line follows this general format:
 
-**`C27D: WAITKEY1      E6 4E       INC RNDL`**
+```
+C27D: WAITKEY1      E6 4E       INC RNDL
+```
 
-Broken down:
+| Column | Meaning |
+|--------|---------|
+| `C27D` | Hex address |
+| `WAITKEY1` | Symbol name at that address (when available) |
+| `E6 4E` | Raw bytes |
+| `INC RNDL` | Disassembled instruction with resolved symbols |
 
-| Element | Meaning                                                                                |
-|:--------|:---------------------------------------------------------------------------------------|
-|C27D     | The hexadecimal address in RAM                                                         |
-|WAITKEY1 | A label for that address (if present)                                                  |
-|E6 4E    | The raw bytes at the address at the start of the line                                  |
-|INC RNDL | The disassembled instruction (with symbols resolved when available)                    |
+Breakpoint addresses show an indicator in the left gutter.
 
-See **Symbols Dialog** for more information.
+### Effective Address and Value
 
-\Needspace{25\baselineskip}
-### Keyboard controls
-These keys apply **when emulation is stopped**:
+When the emulator is paused, lines whose target address is not already obvious
+from the operand gain a trailing annotation showing the resolved address and,
+for memory reads and writes, the byte currently at that address:
 
-| Key           | Action                                                                           |
-|:--------------|:---------------------------------------------------------------------------------|
-| C+a           | Edit the memory address of the cursor line                                       |
-| C+S+b         | Open the Assembler Configuration Dialog                                          |
-| C+b           | Assemble the configured source file                                              |
-| C+e           | Show the assembler errors dialog                                                 |
-| C+p           | Set the PC to the cursor address                                                 |
-| C+s           | Open the symbol lookup dialog                                                    |
-| ENTER         | Finish "edit memory address" mode                                                |
-| TAB           | Cycle through lookup, syms & labels; syms & labels; labels; or raw               |
-| HOME          | Move the cursor to the top of the view                                           |
-| C+HOME        | Jump to address `$0000`                                                          |
-| END           | Move the cursor to the last line of the view                                     |
-| C+END         | Jump to address `$FFFF`                                                          |
-| UP/DOWN       | Move the cursor, scrolling if needed                                             |
-| LEFT          | Scroll to show the cursor                                                        |
-| C+LEFT        | Set PC to cursor and scroll to it                                                |
-| RIGHT         | Scroll to show the PC                                                            |
-| C+RIGHT       | Set cursor to PC and scroll to it                                                |
-| PAGE UP       | Page up by one full view                                                         |
-| PAGE DOWN     | Page down by one full view                                                       |
+```
+C123:             B1 FB       LDA ($FB),Y   [$4050:25]
+```
 
-**C+ and S+ mean CONTROL+ and SHIFT+, respectively.**
+Here the pointer at `$FB/$FC` plus the current **Y** register resolves to
+`$4050`, which currently holds `$25`. The address is computed from the current
+CPU registers and the CPU-visible memory, so it reflects what the running CPU
+would actually read or write.
 
-\Needspace{9\baselineskip}
-### Mouse Controls
-At the bottom of the view are **selector buttons** that choose which memory bank to display.  
-On the Apple ][+ model, the 128K option is disabled, as is the C100 ROM option.
+The annotation appears for:
 
-| Label  | Action                                                                                  |
-|:-------|:----------------------------------------------------------------------------------------|
-|RAM     | Pick between CPUs view (map), Main (1st 64K bank) and AUX (2nd 64K bank)                |
-|C100    | Map shows the CPUs view of C100-CFFF, ROM shows the //e ROM in that space               |
-|D000    | Map is the CPUs view, LC1 is 4K bank1, LC2 is 4K bank2 and ROM is the ][+ or //e ROM    |
+- indexed and indirect operands, such as `$40,X`, `$40,Y`, `($40,X)`, and `($FB),Y`,
+  which show `[$addr:value]`;
+- `JMP ($xxxx)` indirect jumps, which show the resolved `[$addr]` target;
+- direct addresses, branches, `JMP`, and `JSR` operands that are shown as a
+  **label** - data references show `[$addr:value]`, branch and jump targets
+  show `[$addr]`.
 
-The **scrollbar** on the right scrolls from address `$0000` to `$FFFF`.  
-A mouse **scroll wheel** scrolls by 4 lines. Scroll sensitivity can be configured (see **INI Files in Depth - Config**).
+It is deliberately omitted where the address is already plain in the operand,
+such as `LDA #$00` (immediate), `LDA $4000` (literal absolute), and
+`LDA $FB` (literal zero page). Because the annotation depends on the current
+register and memory snapshot, it is shown only while the machine is paused, and
+it is not drawn while the emulator is running.
 
-Click on any row, outside the address section, to put the cursor on that row. Click on the address section to set the address of that row (Same as pressing CTRL+a).
+### Display Modes
 
-\Needspace{11\baselineskip}
+The disassembly view can show bytes from any of these sources:
+
+| Mode | Meaning |
+|------|---------|
+| **Map** | CPU-visible address space (current bank configuration) |
+| **Main** | Physical main 48K |
+| **Aux** | Physical auxiliary 48K (//e) |
+| **LC1** | Language Card bank 1 |
+| **LC2** | Language Card bank 2 |
+| **ROM** | System ROM bytes at ROM addresses, regardless of mapping |
+
+Right-click anywhere in the view to open a **Source** menu listing all six modes,
+with an asterisk next to the active choice. **Opt+M** from the keyboard cycles
+Map -> ROM -> Main -> Map.
+
+When the emulator is paused, the same popup also shows an **Access** group for the
+address under the disassembly cursor. The four `XXXX` entries are the recorded program
+counters of the last instructions that wrote to that address, oldest retained entry
+first and newest entry last. `0000` means no writer has been recorded for that slot.
+Selecting one of the entries moves the Disassembly cursor to that address, the same kind
+of jump as entering the writer PC with `Opt+A`.
+
+### Keyboard Controls
+
+| Key | Action |
+|-----|--------|
+| `Opt+A` | Enter address-jump mode; type four hex digits then Enter |
+| `Opt+B` | Toggle execute breakpoint at cursor (paused only) |
+| `Opt+M` | Cycle source mode: Map -> ROM -> Main -> Map |
+| `Opt+S` | Open the Symbol Lookup dialog |
+| `Opt+Left` | Set PC to cursor address (paused only) |
+| `Up` / `Down` | Move cursor one instruction |
+| `PgUp` / `PgDn` | Scroll one page |
+| `Home` / `End` | Jump to first or last line of the current view |
+| `Opt+Home` | Jump to address `$0000` |
+| `Opt+End` | Jump to address `$FFFF` |
+
+### Symbol Lookup
+
+**Opt+S** opens the Symbol Lookup dialog while the Disassembly view is active.
+
+The dialog shows a searchable, sortable table of all symbols known to the debugger,
+including labels exported from the assembler and symbols loaded from external symbol
+files.
+
+**Columns:**
+
+| Column | Contents |
+|--------|----------|
+| `ADDR` | Symbol address in hex (`XXXX`) |
+| `SCOPE` | Assembler scope path, e.g. `anon_0001` (up to 15 characters) |
+| `LABEL` | Symbol name (leaf portion, up to 15 characters) |
+| `SOURCE` | File basename (no extension), or `assembler` for inline assembly |
+
+**Search:** the field at the top has focus when the dialog opens. Type to filter the
+list. The pattern is matched against a combined string `"XXXX scope label source"` for
+each row using simple regex syntax: `.` matches any character, `*` matches zero or more
+of the previous character, `^` anchors to the start, `$` anchors to the end.
+
+**Sorting:** clicking any column header sorts by that column ascending (`^`). Clicking
+the same header again reverses to descending (`v`). The default sort is by address
+ascending.
+
+**Navigation:**
+
+| Key / Action | Effect |
+|--------------|--------|
+| Type in search box | Filter rows to matching symbols |
+| `Tab` | Switch keyboard focus between search box and table |
+| `Up` / `Down` | Move the selection in the table (table focus) |
+| `Enter` | Commit selected row (table focus) |
+| Click a row | Commit that row |
+| Click a column header | Sort by that column (toggle direction) |
+| **[Close]** or `ESC` | Dismiss without navigating |
+
+**On commit:** the Disassembly view cursor jumps to the symbol's address, equivalent to
+entering the address with `Opt+A`.
+
 ## Memory View
-The memory view is a way of inspecting larger areas of the Apple 2 RAM. The display shows rows of memory in the format:
 
-**`0000: 54 68 69 73 20 69 73 20 41 53 43 49 49 00 00 00 This is ASCII...`**
+The Memory view shows the full 64 K address space as 16-byte rows in hex and ASCII.
 
-Broken down:
+### Line Format
 
-| Element    | Meaning                                                                             |
-|:-----------|:------------------------------------------------------------------------------------|
-| 0000       | The hexadecimal address in RAM                                                      |
-| 54 68 ..   | The bytes starting at the address at the start of the line                          |
-| This is .. | The ASCII representation of the bytes (`54` is `T`, `68` is `h`, etc.)              |
-
-\Needspace{29\baselineskip}
-### Keyboard controls
-These keys apply **when emulation is stopped**:
-
-| Key           | Action                                                                           |
-|:--------------|:---------------------------------------------------------------------------------|
-| 0..9, a..f    | In the HEX portion, type hexadecimal characters to edit the memory               |
-| ASCII         | In the ASCII portion, type ASCII letters to set the memory                       |
-| C+a           | Edit the memory address of the cursor line                                       |
-| C+f           | Open the find dialog box                                                         |
-| C+n           | Search forward for the find string (find next)                                   |
-| C+S+n         | Search backward for the find string (find previous)                              |
-| C+s           | Open the symbol lookup dialog                                                    |
-| C+t           | Switch between Hex and ASCII editing                                             |
-| C+v           | Split the view, up to 16 times, into independent sub-views                       |
-| C+j           | Join the sub-view with its neighbouring sub-view                                 |
-| A+UP          | Switch to the sub-view above the current sub-view                                |
-| A+DOWN        | Switch to the sub-view below the current sub-view                                |
-| ENTER         | Finish "edit memory address" mode                                                |
-| HOME          | Move the cursor to the start of the current line                                 |
-| C+HOME        | Move the cursor to the top of the view                                           |
-| END           | Move the cursor to the end of the current line                                   |
-| C+END         | Move the cursor to the end of the last line of the view                          |
-| UP/DOWN       | Move the cursor up or down, scrolling if needed                                  |
-| C+UP/DOWN     | Scroll the view one line up or down                                              |
-| LEFT/RIGHT    | Move the cursor left or right, wrapping to previous/next row if needed           |
-| PAGE UP       | Page up by one full view                                                         |
-| PAGE DOWN     | Page down by one full view                                                       |
-| S+INSERT      | Paste from the OS clipboard (HEX into address and HEX, ASCII into ASCII)         |
-
-**A+, C+ and S+ mean ALT+, CONTROL+ and SHIFT+, respectively.**
-
-### Mouse Controls
-The **scrollbar** on the right scrolls from address `$0000` to `$FFFF`.  
-A mouse **scroll wheel** scrolls by 4 lines. Scroll sensitivity can be configured (see **INI Files in Depth – Config**).
-
-Click on any row, outside the address section, to place the cursor on that row. Click on the address section to set the address of that row (same as pressing CTRL+a).
-
-Right-click on a value in the hex address matrix to open a pop-up window that shows the last four program-counter addresses where the selected address was modified. The top entry is the most recent change—the change that resulted in the current value at this address. If an address in the pop-up is `$0000`, it means that fewer than four changes to this address were recorded. Select any of the four addresses in the pop-up to move the cursor to the corresponding line in the disassembly view.
-
-The **selector buttons** described in the Disassembly View, mouse controls section are also available in the memory view section.
-
-## Miscellaneous View
-The Miscellaneous View consists of sub-views that can be opened and closed at will. Each sub-view has a triangle to the left of its name; clicking the triangle opens or closes the sub-view. The Miscellaneous View also has a scrollbar on the right, making it possible to see all details without closing any sub-views.
-
-\Needspace{6\baselineskip}
-The sub-views are:
-
-| View Name     | Contents                                                                         |
-|:--------------|:---------------------------------------------------------------------------------|
-| Slots         | Devices inside the Apple 2 slots, such as Disk II or SmartPort cards             |
-| Debugger      | Cycle counters, call stack, breakpoints, etc.                                    |
-| Soft Switches | Memory locations in the $C000–$C0FF range that affect Apple 2 operations         |
-
-Each of these is discussed in more detail below.
-
-### Slots Misc View
-The Slots view shows the hardware installed in the slots of the Apple 2. It is also the panel used for working with disks, both SmartPort and floppy.
-
-\Needspace{7\baselineskip}
-With both SmartPort and floppy devices, there are a few buttons exposed. Next to Disk or Device 0, there is a button with the slot number, a dot, and a zero. Next to that is an Eject button, followed by (a [Save] button on Disk II and) an Insert button. The display looks something like this:
 ```
-Slot 5: Smartport  
-[5.0][Eject][Insert]  
-Slot 6: Disk II  
-[6.0][Eject][Save][Insert]  
+C123: 48 65 6C 6C 6F 20 57 6F 72 6C 64 21 00 00 00 00  Hello World!....
 ```
-Clicking Insert opens the file browser, and if an appropriate file is selected (NIB, DSK, or WOZ for Disk II and any file for SmartPort), the file name is shown to the right of the Insert button. For a Disk II device, more than one file can be inserted. When this is done, a new button appears, labelled Swap. The button also indicates which disk is currently inserted (from the sequence) and how many disks are in the sequence. This looks like:
 
-`[6.0][Eject][Save][Insert][Swap (1/2)] This is disk 1.po`
+| Column | Meaning |
+|--------|---------|
+| `C123` | Hex address of the first byte in the row |
+| `48 65 ...` | Byte values in hex |
+| `Hello ...` | ASCII representation (`.` for non-print) |
 
-The disk name, in this case, is "This is disk 1.po", and the button indicates that it is the first disk of two disks in the queue. Clicking the Swap button switches to the second disk, and the display might then look like this if the second disk is called "This is disk 2.po":
+### Display Modes
 
-`[6.0][Eject][Save][Insert][Swap (2/2)] This is disk 2.po`
+The memory view has source modes that control which address space is displayed:
 
-Clicking Eject removes the currently selected disk from the drive and from the queue.  Clicking Save will write back changes to a .dsk or .nib file.  This should always be automatic and Save may be removed in a future version.
+| Mode | Mode border | Bytes shown |
+|------|-------------|-------------|
+| **Map** | none | CPU-visible address space (current bank configuration) |
+| **Main** | blue | Physical main 48K |
+| **Aux** | green | Physical auxiliary 48K (//e) |
+| **LC1** | purple | Language Card bank 1 |
+| **LC2** | magenta | Language Card bank 2 |
+| **ROM** | amber | System ROM bytes at ROM addresses, regardless of mapping |
 
-Clicking the button labelled `[Slot.0]` boots the disk in drive/device 0 of that slot.
+Non-Map modes draw a colored source-mode border inside the content area.
+Map has no source-mode color; if the view is active, the separate neutral active-view
+border is still shown.
 
-#### Configure INI
-The Configure INI button opens the `Machine Configuration Dialog`.  See the `Dialogs` section for more details.  Through this button, the startup `INI` files can be created and edited.
+Switch modes with **right-click** anywhere in the view (the **Source** group lists all
+choices with an asterisk next to the active choice), or with **Opt+M** from the keyboard.
+**Opt+M** cycles Map -> Main -> Aux -> LC1 -> LC2 -> ROM -> Map.
 
-#### Load INI
-This button opens a file browser that allows selection of a startup INI file.  Selection a new INI file will `reboot` the emulator and it will come up configured using the newly selected INI file.
+The memory and disassembly view modes are independent of each other. You can watch
+auxiliary RAM in the memory view while the disassembler follows the CPU map.
 
-\Needspace{15\baselineskip}
-### Debugger Misc View
-By default, the Debugger View shows status information under the heading **Debug Status**. This information is:
+### Status Row
 
-| Name           | Description                                                                     |
-|:---------------|:--------------------------------------------------------------------------------|
-| Run to PC nnnn | The button is selected when stepping over a JSR or using F6, and the            |
-|                | destination address is in nnnn. Otherwise, the button is unselected and         |
-|                | nnnn contains 0000                                                              |
-| Step Out       | The button is selected when F11 is used to step out of the current              |
-|                | subroutine                                                                      |
-| Step Cycles    | The number of cycles between stops of the emulator. For example,                |
-|                | stepping over an INC of ZP will show 5 cycles, but stepping over a JSR          |
-|                | will show however many cycles the subroutine cost, plus the 6 JSR cycles        |
-| Total Cycles   | Shows the total cycles since the emulator started running the                   |
-|                | Apple 2 ROM code                                                                |
+The bottom of the Memory view shows the active edit field (`Hex`, `ASCII`, or
+`Address`), the current cursor address as `Address: XXXX`, and whether memory editing
+is currently `editable` or `read-only`.
 
-\Needspace{11\baselineskip}
-There is also a **Call Stack** display. This is a window with its own scrollbar if the entries exceed what the window can show. The call stack entries have the form:
+### Virtual Views
 
-**`E69E JSR FF59 OLDRST`**
+The memory panel can be split into up to 16 independent virtual views stacked vertically.
+Each virtual view maintains its own cursor, scroll position, source mode, and edit state.
+A thin separator line marks the boundary between adjacent views.
 
-Broken down:
+**Splitting** inserts a new view directly below the active view. The new view inherits the
+active view's source mode and starts with its cursor at the split address. Row height is
+distributed proportionally among all views; each view has a minimum of one row.
 
-| Element | Meaning                                                                                |
-|:--------|:---------------------------------------------------------------------------------------|
-| E69E    | The hexadecimal address where the JSR resides                                          |
-| JSR     | The instruction that caused the push onto the stack                                    |
-| FF59    | The destination address of the JSR—the address of the subroutine called                |
-| OLDRST  | The symbol name for $FF59, from the loaded symbol files                                |
+**Dissolving** removes the active view and returns its rows proportionally to the remaining
+views. If only one view exists, dissolving is a no-op. After dissolving, focus moves to
+the view below, or to the view above if the dissolved view was the bottommost.
 
-Note that clicking the address (`E69E` in this case) will set the disassembly view cursor to that address and show it in the disassembly view. The same is true for `FF59`; clicking it, or clicking to the right of the JSR, will place the disassembly cursor on that address and show it in the disassembly view.
+Each virtual view has a unique background color drawn from a 16-slot palette. Slots are
+assigned in order and freed when a view is dissolved; a freed slot is reused by the next
+split.
 
-\Needspace{22\baselineskip}
-#### Breakpoints
-The Debugger View has a breakpoints view that is only visible when at least one breakpoint is set. This view lists all configured breakpoints. Each breakpoint in this view has the format:
+Click anywhere in a view to make it active. The mouse wheel scrolls the view under the
+pointer regardless of which view is currently active.
 
-**`label [Edit][Disable][View PC][Clear]`**
+Source-mode borders are drawn inside each view's own region. The neutral
+active-panel selection border still wraps the entire memory panel regardless of how many
+views are present.
 
-The label describes the breakpoint. These are all possible label values, where nnnn is the address of the breakpoint:
+The scrollbar on the right represents the active view's position in the 64 K space.
+Switching the active view moves the thumb without scrolling the memory itself.
 
-| Label                | Meaning                                                                   |
-|:---------------------|:--------------------------------------------------------------------------|
-| nnnn (counters)      | Uses a counter                                                            |
-| nnnn Fast            | Sets the Turbo Mode to Fast                                               |
-| nnnn Restore         | Restores the Turbo Mode to the value before it was set to Fast            |
-| nnnn Slow            | Sets the Turbo Mode to Slow                                               |
-| nnnn Swap sxdy       | Swaps the Disk II disk in Slot x Drive y to the next disk in the queue    |
-| nnnn Troff           | Turns file trace logging off                                              |
-| nnnn Tron            | Turns file trace logging on, to the file ./trace.txt                      |
-| nnnn Type            | Types keys on the Apple II keyboard (`\r`, `123`, or `\x0a`, for example) |
-| z[Range]             | Stop on specified access to an address in the range                       |
-| z[Range] (counters)  | Stop on specified access to an address in the range, subject to counters  |
-| z[nnnn]              | Stop on specified access to an address                                    |
-| z[nnnn] (counters)   | Stop on specified access to an address, subject to counters               |
+Right-clicking a memory view opens a popup for the view under the pointer. The
+**Source** group changes that view's source mode. The **View** group can **Split** the
+clicked view at the clicked address; when more than one virtual view exists it also
+offers **Join** to dissolve the clicked view.
 
-For type keys, the mechanism is similar to how paste works. When address `$C010` is accessed, another key is inserted into the `$C000` keyboard address for the Apple 2 to read. This is useful for pressing a key when, for example, there is a prompt that says "Insert disk 2 and press enter". Type can be used in conjunction with Swap to swap disk 2 in, press enter, and continue execution without user intervention.
+When the emulator is paused, the popup also shows an **Access** group for the clicked
+address. The four `XXXX` entries are the write history for that address:
 
-\Needspace{10\baselineskip}
-In the above table, these symbols mean:
+```
+oldest  older  newer  newest
+```
 
-| Symbol     | Meaning                                                                             |
-|:-----------|:------------------------------------------------------------------------------------|
-| nnnn       | Hexadecimal memory location                                                         |
-| (counters) | Takes the form (x/y), where x means the address has been accessed x times and       |
-|            | the stop will occur when x equals y                                                 |
-| [Range]    | Takes the form [xxxx-yyyy], where x and y are the start and end addresses of an     |
-|            | address range in which any access will count                                        |
-| z          | Represents R for read access, W for write access, and RW for read or write access   |
+Each entry is the 16-bit program counter of an instruction that wrote to the address.
+Selecting an entry moves the Disassembly cursor to that writer PC.
 
-* The `[Edit]` button opens the edit breakpoints dialog.
-* The `[Disable]` button leaves the breakpoint in the list but ignores it. This is useful for leaving bookmarks in memory, as the `[View PC]` button will still jump to the location of that disabled breakpoint.
-* The `[View PC]` button sets the disassembly view cursor to the nnnn address of the breakpoint and brings it into view.
-* The `[Clear]` button deletes the breakpoint.
-* When there is more than one breakpoint, a `[Clear All]` button appears at the top of the list to delete all breakpoints (including disabled ones).
+### Find
 
-### Soft Switches Misc View
-The soft switches view shows the addresses of soft switches in the Apple //e (currently even in Apple ][+ mode). These are read-only, but there is a button to override the display switches. When the override is enabled, the interface does not change the hardware settings, but it behaves as though the hardware is set to the user settings from a UI perspective. 
+With emulation stopped and the Memory panel active, **Opt+F** opens Find.
+Choose String (optionally ignoring case) or Hex; hex accepts complete byte pairs
+with optional spaces, such as `DE AD BE EF`. **Opt+G** repeats forward and
+**Opt+Shift+G** searches backward. Search follows the selected source of the
+active split Memory view and wraps around the 64K address space.
 
-For example, setting Mixed to ON will draw the Apple 2 screen as though Mixed is enabled. This is quite useful when drawing to an off-screen buffer. The override can be turned on and the off-screen buffer can be set as the visible buffer so that the drawing can be seen on-screen. When the display override is turned off, all switches return to showing their actual settings.
+### Keyboard Controls
 
-Note that the addresses work in pairs, and only the first address is shown in the table. The odd address turns the setting on, and the even address turns the setting off. For example, `$C000` sets `80STORE` and `$C001` clears `80STORE`.
+| Key | Action |
+|-----|--------|
+| `Opt+A` | Toggle address-entry mode; type four hex digits to jump |
+| `Opt+M` | Cycle source mode: Map -> Main -> Aux -> LC1 -> LC2 -> ROM -> Map |
+| `Opt+S` | Open the Symbol Lookup dialog |
+| `Opt+F` | Open Find (paused only) |
+| `Opt+G` | Find next |
+| `Opt+Shift+G` | Find previous |
+| `Opt+X` | Toggle between hex and ASCII edit modes |
+| `Opt+V` | Split active view at cursor |
+| `Shift+Opt+V` | Split active view at the start of the cursor row |
+| `Opt+J` | Dissolve active view (no-op when only one view exists) |
+| `Opt+Up` | Switch focus to the view above |
+| `Opt+Down` | Switch focus to the view below |
+| `Up` / `Down` | Move cursor one row (16 bytes) |
+| `Left` / `Right` | Move cursor one byte (or nibble in hex mode) |
+| `PgUp` / `PgDn` | Scroll one page |
+| `Home` | Move cursor to start of the current row |
+| `Opt+Home` | Move cursor to the start of the visible window |
+| `End` | Move cursor to end of the current row |
+| `Opt+End` | Move cursor to the end of the visible window |
+| `0-9`, `A-F` | Edit hex nibble at cursor (paused only, hex mode) |
 
-\Needspace{18\baselineskip}
-| Address | Meaning                                                                                |
-|:-------:|:---------------------------------------------------------------------------------------|
-| C001    | 80STORE - ($C054/$C055) selects main vs aux independently of RAMRD/WRT for disp mem    |
-| C003    | RAMRD   - CPU reads aux $0200-$BFFF and LC $D000-$FFFF, see 80STORE                    |
-| C005    | RAMWRT  - CPU writes aux $0200-$BFFF and LC $D000-$FFFF, see 80STORE                   |
-| C007    | CXROM   - C100-CFFF //e ROM (overrides C3ROM and CFFF)                                 |
-| C009    | ALTZP   - ZP/stack are in aux bank                                                     |
-| C00B    | C3ROM   - Turn internal ROM off, turn Slot ROM on                                      |
-| C00D    | 80COL   - 80-column display (turn 80-col display on)                                   |
-| C00F    | ALTCHAR - alternate character set                                                      |
-| C051    | TEXT    - Enable text mode                                                             |
-| C053    | MIXED   - Graphics modes have 4 lines of text at the bottom                            |
-| C055    | PAGE2   - Display from $800/$4000 instead of  $400/$2000                               |
-| C057    | HIRES   - Enable high resolution graphics mode                                         |
-| C05E    | DHGR    - Enable double resolution graphics mode                                       |
-| C08X    | LCBANK  - Bank1 vs Bank2                                                               |
-| C08X    | LCREAD  - Show RAM vs ROM at $D000-$FFFF                                               |
-| C08X    | LCPREWRITE                                                                             |
-| C08X    | LCWRITE - Write to RAM at $D000-$FFFF                                                  |
+**Opt+S** also opens the Symbol Lookup dialog from the Memory view. On commit, the
+active virtual view scrolls so that the symbol's address is row-aligned (the row
+containing that address appears at the top of the view) and the cursor is placed on
+the exact byte. See **Symbol Lookup** under **Disassembly View** for full dialog
+reference.
 
-The descriptions of the above are very loose. See a credible source for proper explanations.
+Memory editing is only possible while the CPU is paused. In hex mode, typing hex digits
+overwrites the nibble at the cursor. In ASCII mode, printable characters overwrite the
+byte at the cursor.
 
-## Dialogs
-The dialog boxes are activated from various views and reused wherever needed in a2m.
+## Machine
 
-### File Browser Dialog
-This is a simple single-file selection dialog. A single mouse click is used to activate an action. The actions are `select a file` or `select a folder`. Selecting a folder enters that folder and updates the display to show the files and folders within it. The folder `..` is the parent of the current folder. Folders are sorted to the top of the dialog, followed by files.
+The Machine tab is the first tab in the Misc panel and groups controls for slots,
+media, machine files, and emulator management.
 
-Press the `[OK]` button to close the dialog. If a file is highlighted when `[OK]` is pressed, that file becomes the selected file.
+### Slots and Media
+
+Each installed Disk II or SmartPort card is listed by slot. Empty slots and
+Mockingboard cards have no media row. A Disk II or SmartPort row looks like:
+
+```
+Slot 6: Disk II
+[6.0] [Eject] [Insert] [Swap (01/02)]  sideA.nib
+[6.1] [Eject] [Insert]                 (empty)
+```
+
+**[N.0]** boots device 0 of that slot (jumps to `$CN00`). Drive 1 is labelled but
+is not a boot button.
+
+**[Insert]** opens a file browser and mounts the selected image. For Disk II, more
+than one file can be queued; a **[Swap (current/total)]** button then appears.
+
+**[Swap]** advances to the next image in that drive's queue (wraps).
+
+**[Eject]** removes the current image from the drive and from the queue.
+
+The name to the right of the buttons is the basename of the currently mounted image.
+
+Configure the cards themselves (Empty / Disk II / SmartPort / Mockingboard) in
+**Configure -> Machine**. Applying a changed model or card layout performs a
+power-cycle reset.
+
+### Machine Files
+
+**[Load...]** opens the Load dialog:
+
+| Field | Meaning |
+|-------|---------|
+| Name + Browse | Select the host file |
+| Type | `Auto`, `Snapshot`, `Binary`, or `Applesoft text` |
+| Format | For Auto/Binary: `Auto`, `Raw`, `NAPS #06AAAA`, `AppleSingle`, `Legacy DOS` |
+| Raw address | Hex load address, used when the file has no embedded address |
+| Reset before load | Reset the machine before injecting (off for snapshots) |
+| Run after load | Jump to the load address after a binary load (off by default) |
+
+`Auto` recognizes `.a2state` snapshots by extension. For binaries it recognizes
+cc65 AppleSingle, NAPS filenames such as `demo#060803`, and the four-byte DOS header
+used by older cc65 releases; otherwise it loads raw bytes at the entered address.
+
+**Applesoft text** accepts an ASCII listing, sorts it by line number, tokenizes it
+directly into `$0801`, clears variables, and repairs Applesoft's program pointers.
+Duplicate or malformed lines are rejected.
+
+**[Save...]** opens the Save dialog:
+
+| Field | Meaning |
+|-------|---------|
+| Name + Browse | Choose the output filename |
+| Type | `Snapshot`, `Binary`, or `Applesoft listing` |
+| Format | For Binary: `NAPS #06AAAA` (default), `Raw`, or `AppleSingle` |
+| Start / End | Inclusive hex range for a binary save |
+
+**NAPS** appends `#06AAAA` (where `AAAA` is Start) and keeps the contents raw.
+**Applesoft listing** validates and detokenizes the live program to a host ASCII
+`.bas` file.
+
+### State
+
+Snapshots preserve the emulated machine: RAM (main and aux), CPU, soft switches,
+video beam, Disk II, SmartPort, and Mockingboard. A failed load leaves the live
+machine unchanged.
+
+**Shift+Opt+>** quicksaves to the snapshot folder (Configure -> Paths -> `snapshot`,
+which defaults to the current directory). Each quicksave creates a new timestamped
+`.a2state` file; existing quicksaves are not overwritten. **Shift+Opt+<** quickloads
+the newest `.a2state` in that folder.
+
+At startup, use `--sna <file>` to load a snapshot from the command line. Over the
+control port, use `load-state <path>` and `save-state <path>` (see **Remote**).
+
+### Emulator Controls
+
+**[Configure...]** opens the Configure dialog (see **Configure**).
+
+**[Reset]** performs a warm reset of the emulated Apple 2 and preserves its running
+state: it resumes automatically if it was running, or remains paused if it was
+stopped. Any pending assembler-queued run is cancelled.
+
+**F8** is the keyboard stand-in for CTRL+RESET (macOS often eats Control+F-keys).
+**Opt+F8** is CTRL+Open-Apple+RESET (cold start / banner boot).
+
+## Debugger
+
+The Debugger tab shows runtime counters and the call stack.
+
+### Counters
+
+| Counter | Meaning |
+|---------|---------|
+| State / Turbo / PC / Stop | Current run state, turbo label, PC, and stop reason |
+| CPU cycles | Total 6502/65C02 cycles executed |
+| Machine | Master cycle counter |
+| Frame | Frame number, cycle within frame, dropped frames |
+
+### Step Counters
+
+```
+Step - CPU: 5  Machine: 5
+```
+
+The step counter line resets to zero each time a step or run command is issued (F10,
+Shift+F10, F11, F12, Shift+F12) and freezes when the CPU stops. It shows how many
+cycles elapsed during that operation.
+
+Two values are shown because they can differ when video or a peripheral holds the
+bus. **CPU** is cycles the processor actually spent executing. **Machine** is wall
+clock of the Apple 2 chip, including stalls.
+
+### Call Stack
+
+The call stack shows the chain of active JSR calls reconstructed from the hardware
+stack each frame. Entries have the form:
+
+```
+E69E | JSR FF59 OLDRST
+```
+
+| Part | Meaning |
+|------|---------|
+| `E69E` | Address of the JSR instruction |
+| `FF59` | Destination address (subroutine entry) |
+| `OLDRST` | Symbol name for `$FF59`, when available |
+
+Clicking either address in an entry moves the Disassembly view cursor to that address.
+Up to 16 entries are displayed; the list has its own scrollbar when there are more.
+
+## Breakpoints
+
+The Breakpoints tab lists all configured breakpoints. When no breakpoints exist, the
+tab is empty. A **[Clear All]** button appears at the top when more than one
+breakpoint is present. **[New]** opens the Breakpoint Editor.
+
+### Breakpoint Types
+
+| Type | Trigger condition |
+|------|-------------------|
+| Execute | CPU fetches an instruction at the address |
+| Read | CPU reads from the address or range |
+| Write | CPU writes to the address or range |
+
+### BRK
+
+When **Pause on BRK** is enabled (Configure -> Machine, or `[config] pause_on_brk`),
+a `BRK` opcode (`$00`) pauses the emulator with no breakpoint needed. The CPU does
+not execute it; the instruction is intercepted before the stack is touched, and the
+window title ends with `Paused (BRK)`.
+
+This usually indicates that execution has reached uninitialized memory, passed the
+end of a program, or followed a corrupted jump vector. **Pause on BRK is off by
+default.** A single explicit step (**F11**) always executes a BRK normally.
+
+### Breakpoint List Format
+
+Each entry in the list shows a label and action buttons:
+
+```
+W[C123-C1FF] (5/10)  [Edit] [Disable] [Clear]
+```
+
+| Part | Meaning |
+|------|---------|
+| `R`, `W`, `RW` | Access type (read, write, or either) |
+| `[C123]` | Address; or `[C123-C1FF]` for a range |
+| `(5/10)` | Counter: total hits / repeat countdown (shown when counter is active) |
+| Action label | `Fast`, `Slow`, `Tron`, `Troff`, `Swap`, `Type`, or nothing (Break) |
+
+- **[Edit]** opens the Breakpoint Editor.
+- **[Disable]** / **[Enable]** toggles the breakpoint without removing it.
+- **[Clear]** deletes the breakpoint.
+
+Breakpoints are persisted in the INI file under the `[DEBUG]` section.
 
 ### Breakpoint Editor
-The breakpoint editor dialog is used to change the way a breakpoint works. In it you can configure the address or address range that a breakpoint activates on, and whether that activation is on execution, read, write, or read or write. Actions can also be assigned to breakpoints here, as well as counters, as discussed in the Breakpoints section.
 
-The dialog also includes an `In Bank` row that selects which memory bank the breakpoint applies to. `Map` matches the CPU's current mapping, while `Main`, `Aux`, `LC1/LC2`, and `ROM` restrict the breakpoint to those views.
+The editor dialog lets you set the address (or address range), access type, mapping
+filter, action, and counters for a breakpoint.
 
-The dialog has `Break At [nnnn] on [] PC [] Address Access`. In this, `nnnn` is the memory address to watch for an execution break if `on PC` is checked. If `Address Access` is checked, the breakpoint will activate on a read, write, or either. This depends on the checked state of `[] Read [] Write`, which is available if `Address Access` is chosen. Also available when `Address Access` is chosen is `[] Range`. Check `Range` to enter a second address. All selected accesses between the `Break At` and `Range` addresses will now cause a stop.
+**Access** options: `Execute`, `Read`, `Write`.
 
-\Needspace{11\baselineskip}
-The `Actions`:
+**Mapping** is three independent rows:
 
-| Action  | Meaning                                                                                |
-|:--------|:---------------------------------------------------------------------------------------|
-| Break   | Default action. Puts the emulator in a stopped state.                                  |
-| Fast    | Switches the Turbo Mode to `max`.                                                      |
-| Restore | Switches the Turbo Mode to the last mode active through the `F3` setting               |
-| Slow    | Switches the Turbo Mode to 1 MHz.                                                      |
-| Swap    | Enter the slot and drive, and a swap is done on that floppy.                           |
-| Troff   | Turns off trace file logging.                                                          |
-| Tron    | Turns on trace logging to a file called `./trace.txt`.                                 |
-| Type    | Enter text to be "typed" into the Apple 2 when the breakpoint is hit                   |
+| Row | Choices |
+|-----|---------|
+| RAM | Map / Main / Aux |
+| C100 | Map / ROM |
+| D000 | Map / LC1 / LC2 / ROM |
 
-Lastly, there is the `[] use Counter` setting. Select this option to enter two counter values. The first value is how many times the breakpoint must be hit before it causes its action, and the second value specifies what value to install as the counter once the breakpoint has been hit. As an example, setting `Counter` to 10 and `Reset Counter` to 2 means that the breakpoint must be hit 10 times before its action is executed, and after that it will only execute the action every second time the breakpoint is hit.
+`Map` means fire regardless of the current banking for that region.
 
-Using `[Cancel]` will not apply any changes to the breakpoint, but pressing `[Apply]` will apply the changes to the breakpoint.
+**Range**: check to enter a second address; any access in `[start, end]` triggers the
+breakpoint.
 
-### Machine Configuration Dialog
-The Machine Configuration dialog allows common emulator settings to be edited without manually editing the INI file. It has three tabs: `Machine`, `Emulator`, and `Assembler`.
+**Actions**:
 
-#### Machine tab
-Select the model (`Apple ][+` or `Apple //e Enhanced`) and the device installed in slots 1-7. On the `Apple ][+` model, Slot 3 also allows a `Franklin Ace Display` card.  A `Mockingboard` sound card can be added to any slot.  Currently, only one Mockingboard is allowed in a machine.
+| Action | Parameter field | Effect |
+|--------|-----------------|--------|
+| Break | - | Pause execution (default) |
+| Fast | - | Switch turbo to `max` |
+| Slow | - | Switch turbo to 1 MHz |
+| Troff | - | Disable per-instruction execution trace |
+| Tron | Filename | Enable per-instruction execution trace; writes to the given file, or `trace.log` if the field is empty |
+| Swap | Slot + queue step | Advance a Disk II queue (see below) |
+| Type | Text | Inject text as Apple keystrokes when the breakpoint fires |
 
-#### Emulator tab
-Configure the UI (`GUI` or `Text`), original Delete behavior, scroll wheel speed, and symbol files (a comma-separated list). The symbol files row includes a `[Browse]` button. Each file selected through the Browse button is added to the list in the symbol files field. To remove a file, edit the field manually.
-The `Turbo Speeds` field accepts comma-separated multipliers such as `1, 8, max`.  There are also Disk LEDs, and Remember INI settings checkboxes. Selecting the `Remember INI settings` option always saves the INI file when the emulator exits. 
+Tron and Troff are mutually exclusive: checking one automatically clears the other.
+When Tron, Swap, or Type is unchecked, its parameter field is grayed out.
 
-#### Assembler tab
-Select the assembler source file (using the `[Browse]` button), choose the destination bank, and configure `Reset Stack`, `Auto Run`, and the `Auto Run Address`.
+**Swap parameter format:**
 
-#### Common fields
-At the bottom is the `INI file name` field with its own `[Browse]` button, along with `Save settings on Quit`, `[OK]`, and `[Cancel]` buttons. `[OK]` applies the changes. `[Cancel]` closes the dialog without applying them. If the `INI file name` is changed, the configuration is saved immediately to the INI file when `[OK]` is selected, unless `Save settings on Quit` is enabled. In that case, the file is saved when the emulator exits.
-For clarity, `Save settings on Quit` is a one-time option, whereas `Remember INI settings` always saves changes. Also note that disk selections and changes for `DiskII` and `SmartPort` are saved to the INI file as well.
+| Form | Meaning |
+|------|---------|
+| `+N` | Move forward N steps in the queue (wraps) |
+| `-N` | Move backward N steps in the queue (wraps) |
+| `N` | Mount the Nth disk in the queue, 1-based (wraps if out of range) |
+| empty | No-op (Swap flag is set but does nothing) |
 
-### Symbols Dialog
-The symbol search dialog has a search box at the top and two buttons, `[OK]` and `[Cancel]`, at the bottom. In the middle is a list of names, addresses, and a symbol source name.
+The slot field is the Disk II controller slot (`1..7`).
 
-Typing into the symbol search box performs a search on the name and the symbol source, and any matching symbols are shown in the middle section. For example, typing `PP` might show all symbols from the A`PP`LE2E source, as well as `A.TEMPP`T from the A2_BASIC source.
+**Counter**: enter a hit count and a repeat count. With hit count `N` and repeat count
+`M`, the action fires on the Nth hit and then every Mth hit thereafter. Set repeat to
+`0` to auto-disable the breakpoint after it fires once. Set both to 0 to disable
+counting (the Use Counter checkbox controls this).
 
-You can move the selection with the `Up/Down` keys (and `Page Up/Page Down` to move by a page). Press ENTER or click `[OK]` to select the highlighted line. Clicking on any line in the middle section, for example `A.TEMPPT $0052 A2_BASIC`, also selects that symbol.
+**Type text format:**
 
-Selecting a symbol sets the Disassembly View cursor to the symbol address and makes the cursor visible in the Disassembly View.
+The Type field uses an escape-based input encoding. Literal printable characters
+(space through `~`) are typed as Apple keystrokes; newlines become Return. `\[`
+introduces a named token. Names are case-insensitive. Up to 128 events per sequence.
 
-Clicking `[OK]` closes the dialog.
+| Form | Meaning |
+|------|---------|
+| `\[OA]` `\[OA+]` `\[OA-]` | Open-Apple pulse / hold / release |
+| `\[CA]` `\[CA+]` `\[CA-]` | Closed-Apple pulse / hold / release |
+| `\[B0]` `\[B1]` | Gameport buttons (with `+` / `-` hold forms) |
+| `\[RESET]` | Warm reset (CTRL+RESET) |
+| `\[COLDRESET]` | Cold reset (CTRL+Open-Apple+RESET) |
+| `\[W:N]` / `\[WAIT:N]` | Wait N keypress units |
+| `\[J1X=n]` `\[J1Y=n]` | Stick 1 axes `0..255` (`128` = center); `J2` is stick 2 |
+| `\[J1XL]` `\[J1XR]` `\[J1YU]` `\[J1YD]` | Stick 1 extremes |
+| `\[J1XC]` `\[J1YC]` `\[J1C]` | Center one or both axes |
 
-### Find Dialog
-The find dialog has selectors for string or hexadecimal searches. When searching for strings, type the ASCII characters to search for into the search box. When searching for hexadecimal values, type the hex values as two-digit hex numbers, not separated by any characters (for example `01abcd`), and press ENTER or click `[OK]`.
+Bare `OA` / `CA` / `B0` / `B1` tokens pulse (assert, wait one unit, deassert).
+Clipboard paste (**Opt+Ins**) is always plain text; it does not parse this language.
 
-Below the `[OK][Cancel]` buttons is a status string. This normally reads `Okay`. If, for example, you enter a search of `012` into the search field and press ENTER, the status message will indicate an error. In this case, the error would be `Uneven # of hex digits`, meaning that the number of hex digits must be even (pairs of two) for the search to work.
+Examples:
 
-# Using the Assembler
-In the section titled **`Disassembly View`**, it was shown how to set an assembler file to assemble (`CTRL+SHIFT+b`) and how to invoke the assembler (`CTRL+b`). In the following sections, the assembler is covered in more detail, including syntax and commands.
-
-In the remainder of the assembler documentation, 6502 means 6502 or 65C02, unless specifically stated otherwise.
-
-Note:
-
-* There is a complete assembler sample in `./samples/mminer`.  The root file is `mminer-a2m.asm`.
-
-## Invoking from the command line
-The assembler can also be used stand-alone using the program `asm6502`. This is the same assembler used in the emulator, but with a command-line interface.
-
-The `asm6502` executable, when used with no command-line arguments, displays this help message:
 ```
-Usage: asm6502.exe <-i infile> [-o outfile] [-s <symbolfile|->] [-v]
-Where: infile is a 6502 assembly language file
-       outfile will be a binary file containing the assembled 6502
-       symbolfile contains a list all variables, labels and segment addresses
-       symbolfile name as a '-' character sends output to stdout
-       -v turns on verbose and will dump the generated hex 6502
-```
-
-\Needspace{12\baselineskip}
-## Assembler Features and Syntax
-The assembler supports these features:
-
-| Feature          | Description                                                                   |
-|:-----------------|:------------------------------------------------------------------------------|
-| 65x02 mnemonics  | All standard opcodes and addressing modes                                     |
-| labels           | Labels start with `a-z` or `_` and can contain numbers. A label ends with `:` |
-| variables        | Values can be assigned and used in expressions                                |
-| .commands        | Dot commands are described below                                              |
-| comments         | The comment character is `;` and everything after `;` on a line is ignored    |
-| address          | The address character is `*` and it can be assigned and read                  |
-| expressions      | The assembler has a full expression parser                                    |
-
-\Needspace{45\baselineskip}
-There is a set of directives that control how a 6502 source file is assembled. These are referred to as `dot commands`, since each keyword starts with a `.` (period). The available `dot commands` are:
-
-| Command         | Meaning                                                                        |
-|:----------------|:-------------------------------------------------------------------------------|
-| .6502           | Only 6502 opcodes are valid. 65C02 opcodes are not valid and will cause errors |
-| .65c02          | Both 6502 and 65C02 opcodes are valid                                          |
-| .org n          | Set the assembly location to address n. Another way to specify `* =`           |
-| .addr           | Synonym for `.word`                                                            |
-| .align v        | Align to v bytes, inserting up to v-1 zeroes into the output                   |
-| .asciiz         | `.string`, but at the end after all segments, emits a '\0'                     |
-| .res l[,b]      | Insert l bytes into the output, value `0` or the value of the optional `b`     |
-| .byte b`[,b]*`    | Insert b as a byte or bytes into the output - See Notes                      |
-| .word w`[,w]*`    | Insert the word bytes w into the output                                      |
-| .dword dw`[,dw]*` | Insert the double-word bytes dw into the output (low byte first)             |
-| .qword qw`[,qw]*` | Insert the quad-word bytes qw into the output                                |
-| .drow w`[,w]*`    | Insert the word bytes w into the output in reverse order                     |
-| .drowd dw`[,dw]*` | Insert the double-word bytes dw into the output in reverse order             |
-| .drowq qw`[,qw]*` | Insert the quad-word bytes qw into the output in reverse order               |
-| .if p           | Conditional assembly where p is a condition such as `.if c .eq 1`              |
-| .else           | The else part of a conditional `.if` directive                                 |
-| .endif          | Ends a `.if` conditional assembler directive                                   |
-| .for p          | Start a loop where p has the form `<initializer>, <condition>, <iteration>`    |
-| .endfor         | Ends a `.for` loop assembler directive                                         |
-| .repeat a`[,v]` | Repeat [0-a) times, setting the count in the optional variable `v`             |
-| .endrepeat      | Ends a `.repeat` assembler directive                                           |
-| .endrep         | Synonym for `.endrepeat`                                                       |
-| .macro n p      | Start a macro procedure with name n and parameters p                           |
-| .local n        | Creates a macro local variable or label with a unique numeric ID in format `__macro_local_XXXX` |
-| .endmacro       | Ends a `.macro` assembler definition                                           |
-| .incbin "f"     | Include the contents of file f verbatim in the output                          |
-| .include "f"    | Include a 6502 assembler file for assembly at this point                       |
-| .proc n         | Open a procedure (which behaves the same as a named scope)                     |
-| .endproc        | Closes the most recently opened named procedure                                |
-| .scope          | Open an anonymous scope.  Useful in loops                                      |
-| .scope "n"      | Open a named scope, also known as a `Target`.  See `Targets` below             |
-| .endscope       | Closes the most recently opened scope                                          |
-| .segdef  "n",s[,e] | Define a named segment n, starting at s, and emit (default) or noemit       |
-| .segment "n"    | Activate the segment named n                                                   |
-| .string "s"     | Insert the string s into the output                                            |
-| .strcode e      | Set a string character parser; the expression `e` is applied to each character |
-
-Notes:
-
-* Text in `[]` means optional and `[]*` means none or more.
-* The assembler runs in the folder of the input file, so includes must be relative to that folder.
-* .byte can take strings as well, but note that .strcode will not run on those strings.
-* For conditional assembly in emulator vs. command line, see `_asm6502_tool` below.
-
-### Targets
-Using `.scope "name" [file="file name"[, dest="bank name"]]` it is possible to define new output targets.  A target is similar to a sub-project.  For example, you may use the following:
-```
-.scope "game_loader" file="loader.bin" dest="aux,lc2"
-; This is where the code that loads the rest of the executable goes
-; This scope can have .segdef's and .segments of its own
-.endscope
-.scope "exe" file="game.bin" dest="main"
-; This is another executable which could have a different set of .segdef's and .segments
-.endscope
-```
-The `file=` option is used by the command line assembler to write the generated output into the named file.  The `dest=` option is used by the assembler in the emulator to send the bytes to the named destination.  The destination is still subject to the output address specifiers (`.org` or `* =`), but it specifies which bank will be mapped when the address is written.  The names for `dest=` are:  
-```
-6502                - whatever memory is currently banked in in the emulator
-main                - the base 64K ram
-128K/aux            - AUX memory
-LC2/LC Bank/LCBank  - Language Card bank 2
-LC1                 - Language Card bank 1
-```
-These can be combined. For example `dest="aux,lc2"` will put the auxiliary `LC2` at `$D000`.  These words are all case-insensitive.
-
-### _asm6502_tool
-The variable `_asm6502_tool` is set to `1` when using the command-line assembler, allowing conditional behavior between emulator and command-line assembly:
-```
-.if _asm6502_tool .eq 1
-; Only in command line
-.else
-; Only in emulator
-.endif
-```
-Using conditional assembly together with `.scope "name"` allows optional inclusion of components (e.g., disk loaders).
-
-\Needspace{11\baselineskip}
-### The following dot directives work with dot commands:
-
-| Directive   | Meaning                                                                            |
-|:------------|:-----------------------------------------------------------------------------------|
-| .defined    | Used with `.if` to test whether a macro parameter was specified                    |
-| .lt         | Less than (`<`)                                                                    |
-| .le         | Less than or equal (`<=`)                                                          |
-| .gt         | Greater than (`>`)                                                                 |
-| .ge         | Greater than or equal (`>=`)                                                       |
-| .eq         | Equal (`=` or `==`)                                                                |
-| .ne         | Not equal (`!=` or `<>`)                                                           |
-
-\Needspace{19\baselineskip}
-#### Assembler Expressions
-The assembler has a full expression parser. The following table lists valid tokens and illustrates their order of precedence:
-
-| Token                             | Description                                                  |
-|:----------------------------------|:-------------------------------------------------------------|
-| `*`, `:`, `Num`, `variables`, `(` | Address, anonymous labels, numbers, variables, and brackets  |
-| `+`, `-`, `<`, `>`, `~`           | Unary plus, minus, low byte, high byte, and bitwise not      |
-| `**`                              | Exponentiation                                               |
-| `*`, `/`, `%`                     | Multiply, divide, and modulus                                |
-| `+`, `-`                          | Addition and subtraction                                     |
-| `<<`, `>>`                        | Shift left and shift right                                   |
-| relational                        | `.lt .le .gt .ge` for `<, <=, >, >=`                         |
-| equality                          | `.ne .eq` for `!=, ==`                                       |
-| `&`                               | Bitwise AND                                                  |
-| `^`                               | Bitwise exclusive OR                                         |
-| `|`                               | Bitwise OR                                                   |
-| `&&`, `||`                        | Logical AND and OR                                           |
-| `?`, `:`                          | Ternary conditional                                          |
-
-\Needspace{9\baselineskip}
-#### Assembler Numbers
-Numbers can be written in the following formats:
-
-| Prefix  | Base                                                                                   |
-|:--------|:---------------------------------------------------------------------------------------|
-| `$`     | Hexadecimal number. $ followed by 1 to 4 digits                                        |
-| `0`     | Octal number. 0 followed by digits in the range 0..7                                   |
-| `%`     | Binary number. % followed by digits 0 or 1 only                                        |
-| `1`–`9` | Decimal number.                                                                        |
-
-\Needspace{8\baselineskip}
-Inside strings, numbers can also be quoted. In that case, the formats are:
-
-| Prefix      | Base                                                                               |
-|:------------|:-----------------------------------------------------------------------------------|
-| `\x[N]+`    | Hexadecimal number. The same rules apply as in the previous table                  |
-| `\0[N]+`    | Octal                                                                              |
-| `\%[1|0]+`  | Binary                                                                             |
-| `\[0-9]+`   | Decimal                                                                            |
-
-\Needspace{6\baselineskip}
-#### Assembler Variables
-Variables can be followed by assignment (`=`), increment (`++`), and decrement (`--`) operators. Although this looks like postfix C notation, it is actually executed as a prefix operator. For example:
-```
-i = 0
-lda #i++
-```
-This will not load A with 0, but with 1.
-
-\Needspace{6\baselineskip}
-NOTE: The address character `*` is intentionally returned as +1 from where it is read. This means:
-```
-* = $8000
-a = *    ; a will now be $8001
-: b = :- ; but b will be $8000
-```
-The reason is that in statements such as `lda *`, the instruction has not yet been emitted when `*` is evaluated, so reading `*` adds one. Using `a = * - 1` is also valid.
-
-\Needspace{7\baselineskip}
-#### Assembler Ternary
-Like C, the ternary conditional has the form:
-`(condition expression) ? (when true expression) : (when false expression)`
-
-In its simplest form:
-```
-1: i = 1 ? 2 : 3
-; i is assigned 2, since 1 is true
+\[OA]Y               Open-Apple+Y, then release
+CATALOG\r            Type CATALOG and press Return
+\[W:4]\[RESET]       Wait, then warm reset
+\[J1YU]\[B0]         Stick 1 up and fire
 ```
 
-\Needspace{7\baselineskip}
-A slightly more complex example:
+Setting an execute breakpoint from the keyboard while the cursor is in the Disassembly
+view is faster: position the cursor and press **Opt+B**. A second press removes the
+breakpoint.
+
+## Hardware
+
+The Hardware tab provides a view of the emulated Apple 2 using data from the most
+recent runtime snapshot.
+
+The first line is the model (`//e Enhanced` or `][+`).
+
+**Display** rows show the actual soft-switch state and, when **Override** is checked,
+a display-only checkbox. Override does not change the hardware; it only changes what
+the host paints. This is useful when drawing to an off-screen buffer: turn override
+on, set PAGE2 or HIRES as needed, and watch the hidden page. Turning override off
+restores the real switches.
+
+| Address | Name | Meaning |
+|---------|------|---------|
+| $C00D | 80COL | 80-column display |
+| $C00F | ALTCHAR | Alternate character set |
+| $C051 | TEXT | Text mode |
+| $C053 | MIXED | Graphics with four text lines at the bottom |
+| $C055 | PAGE2 | Display from $800/$4000 instead of $400/$2000 |
+| $C057 | HIRES | High-resolution graphics |
+| $C05E | DHIRES | Double-resolution graphics |
+
+**Banking** rows are read-only:
+
+| Address | Name | Meaning |
+|---------|------|---------|
+| $C001 | 80STORE | Display memory follows PAGE2 independently of RAMRD/WRT |
+| $C003 | RAMRD | CPU reads aux $0200-$BFFF (see 80STORE) |
+| $C005 | RAMWRT | CPU writes aux $0200-$BFFF (see 80STORE) |
+| $C009 | ALTZP | Zero page and stack are in aux |
+| $C08X | LC_READ | RAM vs ROM at $D000-$FFFF |
+| $C08X | LC_WRITE | Write-enable Language Card RAM |
+| $C08X | LC_BANK2 | Language Card bank 2 vs bank 1 |
+| $C007 | CXROM | Internal $C100-$CFFF ROM |
+| $C00B | C3ROM off | Slot 3 ROM vs internal $C300 ROM |
+
+Addresses work in pairs on hardware (even/odd set and clear). The table shows the
+latched result, not the poke that produced it.
+
+## Assembler
+
+The Assembler tab provides access to the integrated two-pass 6502 assembler.
+
+### Assembler Controls
+
+| Field | Meaning |
+|-------|---------|
+| File Name | Path to the root assembly source file; use **Browse...** to pick |
+| Assemble at | Optional host origin. When checked, assemble with this hex default (default `$8000`). When unchecked, the source must set its own origin (`* =` / `.org`); the host supplies `$0000` as a placeholder only |
+| Auto-run at | When checked, after a successful assembly sets PC to this hex address and resumes |
+| Reset machine | If checked, resets the machine before assembling |
+| Rearm one-shots | If checked, re-enables every auto-disabled one-shot breakpoint (`repeat = 0`) and resets its hit counter before assembling |
+| **[Assemble]** | Assembles the source and loads bytes into Apple RAM |
+
+After configuring the source and options once, **Shift+Opt+A** invokes the same
+action globally without opening the panel.
+
+When **Reset machine** is checked (the default), assembly waits for the machine to
+come back from reset before writing code. When it is unchecked, the assembler writes
+directly into live RAM in whatever state the machine is in. If **Auto-run at** is
+also set, the emulator immediately jumps to that address and resumes execution.
+
+**Rearm one-shots** is useful during iterative development: set a breakpoint with
+`repeat = 0` so it fires exactly once, then check this box so each re-assemble brings
+it back to life without manual re-enabling.
+
+Assembler labels are exported to the debugger symbol table immediately after a
+successful assembly, and appear in the Disassembly view.
+
+If assembly fails, a scrollable error dialog shows each error with its source file and
+line number.
+
+Apple ][+ starts in 6502 mode; Apple //e Enhanced starts in 65C02 mode. A source
+directive can override that initial profile.
+
+### Assembler INI persistence
+
+The following assembler settings are saved in the `[assembler]` section of the INI
+file and restored on next launch. All keys are optional.
+
 ```
-2: i = j .eq 1 ? 4 : j .eq 2 ? 5 : 6
-; if j == 1, i = 4
-; else if j == 2, i = 5
-; otherwise, i = 6
+[assembler]
+file           = path/to/source.asm   ; path to source file (relative to INI or absolute)
+address        = 8000                 ; hex load/assembly origin address
+use_address    = yes                  ; apply address as host origin (default: yes)
+run_address    = 8000                 ; hex auto-run address
+auto_run       = no                   ; jump to run address after assembly (default: no)
+reset          = yes                  ; Reset machine before assembling (default: yes)
+rearm_oneshots = no                   ; Rearm one-shot breakpoints before assembling (default: no)
+auto_adjust_segments = no             ; Retry overlapping segment layouts (default: no)
 ```
 
-Any valid expression, no matter how complex, is allowed in each of the three clauses.
+When `auto_adjust_segments` is enabled, an overlap detected during pass 1 causes up
+to three fresh layout retries using the assembler's suggested starts. Pass 2 only
+runs after the layout no longer overlaps. The source file is not changed; after a
+successful adjusted assembly, an **Assembly Adjustments** dialog lists the `.segdef`
+addresses to copy back into the source.
 
-\Needspace{5\baselineskip}
-#### Assembler For Loops
-The assembler for-loop syntax is useful for tasks such as creating data tables:
+### Assembler Language
+
+The assembler supports standard 6502 mnemonics and addressing modes. The //e Enhanced
+profile also accepts 65C02 opcodes unless the source selects `.6502`.
+
+**Comments:** `;` begins a comment; everything after it on the line is ignored.
+
+**Labels:** start with a letter or `_`, may contain letters, digits, and `_`, and end
+with `:`.
+
+**Variables:** assigned with `ident = expr`. Postfix `++` and `--` modify the variable
+as a prefix operation: `lda #i++` loads the value after increment.
+
+**Current address:** `*` reads the current output address - the address of the
+instruction or line being assembled, following the standard assembler convention. For
+example `jmp *` assembles a self-loop.
+
 ```
-.for <initialization>, <condition>, <iteration>
-    ; body
-.endfor
+* = $6000
+a = *       ; a = $6000
+jmp *       ; jmp $6000 (self-loop)
 ```
 
-\Needspace{10\baselineskip}
-Example:
+**Numbers:**
+
+| Prefix | Base |
+|--------|------|
+| `$` | Hexadecimal |
+| `%` | Binary |
+| `0` | Octal |
+| `1`-`9` | Decimal |
+
+**Expressions** support the full C precedence table:
+
+| Operators | Notes |
+|-----------|-------|
+| `*`, `:`, numbers, variables, `(` | Atoms |
+| `+`, `-`, `<`, `>`, `~` | Unary: plus, minus, low byte, high byte, bitwise NOT |
+| `**` | Exponentiation |
+| `*`, `/`, `%` | Multiply, divide, modulo |
+| `+`, `-` | Add, subtract |
+| `<<`, `>>` | Shift left, shift right |
+| `.lt`, `.le`, `.gt`, `.ge` | Relational comparison |
+| `.eq`, `.ne` | Equality, inequality |
+| `&` | Bitwise AND |
+| `^` | Bitwise XOR |
+| `\|` | Bitwise OR |
+| `&&`, `\|\|` | Logical AND, OR |
+| `?`, `:` | Ternary conditional |
+
+The ternary form is `condition ? true-expr : false-expr`.
+
+### Directives
+
+| Directive | Meaning |
+|-----------|---------|
+| `.org n` or `* = n` | Set assembly origin to address n |
+| `.byte b[,b]*` | Emit one or more bytes (strings accepted) |
+| `.word w[,w]*` | Emit 16-bit little-endian words |
+| `.addr w[,w]*` | Synonym for `.word` |
+| `.dword dw[,dw]*` | Emit 32-bit little-endian double-words |
+| `.qword qw[,qw]*` | Emit 64-bit little-endian quad-words |
+| `.drow w[,w]*` | Emit 16-bit big-endian words |
+| `.drowd dw[,dw]*` | Emit 32-bit big-endian double-words |
+| `.drowq qw[,qw]*` | Emit 64-bit big-endian quad-words |
+| `.res l[,b]` | Reserve `l` bytes, filled with `b` (default `$00`) |
+| `.align v` | Advance to the next multiple of `v`, padding with zeros |
+| `.string "s"` or `.asciiz "s"` | Emit string bytes; `.asciiz` appends a `\0` |
+| `.strcode e` | Set a per-character mapping expression using `_`; see below |
+| `.include "f"` | Include and assemble another source file |
+| `.incbin "f"` | Include a binary file verbatim |
+| `.define name text` | Text substitution on word boundaries, skipping string literals |
+| `.if cond` | Conditional assembly; condition uses `.lt .le .gt .ge .eq .ne .defined` |
+| `.else` | Alternate branch of `.if` |
+| `.endif` | End of conditional block |
+| `.for init, cond, iter` | Loop with initialization, condition, and iteration clauses |
+| `.endfor` | End of `.for` loop |
+| `.repeat n[,v]` | Repeat block `n` times; optional counter variable `v` |
+| `.endrepeat` / `.endrep` | End of `.repeat` block |
+| `.macro name [args]` | Define a macro with optional parameter list |
+| `.endmacro` | End of macro definition |
+| `.local name` | Macro-local label; expanded to a unique name at call time |
+| `.scope [name] [file="f"] [dest="d"]` | Open a scope namespace; anonymous if no name given. `name` may be a bare identifier or a quoted identifier (`"name"`). `file=`/`dest=` create a host-resolved output target |
+| `.endscope` | Close the innermost scope (and end any output redirect) |
+| `.proc name` | Open a named procedure (a named scope) |
+| `.endproc` | Close the innermost proc |
+| `.segdef "n",addr[,flags]` | Define a named segment at `addr`. Flags (comma-separated) are any of `emit`/`noemit` (suppress output) and `locked` (pin the address; never auto-moved) |
+| `.segdef "n",reclaim="host"` | Define a reclaim segment overlaying an emitted `host`: implicitly `noemit`, inherits the host's start, sized no larger than the host, and moves with it if auto-adjust relocates the host |
+| `.segment "n"` | Activate the named segment; `.segment ""` returns to native mode |
+| `.6502` | Restrict to 6502 opcodes |
+| `.65c02` | Allow 65C02 opcodes |
+| `.rockwell` | Allow 65C02 plus Rockwell RMB/SMB and BBR/BBS operations |
+| `.wdc` | Allow the Rockwell profile plus WDC WAI and STP |
+
+**Paths:** `.include` and `.incbin` resolve relative to the directory of the including
+file.
+
+**`.byte` and strings:** `.byte` accepts strings as well as numeric expressions.
+`.strcode` is not applied to string arguments of `.byte`.
+
+### Macros
+
 ```
-rowL:
-    .for row=0, row .lt $C0, row++
-        .byte   (row & $08) << 4 | (row & $C0) >> 1 | (row & $C0) >> 3
-    .endfor
-
-rowH:
-    .for row=0, row .lt $C0, row++
-        .byte   >$2000 | (row & $07) << 2 | (row & $30) >> 4
-    .endfor
-```
-
-The `row++` could also be written as `row = row + 1`. Any valid expression may be used in any clause. If a loop fails to terminate (that is, the condition is never false), the assembler automatically stops after 64K iterations.
-
-Note that in `rowH`, the high byte of `$2000` is `$20`, which is ORed with the other expressions. The order of operations does not cause `|` to occur before `>`. If it did, the output would simply be `$20`, as the low-byte data would be discarded. Shift operators (`<<`, `>>`) have higher precedence than bitwise AND (`&`), so parentheses are required. The overall precedence rules match those of the C language.
-
-\Needspace{5\baselineskip}
-#### Assembler Macros
-Macros have the form:
-```
-.macro <name> [arg [, arg]*]
- <macro body>
+.macro name [arg [, arg]*]
+    body
 .endmacro
 ```
 
-\Needspace{10\baselineskip}
-Arguments are variables. For example:
+Arguments are substituted as text. Arguments that contain a comma must be wrapped in
+double quotes: `"($55),y"`. Use `.local` inside a macro body to generate label names
+that are unique per invocation.
+
 ```
 .macro add_a_b a b
     clc
@@ -748,265 +1032,998 @@ Arguments are variables. For example:
     adc b
 .endmacro
 
-    add_a_b 12, 25          ; This is a call to use the macro
-    add_a_b "($55),y", #12  ; another call to use the macro with very different parameters
-```
-Notice that the `($55),y` is in quotation marks. Any parameter that contains a `,` must be completely wrapped in `"` marks.
-
-\Needspace{7\baselineskip}
-This emits:
-```
-    clc
-    lda 12
-    adc 15
-    clc
-    lda ($55),y
-    adc #12
+    add_a_b $12, $34
+    add_a_b "($55),y", #12
 ```
 
-\Needspace{7\baselineskip}
-#### Assembler Strcode
-`.strcode` maps characters in a string to other values. It uses the variable `_` to perform the mapping. For example, `.string "Apple ][ Forever"` produces the output `41 70 70 6C 65 20 5D 5B 20 46 6F 72 65 76 65 72`, whereas:
-```
-.strcode _ .ge 'A' && _ .le 'Z' ? _ - 'A' : _ .ge 'a' && _ .le 'z' ? _ - 'a' : _
-.string "Apple ][ Forever"
-```
-produces the output `00 0F 0F 0B 04 20 5D 5B 20 05 0E 11 04 15 04 11`.  
-As can be seen, the ASCII alphabet characters were remapped to the 0..25 range, but the spaces and `][` characters were left alone.
+### Scopes and Procs
 
-Note that quoted characters in strings do not have `.strcode` applied to them. In all strings, the escape sequences `\n\r\t\0` are interpreted as they are in C, and the backslash character itself must always be escaped as `\\`. The escape `\0` represents zero, while `\077` is an octal escape; consequently, `\0` serves both purposes.
+`.proc` and `.scope` define namespaces that allow label reuse:
 
-To disable processing, use `.strcode _`. Note that if you use `_` as a variable in the same scope, `.strcode` will overwrite it.
-
-\Needspace{14\baselineskip}
-#### Assembler Scope and proc
-The directives `.scope` and `.proc` define namespaces that allow the reuse of symbol names within a scope or procedure. For example:
 ```
-.proc A
+.proc loader
 start:
-    lda $ffff
+    lda $C000
 .endproc
 
-.proc B
+.proc display
 start:
-    sta A::start + 1
+    sta loader::start + 1    ; access a label in another scope
 .endproc
 ```
-Here, `A::start` is distinct from `B::start`. The symbol name `start` may be reused freely within different scopes or procs without ambiguity. Note the syntax for accessing labels in other scopes: anchoring with `::` at the start of a name resolves the symbol from the root scope, while omitting the leading `::` resolves it relative to the current parent scope chain.
 
-\Needspace{12\baselineskip}
-Anonymous scopes are useful inside loops, for example:
+Use `::` at the start of a name to resolve from the root scope. Labels in different
+scopes do not collide.
+
+A scope name may be written bare (`.scope game`) or quoted (`.scope "game"`); the two
+forms are equivalent. Quoting is allowed for symmetry with `.segdef`, but because a
+scope name is used in `::` qualified references (`game::start`), a quoted name must
+still be a legal identifier -- it cannot contain spaces or other non-identifier
+characters.
+
+Anonymous scopes (`.scope` without a name) are useful inside
+loops to prevent iteration labels from clashing:
+
 ```
 .for i=0, i .lt 8, i++
   .scope
-    address = $C000 + (i << 4)
-   start:
-    lda address
+    addr = $C000 + i
+  start:
+    lda addr
   .endscope
 .endfor
 ```
-In this example, anonymous scopes are generated with names `anon_0001` through `anon_0008`, assuming they are the first anonymous scopes declared within their parent scope.  Start has no name collision in the loop, as it is wrapped inside a scope.
 
-#### Assembler .segdef and .segment
-The `.segdef` and `.segment` directives exist primarily to improve compatibility with ca65, making it easier to port ca65-based code. ca65 code frequently switches segments within a single assembly source file, and support for segments avoids the need to split such code into multiple files for the a2m assembler. In addition, non-emitting segments are useful even in native mode.
+### Segments
 
-\Needspace{11\baselineskip}
-As an example, consider the file `samples/mminer/mminer-a2m.asm`:
+Named segments let you lay out memory regions and switch between them:
+
 ```
 .segdef "ZEROPAGE", $50, noemit
-.segdef "LOWMEM", $800, noemit
-.segdef "HGR", $4000
 .segdef "CODE", $6000
-.segdef "RODATA", $89DC
-.segdef "DATA", $BE40
+.segdef "DATA", $8000
 
-.include "mminer.asm"
+.segment "ZEROPAGE"
+ptr:    .res 2
+
+.segment "CODE"
+main:
+    lda (ptr),y
+    ...
+
+.segment "DATA"
+table:  .byte $01,$02,$03
 ```
-Named segments are created by `.segdef`. When a segment is activated using, for example, `.segment "ZEROPAGE"`, the code emit location is set to `$50`. Each instruction that would normally emit code advances the location counter, but because `ZEROPAGE` is marked `noemit`, no bytes are written.
 
-This allows zero-page memory to be laid out using directives such as `.res`, without requiring explicit address assignments. The assembler computes locations automatically, avoiding manual constructs such as `= $50`, `= $51`, and so on.
+`noemit` segments advance the location counter but produce no output -- useful for
+mapping zero-page variables without emitting placeholder bytes. A `noemit` segment
+may not overlap any other segment; to overlay memory intentionally, use a reclaim
+segment (below).
 
-\Needspace{6\baselineskip}
-Notes:
+A **reclaim** segment piggybacks on an emitted "host" segment so a region can be
+reused at runtime once the host's contents are consumed. The classic case is a title
+image loaded as part of the executable and then relocated as the program starts,
+freeing its load area for buffers and variables:
 
-* The assembler allows segments to overflow. For segments that are marked as `emit`, the assembler will issue a warning when overflow occurs and will report the amount by which a segment size must be adjusted to allow segments to abut correctly.
-* Before the first `.segment` directive, native mode is active. In native mode, the address specified by `* =` or `.org` determines where code is emitted. After using `.segment`, native mode can be re-enabled with `.segment ""`.
+```
+.segdef "TITLE", $2000              ; the image, emitted into the program
+.segdef "REUSE", reclaim="TITLE"    ; buffers that reuse TITLE's space at runtime
 
-#### Assembler and ca65
-The assembler was not written to be compatible with ca65, but the inclusion of `.proc`, `.scope`, and `.segment` significantly increases compatibility. Most of the `Manic Miner` sample code assembles without modification from the ca65 version. The following differences should be noted:
+.segment "REUSE"
+buffer: .res $100                    ; lives at $2000, emits nothing
+```
 
-* Expression evaluation order differs. a2m uses C-style operator precedence, while ca65 does not. For example, the expression `counter << 2 & 0xFF` will not produce the same result.
-* In macros, a2m uses `.if .defined`, which is the inverse of ca65's `.ifblank`.
-* In a2m, `:=` and `=` are equivalent.
-* In a2m, reading the current address using `*` yields the address at that point in emission, not the start of the line. As a result, ca65 evaluates `lda #*` as `lda #0`, while a2m evaluates it as `lda #1` if the emitter address was 0 when the line was encountered.
-* a2m uses dot comparison operators instead of symbols (for example `.lt` vs `<`)
+A reclaim segment is implicitly `noemit`, takes no address of its own (its labels
+resolve into the host's memory), and is sized no larger than its host. It follows the
+host automatically: if auto-adjust moves the host, the reclaim segment moves with it.
+The host must be a previously defined, emitted segment. Consuming or relocating the
+host before the reclaimed region is used is the programmer's responsibility -- the
+assembler enforces only the address and size relationship, not the runtime ordering.
 
-a2m lacks many of the advanced features found in ca65, but with what is there, a lot of code ports fairly easily to a2m now.
+Emitted segments are checked for overlap. Normally an overlap fails assembly and
+prints a compacted set of suggested starts. With segment auto-adjust enabled, those
+starts are applied temporarily and pass 1 is restarted up to three times. This
+re-evaluates `.align` padding at each new start, so a first approximation that changes
+segment sizes can converge on a later retry. The lowest segment remains the packing
+anchor; subsequent emitted segments are packed contiguously in address order.
 
-### Assembler Sample
-The sample folder contains code for use with the assembler. The `samples/mminer` folder contains the full source code for the `Manic Miner` game, and most of the constructs discussed above are used there.
+A `locked` segment is an anchor whose start address is never changed by auto-adjust --
+use it for regions the hardware requires at a fixed address, such as an HGR page that
+must stay at `$2000`. Lower segments are still packed around a locked segment, but if
+they grow enough to overrun it, auto-adjust does not attempt to reshuffle the layout
+around the anchor: assembly fails with an error naming the locked segment, leaving the
+fix to the author.
 
-# INI Files in Depth
-a2m uses INI files to configure itself at startup. The sequence is to read the INI file specified on the command line, or, if none is specified, to read `a2m.ini` in the current folder. This is unless `--noini` was specified, in which case an INI file is not read. After reading the INI file, a2m will apply any command-line switches that affect configuration to the configuration loaded from the INI file.
+```
+.segdef "CODE", $0800
+.segdef "HGR",  $2000, locked   ; hires page -- must stay at $2000
+```
 
-This means the on-disk INI file can be altered by the command line. This can be prevented by specifying the `--nosaveini` command-line switch. When `--nosaveini` is specified, the INI file is not saved on exit, even if the INI file that was parsed contained a switch to save on exit, or `--saveini` was specified. `--saveini` is used to force saving to an INI file that does not contain a switch to save on exit. This is a way to force a command-line change into an on-disk INI file.
+### Strcode
 
-All section headings appear between square brackets, for example `[Machine]`. The names are case-insensitive. All variables in a section have the form `<Name> = <value>`, where `<Name>` is the name of the variable and `<value>` is the value associated with that variable.
+`.strcode e` remaps string characters using the expression `e`. The variable `_` holds
+the current character's ASCII value:
 
-Comments can be used in INI files, but note that if a2m saves out an INI file, the comments will be lost. Comments take the form `# Everything after the hash symbol (#) is a comment`. Comments can appear on lines that also have valid information, for example: `Variable = Value # assign Value to Variable`.
+```
+.strcode _ .ge 'A' && _ .le 'Z' ? _ - 'A' : _ .ge 'a' && _ .le 'z' ? _ - 'a' : _
+.string "Hello"
+```
 
-\Needspace{7\baselineskip}
-## Machine Section
-The Machine section is used to configure the Apple 2 machine that is being emulated. Variables are:
+This remaps A-Z to 0-25 and a-z to 0-25, leaving other characters unchanged. Restore
+default behavior with `.strcode _`. Quoted escape sequences (`\n`, `\r`, `\t`, `\0`,
+`\\`, `\xNN`, `\0NN` octal) are processed in strings but are not passed through
+`.strcode`.
 
-| Variable | Value                                                                                 |
-|:---------|:--------------------------------------------------------------------------------------|
-| Model    | `plus` or `enh`. `plus` emulates a ][+, and `enh` emulates a //e Enhanced             |
-| Turbo    | Comma-separated values as 1 MHz multipliers. `max` for as fast as possible            |
+### Named Output Targets
 
-An example Turbo setting might be `Turbo = 1, 8, max ; This means 1 MHz, 8 MHz, or as fast as possible at 60 FPS`.
+A named `.scope` can send its output to a separate file or to a named memory bank, so
+a single source can build several binaries in one pass -- a loader plus a game, a main
+program plus overlays, and so on:
 
-\Needspace{9\baselineskip}
-## Config Section
-The Config section is mostly UI configuration. Variables are:
+```
+* = $0800
+        ; ... loader code, written to the default output ...
 
-| Variable     | Value                                                                             |
-|:-------------|:----------------------------------------------------------------------------------|
-| disk_leds    | Value `on` or `1` shows disk activity LEDs in the lower right of the UI           |
-| original_del | Value `on` or `1` makes Backspace send Apple II DEL                               |
-| save         | `yes` means save the INI file on exit                                             |
-| symbols      | Comma-separated files that contain symbol information                             |
-| symbol_view  | In disassembler `0`: lookup, syms & labels, `1`: syms & labels, `2`: labels, `3`: raw   |
-| ui           | `text` for text based UI.  Anything else means GUI based UI                       |
-| wheel_speed  | Number of lines to scroll when using the mouse scroll wheel                       |
+.scope game file="game.bin" dest="main"
+    * = $6000
+main:
+        inc $C034
+        jmp main
+.endscope
+```
 
-\Needspace{7\baselineskip}
-## Video Section
-The Video section has only one valid variable, and it is only used to configure the 80-column card on the Apple ][+ model. Using this will install the Franklin Ace Display card into a slot on an Apple ][+ machine.
+Everything between the named `.scope file="..."` and its `.endscope` is assembled into
+its own output image; code outside goes to the default output. Labels remain visible
+across files through the normal scope rules (`game::main`), so the loader can reference
+addresses in the game and vice versa.
 
-| Variable | Value                                                                                 |
-|:---------|:--------------------------------------------------------------------------------------|
-| sNdX     | Franklin Ace Display. The `N` in `sNdX` is a slot number, usually 3. `X` is `0`       |
+The assembler core passes `file=` and `dest=` to its host. Command-line `am65` uses
+`file=` to create a separate binary and accepts but ignores `dest=`. A `dest=`-only
+scope therefore continues writing into its parent file image.
 
-\Needspace{6\baselineskip}
-## DiskII Section
-The Disk II section configures an Apple Disk II floppy drive.
+The in-emulator host ignores `file=` and uses `dest=` to place bytes. Valid Apple II
+destinations are `map`, `main`, `aux`, `lc1`, and `lc2` (case-insensitive), and
+independent selections may be combined, for example `dest="aux,lc2"`. A scope with
+`file=` but no `dest=` defaults to `map`. Unsupported names are assembly errors.
 
-Disk II supports NIB and DSK for reading and writing, and WOZ for reading.
+### Build-Time Detection
 
-| Variable | Value                                                                                 |
-|:---------|:--------------------------------------------------------------------------------------|
-| sNdX     | Comma-separated paths to floppy disk images                                           |
+The define `AM65` distinguishes how the source is being assembled: it is `1` under the
+command-line `am65` tool and `0` when assembled by the in-emulator Assembler tab. The
+emulator also predefines `APPLE2=1`; standalone `am65` defines no machine symbol. Use
+these to switch behaviour between a live-poke session and a file build:
 
-The `N` and `X` in `sNdX` are slot and drive numbers. The slot is usually 6, and the drive number can be `0` or `1`.
+```
+.if AM65
+    * = $0800           ; standalone build: normal load address
+.else
+    * = $6000           ; live in the emulator: assemble into spare RAM
+.endif
+```
 
-Example:  
-`s6d0 = "./disks/Leaderboard side A.nib","./disks/Leaderboard side B.nib"`
+Additional build flags can be injected from the command line with `-D name[=value]`
+(see below) and tested the same way.
 
-In the example, both floppy disk images are configured for a Disk II in slot 6, drive 0. Side A will be mounted, and using the Swap button in the UI, or the Swap action in a breakpoint, the Side B floppy can be swapped into the drive for use.
+### Command-Line Assembler (am65)
 
-\Needspace{8\baselineskip}
-## SmartPort Section
-The SmartPort section configures a slot for use as a SmartPort block device. These contain block device images, usually 32 MB images (often 33,553,920 bytes) or smaller.
+`am65` is a standalone build of the same assembler, for use in scripts and makefiles.
+It writes raw binary files rather than poking live memory.
 
-| Variable | Value                                                                                 |
-|:---------|:--------------------------------------------------------------------------------------|
-| sNdX     | Path to a disk image                                                                  |
-| bs       | A value of `1` will force-boot that device                                            |
+```
+am65 -i <infile> [-o <outfile>] [-a <addr>] [-s <symfile|->]
+     [-C <6502|65c02|rockwell|wdc>] [-D name[=value]]...
+     [--auto-adjust-segments] [-v] [-h]
+```
 
-As with the Disk II section, the values for `N` and `X` are a valid, unused slot number and device number, where device numbers are `0` or `1`. Usually the slot numbers are `5` or `7`. The Apple //e will try to boot from a SmartPort device `0` in slot `7`. The `bs` setting can be used to force an Apple 2 to boot a SmartPort device `0` in a slot other than slot `7`, or to boot an Apple ][+ from a SmartPort device instead of the Disk II device.
+| Switch | Effect |
+|--------|--------|
+| `-i <infile>` | Assembly source to assemble (required) |
+| `-o <outfile>` | Binary output for the default (unnamed) target |
+| `-a <addr>` | Origin/load address of the default target (default `$0000`; accepts `$hex`, `0xhex`, or decimal). Not needed if the source sets its own origin with `* =` / `.org` |
+| `-s <symfile\|->` | Write a symbol + segment listing; `-` sends it to stdout |
+| `-C`, `--cpu <name>` | Select the initial CPU profile (default `6502`) |
+| `-D name[=value]` | Predefine a text define (value defaults to `1`); repeatable |
+| `-A`, `--auto-adjust-segments` | Retry overlapping pass-1 layouts up to three times using suggested starts |
+| `-v` | Verbose: hex-dump each target's emitted bytes |
+| `-h` | Show usage |
 
-\Needspace{8\baselineskip}
-## Mockingboard Section
-The Mockingboard section adds a Mockingboard card, with two AY-3-8910 sound chips, to an Apple II as a slot card. Simply enabling the card incurs a performance penalty. At the BASIC prompt, an M2 Mac Mini achieves 160 MHz without a Mockingboard, but only 110 MHz with one configured.
+Each output file contains exactly the range of addresses the source emitted into.
+Named `.scope file="..."` targets are written to their own files (resolved relative to
+the current directory). `dest=` is accepted but ignored. `AM65` is predefined to `1`;
+no emulator machine symbol is predefined.
 
-| Variable | Value                                                                                 |
-|:---------|:--------------------------------------------------------------------------------------|
-| sNdX     | Adds a Mockingboard audio card to slot `N`.  `X` is `0`                               |
+```
+am65 -i demo.asm -o loader.bin -a $0800 -D VERSION=3 -s symbols.txt
+```
 
-## Debug Section
-The Debug section is not a normal INI section. Normally, a variable (or key, in INI parlance) must have a unique name. In the Debug section, the `break` variable is used repeatedly.
+Sample sources live in `samples/`.
 
-\Needspace{2\baselineskip}
-The `break` variable takes the form:  
-`break = <address[-address]>[,<pc|read|write|access|map|main|aux|lc1|lc2|rom|c100rom|c100map|d000map|reset|fast|slow|swap sNdX|tron|troff|type str|count[,reset]>`
+## Configure
 
-In this syntax, elements in `<>` are required, and elements in `[]` are optional. When `|` is used, it means "or". For example, `[,pc|read|write]` means an optional comma followed by one of `pc`, `read`, or `write`.
+The Configure dialog (opened from **[Configure...]** in **Misc -> Machine**) has three
+tabs: **Machine**, **Emulator**, and **Paths**. Shared controls for the INI file sit
+below the tab body on every tab.
 
-* **address** is the breakpoint address, usually a hexadecimal number such as `0x1234`.
-* **-address** is optional and makes the breakpoint apply to a range from address to address. This takes the form `0x8000-0x80ff`, where `0x8000` is the range start and `0x80ff` is the range end.
-* **pc** means this is a breakpoint on code execution.
-* **read** means the breakpoint is activated by a read from the address or range.
-* **write** means the breakpoint is activated by a write to the address or range.
-* **access** means the breakpoint is activated by either a read from or a write to the address or range.
-* **map/main/aux/lc1/lc2/rom/c100rom/c100map/d000map** set the breakpoint bank view for ini breakpoints.
-* **fast** sets Turbo Mode to `max`.
-* **slow** sets Turbo Mode to 1 MHz.
-* **restore** sets Turbo Mode back to the value it had before `slow` or `fast` was used.
-* **swap** swaps the disk in the drive (Slot N Drive X) to the next disk in the queue.
-* **tron** turns trace logging on. The log is written to the file `trace.txt` in the current folder.
-* **troff** turns trace logging off.
-* **type** inserts the characters from `str` into the keyboard address.
-* **count** is a number that sets the breakpoint counter to that value.
-* **reset** is a number that sets the breakpoint reset counter to that value.
+### Machine
 
-For `count` and `reset`, the first non-keyword number is assumed to be `count`, and the second is `reset`.
+| Control | Effect |
+|---------|--------|
+| Model | `//e Enhanced` or `][+`; applying a change power-cycles the machine |
+| Slot 1-7 | Card in that slot: `Empty`, `Disk II`, `SmartPort`, or `Mockingboard`. Only one Mockingboard is allowed; choosing a second slot clears the first. Applying a changed layout power-cycles the machine |
+| Keyboard Joystick | `Off`, `Stick 1`, or `Stick 2`, plus the `Numpad` or `WASD` key layout |
+| Swap fire keys | While the stick is on: Space is button 0 and Option is button 1 (WASD-friendly). Off when the stick is Off |
+| Turbo | Comma-separated ladder, e.g. `1,max` or `1,4,8,max` |
+| History off on max | Pause the CPU flight recorder while turbo is `max` (faster free-run) |
+| Pause on BRK | Auto-pause free-run at the next `BRK` (`$00`); off by default |
+| Show disk LEDs | Draw green (read) and red (write) activity LEDs in the window corner |
 
-\Needspace{10\baselineskip}
-Here are a few examples:
+The Keyboard Joystick stick selector matches the runtime **Shift+Opt+1** /
+**Shift+Opt+2** assignment; either place can change the active stick. Change the
+layout here or with **Shift+Opt+M**. Default at first launch is Stick 1 / Numpad so
+titles that expect a gameport have a keyboard stick without a pad.
 
-`; switch to the second floppy for Disk II in slot 6, drive 0`  
-`break = 0x55b5,swap=s6d0`  
-`; press enter`  
-`break = 0x55b8,type=\r`  
-`; set Turbo Mode to fast, that is, as fast as possible at 60 FPS (max)`  
-`break = 0x581e,fast`  
-`; after 10 read/write accesses in the range, a break will occur`  
-`; thereafter, every second access will cause a break`  
-`break = 0x5000-0x5002,access,10,2`  
+### Emulator
 
-## Assembler Section
-The assembler section sets up a root file to assemble using the built-in assembler.
+| Control | Effect |
+|---------|--------|
+| Scroll Wheel Speed | Number of rows scrolled per wheel click (1-100) |
+| Original DEL behaviour | Backspace sends Apple II DEL (`$7F`) instead of cursor-left (`$08`). The physical Delete key always sends DEL |
+| Symbol Files | Add symbol files and display the comma-separated list of selected files |
+| True Aspect Ratio | Keep a classic 4:3 Apple monitor shape; off stretches the picture to fill the view |
+| CRT Smoothing | Filter the picture instead of showing hard pixel edges; forced on by CRT Scanlines and CRT Curvature |
+| CRT Scanlines | Simulate the dark gap between raster lines; the slider sets strength from 1-100% |
+| CRT Curvature | Bend the picture toward a curved CRT surface; the slider sets amount from 1-100% |
 
-\Needspace{7\baselineskip}
-| Variable    | Value                                                                              |
-|:------------|:-----------------------------------------------------------------------------------|
-| source      | Fully qualified path to the file                                                   |
-| dest        | `6502`, `64K`, `128K` or `LC Bank`. `6502` is the default                          |
-| auto_run    | `yes` or `1` to auto run after successful assembly                                 |
-| address     | Address at which to start auto-run (example: `0x6000`)                             |
-| reset_stack | `yes` or `1` to reset/clear the stack when auto-running                            |
+The CRT controls are a live preview: checkboxes and sliders update the Apple 2 display
+while Configure remains open. **[Cancel]** or the dialog close button restores the
+values that were active when Configure opened. **[OK]** accepts them. All three
+effects are optional and independent; with them disabled, a2m uses the original
+rectangular render path.
 
-Since the assembler is mapped to `CTRL+F4`, configuring the assembler settings in an `.ini` file makes it possible to assemble and run a program under development by pressing `CTRL+F4` after editing the assembly source, without having to restart or stop the emulator.
+### Paths
 
-\Needspace{13\baselineskip}
-# Appendix A: Version History
+The Paths tab holds the default browse folders. Each field starts empty (the browser
+then opens in the current working directory) and updates as you pick files. Paths are
+shown and stored relative to the INI file's directory, and each row has a **[...]**
+button that opens a folder picker:
 
-31 Oct 2024
-:   Initial release - made in London, UK.
+| Field | Used by |
+|-------|---------|
+| assembler | Select Assembler Source |
+| floppy | Insert Disk II images |
+| smartport | Insert SmartPort volumes |
+| binary | Load/Save Binary |
+| basic | Load/Save Applesoft text |
+| snapshot | Save/Load State - and the quicksave folder (Shift+Opt+> / <) |
 
-8 Dec 2024
-:   Version 1.0 release.
+Edits to the browse folders take effect on the next browse immediately. The folder
+picker's **[Use This Folder]** button selects the folder currently shown. **[Save
+Paths Only]** rewrites just the browse folders (and current media paths) into the
+named INI file, leaving every other setting untouched; it is a silent no-op if no
+INI file is set.
 
-10 Dec 2024
-:   Version 1.1 release.
+### INI File
 
-23 Dec 2025
-:   Version 2.0 release.
-    The version 2 release is a re-architecture of the entire code base, as well as a rewrite of the 6502 core, adding a 65C02 mode. The Apple //e is also supported, along with many new features such as a NIB Disk II, resizable window, window pane sliders, and many more.
+Below the tab body, the Configure dialog shows the INI file path and a **[...]**
+button. Changing the path prompts a2m to parse the selected file immediately.
 
-4 Feb 2026
-:   Version 2.1 release.
-    This version fixes bugs and has tweaks above the V2.0 release, and it enhances the built-in assembler allowing it to compile the bulk of ca65 assembler targeted sources with only some edits.
- 
-11 Feb 2026
-:   Version 2.11 release.
-    This version is mostly about UI; added an INI configuration dialog and load from within a2m as well as other tweaks. Breakpoints can now be set in any bank and will only break in that bank, not that PC in any bank.  Audio (speaker) also tweaked.
+**Auto-save INI on Quit** enables persistent save-on-quit behavior by writing `Save=yes`
+under `[config]`. When that box is ticked, quitting the emulator writes the current
+settings to the named INI file.
 
-5 April 2026
-:   Version 2.2 release.
-    This version has some assembler inprovements (multi-target support), and added the Mockingboard.  Dialogs now also use a double-click, not a single click as it did before.
+| Button | Effect |
+|--------|--------|
+| **[Save INI now]** | Apply the dialog settings and write the INI file immediately (including the current window size and layout splitters); Configure stays open |
+| **[OK]** | Apply all changes without writing the INI (quit still saves when Auto-save is on) |
+| **[Cancel]** | Discard dialog changes |
 
-16 May 2026
-:   Version 2.3 release.
-    This version adds .dsk RW and .WOZ ro support and fixes a background clear bug.
+## INI Files
+
+a2m reads `a2m.ini` from the current directory by default. Use `--inifile <path>` to
+load a different file, or `--noini` to skip loading entirely.
+
+Relative paths in the INI (disks, browse folders, assembler source, symbols) are
+resolved against the directory that contains the INI file, not against the process
+working directory. Absolute paths stay absolute. On save, paths near the INI (under
+it, or a close sibling via at most two `..` steps) are rewritten relative so a
+movable install stays portable; farther absolute paths are kept absolute.
+
+Command-line media paths (`--disk`, `--hd`, and similar) stay relative to the shell's
+current directory.
+
+All section names are case-insensitive. Comment lines start with `#`. Saving from the
+emulator removes comments.
+
+### [machine]
+
+| Key | Value |
+|-----|-------|
+| `model` | `enh` (//e Enhanced, default) or `plus` (][+) |
+
+### [Slots]
+
+| Key | Value |
+|-----|-------|
+| `slot1` ... `slot7` | `empty`, `diskii`, `smartport`, or `mockingboard` |
+
+Default layout: slot 4 Mockingboard, slot 6 Disk II, slot 7 SmartPort, others empty.
+
+### [config]
+
+| Key | Value |
+|-----|-------|
+| `Save` | `yes` -- save INI on quit |
+| `turbo_speeds` | Comma-separated turbo ladder, e.g. `1,max` |
+| `history_off_on_max` | `true`/`false`; pause flight recorder on `max` (default true) |
+| `scroll_wheel_lines` | Integer; lines scrolled per wheel click |
+| `original_del` | `true`/`false`; Backspace sends `$7F` instead of `$08` |
+| `symbol_files` | Comma-separated list of symbol file paths |
+| `pause_on_brk` | `true`/`false`; when true, free-run auto-pauses at the next `BRK` |
+| `disk_leds` | `true`/`false`; show disk activity LEDs (also written as `[disk] show_disk_leds`) |
+
+### [Video]
+
+| Key | Value |
+|-----|-------|
+| `true_aspect` | `true`/`false`; true keeps 4:3, false fills the view |
+| `crt_smoothing` | `true`/`false`; filter the picture rather than show hard pixel edges |
+| `crt_scanlines` | `true`/`false`; enable scanlines |
+| `crt_scanline_strength` | Integer 1-100; scanline darkness (default `35`) |
+| `crt_curvature` | `true`/`false`; enable curved-screen distortion |
+| `crt_curvature_amount` | Integer 1-100; curvature amount (default `30`) |
+
+### [input]
+
+| Key | Value |
+|-----|-------|
+| `keyboard_joystick_layout` | `numpad` or `wasd` (default `numpad`) |
+| `keyboard_joystick_port` | `0` (disabled), `1`, or `2` (default `1`) |
+| `keyboard_joystick_swap_buttons` | `true`/`false`; Space=BUTN0 and Option=BUTN1 while the stick is on |
+
+The stick can also be set for one launch with `--kbdjoy <0|1|2>`, and the layout with
+`--kbdjoy-layout <numpad|wasd>`.
+
+### [browse]
+
+Default folders the file browser remembers per browse type (see the Configure
+dialog's Paths tab). Any missing key defaults to the current working directory.
+
+| Key | Used by |
+|-----|---------|
+| `assembler` | Select Assembler Source |
+| `floppy` | Insert Disk II images |
+| `smartport` | Insert SmartPort volumes |
+| `binary` | Load/Save Binary |
+| `basic` | Load/Save Applesoft text |
+| `snapshot` | Save/Load State and the quicksave folder |
+
+### [Window]
+
+| Key | Value |
+|-----|-------|
+| `width` | Window width in pixels |
+| `height` | Window height in pixels |
+
+### [Layout]
+
+| Key | Value |
+|-----|-------|
+| `split_display_right` | Float 0-1; vertical split between Apple 2 and debugger |
+| `split_top_bottom` | Float 0-1; horizontal split between top and bottom |
+| `split_memory_misc` | Float 0-1; split between memory and misc panel |
+
+### [DiskII]
+
+Each key is `sNdX` where `N` is the slot (`1..7`) and `X` is the drive (`0` or `1`).
+The value is a path, or a comma-separated list of paths for a multi-image queue.
+
+```
+[DiskII]
+s6d0 = ./disks/sideA.nib,./disks/sideB.nib
+s6d1 = ./disks/util.dsk
+```
+
+The first image in the list is mounted at startup. The current position within the
+queue is not saved; launching the emulator always starts from the first image.
+
+Legacy `[disk] path=` is still accepted as Slot 6 Drive 0.
+
+### [SmartPort]
+
+Each key is `sNdX` where `N` is the slot and `X` is the unit (`0` or `1`).
+
+| Key | Value |
+|-----|-------|
+| `s7d0`, `s5d0`, ... | Path to a block-device image |
+| `boot_slot` | Force startup through SmartPort unit 0 in this slot |
+
+Legacy `[disk] hd=` is still accepted as Slot 7 Device 0.
+
+### [assembler]
+
+Persists the Assembler tab state. See **Assembler INI persistence**.
+
+### [debug]
+
+| Key | Value |
+|-----|-------|
+| `history_memory_mb` | CPU flight-recorder budget; `0` or `16..4096` (default `256`) |
+| `frame_ring_memory_mb` | Frame-ring budget; `0` or `8..4096` (default `128`) |
+
+### [DEBUG]
+
+Breakpoints are stored as repeated `break.*` keys.
+
+Each entry has the form:
+
+```
+break.<addr[-addr]> = <access>[,mapping][,actions][,count=N][,reset=N]
+```
+
+**Address and access:**
+
+| Part | Meaning |
+|------|---------|
+| `address` | Hex address, e.g. `C000` or `$C000` |
+| `-address` | Optional range end |
+| `execute` | Execute breakpoint |
+| `read` | Read-access breakpoint |
+| `write` | Write-access breakpoint |
+| `access` | Read or write |
+| `map` / `main` / `aux` / `c100map` / `c100rom` / `d000map` / `lc1` / `lc2` / `rom` | Mapping filter |
+
+**Actions:**
+
+| Token | Meaning |
+|-------|---------|
+| `break` | Pause execution |
+| `fast` | Switch turbo to `max` |
+| `slow` | Switch turbo to 1 MHz |
+| `troff` | Disable execution trace |
+| `tron` | Enable execution trace; writes to `trace.log` |
+| `tron=path` | Enable execution trace; writes to `path` |
+| `swap=+N` | Advance the Disk II queue forward N steps (wraps) |
+| `swap=-N` | Advance the Disk II queue backward N steps (wraps) |
+| `swap=N` | Mount the Nth disk in the queue, 1-based |
+| `type=text` | Inject text as Apple keystrokes (see **Type text format**) |
+| `count=N` | Fire on the Nth hit |
+| `reset=N` | Repeat interval after firing; `1` = every hit (default), `N>1` = every Nth hit, `0` = auto-disable after firing |
+| `disabled` | Leave the breakpoint in the list but ignore it |
+
+Examples:
+
+```
+break.C000 = execute,map,break
+break.D000-D3FF = write,map,fast
+break.C100 = execute,map,break,count=10,reset=2
+break.55B5 = execute,map,swap=+1
+break.55B8 = execute,map,type=\r
+```
+
+## Keyboard
+
+Keys listed here are intercepted by the emulator before reaching the Apple 2. On
+macOS, **Opt** = Option/Alt.
+
+### Emulator Keys
+
+| Key | Action |
+|-----|--------|
+| **F9** | Toggle Debug Mode on/off |
+| **Opt+H** | Toggle in-emulator help on/off |
+| **Shift+Opt+A** | Assemble the configured source file using the Assembler settings |
+| **Shift+Opt+M** | Toggle keyboard joystick mapping between Numpad and WASD |
+| **F10** | Step instruction (paused) or Pause (running) |
+| **Shift+F10** | Step out of current subroutine |
+| **F11** | Step over JSR |
+| **F12** | Run (resume execution) |
+| **Shift+F12** | Run to the cursor address in the Disassembly view |
+| **F8** | Warm reset (CTRL+RESET) |
+| **Opt+F8** | Cold reset (CTRL+Open-Apple+RESET) |
+| **Opt+T** | Cycle turbo mode |
+| **Opt+Tab** | Cycle active view: Apple 2 -> Disassembly -> Misc -> Memory |
+| **Shift+Opt+Tab** | Cycle active view in reverse |
+| **Opt+1** | Map gamepad to stick 1 |
+| **Opt+2** | Map gamepad to stick 2 (or swap two pads) |
+| **Shift+Opt+1** | Assign the keyboard joystick to stick 1 (press again to disable) |
+| **Shift+Opt+2** | Assign the keyboard joystick to stick 2 (press again to disable) |
+| **Shift+Opt+0** | Disable the keyboard joystick |
+| **Shift+Opt+>** | Quicksave state to the snapshot folder (Configure -> Paths) |
+| **Shift+Opt+<** | Quickload the newest state from the snapshot folder |
+| **Cmd+Q** | Quit (macOS) |
+| **Opt+Q** | Quit (Windows / Linux) |
+
+### Paste and Clipboard
+
+| Key | Action |
+|-----|--------|
+| **Opt+Ins** | Paste OS clipboard into the Apple keyboard (`$C000` / `$C010`). //e keeps case; ][+ uppercases. Does not change turbo. |
+
+### Apple Key Mapping
+
+The host keyboard maps to the Apple 2 keyboard. Common mappings:
+
+| Host Key | Apple 2 |
+|----------|---------|
+| Letters A-Z | A-Z (//e keeps case; ][+ is uppercase) |
+| Digits 0-9 | 0-9 |
+| Shift + digit / symbol | The shifted Apple character (`!`, `@`, and so on) |
+| Left Alt / Option | Open-Apple (`$C061` / BUTN0), unless the keyboard stick is on |
+| Right Alt | Closed-Apple (`$C062` / BUTN1) |
+| Ctrl | CONTROL |
+| Escape | ESC |
+| Tab | TAB |
+| Backspace | Cursor-left (`$08`), or DEL (`$7F`) if Original DEL is on |
+| Delete | Apple DEL (`$7F`) |
+| Return | Return |
+| Arrow keys | Arrow keys |
+| Space | Space |
+
+Host function keys are product-shell shortcuts and are not forwarded to the Apple 2.
+
+### Keyboard Joystick
+
+The host keyboard can also act as an Apple gameport stick. Default at first launch is
+**Stick 1** / **Numpad**. Assign it with **Shift+Opt+1** / **Shift+Opt+2**, the
+Keyboard Joystick control in the Configure dialog, or `--kbdjoy`.
+
+| Layout | Directions | Diagonals | Fire 0 | Fire 1 |
+|--------|------------|-----------|--------|--------|
+| `numpad` | Keypad 8 / 2 / 4 / 6 | Keypad 7 / 9 / 1 / 3 | Option / Keypad 0 | Space |
+| `wasd` | W / S / A / D | (hold two keys) | Option | Space |
+
+**Swap fire keys** (Configure, or INI `keyboard_joystick_swap_buttons`) makes Space
+primary and Option secondary while the stick is on. Stick off: Option is Open-Apple
+again.
+
+The `numpad` keys are not Apple keys, so that layout never interferes with typing.
+The `wasd` keys are Apple keys, so while the stick is assigned they drive the
+gameport instead of reaching the keyboard. They type normally when the stick is
+disabled or when a debugger view has keyboard focus. The `numpad` layout uses
+keypad key codes, so Num Lock must be on.
+
+SDL gamepads: D-pad/stick, A=BUTN0, B=BUTN1. **Opt+1** / **Opt+2** map a single pad
+to stick 1 or 2, or swap two pads.
+
+## Remote
+
+a2m has an opt-in localhost TCP control port for remote debugging and automation. It
+is disabled by default. Start it with:
+
+```sh
+./a2m --control-port 6510
+```
+
+For automation without a visible window or host audio device, use headless mode:
+
+```sh
+./a2m --headless --control-port 6510
+```
+
+To restore a machine snapshot as soon as the process starts (before remote commands),
+combine headless mode with `--sna`:
+
+```sh
+./a2m --headless --control-port 6510 --sna demos/midload.a2state
+```
+
+The server always binds to `127.0.0.1`. It accepts one client at a time. The socket
+thread performs network I/O only; runtime commands and snapshot requests are dispatched
+by the main loop, so remote control follows the same thread-ownership rules as the GUI
+debugger. The current protocol name is `A2M/6`.
+
+Python helpers:
+
+```sh
+./a2m --control-port 6510
+python3 tools/a2m_control_client.py --port 6510 hello get-softswitches
+```
+
+### Quick Start
+
+A remote session is line-oriented. Each request starts with a decimal request id, then a
+command, then command arguments:
+
+```text
+1 ping
+2 pause
+3 get-cpu
+4 get-memory $0400 64 map
+5 set-memory $0400 4 main
+<4 raw bytes>
+6 quit-client
+```
+
+Responses begin with the same id:
+
+```text
+1 ok
+2 ok accepted=1
+3 ok pc=FF69 a=00 x=00 y=00 sp=F8 p=34 cycles=1712136
+4 data memory 64 addr=0400 length=64 mode=0
+<64 raw bytes>
+5 ok addr=0400 length=4 mode=1
+6 ok
+```
+
+`quit-client` closes the TCP client connection. It does not quit the emulator process.
+Headless automation should terminate the process externally after the final client
+command.
+
+### Request Format
+
+Requests are ASCII lines terminated by `\n`:
+
+```text
+<id> <command> [arguments...]\n
+```
+
+`<id>` is a decimal unsigned integer chosen by the client. a2m does not require ids to
+be sequential, but sequential ids make logs easier to read. Commands are lower-case
+words with hyphens. Hex addresses may be written as `0xC000` or `$C000`; decimal counts
+and timeouts are written without a prefix.
+
+Most commands are single-line. `set-memory` carries a length-prefixed raw payload after
+the request line:
+
+```text
+<id> set-memory <addr> <length> <map|main|aux|lc1|lc2|rom>\n
+<length raw bytes>\n
+```
+
+The payload may contain arbitrary bytes except that the framing still requires exactly
+one trailing newline after the payload. `set-memory` payloads are limited to 1..1024
+bytes. `get-memory` allows 1..65536 bytes in one call.
+
+### Response Format
+
+Text responses are ASCII lines terminated by `\n`:
+
+```text
+<id> ok [metadata...]\n
+<id> error <code> <message>\n
+```
+
+Binary responses use a header line, exactly `<byte_count>` raw payload bytes, and one
+trailing newline:
+
+```text
+<id> data <type> <byte_count> [metadata...]\n
+<byte_count raw bytes>
+\n
+```
+
+The client should parse the byte count from the `data` header and then read exactly that
+many bytes before consuming the trailing newline. Do not treat binary payloads as
+newline-delimited text.
+
+Deferred responses use a multi-entry table. Token-matched commands such as `get-cpu`
+and `get-memory` may be outstanding together. Other deferred work is still exclusive.
+A second conflicting deferred command may return:
+
+```text
+<id> error busy deferred-response-active
+<id> error busy wait already active
+<id> error busy deferred-table-full
+```
+
+Clients may pipeline requests (send several without waiting); responses may complete
+out of send order - correlate by request id. Duplicate outstanding ids are rejected
+with `bad-id`.
+
+Deferred commands time out with:
+
+```text
+<id> error timeout deferred response timed out
+```
+
+Headless mode wakes the main loop when a control request is queued. Prefer headless
+for low-latency automation; a windowed session is still paced by present/vsync.
+
+### Connection and Introspection
+
+| Command | Response |
+|---------|----------|
+| `hello` | `ok name=a2m protocol=A2M/6` |
+| `version` | `ok protocol=A2M/6 app=a2m` |
+| `capabilities` | Space-separated capability names |
+| `ping` | `ok` |
+| `quit-client` | `ok`, then the server closes the client connection |
+
+`capabilities` currently includes `connection`, `introspection`, `execution`,
+`state`, `softswitches`, `step`, `turbo`, `frame`, `frame-ring`, `memory`,
+`breakpoints`, `wait`, `key`, `disk`, `snapshot`, and `history`.
+
+### Execution Control
+
+Execution commands return after the command is accepted by the runtime, not after the
+machine reaches a new state. Use `wait-*` commands when a script needs to synchronize.
+
+| Command | Meaning |
+|---------|---------|
+| `reset` | Reset the emulated machine |
+| `run` | Resume execution |
+| `pause` | Pause execution |
+| `step-cycle` | Execute one machine cycle |
+| `step-instruction` | Execute one CPU instruction |
+| `step-over` | Step over a JSR |
+| `step-out` | Run until the current subroutine returns |
+| `set-turbo <MHz\|max\|-1>` | Set turbo to a MHz target or `max` |
+
+Accepted execution commands respond:
+
+```text
+<id> ok accepted=1
+```
+
+`set-turbo` changes only the active mode; it does not modify the configured Opt+T
+turbo list. Its accepted response includes the requested mode:
+
+```text
+<id> ok accepted=1 turbo=max
+```
+
+### CPU Flight Recorder
+
+The flight recorder continuously retains recent main-CPU execution and physical
+bus accesses in a bounded memory arena. The default budget is 256 MiB. Set it
+with `--history-memory=<MiB>` or `[debug] history_memory_mb`; `0` disables the
+feature and other valid values are 16 through 4096.
+
+| Command | Meaning |
+|---------|---------|
+| `history-info` | Report availability, recording state, epoch, timelines, retained IDs, records, and bytes |
+| `history-record <on\|off>` | Resume or stop recording without discarding retained records |
+| `history-clear` | Clear retained records and start a new epoch |
+| `history-find [key=value ...]` | Search retained execution and markers |
+| `history-next <cursor> [limit=1..256]` | Continue the current search |
+| `history-read <id> [epoch=N] [before=0..256] [after=0..256]` | Read one record with surrounding context |
+| `history-close <cursor>` | Close a cursor; closing an absent cursor is harmless |
+
+Find, next, and read require the machine to be paused. Searches run newest-first
+unless `direction=forward` is specified. Find accepts these keys:
+
+```text
+epoch timeline cycle from direction pc address access value opcodes limit
+```
+
+Ranges are inclusive. `from` is `oldest`, `newest`, or a retained record ID.
+Access values are `execute`, `opcode`, `operand`, `data-read`, `data-write`,
+`dummy-read`, `rmw-dummy-write`, `stack-read`, `stack-write`, or `vector-read`.
+Aliases are `fetch`, `read`, `write`, and `data`. Opcode patterns contain 1..32
+comma-separated bytes and may use `?` nibble wildcards, for example
+`A9,??,8D`.
+
+Find, next, and read return a counted binary `data history` response with
+metadata:
+
+```text
+epoch=N count=N cursor=N more=0|1 oldest=N newest=N
+```
+
+The payload is little-endian HST1: a 24-byte header followed by records with a
+48-byte header and 8-byte bus-access entries. Use
+`tools/a2m_control_client.py` to validate and decode it. There is one search
+cursor; execution, reset, recording control, state load, or direct machine
+mutation makes it stale.
+
+By default the recorder pauses while turbo is `max` and resumes when you leave
+`max`.
+
+### Frame Ring
+
+The flight recorder retains what the CPU did; the frame ring retains what the
+screen showed. It keeps the most recent completed frames in memory so a glitch
+that lasted a single frame can still be retrieved after you notice it and pause.
+
+The default budget is 128 MiB. Set it with `[debug] frame_ring_memory_mb`; `0`
+disables the ring and other valid values are 8 through 4096. Frames are 560 x 192
+ARGB.
+
+| Command | Meaning |
+|---------|---------|
+| `frame-ring-info` | Report capacity, retained count, dropped frames, recording state, and the retained frame and cycle range |
+| `frame-ring-record <on\|off>` | Resume or stop recording without discarding retained frames |
+| `frame-ring-clear` | Discard retained frames |
+| `get-frame-at <frame=N\|cycle=N>` | Fetch one retained frame |
+
+The target must be named as either a frame number or a machine cycle, because a
+bare number could be either and the wrong reading returns a plausible but wrong
+frame. The lookup resolves to the nearest frame at or before the target. A target
+past the newest returns the newest; a target older than the retained window
+returns `not-found` rather than a substituted neighbour. Payloads are identical
+to `get-frame`.
+
+These commands answer immediately and work while the machine runs, although the
+retained window keeps moving until you pause. Loading a machine state clears the
+ring.
+
+Each retained frame carries its machine cycle, which is the key for searching the
+flight recorder for the same moment.
+
+### State and Snapshots
+
+| Command | Response |
+|---------|----------|
+| `get-state` | Text state summary: runtime state, CPU availability, frame, cycle, stop reason, turbo |
+| `get-cpu` | Text CPU snapshot |
+| `get-softswitches` | Latched soft-switch flags plus beam (not `$C0xx` memory) |
+| `get-frame` | Binary 560 x 192 ARGB frame |
+| `get-memory <addr> <length> <mode>` | Binary memory snapshot |
+| `set-memory <addr> <length> <mode>` | Poke bytes (raw payload; auto-pauses) |
+| `set-reg <name> <value>` | Set a CPU register (`pc`, `sp`, `a`, `x`, `y`, `p`) |
+| `load-state <path>` | Load a `.a2state` snapshot |
+| `save-state <path>` | Write a `.a2state` snapshot |
+
+`get-state` is answered from the main loop's cached frontend debug state.
+`get-frame` uses the latest completed frame cached by the main loop, or requests one
+if no cached frame exists yet.
+
+**Gotcha:** `get-memory` of `$C0xx` peeks RAM and never hits the soft-switch
+handler. Use `get-softswitches` for video and banking state.
+
+Memory modes:
+
+| Mode | Meaning |
+|------|---------|
+| `map` | CPU-visible memory after current banking |
+| `main` | Physical main 48K |
+| `aux` | Physical auxiliary 48K |
+| `lc1` | Language Card bank 1 |
+| `lc2` | Language Card bank 2 |
+| `rom` | System ROM |
+
+### Waiting
+
+| Command | Meaning |
+|---------|---------|
+| `wait-paused [timeout-ms]` | Return when the machine is paused |
+| `wait-running [timeout-ms]` | Return when the machine is running |
+| `wait-frame [delta]` | Return after `delta` frames (default 1) |
+| `wait-event <name>` | Return when a named runtime event arrives |
+
+### Input, Disks, and Breakpoints
+
+| Command | Meaning |
+|---------|---------|
+| `key <byte>` | Inject one Apple keystroke (`$C000` path). `$8D` / CR becomes Return |
+| `mount-disk <drive> <path>` | Mount a Disk II image on slot 6 drive `0` or `1` (legacy `8`/`9` also accepted) |
+| `break-exec <addr>` | Set an execute breakpoint |
+| `break-create <definition>` | Create a full breakpoint (same tokens as `[DEBUG]`) |
+| `break-update <id> <definition>` | Replace an existing breakpoint |
+| `break-list` | List breakpoints |
+| `break-enable <id> <0\|1>` | Enable or disable a breakpoint |
+| `break-clear <id>` | Clear one breakpoint (`0` = all) |
+| `break-clear-all` | Clear every breakpoint |
+| `rearm-oneshots` | Re-enable auto-disabled one-shot breakpoints |
+
+## Details
+
+This section records implementation details that are not necessary for day-to-day use
+but are useful for understanding what the emulator actually does under the hood.
+
+### Architecture
+
+a2m uses a layered C99 architecture: Machine -> Runtime -> Frontend, with a shared
+Tools layer. The machine (CPU, banking, video, Disk II, SmartPort, Mockingboard)
+runs entirely on a dedicated runtime thread. The UI and renderer run on the main
+thread. No live machine pointers cross threads -- all inter-thread data travels as
+copied snapshots through a command/event queue. The snapshot rule is strictly
+enforced: the frontend may only read runtime-provided copies and must never access
+live machine state directly.
+
+### CPU
+
+Apple ][+ uses an NMOS 6502. Apple //e Enhanced uses a 65C02. The core is
+cycle-stepped with the video beam: each CPU Phi0 advances one video cell, then
+horizontal position, then vertical position. IRQ is level-sensitive. The //e
+Enhanced instruction set is the documented 65C02 additions; Rockwell bit ops and
+WDC WAI/STP are assembler profiles, not the emulated CPU.
+
+### Memory and Banking
+
+The machine has 64K of main RAM and, on the //e Enhanced, 64K of auxiliary RAM
+plus Language Card banks at `$D000-$FFFF`. Soft switches in `$C000-$C0FF` select
+the CPU-visible map (RAMRD, RAMWRT, ALTZP, 80STORE, CXROM, C3ROM, Language Card
+read/write/bank). Slot ROM at `$Cn00` and the `$C800` shared space follow those
+switches. SmartPort uses a `$C800` host trap for block commands.
+
+### Video
+
+Timing is NTSC Phi0: 65 cycles per line, 262 lines per frame, 17030 cycles per
+frame. Visible lines are 0..191; VBL (`$C019`) is line 192 and above. Horizontal
+active is scanner columns 0..39 (14 host pixels each, 560 wide). The floating bus
+returns the scanner byte during active video and the last latch during blanking.
+Mid-frame PAGE2 and mode switches are sampled at paint time.
+
+Double low-resolution graphics use aux/main 7-pixel half-columns and the same
+16-colour LORES palette (auxiliary nibbles are remapped as on a2m). Composite
+NTSC artifact colour is not simulated; HGR and DHGR use a digital neighbour-bit
+lookup.
+
+### Disk II
+
+A Disk II card can occupy any slot. Images are nibble streams (`.nib`), 140K DOS
+order / ProDOS order (`.dsk` / `.do` / `.po`), or WOZ (read). Writes flush dirty
+tracks back to `.dsk` and `.nib`. WOZ write fidelity is limited. Each drive keeps
+an ordered multi-image queue; only one image is mounted at a time.
+
+### SmartPort
+
+A SmartPort card exposes two block units. ProDOS `$C0s4` / `$C0s5` and the `$C800`
+trap handle the common read/write/status commands. `boot_slot` starts execution at
+`$CN00` after unit 0 of that slot has mounted.
+
+### Mockingboard
+
+A Mockingboard is two AY-3-8910 chips behind a pair of 6522 VIAs. Only one card is
+installed at a time. Enabling it costs host time even when silent. Host output is
+stereo; at turbo `max` chip time advances without host PCM.
+
+### Gameport
+
+Paddles, buttons, a keyboard stick, and SDL pads feed `$C061`/`$C062`/`$C064`/`$C065`.
+Open-Apple is button 0; Closed-Apple is button 1. Motor activity can light the disk
+LEDs.
+
+### Joystick
+
+See **Keyboard Joystick**. A connected gamepad defaults to stick 2 mapping unless
+**Opt+1** / **Opt+2** reassign it. A gamepad and the keyboard stick may share the
+same stick, in which case their directions and fire are combined.
+
+### Display and Scaling
+
+The Apple 2 display is scaled to fit its panel. The display settings are under
+**Misc -> Machine -> Configure -> Emulator**, and all of them preview live, with
+Cancel restoring their previous values.
+
+The `CRT` prefix marks the difference between them. **CRT Smoothing**, **CRT
+Scanlines** and **CRT Curvature** are deliberate imitations of a CRT: they add
+artifacts that were never in the Apple 2's digital signal, for looks. **True Aspect
+Ratio** carries no prefix because it is not an imitation of anything - it is the
+classic 4:3 monitor geometry.
+
+**CRT Smoothing** filters the picture instead of drawing hard-edged pixels. CRT
+Scanlines and CRT Curvature both force CRT Smoothing on, and show it ticked and
+greyed out while they are enabled.
+
+**True Aspect Ratio** decides the shape of the picture:
+
+- **On** - the picture keeps a 4:3 Apple monitor shape. Letterbox or pillarbox
+  fills the unused space (black).
+- **Off** - no correction at all: the picture stretches to fill the view, whatever
+  shape you have made it, and there are no bars.
+
+In Debug Mode, clicking the corner handle at the bottom-right of the display region
+without dragging snaps the region to the true aspect (see **Layout**), so the
+correct geometry is one click away in either mode.
+
+### Vendored third-party code
+
+- `stb/stb_ds.h`, `stb/stb_image.h`
+  - Upstream: https://github.com/nothings/stb
+  - License: public domain or MIT
+- `inih/ini.c`, `inih/ini.h`
+  - Upstream: https://github.com/benhoyt/inih
+  - License: BSD-3-Clause
+- `logc/log.c`, `logc/log.h`
+  - Upstream: https://github.com/rxi/log.c
+  - License: MIT
+- `argparse/argparse.c`, `argparse/argparse.h`
+  - Upstream: https://github.com/cofyc/argparse
+  - License: MIT
+- `whereami/whereami.c`, `whereami/whereami.h`
+  - Upstream: https://github.com/gpakosz/whereami
+  - License: MIT or WTFPL v2
+- `tiny-regex-c/re.c`, `tiny-regex-c/re.h`
+  - Upstream: https://github.com/kokke/tiny-regex-c
+  - License: The Unlicense (public domain)
+- Nuklear (`src/frontend/nuklear.h`)
+  - Immediate-mode debugger UI
+  - License: public domain / MIT (see the header)
+
+## Versions
+
+15 July 2026
+:   V3.00_start - Updated all the code to be a closer match to c64m so the same muscle memory works in both.

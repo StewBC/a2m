@@ -1,3 +1,5 @@
+With the exception of the files in external, the LICENSE for this repo is:
+
 This is free and unencumbered software released into the public domain.
 
 Anyone is free to copy, modify, publish, use, compile, sell, or
@@ -21,4 +23,21 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 
-For more information, please refer to <http://unlicense.org>
+For more information, please refer to <https://unlicense.org>
+
+For the Files in external, see the licenses in the respective folders.  Generally:
+- `stb/stb_ds.h`
+  - Upstream: <https://github.com/nothings/stb>
+  - License: public domain or MIT
+- `inih/ini.c`, `inih/ini.h`
+  - Upstream: <https://github.com/benhoyt/inih>
+  - License: BSD-3-Clause
+- `logc/log.c`, `logc/log.h`
+  - Upstream: <https://github.com/rxi/log.c>
+  - License: MIT
+- `argparse/argparse.c`, `argparse/argparse.h`
+  - Upstream: <https://github.com/cofyc/argparse>
+  - License: MIT
+- `whereami/whereami.c`, `whereami/whereami.h`
+  - Upstream: <https://github.com/gpakosz/whereami>
+  - License: MIT or WTFPL v2

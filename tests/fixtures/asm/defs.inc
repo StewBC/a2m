@@ -1,0 +1,2 @@
+MSG_LEN = 12
+ZP_TMP  = $50

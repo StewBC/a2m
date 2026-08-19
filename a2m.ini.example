@@ -1,0 +1,66 @@
+; Example configuration for a2m
+; Copy to a2m.ini in the working directory, or pass: --inifile path
+; Command-line flags override values from this file.
+
+[window]
+width = 1120
+height = 768
+headless = false
+
+; [control] port — reserved; long-lived A2M/1 server is not product-wired yet.
+; [control]
+; port = 0
+
+[machine]
+; enh = //e Enhanced (default); plus = Apple ][+
+model = enh
+
+[Slots]
+slot1 = empty
+slot2 = empty
+slot3 = empty
+slot4 = mockingboard
+slot5 = empty
+slot6 = diskii
+slot7 = smartport
+
+[config]
+; Turbo ladder: MHz targets and/or max (e.g. 1,max or 1,4,8,max).
+; First entry is the startup mode. Cycle with Opt+T (Alt+T).
+turbo_speeds = 1,max
+; Pause CPU flight-recorder while turbo is max (~25% free-run boost). Default true.
+history_off_on_max = true
+; Write this file on exit when true, or use --saveini / --remember
+save_ini = false
+remember = false
+disk_leds = true
+; Make Backspace send the original Apple II DEL code ($7F) instead of cursor-left ($08).
+original_del = false
+; Optional startup execute break (hex)
+; break = 0x3000
+; Optional symbol file (NAME hex per line)
+; symbols = symbols.txt
+
+; Legacy single-path keys (still supported):
+; [disk]
+; path = ...   ; Disk II s6d0
+; hd = ...     ; SmartPort s7d0
+
+[DiskII]
+; a2m-style multi-mount: s<slot>d<drive> = path (drive 0 or 1)
+s6d0 = tests/fixtures/Apple DOS 3.3 January 1983.nib
+; s6d1 = /path/to/second.nib
+
+[SmartPort]
+; s<slot>d<unit> = path (unit 0 or 1)
+; s7d0 = /path/to/prodos.po
+; s5d0 = /path/to/other.po
+; Force startup through a mounted SmartPort unit 0 (useful for Apple ][+ or non-slot-7 boot).
+; boot_slot = 5
+
+[input]
+; Keyboard stick: 0=off, 1 or 2 = gameport stick; layout numpad|wasd
+; keyboard_joystick_port = 1
+; keyboard_joystick_layout = wasd
+; Swap Space↔Option fire while stick is on (Space=BUTN0, Option=BUTN1)
+; keyboard_joystick_swap_buttons = true

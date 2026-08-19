@@ -1,10 +1,18 @@
+/build/
+/build-*/
+/.cache/
+compile_commands.json
+*.o
+*.a
 .DS_Store
+*.user
+CMakeUserPresets.json
+
+# Local editor / user config (example: a2m.ini.example)
 .vscode/
-.cache/
-build/
+/*.ini
+TODO.txt
+
 disks/
-*.ini
-*.txt
-!CMakeLists.txt
 symbols/USER.SYM
 samples/penetrator
