@@ -9,7 +9,6 @@ add_library(util STATIC
     dynarray.c
     message_queue.c
     mutex.c
-    paste_parser.c
     thread.c
     util.c
     util_file.c

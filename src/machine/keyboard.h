@@ -6,9 +6,6 @@
  * Product input is not a C64 matrix. Keys are abstract host symbols that the
  * runtime maps to Apple ASCII+strobe ($C000). Shift may be a separate
  * HOST_KEY_SHIFT press, or the frontend may emit an explicit shifted symbol.
- *
- * Ordinals for A–Z / 0–9 / SPACE / RETURN / DELETE stay at the front so
- * paste_parser's integer table remains easy to keep in sync.
  */
 
 #include <stdbool.h>
@@ -77,8 +74,7 @@ typedef enum host_key {
     HOST_KEY_ASTERISK,
     HOST_KEY_AT,
     HOST_KEY_COLON,
-    /* //e solid-apple keys → BUTN0/BUTN1 ($C061/$C062). Appended so paste_parser
-       ordinals for earlier symbols stay stable. */
+    /* //e solid-apple keys → BUTN0/BUTN1 ($C061/$C062). */
     HOST_KEY_OPEN_APPLE,
     HOST_KEY_CLOSED_APPLE,
     /* Apple keyboard DEL ($7F), distinct from modern Backspace/cursor-left ($08). */

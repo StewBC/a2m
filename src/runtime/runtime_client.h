@@ -7,7 +7,6 @@
 
 #include "display_frame.h"
 #include "keyboard.h"
-#include "paste_parser.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -186,8 +185,6 @@ bool runtime_client_assemble_file_full(
     bool auto_adjust_segments);
 bool runtime_client_poll_symbols(runtime_client *client, runtime_symbol_snapshot *out);
 bool runtime_client_paste_text(runtime_client *client, const char *text, size_t length);
-bool runtime_client_paste_text_buffer(runtime_client *client, const char *text, size_t length);
-bool runtime_client_paste_events(runtime_client *client, const paste_event_t *events, size_t count);
 bool runtime_client_cycle_turbo_speed(runtime_client *client);
 /* milli_mhz: RUNTIME_TURBO_MAX (0) = max free-run; else target MHz × 1000 (1000 = 1 MHz). */
 bool runtime_client_set_turbo_multiplier(runtime_client *client, uint32_t milli_mhz);

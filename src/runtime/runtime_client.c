@@ -1217,7 +1217,6 @@ bool runtime_client_paste_text(runtime_client *client, const char *text, size_t 
 
     memcpy(command.data.paste_text.text, text, length);
     command.data.paste_text.length = length;
-    command.data.paste_text.use_buffer = 0;
     return message_queue_push(client->command_queue, &command);
 }
 
@@ -1266,43 +1265,6 @@ bool runtime_client_save_bin(
     command.data.save_bin.end_address = end_address;
     command.data.save_bin.format = (uint8_t)format;
     command.data.save_bin.is_basic_text = is_basic_text ? 1u : 0u;
-    return message_queue_push(client->command_queue, &command);
-}
-
-bool runtime_client_paste_text_buffer(runtime_client *client, const char *text, size_t length) {
-    runtime_command command = {
-        .type = RUNTIME_COMMAND_PASTE_TEXT,
-    };
-
-    if (!client || !text || length == 0) {
-        return false;
-    }
-
-    if (length > RUNTIME_PASTE_TEXT_MAX) {
-        length = RUNTIME_PASTE_TEXT_MAX;
-    }
-
-    memcpy(command.data.paste_text.text, text, length);
-    command.data.paste_text.length = length;
-    command.data.paste_text.use_buffer = 1;
-    return message_queue_push(client->command_queue, &command);
-}
-
-bool runtime_client_paste_events(runtime_client *client, const paste_event_t *events, size_t count) {
-    runtime_command command = {
-        .type = RUNTIME_COMMAND_PASTE_EVENTS,
-    };
-
-    if (!client || !events || count == 0) {
-        return false;
-    }
-
-    if (count > PASTE_EVENTS_MAX) {
-        count = PASTE_EVENTS_MAX;
-    }
-
-    memcpy(command.data.paste_events.events, events, count * sizeof(paste_event_t));
-    command.data.paste_events.count = count;
     return message_queue_push(client->command_queue, &command);
 }
 

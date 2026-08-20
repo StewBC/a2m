@@ -3,7 +3,6 @@
 #include "runtime_event.h"
 #include "apple2_file.h"
 #include "keyboard.h"
-#include "paste_parser.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -59,7 +58,6 @@ typedef enum runtime_command_type {
     RUNTIME_COMMAND_LOAD_BIN,
     RUNTIME_COMMAND_SAVE_BIN,
     RUNTIME_COMMAND_REQUEST_CALL_STACK,
-    RUNTIME_COMMAND_PASTE_EVENTS,
     RUNTIME_COMMAND_REARM_ONESHOT_BREAKPOINTS,
     RUNTIME_COMMAND_REQUEST_DEBUG_MEMORY,
     RUNTIME_COMMAND_LOAD_CRT,
@@ -268,7 +266,6 @@ typedef struct runtime_command {
         struct {
             char text[RUNTIME_PASTE_TEXT_MAX];
             size_t length;
-            uint8_t use_buffer;
         } paste_text;
 
         struct {
@@ -308,11 +305,6 @@ typedef struct runtime_command {
             uint8_t format;
             uint8_t is_basic_text;
         } save_bin;
-
-        struct {
-            paste_event_t events[PASTE_EVENTS_MAX];
-            size_t count;
-        } paste_events;
 
         struct {
             uint8_t include_write_history;
