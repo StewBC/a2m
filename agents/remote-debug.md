@@ -276,7 +276,8 @@ sensible sub-slices).
 | **A2M/4** | Frame ring commands + ARGB product ring |
 | **A2M/5** | History / HST1 commands |
 | **A2M/6** | `get-softswitches` (latched flags + beam; not `$C0xx` mem) |
-| **A2M/7** | **Current.** `select-disk` (absolute queue) + `set-disk-writable` (notch) |
+| **A2M/7** | `select-disk` (absolute queue) + `set-disk-writable` (notch) |
+| **A2M/8** | **Current.** Disk II `mount-disk` / `select-disk` / `set-disk-writable` resolve installed slot (prefer 6); explicit `slot drive` forms |
 
 Bump only when scripts must learn new behaviour; update this table and
 `CONTROL_PROTOCOL_VERSION` in the same change.
@@ -323,7 +324,9 @@ Apple media / input (product-shaped; exact tokens land with C0/C5):
 
 ```text
 key-down / key-up  (or unified key)
-paste-text  mount / unmount  (Disk II + SmartPort paths)
+paste-text
+mount-disk / select-disk / set-disk-writable  (Disk II; slot resolve A2M/8)
+mount / unmount  (SmartPort + unified media — pass 2)
 load-state  save-state
 ```
 

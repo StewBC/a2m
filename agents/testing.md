@@ -42,6 +42,7 @@ Expect **51** green. Run from repo root.
 | `frontend_input` | Modern Backspace vs original Apple DEL mapping and physical Delete |
 | `help_view` | Headless nuklear render of the help overlay: search hit highlighting and the measured scroll correction |
 | `runtime_turbo` | turbo CSV MHz/max cycle / set |
+| `runtime_slot_resolve` | prefer-home then scan for Disk II / SmartPort slots |
 | `runtime_savestate` | save/load `.a2state` via runtime client |
 | `runtime_machine_files` | worker raw/NAPS load-save + Applesoft ASCII round trip |
 | `runtime_frame_ring` | ARGB rolling frame ring unit |

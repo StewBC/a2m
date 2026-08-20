@@ -18,6 +18,7 @@
 #include "platform_audio.h"
 #include "runtime.h"
 #include "runtime_client.h"
+#include "runtime_slot_resolve.h"
 #include "version.h"
 #include "video.h"
 #include "window_title.h"
@@ -1096,74 +1097,58 @@ static void host_disk_queue_add(
 }
 
 /* Live machine slots win when available; else Configure slot_cards. */
-static bool slot_is_diskii_for_drop(
+static void fill_slot_cards_for_drop(
+    runtime_slot_card_type cards[RUNTIME_APPLE_SLOT_COUNT],
     const frontend_debug_state *debug,
-    const app_options *options,
-    int slot)
+    const app_options *options)
 {
-    if (slot < 1 || slot > 7) {
-        return false;
+    int slot;
+
+    memset(cards, 0, sizeof(runtime_slot_card_type) * (size_t)RUNTIME_APPLE_SLOT_COUNT);
+    for (slot = 1; slot <= 7; ++slot) {
+        if (debug != NULL && debug->has_apple_flags) {
+            cards[slot] = debug->slots[slot].card_type;
+            continue;
+        }
+        if (options == NULL) {
+            continue;
+        }
+        switch (options->slot_cards[slot]) {
+        case APP_SLOT_CARD_DISKII:
+            cards[slot] = RUNTIME_SLOT_CARD_DISKII;
+            break;
+        case APP_SLOT_CARD_SMARTPORT:
+            cards[slot] = RUNTIME_SLOT_CARD_SMARTPORT;
+            break;
+        case APP_SLOT_CARD_MOCKINGBOARD:
+            cards[slot] = RUNTIME_SLOT_CARD_MOCKINGBOARD;
+            break;
+        case APP_SLOT_CARD_EMPTY:
+        default:
+            cards[slot] = RUNTIME_SLOT_CARD_EMPTY;
+            break;
+        }
     }
-    if (debug != NULL && debug->has_apple_flags) {
-        return debug->slots[slot].card_type == RUNTIME_SLOT_CARD_DISKII;
-    }
-    if (options != NULL) {
-        return options->slot_cards[slot] == APP_SLOT_CARD_DISKII;
-    }
-    return false;
 }
 
-static bool slot_is_smartport_for_drop(
-    const frontend_debug_state *debug,
-    const app_options *options,
-    int slot)
-{
-    if (slot < 1 || slot > 7) {
-        return false;
-    }
-    if (debug != NULL && debug->has_apple_flags) {
-        return debug->slots[slot].card_type == RUNTIME_SLOT_CARD_SMARTPORT;
-    }
-    if (options != NULL) {
-        return options->slot_cards[slot] == APP_SLOT_CARD_SMARTPORT;
-    }
-    return false;
-}
-
-/* Prefer classic slot 6, then 7→1 (skipping 6). */
 static int find_diskii_slot_for_drop(
     const frontend_debug_state *debug,
     const app_options *options)
 {
-    int slot;
+    runtime_slot_card_type cards[RUNTIME_APPLE_SLOT_COUNT];
 
-    if (slot_is_diskii_for_drop(debug, options, 6)) {
-        return 6;
-    }
-    for (slot = 7; slot >= 1; --slot) {
-        if (slot == 6) {
-            continue;
-        }
-        if (slot_is_diskii_for_drop(debug, options, slot)) {
-            return slot;
-        }
-    }
-    return 0;
+    fill_slot_cards_for_drop(cards, debug, options);
+    return runtime_resolve_diskii_slot(cards);
 }
 
-/* Prefer classic slot 7, then 6→1. */
 static int find_smartport_slot_for_drop(
     const frontend_debug_state *debug,
     const app_options *options)
 {
-    int slot;
+    runtime_slot_card_type cards[RUNTIME_APPLE_SLOT_COUNT];
 
-    for (slot = 7; slot >= 1; --slot) {
-        if (slot_is_smartport_for_drop(debug, options, slot)) {
-            return slot;
-        }
-    }
-    return 0;
+    fill_slot_cards_for_drop(cards, debug, options);
+    return runtime_resolve_smartport_slot(cards);
 }
 
 /* Raw 35-track × 16-sector × 256-byte Disk II image (matches image_load_dsk). */
@@ -2277,6 +2262,8 @@ int main(int argc, char **argv)
         } else {
             control_dispatch_init(&control_disp, control, client);
             control_active = true;
+            /* Seed slot map for mount-disk / select-disk resolve defaults. */
+            (void)runtime_client_request_machine_state(client);
             fprintf(
                 stderr,
                 "a2m: control port %d (protocol %s)\n",

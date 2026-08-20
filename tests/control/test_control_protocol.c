@@ -199,13 +199,13 @@ int main(void)
     expect_true("history-read id", request.args.history_id == 42ull);
     expect_u32("before", 8, request.args.history_before);
 
-    expect_true("line has A2M/7", strstr(line, "A2M/7") != NULL);
+    expect_true("line has A2M/8", strstr(line, "A2M/8") != NULL);
 
     expect_true(
         "select-disk index",
         control_protocol_parse_request("40 select-disk 3", &request, &error));
     expect_int("select type", CONTROL_COMMAND_SELECT_DISK, (int)request.type);
-    expect_u32("select slot default", 6, request.args.slot);
+    expect_u32("select slot resolve", 0, request.args.slot);
     expect_u32("select drive default", 0, request.args.drive);
     expect_u32("select index", 3, request.args.disk_index);
 
@@ -221,6 +221,7 @@ int main(void)
         control_protocol_parse_request("42 set-disk-writable 0", &request, &error));
     expect_int(
         "writable type", CONTROL_COMMAND_SET_DISK_WRITABLE, (int)request.type);
+    expect_u32("writable slot resolve", 0, request.args.slot);
     expect_u32("writable flag", 0, request.args.disk_writable);
 
     expect_true(
@@ -229,6 +230,33 @@ int main(void)
     expect_u32("writable slot", 6, request.args.slot);
     expect_u32("writable drive", 1, request.args.drive);
     expect_u32("writable on", 1, request.args.disk_writable);
+
+    expect_true(
+        "mount-disk path",
+        control_protocol_parse_request("50 mount-disk /tmp/a.nib", &request, &error));
+    expect_int("mount type", CONTROL_COMMAND_MOUNT_DISK, (int)request.type);
+    expect_u32("mount slot resolve", 0, request.args.slot);
+    expect_u32("mount drive 0", 0, request.args.drive);
+    expect_true("mount path", strcmp(request.args.path, "/tmp/a.nib") == 0);
+
+    expect_true(
+        "mount-disk drive path",
+        control_protocol_parse_request("51 mount-disk 1 /tmp/b.nib", &request, &error));
+    expect_u32("mount drive 1", 1, request.args.drive);
+    expect_u32("mount slot still resolve", 0, request.args.slot);
+    expect_true("mount path b", strcmp(request.args.path, "/tmp/b.nib") == 0);
+
+    expect_true(
+        "mount-disk slot drive path",
+        control_protocol_parse_request(
+            "52 mount-disk 5 0 /tmp/c.nib", &request, &error));
+    expect_u32("mount explicit slot", 5, request.args.slot);
+    expect_u32("mount explicit drive", 0, request.args.drive);
+    expect_true("mount path c", strcmp(request.args.path, "/tmp/c.nib") == 0);
+
+    expect_true(
+        "mount-disk bad drive rejected",
+        !control_protocol_parse_request("53 mount-disk 2 /tmp/d.nib", &request, &error));
 
     {
         runtime_breakpoint_definition definition;

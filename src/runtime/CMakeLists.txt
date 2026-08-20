@@ -10,6 +10,7 @@ add_library(runtime STATIC
     runtime_history.c
     runtime_history_wire.c
     runtime_assembler.c
+    runtime_slot_resolve.c
     runtime.c
     runtime_thread.c
 )

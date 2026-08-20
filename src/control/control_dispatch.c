@@ -6,6 +6,7 @@
 #include "runtime.h"
 #include "runtime_event.h"
 #include "runtime_history.h"
+#include "runtime_slot_resolve.h"
 #include "softswitch.h"
 
 #include <SDL.h>
@@ -120,6 +121,246 @@ static deferred_control_response *begin_deferred(
     d->connection_epoch = control_server_connection_epoch(disp->server);
     d->deadline_ms = (uint64_t)SDL_GetTicks() + (uint64_t)timeout_ms;
     return d;
+}
+
+static void cache_slot_map_from_machine_state(
+    control_dispatch_t *disp,
+    const runtime_machine_snapshot *state)
+{
+    int slot;
+
+    if (disp == NULL || state == NULL) {
+        return;
+    }
+    for (slot = 1; slot <= 7; ++slot) {
+        disp->slot_cards[slot] = state->slots[slot].card_type;
+    }
+    disp->slot_cards[0] = RUNTIME_SLOT_CARD_EMPTY;
+    disp->has_slot_map = true;
+}
+
+/* Resolve slot 0 → installed Disk II. allow_empty: mount may target empty. */
+static bool diskii_pick_slot(
+    control_dispatch_t *disp,
+    uint8_t requested_slot,
+    bool allow_empty,
+    uint8_t *out_slot,
+    const char **out_error)
+{
+    uint8_t slot;
+    runtime_slot_card_type card;
+
+    if (out_slot == NULL) {
+        return false;
+    }
+    if (requested_slot != 0u) {
+        slot = requested_slot;
+        if (slot < 1u || slot > 7u) {
+            if (out_error != NULL) {
+                *out_error = "slot";
+            }
+            return false;
+        }
+        if (disp->has_slot_map) {
+            card = disp->slot_cards[slot];
+            if (card == RUNTIME_SLOT_CARD_DISKII ||
+                (allow_empty && card == RUNTIME_SLOT_CARD_EMPTY)) {
+                *out_slot = slot;
+                return true;
+            }
+            if (out_error != NULL) {
+                *out_error = "wrong-card";
+            }
+            return false;
+        }
+        *out_slot = slot;
+        return true;
+    }
+
+    if (!disp->has_slot_map) {
+        if (out_error != NULL) {
+            *out_error = "not-ready";
+        }
+        return false;
+    }
+    slot = (uint8_t)runtime_resolve_diskii_slot(disp->slot_cards);
+    if (slot == 0u) {
+        if (out_error != NULL) {
+            *out_error = "no-diskii";
+        }
+        return false;
+    }
+    *out_slot = slot;
+    return true;
+}
+
+static void post_diskii_ok(
+    control_dispatch_t *disp,
+    uint32_t request_id,
+    control_command_type op,
+    uint8_t slot,
+    uint8_t drive,
+    const char *path,
+    uint32_t disk_index,
+    uint8_t writable)
+{
+    char text[CONTROL_RESPONSE_TEXT_MAX];
+
+    if (op == CONTROL_COMMAND_MOUNT_DISK) {
+        snprintf(
+            text,
+            sizeof(text),
+            "accepted=1 slot=%u drive=%u",
+            (unsigned)slot,
+            (unsigned)drive);
+        (void)path;
+    } else if (op == CONTROL_COMMAND_SELECT_DISK) {
+        snprintf(
+            text,
+            sizeof(text),
+            "accepted=1 slot=%u drive=%u index=%u",
+            (unsigned)slot,
+            (unsigned)drive,
+            (unsigned)disk_index);
+    } else {
+        snprintf(
+            text,
+            sizeof(text),
+            "accepted=1 slot=%u drive=%u writable=%u",
+            (unsigned)slot,
+            (unsigned)drive,
+            (unsigned)writable);
+    }
+    post_ok(disp, request_id, text);
+}
+
+static bool execute_diskii_op(
+    control_dispatch_t *disp,
+    uint32_t request_id,
+    control_command_type op,
+    uint8_t requested_slot,
+    uint8_t drive,
+    const char *path,
+    uint32_t disk_index,
+    uint8_t writable)
+{
+    uint8_t slot = 0;
+    const char *err = "bad-args";
+    bool allow_empty = (op == CONTROL_COMMAND_MOUNT_DISK);
+    runtime_client *client;
+
+    if (disp == NULL || disp->client == NULL) {
+        post_error(disp, request_id, "runtime", "no client");
+        return true;
+    }
+    client = disp->client;
+    if (drive > 1u) {
+        post_error(disp, request_id, "bad-args", "drive");
+        return true;
+    }
+    if (!diskii_pick_slot(disp, requested_slot, allow_empty, &slot, &err)) {
+        if (strcmp(err, "not-ready") == 0) {
+            return false;
+        }
+        post_error(disp, request_id, err, "diskii");
+        return true;
+    }
+
+    if (op == CONTROL_COMMAND_MOUNT_DISK) {
+        if (path == NULL || path[0] == '\0') {
+            post_error(disp, request_id, "bad-args", "path");
+            return true;
+        }
+        if (!runtime_client_media_insert(
+                client, slot, drive, RUNTIME_SLOT_CARD_DISKII, path)) {
+            post_error(disp, request_id, "bad-args", "mount");
+            return true;
+        }
+    } else if (op == CONTROL_COMMAND_SELECT_DISK) {
+        if (disk_index == 0u ||
+            !runtime_client_media_swap(
+                client, slot, drive, (int32_t)disk_index, false)) {
+            post_error(disp, request_id, "bad-args", "select-disk");
+            return true;
+        }
+    } else if (op == CONTROL_COMMAND_SET_DISK_WRITABLE) {
+        if (!runtime_client_set_disk_writable(
+                client, slot, drive, writable != 0u)) {
+            post_error(disp, request_id, "bad-args", "set-disk-writable");
+            return true;
+        }
+    } else {
+        post_error(disp, request_id, "bad-args", "diskii");
+        return true;
+    }
+
+    post_diskii_ok(
+        disp, request_id, op, slot, drive, path, disk_index, writable);
+    return true;
+}
+
+static void begin_diskii_op_deferred(
+    control_dispatch_t *disp,
+    uint32_t request_id,
+    control_command_type op,
+    uint8_t requested_slot,
+    uint8_t drive,
+    const char *path,
+    uint32_t disk_index,
+    uint8_t writable)
+{
+    deferred_control_response *d;
+
+    d = begin_deferred(disp, request_id, CONTROL_DEFERRED_DISKII_OP, 2000u, 0u);
+    if (d == NULL) {
+        return;
+    }
+    d->diskii_op = op;
+    d->diskii_slot = requested_slot;
+    d->diskii_drive = drive;
+    d->diskii_index = disk_index;
+    d->diskii_writable = writable;
+    d->diskii_path[0] = '\0';
+    if (path != NULL) {
+        strncpy(d->diskii_path, path, sizeof(d->diskii_path) - 1u);
+        d->diskii_path[sizeof(d->diskii_path) - 1u] = '\0';
+    }
+    if (!runtime_client_request_machine_state(disp->client)) {
+        post_error(disp, request_id, "runtime", "machine-state");
+        control_deferred_clear(d);
+    }
+}
+
+static void handle_diskii_command(
+    control_dispatch_t *disp,
+    uint32_t request_id,
+    control_command_type op,
+    uint8_t requested_slot,
+    uint8_t drive,
+    const char *path,
+    uint32_t disk_index,
+    uint8_t writable)
+{
+    if (execute_diskii_op(
+            disp,
+            request_id,
+            op,
+            requested_slot,
+            drive,
+            path,
+            disk_index,
+            writable)) {
+        return;
+    }
+    begin_diskii_op_deferred(
+        disp,
+        request_id,
+        op,
+        requested_slot,
+        drive,
+        path,
+        disk_index,
+        writable);
 }
 
 static runtime_memory_mode to_runtime_memory_mode(uint8_t mode)
@@ -356,6 +597,7 @@ void control_dispatch_on_runtime_event(
         disp->last_sp = event->data.machine_state.sp;
         disp->last_p = event->data.machine_state.p;
         disp->turbo_mode = event->data.machine_state.active_turbo_multiplier;
+        cache_slot_map_from_machine_state(disp, &event->data.machine_state);
         if (event->data.machine_state.running == 0u) {
             disp->machine_running = false;
             disp->seen_paused = true;
@@ -407,6 +649,22 @@ void control_dispatch_on_runtime_event(
 
     d = control_deferred_active(&disp->deferred);
     if (d == NULL) {
+        return;
+    }
+
+    if (d->kind == CONTROL_DEFERRED_DISKII_OP &&
+        event->type == RUNTIME_EVENT_MACHINE_STATE_RESPONSE) {
+        /* Slot map already cached above; resolve and run the pending op. */
+        (void)execute_diskii_op(
+            disp,
+            d->request_id,
+            d->diskii_op,
+            d->diskii_slot,
+            d->diskii_drive,
+            d->diskii_path,
+            d->diskii_index,
+            d->diskii_writable);
+        control_deferred_clear(d);
         return;
     }
 
@@ -1401,46 +1659,40 @@ static void handle_request(control_dispatch_t *disp, control_request *req)
     }
 
     case CONTROL_COMMAND_MOUNT_DISK:
-        /* Disk II on slot 6, drive 0 or 1. */
-        if (req->args.drive > 1u ||
-            !runtime_client_media_insert(
-                client,
-                6u,
-                req->args.drive,
-                RUNTIME_SLOT_CARD_DISKII,
-                req->args.path)) {
-            post_error(disp, req->id, "bad-args", "mount");
-        } else {
-            post_ok(disp, req->id, "accepted=1");
-        }
+        handle_diskii_command(
+            disp,
+            req->id,
+            CONTROL_COMMAND_MOUNT_DISK,
+            req->args.slot,
+            req->args.drive,
+            req->args.path,
+            0u,
+            0u);
         break;
 
-    case CONTROL_COMMAND_SELECT_DISK: {
-        uint8_t slot = req->args.slot != 0u ? req->args.slot : 6u;
-        uint8_t drive = req->args.drive;
-        if (drive > 1u ||
-            req->args.disk_index == 0u ||
-            !runtime_client_media_swap(
-                client, slot, drive, (int32_t)req->args.disk_index, false)) {
-            post_error(disp, req->id, "bad-args", "select-disk");
-        } else {
-            post_ok(disp, req->id, "accepted=1");
-        }
+    case CONTROL_COMMAND_SELECT_DISK:
+        handle_diskii_command(
+            disp,
+            req->id,
+            CONTROL_COMMAND_SELECT_DISK,
+            req->args.slot,
+            req->args.drive,
+            NULL,
+            req->args.disk_index,
+            0u);
         break;
-    }
 
-    case CONTROL_COMMAND_SET_DISK_WRITABLE: {
-        uint8_t slot = req->args.slot != 0u ? req->args.slot : 6u;
-        uint8_t drive = req->args.drive;
-        if (drive > 1u ||
-            !runtime_client_set_disk_writable(
-                client, slot, drive, req->args.disk_writable != 0u)) {
-            post_error(disp, req->id, "bad-args", "set-disk-writable");
-        } else {
-            post_ok(disp, req->id, "accepted=1");
-        }
+    case CONTROL_COMMAND_SET_DISK_WRITABLE:
+        handle_diskii_command(
+            disp,
+            req->id,
+            CONTROL_COMMAND_SET_DISK_WRITABLE,
+            req->args.slot,
+            req->args.drive,
+            NULL,
+            0u,
+            req->args.disk_writable);
         break;
-    }
 
     case CONTROL_COMMAND_HISTORY_INFO: {
         uint64_t token = runtime_client_alloc_request_token(client);

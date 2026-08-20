@@ -316,6 +316,13 @@ target_compile_features(test_runtime_turbo PRIVATE c_std_99)
 target_link_libraries(test_runtime_turbo PRIVATE runtime SDL2::SDL2)
 add_test(NAME runtime_turbo COMMAND test_runtime_turbo)
 
+add_executable(test_runtime_slot_resolve
+    tests/runtime/test_runtime_slot_resolve.c
+)
+target_compile_features(test_runtime_slot_resolve PRIVATE c_std_99)
+target_link_libraries(test_runtime_slot_resolve PRIVATE runtime)
+add_test(NAME runtime_slot_resolve COMMAND test_runtime_slot_resolve)
+
 add_executable(test_runtime_savestate
     tests/runtime/test_runtime_savestate.c
 )

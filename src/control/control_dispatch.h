@@ -4,6 +4,7 @@
 #include "control_protocol.h"
 #include "control_server.h"
 #include "runtime_client.h"
+#include "runtime_event.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -34,6 +35,9 @@ typedef struct control_dispatch {
     bool latch_reset_complete;
     bool latch_breakpoints;
     bool latch_frame;
+    /* Live peripheral map from MACHINE_STATE (index 0 unused). */
+    bool has_slot_map;
+    runtime_slot_card_type slot_cards[RUNTIME_APPLE_SLOT_COUNT];
 } control_dispatch_t;
 
 void control_dispatch_init(

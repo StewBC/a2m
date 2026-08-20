@@ -35,7 +35,7 @@ Useful flags:
 | `--break <addr>` / `-b` | Install an execute breakpoint at a hex address |
 | `--symbols <file>` | Load a simple symbol file (`NAME` hex per line) |
 | `--headless` | No window; short smoke exit unless `--control-port` is set |
-| `--control-port N` | Listen on localhost TCP for A2M/7 remote control (`0`=off) |
+| `--control-port N` | Listen on localhost TCP for A2M/8 remote control (`0`=off) |
 | `--audio-smoke` | Emit a 440 Hz test tone to verify audio output |
 
 By default, a2m loads `a2m.ini` from the current directory. The INI file stores
@@ -1683,7 +1683,7 @@ combine headless mode with `--sna`:
 The server always binds to `127.0.0.1`. It accepts one client at a time. The socket
 thread performs network I/O only; runtime commands and snapshot requests are dispatched
 by the main loop, so remote control follows the same thread-ownership rules as the GUI
-debugger. The current protocol name is `A2M/7`.
+debugger. The current protocol name is `A2M/8`.
 
 Python helpers:
 
@@ -1797,8 +1797,8 @@ for low-latency automation; a windowed session is still paced by present/vsync.
 
 | Command | Response |
 |---------|----------|
-| `hello` | `ok name=a2m protocol=A2M/7` |
-| `version` | `ok protocol=A2M/7 app=a2m` |
+| `hello` | `ok name=a2m protocol=A2M/8` |
+| `version` | `ok protocol=A2M/8 app=a2m` |
 | `capabilities` | Space-separated capability names |
 | `ping` | `ok` |
 | `quit-client` | `ok`, then the server closes the client connection |
@@ -1960,9 +1960,11 @@ Memory modes:
 | Command | Meaning |
 |---------|---------|
 | `key <byte>` | Inject one Apple keystroke (`$C000` path). `$8D` / CR becomes Return |
-| `mount-disk <drive> <path>` | Mount a Disk II image on slot 6 drive `0` or `1` |
-| `select-disk [slot] [drive] <index>` | Make the 1-based queued Disk II image current (defaults: slot 6, drive 0) |
-| `set-disk-writable [slot] [drive] <0\|1>` | Set the Disk II write-protect notch (`0`=read-only, `1`=writable; defaults: slot 6, drive 0) |
+| `mount-disk <path>` | Mount a Disk II image on drive 0 of the resolved Disk II slot (prefer 6, else scan) |
+| `mount-disk <drive> <path>` | Same, on drive `0` or `1` of the resolved Disk II slot |
+| `mount-disk <slot> <drive> <path>` | Mount on an explicit slot/drive (empty slot may attach Disk II) |
+| `select-disk [slot] [drive] <index>` | Make the 1-based queued Disk II image current (omitted slot → resolve; drive defaults to 0) |
+| `set-disk-writable [slot] [drive] <0\|1>` | Set the Disk II write-protect notch (`0`=read-only, `1`=writable; omitted slot → resolve) |
 | `break-exec <addr>` | Set an execute breakpoint |
 | `break-create <definition>` | Create a full breakpoint (same tokens as `[DEBUG]`) |
 | `break-update <id> <definition>` | Replace an existing breakpoint |

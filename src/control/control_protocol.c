@@ -830,29 +830,56 @@ bool control_protocol_parse_request(
     }
 
     case CONTROL_COMMAND_MOUNT_DISK: {
-        uint32_t slot = 6;
-        char *p1 = cursor;
+        /* Forms: mount-disk <path> |
+                  mount-disk <drive> <path> |
+                  mount-disk <slot> <drive> <path>
+           slot 0 = resolve installed Disk II at dispatch (prefer 6). */
+        uint32_t a = 0;
+        uint32_t b = 0;
         char *e1 = NULL;
-        if (parse_u32(p1, &e1, &slot) && e1 != p1 && (*e1 == ' ' || *e1 == '\t')) {
-            char *p2 = (char *)skip_ws(e1);
-            char *e2 = NULL;
-            uint32_t d = 0;
-            if (parse_u32(p2, &e2, &d) && e2 != p2 && (*e2 == ' ' || *e2 == '\t')) {
-                out_request->args.slot = (uint8_t)slot;
-                out_request->args.drive = (uint8_t)d;
+        char *p2;
+        char *e2 = NULL;
+        char *p3;
+
+        out_request->args.slot = 0u;
+        out_request->args.drive = 0u;
+        if (parse_u32(cursor, &e1, &a) && e1 != cursor &&
+            (*e1 == ' ' || *e1 == '\t')) {
+            p2 = (char *)skip_ws(e1);
+            if (parse_u32(p2, &e2, &b) && e2 != p2 &&
+                (*e2 == ' ' || *e2 == '\t')) {
+                /* slot drive path */
+                if (a < 1u || a > 7u || b > 1u) {
+                    if (out_error != NULL) {
+                        control_protocol_format_error(
+                            out_error, id, "bad-args", "slot/drive", false);
+                    }
+                    return false;
+                }
+                out_request->args.slot = (uint8_t)a;
+                out_request->args.drive = (uint8_t)b;
                 cursor = (char *)skip_ws(e2);
             } else {
-                out_request->args.slot = (uint8_t)slot;
+                /* drive path */
+                if (a > 1u) {
+                    if (out_error != NULL) {
+                        control_protocol_format_error(
+                            out_error, id, "bad-args", "drive", false);
+                    }
+                    return false;
+                }
+                out_request->args.drive = (uint8_t)a;
                 cursor = p2;
             }
         }
-        if (cursor[0] == '\0') {
+        p3 = (char *)skip_ws(cursor);
+        if (p3[0] == '\0') {
             if (out_error != NULL) {
                 control_protocol_format_error(out_error, id, "bad-args", "path", false);
             }
             return false;
         }
-        strncpy(out_request->args.path, cursor, sizeof(out_request->args.path) - 1);
+        strncpy(out_request->args.path, p3, sizeof(out_request->args.path) - 1);
         break;
     }
 
@@ -860,7 +887,7 @@ bool control_protocol_parse_request(
         /* Forms: select-disk <index> |
                   select-disk <drive> <index> |
                   select-disk <slot> <drive> <index>
-           Defaults: slot 6, drive 0. Index is 1-based. */
+           slot 0 = resolve installed Disk II at dispatch. Index is 1-based. */
         uint32_t a = 0;
         uint32_t b = 0;
         uint32_t c = 0;
@@ -870,7 +897,7 @@ bool control_protocol_parse_request(
         char *p3;
         char *e3 = NULL;
 
-        out_request->args.slot = 6u;
+        out_request->args.slot = 0u;
         out_request->args.drive = 0u;
         if (!parse_u32(cursor, &e1, &a) || e1 == cursor) {
             if (out_error != NULL) {
@@ -911,7 +938,8 @@ bool control_protocol_parse_request(
     case CONTROL_COMMAND_SET_DISK_WRITABLE: {
         /* Forms: set-disk-writable <0|1> |
                   set-disk-writable <drive> <0|1> |
-                  set-disk-writable <slot> <drive> <0|1> */
+                  set-disk-writable <slot> <drive> <0|1>
+           slot 0 = resolve installed Disk II at dispatch. */
         uint32_t a = 0;
         uint32_t b = 0;
         uint32_t c = 0;
@@ -921,7 +949,7 @@ bool control_protocol_parse_request(
         char *p3;
         char *e3 = NULL;
 
-        out_request->args.slot = 6u;
+        out_request->args.slot = 0u;
         out_request->args.drive = 0u;
         if (!parse_u32(cursor, &e1, &a) || e1 == cursor) {
             if (out_error != NULL) {

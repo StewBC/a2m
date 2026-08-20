@@ -11,7 +11,7 @@ enum {
 };
 
 /* Product wire identity. Bump when scripts must learn new behaviour. */
-#define CONTROL_PROTOCOL_VERSION "A2M/7"
+#define CONTROL_PROTOCOL_VERSION "A2M/8"
 #define CONTROL_PROTOCOL_APP_NAME "a2m"
 
 typedef enum control_command_type {
