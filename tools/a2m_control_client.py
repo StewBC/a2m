@@ -18,6 +18,9 @@ Then:
     c.cmd("wait-paused 2000")
     r = c.history_find(limit=8)
     assert r["records"]  # HST1 decoded
+    c.mount("disks/game.nib")                      # kind inferred → diskii
+    c.mount("disks/hd.hdv", kind="smartport")      # or omit kind for .hdv
+    c.unmount(kind="diskii", drive=0)
 
 GOTCHAS (Apple A2M/9):
   * Identity: hello -> name=a2m protocol=A2M/9
@@ -27,7 +30,11 @@ GOTCHAS (Apple A2M/9):
     peeks RAM only — never the softswitch handler; do not infer video from it
   * No VIC/CIA/drive-cpu product surface
   * Headless often starts paused -> send `run` before free-run waits
-  * Turbo: 1=normal, 2=max, 3=warp; warp does not fill the live frame ring
+  * Turbo: set-turbo <MHz|max|-1> (not C64 ladder indices 1/2/3)
+  * Media: mount [kind=diskii|smartport] [slot] [drive] <path>; unmount similarly.
+    Omit kind on mount to infer from path (floppy exts → diskii; dir/.hdv/.2mg →
+    smartport; .po requires kind=). Omit slot to resolve live card map (Disk II
+    prefer 6, SmartPort prefer 7). mount-disk is Disk II alias. See mount()/unmount().
   * Addresses parse base-0: prefix hex with '$' (mem() does this for you)
   * get-memory length is DECIMAL (mem() handles it)
   * quit-client closes the control socket, not the emulator process
@@ -36,6 +43,9 @@ GOTCHAS (Apple A2M/9):
   * break-create/clear/enable return data (breakpoint list); use break_* helpers
   * wait-paused consumes sticky latch after each success (edge for next pause)
   * BP hit → wait-paused/get-state stop=breakpoint (not pause)
+
+Ops brief for agents: agents/control-tools.md (source of truth is still
+src/control/ + this client).
 
 Wire format:
   request : "<id> <command> [args]\\n"
@@ -56,6 +66,8 @@ MEMORY_MODES = ("map", "main", "aux", "lc1", "lc2", "rom")
 # Legacy breakpoint mapping shorthand; independent axes are also supported.
 BREAK_MAPPINGS = ("map", "main", "ram", "aux", "lc1", "lc2", "rom")
 BREAK_ACCESS = ("exec", "execute", "read", "load", "write", "store", "read-write", "load-store")
+# mount/unmount kind= tokens (aliases accepted by the wire).
+MEDIA_KINDS = ("diskii", "disk", "smartport", "sp", "hd")
 
 # HST1 bus access kinds (cpu65 / c6510 taxonomy; matches runtime_history.h).
 HST1_ACCESS_NAMES = {
@@ -243,6 +255,142 @@ class Ctl:
             f"set-memory ${addr:04X} {len(data):d} {mode}",
             payload=data,
         )
+
+    # --------------------------------------------------------------- media
+    def mount(
+        self,
+        path: str,
+        *,
+        kind: Optional[str] = None,
+        slot: Optional[int] = None,
+        drive: int = 0,
+    ) -> str:
+        """mount [kind=…] [slot] [drive] <path> → ok text (includes kind/slot/drive).
+
+        Omit kind to let the wire infer from path. Omit slot (or pass None) to
+        resolve the installed Disk II / SmartPort card. drive/unit is 0 or 1.
+        """
+        if not path:
+            raise ValueError("path is required")
+        if drive not in (0, 1):
+            raise ValueError("drive must be 0 or 1")
+        tokens: List[str] = ["mount"]
+        if kind is not None:
+            k = kind.strip().lower()
+            if k not in MEDIA_KINDS:
+                raise ValueError(f"kind must be one of {MEDIA_KINDS}, got {kind!r}")
+            tokens.append(f"kind={k}")
+        if slot is not None:
+            if slot < 1 or slot > 7:
+                raise ValueError("slot must be 1..7 when explicit")
+            tokens.append(str(int(slot)))
+            tokens.append(str(int(drive)))
+        elif drive != 0:
+            tokens.append(str(int(drive)))
+        tokens.append(path)
+        return self.ok(" ".join(tokens))
+
+    def mount_disk(
+        self,
+        path: str,
+        *,
+        slot: Optional[int] = None,
+        drive: int = 0,
+    ) -> str:
+        """mount-disk alias → Disk II only (same progressive slot/drive forms)."""
+        if not path:
+            raise ValueError("path is required")
+        if drive not in (0, 1):
+            raise ValueError("drive must be 0 or 1")
+        tokens: List[str] = ["mount-disk"]
+        if slot is not None:
+            if slot < 1 or slot > 7:
+                raise ValueError("slot must be 1..7 when explicit")
+            tokens.append(str(int(slot)))
+            tokens.append(str(int(drive)))
+        elif drive != 0:
+            tokens.append(str(int(drive)))
+        tokens.append(path)
+        return self.ok(" ".join(tokens))
+
+    def unmount(
+        self,
+        *,
+        kind: Optional[str] = None,
+        slot: Optional[int] = None,
+        drive: int = 0,
+    ) -> str:
+        """unmount [kind=…] [slot] [drive] → ok text.
+
+        Omit kind only when exactly one media card type is installed.
+        """
+        if drive not in (0, 1):
+            raise ValueError("drive must be 0 or 1")
+        tokens: List[str] = ["unmount"]
+        if kind is not None:
+            k = kind.strip().lower()
+            if k not in MEDIA_KINDS:
+                raise ValueError(f"kind must be one of {MEDIA_KINDS}, got {kind!r}")
+            tokens.append(f"kind={k}")
+        if slot is not None:
+            if slot < 1 or slot > 7:
+                raise ValueError("slot must be 1..7 when explicit")
+            tokens.append(str(int(slot)))
+            tokens.append(str(int(drive)))
+        elif drive != 0:
+            tokens.append(str(int(drive)))
+        return self.ok(" ".join(tokens))
+
+    def select_disk(
+        self,
+        index: int,
+        *,
+        slot: Optional[int] = None,
+        drive: int = 0,
+    ) -> str:
+        """select-disk [slot] [drive] <index> — Disk II queue; index is 1-based."""
+        if index < 1:
+            raise ValueError("index must be >= 1")
+        if drive not in (0, 1):
+            raise ValueError("drive must be 0 or 1")
+        tokens: List[str] = ["select-disk"]
+        if slot is not None:
+            if slot < 1 or slot > 7:
+                raise ValueError("slot must be 1..7 when explicit")
+            tokens.append(str(int(slot)))
+            tokens.append(str(int(drive)))
+            tokens.append(str(int(index)))
+        elif drive != 0:
+            tokens.append(str(int(drive)))
+            tokens.append(str(int(index)))
+        else:
+            tokens.append(str(int(index)))
+        return self.ok(" ".join(tokens))
+
+    def set_disk_writable(
+        self,
+        writable: bool,
+        *,
+        slot: Optional[int] = None,
+        drive: int = 0,
+    ) -> str:
+        """set-disk-writable [slot] [drive] <0|1> — Disk II write-protect notch."""
+        if drive not in (0, 1):
+            raise ValueError("drive must be 0 or 1")
+        flag = 1 if writable else 0
+        tokens: List[str] = ["set-disk-writable"]
+        if slot is not None:
+            if slot < 1 or slot > 7:
+                raise ValueError("slot must be 1..7 when explicit")
+            tokens.append(str(int(slot)))
+            tokens.append(str(int(drive)))
+            tokens.append(str(flag))
+        elif drive != 0:
+            tokens.append(str(int(drive)))
+            tokens.append(str(flag))
+        else:
+            tokens.append(str(flag))
+        return self.ok(" ".join(tokens))
 
     # ----------------------------------------------------------- breakpoints
     def break_create(

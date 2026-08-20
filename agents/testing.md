@@ -8,7 +8,7 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-Expect **51** green. Run from repo root.
+Expect **52** green. Run from repo root.
 
 ## Registered tests (product gate)
 

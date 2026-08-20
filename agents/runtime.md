@@ -70,8 +70,8 @@ Full epic: [`remote-debug.md`](remote-debug.md).
 
 | Item | Status |
 |------|--------|
-| Product wire | **Done (C0–C4c + softswitches)** — A2M/6; `--control-port` windowed + headless |
-| A2M/6 | `src/control` (BP + frame ring + history + `get-softswitches`) |
+| Product wire | **Done** — A2M/9; `--control-port` windowed + headless |
+| A2M/9 | `src/control` (BP + frame ring + history + softswitches + mount/unmount) · ops: [`control-tools.md`](control-tools.md) |
 | Product `src/control` | Parked c64-shaped library (not linked) |
 | Frame ring | **Done** — ARGB ring, live push, control wire |
 | CPU history | **Done through C4c** — arena, observer, worker RPC, control wire |

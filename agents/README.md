@@ -23,8 +23,8 @@ Siblings (not submodules): `../a2m` (Apple domain / paint reference),
 | 2 | **[`rules.md`](rules.md)** | Golden rules (threads, ownership, product) |
 | 3 | **[`testing.md`](testing.md)** | Build + ctest gate |
 | 4 | **[`snapshots.md`](snapshots.md)** | Closed: machine save/load (c64m port) |
-| 5 | **[`remote-debug.md`](remote-debug.md)** | Closed: A2M/6 wire |
-| 6 | **[`control-tools.md`](control-tools.md)** | Closed: Python client + coop_watch |
+| 5 | **[`remote-debug.md`](remote-debug.md)** | Closed epic: control / frame ring / history wire |
+| 6 | **[`control-tools.md`](control-tools.md)** | **Drive a2m over the control port** (A2M/9 ops brief) |
 | 7 | **[`turbo-zip.md`](turbo-zip.md)** | Closed: Zip MHz + max block paint |
 
 Open the component note only when the task touches that area:
@@ -43,8 +43,8 @@ Open the component note only when the task touches that area:
 | `rules.md` | Must-not-break architecture / host rules |
 | `snapshots.md` | Closed: machine save/load — c64m reuse + Apple payload |
 | `turbo-zip.md` | Closed: Zip MHz ladder + max presentation (block) paint |
-| `control-tools.md` | Closed: Python control client + coop_watch |
-| `remote-debug.md` | Closed: A2M/6 control/history/frame-ring/`get-softswitches` wire |
+| `control-tools.md` | Agent ops: control-port scripting via `Ctl` + coop_watch (A2M/9) |
+| `remote-debug.md` | Closed epic record: control/history/frame-ring wire |
 | `breakpoints.md` | Debugger BP product path (done through P5 + TRON) |
 | `video-paint.md` | Closed epic record: a2m-class paint into the beam |
 | `testing.md` | Gate, fixtures, deferred tests |
