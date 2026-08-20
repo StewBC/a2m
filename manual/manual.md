@@ -672,8 +672,10 @@ Duplicate or malformed lines are rejected.
 ### State
 
 Snapshots preserve the emulated machine: RAM (main and aux), CPU, soft switches,
-video beam, Disk II, SmartPort, and Mockingboard. A failed load leaves the live
-machine unchanged.
+video beam, Disk II, SmartPort, and Mockingboard. Host-side extras stored with the
+snapshot include the keyboard joystick port, layout, and swap-fire setting (so a
+quickload restores stick assignment without rewriting the INI). A failed load leaves
+the live machine unchanged.
 
 **Shift+Opt+>** quicksaves to the snapshot folder (Configure -> Paths -> `snapshot`,
 which defaults to the current directory). Each quicksave creates a new timestamped

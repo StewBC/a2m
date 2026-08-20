@@ -7,6 +7,7 @@
  */
 
 #include "app_options.h"
+#include "apple2_snapshot.h"
 #include "audio_buffer.h"
 #include "control_dispatch.h"
 #include "control_server.h"
@@ -45,7 +46,21 @@
 enum {
     A2M_CONTROLLER_MAX = 2,
     /* Below this |axis| SDL reading, treat as center (paddle mid). */
-    A2M_CONTROLLER_DEADZONE = 6000
+    A2M_CONTROLLER_DEADZONE = 6000,
+    A2M_STATE_CHUNK_HEADER_SIZE = 8,
+    /* HOST payload: version + port + layout + swap + pad. */
+    A2M_STATE_HOST_V1_SIZE = 8,
+    /* Matches apple2_snapshot private header size (magic..pad). */
+    A2M_STATE_FILE_HEADER_MIN = 32
+};
+
+#define A2M_STATE_TAG(a, b, c, d) \
+    ((uint32_t)(uint8_t)(a) | ((uint32_t)(uint8_t)(b) << 8) | \
+     ((uint32_t)(uint8_t)(c) << 16) | ((uint32_t)(uint8_t)(d) << 24))
+
+enum {
+    A2M_STATE_HOST_TAG = A2M_STATE_TAG('H', 'O', 'S', 'T'),
+    A2M_STATE_HOST_VERSION = 1u
 };
 
 typedef struct sdl_apple_controller {
@@ -1139,6 +1154,206 @@ static void apply_keyboard_joystick_options(
     }
 }
 
+/* ---- .a2state HOST trailer (kbd joy port/layout/swap; host-owned) ------- */
+
+static uint32_t read_le32_local(const uint8_t *bytes)
+{
+    return (uint32_t)bytes[0] |
+        ((uint32_t)bytes[1] << 8) |
+        ((uint32_t)bytes[2] << 16) |
+        ((uint32_t)bytes[3] << 24);
+}
+
+static void write_le32_local(uint8_t *bytes, uint32_t value)
+{
+    bytes[0] = (uint8_t)(value & 0xffu);
+    bytes[1] = (uint8_t)((value >> 8) & 0xffu);
+    bytes[2] = (uint8_t)((value >> 16) & 0xffu);
+    bytes[3] = (uint8_t)(value >> 24);
+}
+
+typedef struct host_state_loaded {
+    uint8_t port;
+    frontend_joystick_layout layout;
+    bool swap_buttons;
+    bool has_joystick;
+} host_state_loaded;
+
+static bool append_host_state_chunk(
+    const char *path,
+    const app_options *options,
+    const frontend_joystick_input *kbd_joystick)
+{
+    FILE *file;
+    uint8_t bytes[A2M_STATE_CHUNK_HEADER_SIZE + A2M_STATE_HOST_V1_SIZE];
+    uint8_t *cursor = bytes;
+    uint8_t port;
+    uint8_t layout;
+    uint8_t swap;
+
+    if (path == NULL || path[0] == '\0') {
+        return false;
+    }
+    port = kbd_joystick != NULL ? (uint8_t)kbd_joystick->port :
+        (uint8_t)(options != NULL ? options->keyboard_joystick_port : 0);
+    if (port > 2u) {
+        port = 0;
+    }
+    layout = kbd_joystick != NULL ? (uint8_t)kbd_joystick->layout :
+        (uint8_t)frontend_joystick_layout_from_string(
+            options != NULL ? options->keyboard_joystick_layout : NULL);
+    if (layout > (uint8_t)FRONTEND_JOYSTICK_LAYOUT_WASD) {
+        layout = (uint8_t)FRONTEND_JOYSTICK_LAYOUT_NUMPAD;
+    }
+    swap = kbd_joystick != NULL ? (kbd_joystick->swap_buttons ? 1u : 0u) :
+        (uint8_t)(options != NULL && options->keyboard_joystick_swap_buttons ? 1u : 0u);
+
+    write_le32_local(cursor, A2M_STATE_HOST_TAG);
+    cursor += 4;
+    write_le32_local(cursor, (uint32_t)A2M_STATE_HOST_V1_SIZE);
+    cursor += 4;
+    write_le32_local(cursor, A2M_STATE_HOST_VERSION);
+    cursor += 4;
+    *cursor++ = port;
+    *cursor++ = layout;
+    *cursor++ = swap;
+    *cursor++ = 0;
+
+    file = fopen(path, "ab");
+    if (file == NULL) {
+        return false;
+    }
+    if (fwrite(bytes, 1, sizeof(bytes), file) != sizeof(bytes)) {
+        fclose(file);
+        return false;
+    }
+    fclose(file);
+    return true;
+}
+
+static bool read_host_state_chunk(const char *path, host_state_loaded *out)
+{
+    FILE *file;
+    uint8_t *bytes = NULL;
+    long length;
+    size_t pos;
+    uint32_t magic;
+    uint32_t version;
+    uint32_t header_size;
+    bool found = false;
+
+    if (path == NULL || out == NULL) {
+        return false;
+    }
+    memset(out, 0, sizeof(*out));
+    file = fopen(path, "rb");
+    if (file == NULL) {
+        return false;
+    }
+    if (fseek(file, 0, SEEK_END) != 0) {
+        fclose(file);
+        return false;
+    }
+    length = ftell(file);
+    if (length < (long)A2M_STATE_FILE_HEADER_MIN || fseek(file, 0, SEEK_SET) != 0) {
+        fclose(file);
+        return false;
+    }
+    bytes = (uint8_t *)malloc((size_t)length);
+    if (bytes == NULL) {
+        fclose(file);
+        return false;
+    }
+    if (fread(bytes, 1, (size_t)length, file) != (size_t)length) {
+        free(bytes);
+        fclose(file);
+        return false;
+    }
+    fclose(file);
+
+    magic = read_le32_local(bytes);
+    version = read_le32_local(bytes + 4);
+    header_size = read_le32_local(bytes + 8);
+    if (magic != A2_SNAPSHOT_MAGIC || version < A2_SNAPSHOT_VERSION_MIN ||
+        version > A2_SNAPSHOT_VERSION || header_size < 12u ||
+        header_size > (uint32_t)length) {
+        free(bytes);
+        return false;
+    }
+
+    pos = header_size;
+    while (pos + A2M_STATE_CHUNK_HEADER_SIZE <= (size_t)length) {
+        uint32_t tag = read_le32_local(bytes + pos);
+        uint32_t chunk_len = read_le32_local(bytes + pos + 4);
+        const uint8_t *payload;
+
+        pos += A2M_STATE_CHUNK_HEADER_SIZE;
+        if (chunk_len > (uint32_t)((size_t)length - pos)) {
+            break;
+        }
+        payload = bytes + pos;
+        if (tag == A2M_STATE_HOST_TAG && chunk_len >= A2M_STATE_HOST_V1_SIZE) {
+            uint32_t host_version = read_le32_local(payload);
+            if (host_version == A2M_STATE_HOST_VERSION) {
+                uint8_t port = payload[4];
+                uint8_t layout = payload[5];
+                uint8_t swap = payload[6];
+                if (port <= 2u && layout <= (uint8_t)FRONTEND_JOYSTICK_LAYOUT_WASD) {
+                    out->port = port;
+                    out->layout = (frontend_joystick_layout)layout;
+                    out->swap_buttons = swap != 0;
+                    out->has_joystick = true;
+                    found = true; /* last valid HOST wins */
+                }
+            }
+        }
+        pos += chunk_len;
+    }
+    free(bytes);
+    return found;
+}
+
+static void apply_loaded_host_state(
+    const char *path,
+    app_options *options,
+    frontend *ui,
+    runtime_client *client,
+    sdl_apple_controller_state *controllers,
+    frontend_joystick_input *kbd_joystick)
+{
+    host_state_loaded host;
+
+    memset(&host, 0, sizeof(host));
+    if (!read_host_state_chunk(path, &host) || !host.has_joystick) {
+        return;
+    }
+
+    if (kbd_joystick != NULL) {
+        frontend_joystick_set_layout(kbd_joystick, host.layout);
+        frontend_joystick_set_port(kbd_joystick, host.port);
+        frontend_joystick_set_swap_buttons(kbd_joystick, host.swap_buttons);
+    }
+    if (options != NULL) {
+        options->keyboard_joystick_port = (int)host.port;
+        options->keyboard_joystick_swap_buttons = host.swap_buttons;
+        (void)app_options_set_string(
+            &options->keyboard_joystick_layout,
+            frontend_joystick_layout_to_string(host.layout));
+    }
+    if (controllers != NULL && client != NULL) {
+        controllers->published = false;
+        sdl_apple_gameport_publish(controllers, client);
+    }
+    if (ui != NULL && options != NULL && !frontend_config_dialog_is_open(ui)) {
+        frontend_set_config_state(ui, options);
+    }
+    SDL_Log(
+        "loaded host keyboard joystick: port %u (%s)%s",
+        (unsigned)host.port,
+        frontend_joystick_layout_to_string(host.layout),
+        host.swap_buttons ? ", swap fire" : "");
+}
+
 static void dispatch_intent(
     runtime_client *client,
     frontend *ui,
@@ -2005,7 +2220,24 @@ int main(int argc, char **argv)
             runtime_event revent;
             while (runtime_client_poll_event(client, &revent)) {
                 control_dispatch_on_runtime_event(&control_disp, &revent);
-                if (revent.type == RUNTIME_EVENT_ERROR) {
+                if (revent.type == RUNTIME_EVENT_SAVE_STATE_COMPLETE) {
+                    if (!append_host_state_chunk(
+                            revent.data.state_file.path, &options, &kbd_joystick)) {
+                        SDL_Log(
+                            "save state host settings append failed: %s",
+                            revent.data.state_file.path);
+                    }
+                    SDL_Log("save state complete: %s", revent.data.state_file.path);
+                } else if (revent.type == RUNTIME_EVENT_LOAD_STATE_COMPLETE) {
+                    apply_loaded_host_state(
+                        revent.data.state_file.path,
+                        &options,
+                        NULL,
+                        client,
+                        &controllers,
+                        &kbd_joystick);
+                    SDL_Log("load state complete: %s", revent.data.state_file.path);
+                } else if (revent.type == RUNTIME_EVENT_ERROR) {
                     fprintf(stderr, "a2m: runtime: %s\n", revent.data.error.message);
                 } else if (revent.type == RUNTIME_EVENT_STOPPED) {
                     running = false;
@@ -2334,6 +2566,25 @@ int main(int argc, char **argv)
                     debug.breakpoints = bps;
                     debug.has_breakpoints = true;
                 }
+            }
+            if (revent.type == RUNTIME_EVENT_SAVE_STATE_COMPLETE) {
+                if (!append_host_state_chunk(
+                        revent.data.state_file.path, &options, &kbd_joystick)) {
+                    SDL_Log(
+                        "save state host settings append failed: %s",
+                        revent.data.state_file.path);
+                }
+                SDL_Log("save state complete: %s", revent.data.state_file.path);
+            }
+            if (revent.type == RUNTIME_EVENT_LOAD_STATE_COMPLETE) {
+                apply_loaded_host_state(
+                    revent.data.state_file.path,
+                    &options,
+                    ui,
+                    client,
+                    &controllers,
+                    &kbd_joystick);
+                SDL_Log("load state complete: %s", revent.data.state_file.path);
             }
             if (revent.type == RUNTIME_EVENT_ERROR) {
                 fprintf(
