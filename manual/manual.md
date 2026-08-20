@@ -89,7 +89,7 @@ NAME#ttxxxx
 
 `tt` is the ProDOS file type (two hex digits) and `xxxx` is the aux type (four hex
 digits). The ProDOS name is the stem, uppercased and limited to 15 legal characters
-(`A–Z`, `0–9`, `.`). Non-NAPS names and subdirectories are skipped. If a tool (for
+(`A-Z`, `0-9`, `.`). Non-NAPS names and subdirectories are skipped. If a tool (for
 example the built-in assembler) already supplies a NAPS name, HostFS observes the
 stem and does not append a second `#ttxxxx`.
 
@@ -115,7 +115,7 @@ edits to files already on the volume are picked up by a periodic rescan (remount
 the directory was full when new files appeared).
 
 ProDOS catalog **order** (which `.SYSTEM` file comes first, and so on) is remembered in
-an optional `hostfs.order` text file in the folder — one NAPS basename per line, `#`
+an optional `hostfs.order` text file in the folder - one NAPS basename per line, `#`
 comments allowed. If the file is present at mount, those names are added in that
 order and any other NAPS files are appended. Reordering the catalog in ProDOS (for
 example with CAT.DOCTOR) rewrites `hostfs.order` automatically so the next launch
@@ -124,7 +124,7 @@ keeps that order. The file is not itself a ProDOS volume entry.
 HostFS is selected by path kind only (directory vs file). Mount it from the command
 line, `[SmartPort]` in the INI, or Machine **[Insert]** on a SmartPort unit:
 **[Open]** mounts a selected image file; **[Use This Folder]** mounts the directory
-currently shown as HostFS (same button as Configure → Paths). Disk II Insert stays
+currently shown as HostFS (same button as Configure -> Paths). Disk II Insert stays
 file-only.
 
 ### Machine Snapshots

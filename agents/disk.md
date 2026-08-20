@@ -68,9 +68,10 @@ Slot configuration UI and broader write fidelity remain open.
 SP trap: min cmds only (STATUS/READ/WRITE); no full DIB / extended SP.
 
 **HostFS** (mount a host folder as a ProDOS SmartPort volume):
-Phase 0–3 + 5a/5b done — directory path → NAPS volume with host subdirs as
-ProDOS folders, live host refresh, file + directory write-through, optional
-`hostfs.order`; see [`hostfs.md`](hostfs.md).
+Directory path mounts as a NAPS volume (host subdirs as ProDOS folders, live
+host refresh, file + directory write-through, optional `hostfs.order`).
+SmartPort Insert **Use This Folder** or CLI/INI; path kind selects HostFS vs
+image. See the user manual HostFS section for operator details.
 
 ```bash
 ./build/a2m --noini --smart s7d0=./tests/fixtures/hostfs
