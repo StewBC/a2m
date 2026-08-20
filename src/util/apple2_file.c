@@ -87,6 +87,13 @@ static int hex_value(char c)
     return -1;
 }
 
+bool apple2_binary_prodos_type_is_loadable(uint16_t prodos_type)
+{
+    /* BIN ($06): aux is load address (BLOAD/BRUN).
+       SYS ($FF): aux is load/run address (ProDOS .SYSTEM programs). */
+    return prodos_type == 0x0006u || prodos_type == 0x00ffu;
+}
+
 bool apple2_naps_parse_path(const char *path, uint8_t *file_type, uint16_t *aux_type)
 {
     const char *suffix;
@@ -187,13 +194,16 @@ static bool decode_applesingle(
         const uint8_t *info = bytes + prodos_offset;
         uint16_t type = read_be16(info + 2);
         uint32_t aux = read_be32(info + 4);
-        if (type == 0x0006u && aux <= 0xffffu) {
+        if (apple2_binary_prodos_type_is_loadable(type) && aux <= 0xffffu) {
             out->load_address = (uint16_t)aux;
             out->has_load_address = true;
+            out->prodos_type = (uint8_t)type;
+            out->has_prodos_type = true;
         }
     }
     if (!out->has_load_address) {
-        set_error(error, error_size, "AppleSingle data is not a ProDOS BIN with a load address");
+        set_error(error, error_size,
+            "AppleSingle data is not a ProDOS BIN/SYS with a load address");
         return false;
     }
     return true;
@@ -222,14 +232,18 @@ bool apple2_binary_decode(
     if (requested == APPLE2_BINARY_FORMAT_NAPS ||
         (requested == APPLE2_BINARY_FORMAT_AUTO &&
          apple2_naps_parse_path(path, &naps_type, &naps_aux))) {
-        if (!apple2_naps_parse_path(path, &naps_type, &naps_aux) || naps_type != 0x06u) {
-            set_error(error, error_size, "NAPS filename is not a ProDOS BIN (#06AAAA)");
+        if (!apple2_naps_parse_path(path, &naps_type, &naps_aux) ||
+            !apple2_binary_prodos_type_is_loadable(naps_type)) {
+            set_error(error, error_size,
+                "NAPS filename is not a ProDOS BIN/SYS (#06AAAA / #FFAAAA)");
             return false;
         }
         out->data = bytes;
         out->size = size;
         out->load_address = naps_aux;
         out->has_load_address = true;
+        out->prodos_type = naps_type;
+        out->has_prodos_type = true;
         out->format = APPLE2_BINARY_FORMAT_NAPS;
     } else if (requested == APPLE2_BINARY_FORMAT_LEGACY_DOS ||
                (requested == APPLE2_BINARY_FORMAT_AUTO && size >= 4u &&

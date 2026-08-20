@@ -27,32 +27,73 @@ static void test_binary_formats(void)
     apple2_binary_view view;
     char error[128] = {0};
     uint8_t legacy[] = {0x00u, 0x20u, 0x03u, 0x00u, 0xa9u, 0x01u, 0x60u};
+    bool ok;
 
-    assert(apple2_applesingle_encode_bin(payload, sizeof(payload), 0x0803u, &single, &single_size));
-    assert(single_size == 58u + sizeof(payload));
-    assert(apple2_binary_decode(
+    assert(apple2_binary_prodos_type_is_loadable(0x06u));
+    assert(apple2_binary_prodos_type_is_loadable(0xffu));
+    assert(!apple2_binary_prodos_type_is_loadable(0x04u));
+    assert(!apple2_binary_prodos_type_is_loadable(0xfcu));
+
+    /* Keep encode/decode outside assert(): Release builds define NDEBUG. */
+    ok = apple2_applesingle_encode_bin(payload, sizeof(payload), 0x0803u, &single, &single_size);
+    assert(ok);
+    assert(single != NULL && single_size == 58u + sizeof(payload));
+    ok = apple2_binary_decode(
         "demo.as", single, single_size, APPLE2_BINARY_FORMAT_AUTO, 0u,
-        &view, error, sizeof(error)));
+        &view, error, sizeof(error));
+    assert(ok);
     assert(view.format == APPLE2_BINARY_FORMAT_APPLESINGLE);
     assert(view.load_address == 0x0803u);
     assert(view.size == sizeof(payload));
+    assert(view.has_prodos_type && view.prodos_type == 0x06u);
     assert(memcmp(view.data, payload, sizeof(payload)) == 0);
+
+    /* AppleSingle SYS ($FF) with load address in aux. */
+    single[52] = 0x00u;
+    single[53] = 0xffu;
+    single[54] = 0x00u;
+    single[55] = 0x00u;
+    single[56] = 0x20u;
+    single[57] = 0x00u;
+    ok = apple2_binary_decode(
+        "demo.system.as", single, single_size, APPLE2_BINARY_FORMAT_AUTO, 0u,
+        &view, error, sizeof(error));
+    assert(ok);
+    assert(view.format == APPLE2_BINARY_FORMAT_APPLESINGLE);
+    assert(view.load_address == 0x2000u);
+    assert(view.has_prodos_type && view.prodos_type == 0xffu);
     free(single);
 
-    assert(apple2_binary_decode(
+    ok = apple2_binary_decode(
         "demo#062000", payload, sizeof(payload), APPLE2_BINARY_FORMAT_AUTO, 0u,
-        &view, error, sizeof(error)));
+        &view, error, sizeof(error));
+    assert(ok);
     assert(view.format == APPLE2_BINARY_FORMAT_NAPS && view.load_address == 0x2000u);
+    assert(view.has_prodos_type && view.prodos_type == 0x06u);
 
-    assert(apple2_binary_decode(
+    ok = apple2_binary_decode(
+        "chess.system#ff2000", payload, sizeof(payload), APPLE2_BINARY_FORMAT_AUTO, 0u,
+        &view, error, sizeof(error));
+    assert(ok);
+    assert(view.format == APPLE2_BINARY_FORMAT_NAPS && view.load_address == 0x2000u);
+    assert(view.has_prodos_type && view.prodos_type == 0xffu);
+
+    ok = apple2_binary_decode(
+        "notes#040000", payload, sizeof(payload), APPLE2_BINARY_FORMAT_AUTO, 0u,
+        &view, error, sizeof(error));
+    assert(!ok);
+
+    ok = apple2_binary_decode(
         "old.bin", legacy, sizeof(legacy), APPLE2_BINARY_FORMAT_AUTO, 0u,
-        &view, error, sizeof(error)));
+        &view, error, sizeof(error));
+    assert(ok);
     assert(view.format == APPLE2_BINARY_FORMAT_LEGACY_DOS && view.load_address == 0x2000u);
     assert(view.size == 3u && view.data[0] == 0xa9u);
 
-    assert(apple2_binary_decode(
+    ok = apple2_binary_decode(
         "raw.bin", payload, sizeof(payload), APPLE2_BINARY_FORMAT_RAW, 0x3000u,
-        &view, error, sizeof(error)));
+        &view, error, sizeof(error));
+    assert(ok);
     assert(view.format == APPLE2_BINARY_FORMAT_RAW && view.load_address == 0x3000u);
 }
 

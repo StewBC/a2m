@@ -63,11 +63,13 @@ installed slot cards directly, without a collapsible section; Disk II and SmartP
 expose device 0/1 boot, eject, and insert controls. Disk II shows Swap only when
 that drive has multiple queued images. A unified **Machine files** Load/Save pair
 follows: Load Auto routes `.a2state` snapshots by extension and otherwise detects
-AppleSingle, NAPS `#06AAAA`, legacy DOS/old-cc65 headers, or raw bytes; explicit
-Applesoft text import tokenizes at `$0801` and repairs BASIC bookkeeping. Save
-offers snapshots, binary ranges (NAPS default, Raw, or AppleSingle), and Applesoft
-ASCII listings. Configure/reset remain below it. The superseded fixed Disk II,
-SmartPort, separate binary, and separate state sections have been removed.
+AppleSingle, NAPS `#TTAAAA` (ProDOS BIN `$06` or SYS `$FF` with load address in
+aux), legacy DOS/old-cc65 headers, or raw bytes; **Run after load** sets PC to
+the decoded load address. Explicit Applesoft text import tokenizes at `$0801`
+and repairs BASIC bookkeeping. Save offers snapshots, binary ranges (NAPS
+`#06AAAA` default, Raw, or AppleSingle), and Applesoft ASCII listings.
+Configure/reset remain below it. The superseded fixed Disk II, SmartPort,
+separate binary, and separate state sections have been removed.
 
 ## Hardware view
 

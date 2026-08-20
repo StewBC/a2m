@@ -7669,6 +7669,17 @@ void frontend_set_load_bin_path(frontend *ui, const char *path)
     dlg = &ui->load_bin_dialog;
     snprintf(dlg->path, sizeof(dlg->path), "%s", path);
     dlg->detected[0] = '\0';
+    dlg->has_naps_type = false;
+    dlg->naps_type = 0u;
+    dlg->decode_ok = false;
+    {
+        uint8_t naps_type = 0u;
+        uint16_t naps_aux = 0u;
+        if (apple2_naps_parse_path(path, &naps_type, &naps_aux)) {
+            dlg->has_naps_type = true;
+            dlg->naps_type = naps_type;
+        }
+    }
     if (dlg->kind == FRONTEND_MACHINE_FILE_SNAPSHOT) {
         snprintf(dlg->detected, sizeof(dlg->detected), "Selected: machine snapshot");
         return;
@@ -7703,12 +7714,22 @@ void frontend_set_load_bin_path(frontend *ui, const char *path)
     if (apple2_binary_decode(
             path, bytes, (size_t)file_size, dlg->binary_format, raw_address,
             &binary, error, sizeof(error))) {
-        const char *name = binary.format == APPLE2_BINARY_FORMAT_APPLESINGLE ? "AppleSingle" :
-            binary.format == APPLE2_BINARY_FORMAT_NAPS ? "NAPS BIN" :
-            binary.format == APPLE2_BINARY_FORMAT_LEGACY_DOS ? "legacy DOS binary" : "raw binary";
+        const char *name;
+        if (binary.format == APPLE2_BINARY_FORMAT_APPLESINGLE) {
+            name = binary.has_prodos_type && binary.prodos_type == 0xffu ?
+                "AppleSingle SYS" : "AppleSingle BIN";
+        } else if (binary.format == APPLE2_BINARY_FORMAT_NAPS) {
+            name = binary.has_prodos_type && binary.prodos_type == 0xffu ?
+                "NAPS SYS" : "NAPS BIN";
+        } else if (binary.format == APPLE2_BINARY_FORMAT_LEGACY_DOS) {
+            name = "legacy DOS binary";
+        } else {
+            name = "raw binary";
+        }
         snprintf(dlg->detected, sizeof(dlg->detected),
             "Detected: %s at $%04X (%u bytes)", name,
             (unsigned)binary.load_address, (unsigned)binary.size);
+        dlg->decode_ok = true;
     } else {
         snprintf(dlg->detected, sizeof(dlg->detected), "%s", error);
     }
@@ -9512,7 +9533,7 @@ static void frontend_draw_load_bin_dialog(frontend *ui, int width, int height)
         "Auto", "Snapshot", "Binary", "Applesoft text"
     };
     static const char *const format_items[] = {
-        "Auto", "Raw", "NAPS #06AAAA", "AppleSingle", "Legacy DOS"
+        "Auto", "Raw", "NAPS #TTAAAA", "AppleSingle", "Legacy DOS"
     };
     frontend_load_bin_dialog_state *dlg;
     struct nk_context *ctx;
@@ -9554,7 +9575,12 @@ static void frontend_draw_load_bin_dialog(frontend *ui, int width, int height)
                 frontend_machine_file_kind previous = dlg->kind;
                 dlg->kind = (frontend_machine_file_kind)nk_combo(
                     ctx, kind_items, 4, (int)dlg->kind, 18, nk_vec2(250.0f, 130.0f));
-                if (dlg->kind != previous) dlg->detected[0] = '\0';
+                if (dlg->kind != previous && dlg->path[0] != '\0') {
+                    frontend_set_load_bin_path(ui, dlg->path);
+                } else if (dlg->kind != previous) {
+                    dlg->detected[0] = '\0';
+                    dlg->decode_ok = false;
+                }
             }
             nk_layout_row_end(ctx);
 
@@ -9569,7 +9595,12 @@ static void frontend_draw_load_bin_dialog(frontend *ui, int width, int height)
                     dlg->binary_format = (apple2_binary_format)nk_combo(
                         ctx, format_items, 5, (int)dlg->binary_format, 18,
                         nk_vec2(250.0f, 150.0f));
-                    if (dlg->binary_format != previous) dlg->detected[0] = '\0';
+                    if (dlg->binary_format != previous && dlg->path[0] != '\0') {
+                        frontend_set_load_bin_path(ui, dlg->path);
+                    } else if (dlg->binary_format != previous) {
+                        dlg->detected[0] = '\0';
+                        dlg->decode_ok = false;
+                    }
                 }
                 nk_layout_row_end(ctx);
             } else {
@@ -9609,6 +9640,17 @@ static void frontend_draw_load_bin_dialog(frontend *ui, int width, int height)
             if (dlg->detected[0] != '\0') {
                 nk_layout_row_dynamic(ctx, 18.0f, 1);
                 nk_label(ctx, dlg->detected, NK_TEXT_LEFT);
+            }
+            /* Soft warning only when Run is requested for a non-BIN/SYS NAPS file
+               that still decoded (typically Format=Raw bypassing the type gate). */
+            if (dlg->run_after_load && dlg->decode_ok && dlg->has_naps_type &&
+                !apple2_binary_prodos_type_is_loadable(dlg->naps_type)) {
+                char run_note[96];
+                snprintf(run_note, sizeof(run_note),
+                    "Note: NAPS type $%02X is not BIN/SYS; Run sets PC to the load address",
+                    (unsigned)dlg->naps_type);
+                nk_layout_row_dynamic(ctx, 18.0f, 1);
+                nk_label_colored(ctx, run_note, NK_TEXT_LEFT, nk_rgb(255, 200, 120));
             }
 
             /* Error / spacer */

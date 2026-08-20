@@ -196,6 +196,10 @@ typedef struct frontend_load_bin_dialog_state {
     bool run_after_load;
     char detected[96];
     char error[128];
+    /* NAPS type from the selected path (for Run-after-load soft warnings). */
+    bool has_naps_type;
+    uint8_t naps_type;
+    bool decode_ok;
 } frontend_load_bin_dialog_state;
 
 typedef struct frontend_save_bin_dialog_state {

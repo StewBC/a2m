@@ -644,14 +644,19 @@ power-cycle reset.
 |-------|---------|
 | Name + Browse | Select the host file |
 | Type | `Auto`, `Snapshot`, `Binary`, or `Applesoft text` |
-| Format | For Auto/Binary: `Auto`, `Raw`, `NAPS #06AAAA`, `AppleSingle`, `Legacy DOS` |
+| Format | For Auto/Binary: `Auto`, `Raw`, `NAPS #TTAAAA`, `AppleSingle`, `Legacy DOS` |
 | Raw address | Hex load address, used when the file has no embedded address |
 | Reset before load | Reset the machine before injecting (off for snapshots) |
 | Run after load | Jump to the load address after a binary load (off by default) |
 
 `Auto` recognizes `.a2state` snapshots by extension. For binaries it recognizes
-cc65 AppleSingle, NAPS filenames such as `demo#060803`, and the four-byte DOS header
-used by older cc65 releases; otherwise it loads raw bytes at the entered address.
+cc65 AppleSingle, NAPS filenames such as `demo#060803` (BIN) or
+`chess.system#ff2000` (SYS), and the four-byte DOS header used by older cc65
+releases; otherwise it loads raw bytes at the entered address. NAPS/AppleSingle
+Auto-load accepts ProDOS **BIN (`$06`)** and **SYS (`$FF`)** only — both carry
+the load address in aux. **Run after load** sets PC to that same load address
+(there is no separate entry point). A soft note appears if Run is checked for a
+non-BIN/SYS NAPS file loaded via Raw.
 
 **Applesoft text** accepts an ASCII listing, sorts it by line number, tokenizes it
 directly into `$0801`, clears variables, and repairs Applesoft's program pointers.

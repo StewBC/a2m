@@ -17,8 +17,13 @@ typedef struct apple2_binary_view {
     size_t size;
     uint16_t load_address;
     bool has_load_address;
+    uint8_t prodos_type; /* set when has_prodos_type; $06 BIN or $FF SYS */
+    bool has_prodos_type;
     apple2_binary_format format;
 } apple2_binary_view;
+
+/* ProDOS types that carry a load address in aux and are safe to inject/run. */
+bool apple2_binary_prodos_type_is_loadable(uint16_t prodos_type);
 
 bool apple2_naps_parse_path(const char *path, uint8_t *file_type, uint16_t *aux_type);
 bool apple2_naps_make_path(

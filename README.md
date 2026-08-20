@@ -51,9 +51,10 @@ without leaving the emulator. Assembled labels feed straight into the
 disassembler's symbol table.
 
 Loading and saving host files is done from the Machine tab: binaries at any
-address (raw, AppleSingle, NAPS `#06AAAA`, or legacy DOS), optionally with a
-reset before load; Applesoft listings as ASCII (tokenized by the emulator on
-load, detokenized on save); and `.a2state` snapshots.
+address (raw, AppleSingle, NAPS `#TTAAAA` for BIN `$06` / SYS `$FF`, or legacy
+DOS), optionally with a reset before load and optional run at the load
+address; Applesoft listings as ASCII (tokenized by the emulator on load,
+detokenized on save); and `.a2state` snapshots.
 
 The manual is here: [a2m Manual](./manual/manual.md).  
 There is a details section with more [technical details](./manual/manual.md#Details).
