@@ -266,6 +266,9 @@ void frontend_set_layout_state(frontend *ui, const frontend_layout_state *state)
 void frontend_get_layout_state(frontend *ui, frontend_layout_state *out_state);
 void frontend_debug_min_window_size(const frontend *ui, int *out_min_w, int *out_min_h);
 void frontend_set_config_state(frontend *ui, const app_options *options);
+/* Refresh Disk II / SmartPort mounts in an open Configure dialog from live
+   options without discarding other in-progress Configure edits. */
+void frontend_sync_config_media_mounts(frontend *ui, const app_options *options);
 bool frontend_config_dialog_is_open(const frontend *ui);
 bool frontend_trigger_assembler(frontend *ui);
 /* device: Disk II drive 0 or 1 (8/9 accepted as legacy aliases). */

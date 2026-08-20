@@ -323,6 +323,65 @@ int main(void)
         (void)rmdir(dir);
     }
 
+    /* Configure Apply/Save must keep live media mounts: eject clears live options
+       while the dialog snapshot can still hold the old SmartPort paths. */
+    {
+        const char *path = "/tmp/a2m-test-sp-eject-save.ini";
+        app_options live;
+        app_options dialog;
+        config *saved;
+        FILE *file = fopen(path, "w");
+        expect_true("create SP eject INI", file != NULL);
+        fputs(
+            "[Slots]\n"
+            "slot6=diskii\n"
+            "slot7=smartport\n"
+            "[SmartPort]\n"
+            "s7d0=/tmp/a.po\n"
+            "s7d1=/tmp/b.po\n",
+            file);
+        expect_true("close SP eject INI", fclose(file) == 0);
+
+        app_options_init(&live);
+        expect_true("load SP eject INI", app_options_apply_ini_file(&live, path));
+        expect_true("two SP before eject", live.smartport_count == 2);
+        app_options_smartport_clear_path(&live, 7, 0);
+        app_options_smartport_clear_path(&live, 7, 1);
+        expect_true("live cleared after eject", live.smartport_count == 0);
+
+        /* Stale Configure snapshot still has the pre-eject mounts. */
+        app_options_init(&dialog);
+        expect_true("load stale dialog snapshot",
+            app_options_apply_ini_file(&dialog, path));
+        expect_true("dialog still mounted", dialog.smartport_count == 2);
+
+        /* Simulate CONFIG_APPLY / SAVE_INI_NOW: take dialog settings, then put
+           live media back. */
+        expect_true(
+            "replace keeps live empty mounts",
+            app_options_replace_media_mounts(&dialog, &live));
+        expect_true("dialog media now empty", dialog.smartport_count == 0);
+        expect_true("slot card still SmartPort",
+            dialog.slot_cards[7] == APP_SLOT_CARD_SMARTPORT);
+
+        set_ini_path(&dialog, path);
+        expect_true("save after eject", app_options_save_shutdown(&dialog));
+        saved = config_load(path);
+        expect_true("reload after eject save", saved != NULL);
+        expect_true(
+            "s7d0 empty after eject save",
+            config_get(saved, "SmartPort", "s7d0") != NULL &&
+                config_get(saved, "SmartPort", "s7d0")[0] == '\0');
+        expect_true(
+            "s7d1 empty after eject save",
+            config_get(saved, "SmartPort", "s7d1") != NULL &&
+                config_get(saved, "SmartPort", "s7d1")[0] == '\0');
+        config_destroy(saved);
+        app_options_destroy(&dialog);
+        app_options_destroy(&live);
+        expect_true("remove SP eject INI", remove(path) == 0);
+    }
+
     /* samples/golf.ini: ../disks/... is relative to the INI, not the process cwd. */
     {
         const char *golf_paths[] = {

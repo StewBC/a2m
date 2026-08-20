@@ -181,6 +181,10 @@ bool app_options_save_shutdown(const app_options *options);
    (returns true) when there is no writable INI target. */
 bool app_options_save_paths_only(const app_options *options);
 bool app_options_copy(app_options *dest, const app_options *src);
+/* Replace dest Disk II / SmartPort mounts (and Disk II queues) from src.
+   Slot cards and other Configure fields are left alone. Used because live
+   media is owned by Misc -> Machine, not the Configure dialog snapshot. */
+bool app_options_replace_media_mounts(app_options *dest, const app_options *src);
 bool app_options_apply_ini_file(app_options *options, const char *path);
 bool app_options_set_string(char **target, const char *value);
 bool app_options_path_relative_to_ini(

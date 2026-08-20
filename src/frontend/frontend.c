@@ -7578,6 +7578,15 @@ void frontend_set_config_state(frontend *ui, const app_options *options)
     }
 }
 
+void frontend_sync_config_media_mounts(frontend *ui, const app_options *options)
+{
+    if (ui == NULL || options == NULL || !ui->config_dialog.initialized) {
+        return;
+    }
+    (void)app_options_replace_media_mounts(&ui->config_dialog.original, options);
+    (void)app_options_replace_media_mounts(&ui->config_dialog.edited, options);
+}
+
 bool frontend_config_dialog_is_open(const frontend *ui)
 {
     return ui != NULL && ui->config_dialog.open;

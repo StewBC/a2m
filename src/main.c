@@ -1441,10 +1441,25 @@ static void dispatch_intent(
         if (options != NULL) {
             int slot;
             bool save_now = (intent->type == FRONTEND_DEBUGGER_INTENT_SAVE_INI_NOW);
-            app_options_destroy(options);
-            if (!app_options_copy(options, &intent->config)) {
+            /* Configure edits host/machine settings, not live Disk II / SmartPort
+               mounts (those live under Misc -> Machine). Keep the live media so
+               eject/insert is not undone by Save INI / OK from a stale dialog. */
+            app_options media_live;
+            app_options_init(&media_live);
+            if (!app_options_replace_media_mounts(&media_live, options)) {
+                app_options_destroy(&media_live);
                 break;
             }
+            app_options_destroy(options);
+            if (!app_options_copy(options, &intent->config)) {
+                app_options_destroy(&media_live);
+                break;
+            }
+            if (!app_options_replace_media_mounts(options, &media_live)) {
+                app_options_destroy(&media_live);
+                break;
+            }
+            app_options_destroy(&media_live);
             options->save_ini = options->remember;
             app_options_reconcile_slot_cards(options);
             if (intent->config_result.machine_changed) {
@@ -2412,6 +2427,16 @@ int main(int argc, char **argv)
                     }
                 }
                 app_options_sync_convenience_paths(&options);
+                /* Keep Configure's options snapshot aligned with live media so a
+                   later Save INI does not revive ejected mounts. When the dialog
+                   is open, only refresh mounts (preserve in-progress edits). */
+                if (ui != NULL) {
+                    if (frontend_config_dialog_is_open(ui)) {
+                        frontend_sync_config_media_mounts(ui, &options);
+                    } else {
+                        frontend_set_config_state(ui, &options);
+                    }
+                }
             }
             /* After stop-class events, refresh tables like c64m request_debug_state. */
             if (revent.type == RUNTIME_EVENT_PAUSED ||

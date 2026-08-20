@@ -45,6 +45,9 @@ Default SP **slot 7**.
 
 The Machine UI supports live SmartPort insert/eject for both devices on any
 configured SmartPort card. SmartPort does not use a multi-image queue.
+Live insert/eject updates the options used for Save INI / quit; Configure does
+not own media mounts (Misc → Machine does), so Apply / Save INI keeps the live
+Disk II / SmartPort paths rather than a stale Configure snapshot.
 The INI-only `[SmartPort] boot_slot=N` setting redirects initial execution to `$Cn00`
 after unit 0 mounts, enabling Apple ][+ and non-slot-7 SmartPort boot. Invalid
 card or missing-media selections publish a runtime error and keep normal startup.

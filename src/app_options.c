@@ -2454,6 +2454,57 @@ bool app_options_copy(app_options *dest, const app_options *src)
     return true;
 }
 
+bool app_options_replace_media_mounts(app_options *dest, const app_options *src)
+{
+    int i;
+
+    if (dest == NULL || src == NULL) {
+        return false;
+    }
+
+    for (i = 0; i < dest->diskii_count; ++i) {
+        free(dest->diskii[i].path);
+        dest->diskii[i].path = NULL;
+    }
+    dest->diskii_count = 0;
+
+    for (i = 0; i < dest->smartport_count; ++i) {
+        free(dest->smartport[i].path);
+        dest->smartport[i].path = NULL;
+    }
+    dest->smartport_count = 0;
+
+    for (i = 0; i < src->diskii_count; ++i) {
+        if (src->diskii[i].path == NULL || src->diskii[i].path[0] == '\0') {
+            continue;
+        }
+        if (!add_diskii_mount(
+                dest, src->diskii[i].slot, src->diskii[i].drive, src->diskii[i].path)) {
+            return false;
+        }
+    }
+
+    dest->smartport_boot_slot = src->smartport_boot_slot;
+    for (i = 0; i < src->smartport_count; ++i) {
+        if (src->smartport[i].path == NULL || src->smartport[i].path[0] == '\0') {
+            continue;
+        }
+        if (!add_smartport_mount(
+                dest, src->smartport[i].slot, src->smartport[i].unit, src->smartport[i].path)) {
+            return false;
+        }
+    }
+
+    for (i = 0; i < A2M_DISK_SLOT_COUNT; ++i) {
+        if (!app_disk_slot_copy(&dest->disk_slots[i], &src->disk_slots[i])) {
+            return false;
+        }
+    }
+
+    app_options_sync_convenience_paths(dest);
+    return true;
+}
+
 bool app_options_load_startup(app_options *options, int argc, char **argv)
 {
     config *cfg = NULL;
