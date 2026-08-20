@@ -7538,14 +7538,10 @@ void frontend_set_disk_queue(frontend *ui, uint8_t device, const app_disk_slot *
     if (ui == NULL || slot == NULL) {
         return;
     }
-    /* Apple: drive 0/1. Legacy C64 device 8/9 accepted as aliases. */
-    if (device == 0u || device == 8u) {
-        index = 0;
-    } else if (device == 1u || device == 9u) {
-        index = 1;
-    } else {
+    if (device > 1u) {
         return;
     }
+    index = (int)device;
 
     app_disk_slot_copy(&ui->disk_queue[index], slot);
 }

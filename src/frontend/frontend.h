@@ -260,7 +260,7 @@ void frontend_set_config_state(frontend *ui, const app_options *options);
 void frontend_sync_config_media_mounts(frontend *ui, const app_options *options);
 bool frontend_config_dialog_is_open(const frontend *ui);
 bool frontend_trigger_assembler(frontend *ui);
-/* device: Disk II drive 0 or 1 (8/9 accepted as legacy aliases). */
+/* device: Disk II drive 0 or 1. */
 void frontend_set_disk_queue(frontend *ui, uint8_t device, const app_disk_slot *slot);
 bool frontend_apply_selected_ini(frontend *ui, const app_options *options);
 bool frontend_get_disassembly_cursor(const frontend *ui, uint16_t *out_address);

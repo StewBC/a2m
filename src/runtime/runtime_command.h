@@ -35,7 +35,6 @@ typedef enum runtime_command_type {
     RUNTIME_COMMAND_UPDATE_BREAKPOINT,
     RUNTIME_COMMAND_DUPLICATE_BREAKPOINT,
     RUNTIME_COMMAND_REQUEST_BREAKPOINTS,
-    RUNTIME_COMMAND_MOUNT_D64,
     RUNTIME_COMMAND_SET_DISK_WRITABLE,
     RUNTIME_COMMAND_ASSEMBLE_FILE,
     RUNTIME_COMMAND_APPLY_MACHINE_CONFIG,
@@ -169,12 +168,6 @@ typedef struct runtime_command {
         struct {
             char path[RUNTIME_COMMAND_PATH_MAX];
         } state_file;
-
-        struct {
-            char path[RUNTIME_COMMAND_PATH_MAX];
-            uint8_t device;
-            uint8_t writable;
-        } mount_d64;
 
         struct {
             char path[RUNTIME_COMMAND_PATH_MAX];

@@ -136,12 +136,6 @@ bool runtime_client_rearm_oneshot_breakpoints(runtime_client *client);
 bool runtime_client_request_breakpoints(runtime_client *client);
 bool runtime_client_save_state(runtime_client *client, const char *path);
 bool runtime_client_load_state(runtime_client *client, const char *path);
-bool runtime_client_mount_d64(runtime_client *client, uint8_t device, const char *path);
-bool runtime_client_mount_d64_ex(
-    runtime_client *client,
-    uint8_t device,
-    const char *path,
-    bool writable);
 /* Disk II write-protect notch (slot 1–7, drive 0/1). */
 bool runtime_client_set_disk_writable(
     runtime_client *client,

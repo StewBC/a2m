@@ -1959,7 +1959,7 @@ Memory modes:
 | Command | Meaning |
 |---------|---------|
 | `key <byte>` | Inject one Apple keystroke (`$C000` path). `$8D` / CR becomes Return |
-| `mount-disk <drive> <path>` | Mount a Disk II image on slot 6 drive `0` or `1` (legacy `8`/`9` also accepted) |
+| `mount-disk <drive> <path>` | Mount a Disk II image on slot 6 drive `0` or `1` |
 | `select-disk [slot] [drive] <index>` | Make the 1-based queued Disk II image current (defaults: slot 6, drive 0) |
 | `set-disk-writable [slot] [drive] <0\|1>` | Set the Disk II write-protect notch (`0`=read-only, `1`=writable; defaults: slot 6, drive 0) |
 | `break-exec <addr>` | Set an execute breakpoint |

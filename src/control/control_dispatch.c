@@ -1401,8 +1401,14 @@ static void handle_request(control_dispatch_t *disp, control_request *req)
     }
 
     case CONTROL_COMMAND_MOUNT_DISK:
-        /* Disk II: device 0/1 (or 8/9 legacy) → drive; path is image. Slot arg ignored (s6). */
-        if (!runtime_client_mount_d64(client, req->args.drive, req->args.path)) {
+        /* Disk II on slot 6, drive 0 or 1. */
+        if (req->args.drive > 1u ||
+            !runtime_client_media_insert(
+                client,
+                6u,
+                req->args.drive,
+                RUNTIME_SLOT_CARD_DISKII,
+                req->args.path)) {
             post_error(disp, req->id, "bad-args", "mount");
         } else {
             post_ok(disp, req->id, "accepted=1");
@@ -1412,11 +1418,8 @@ static void handle_request(control_dispatch_t *disp, control_request *req)
     case CONTROL_COMMAND_SELECT_DISK: {
         uint8_t slot = req->args.slot != 0u ? req->args.slot : 6u;
         uint8_t drive = req->args.drive;
-        /* Legacy C64 unit numbers on the drive field. */
-        if (drive == 8u || drive == 9u) {
-            drive = (drive == 9u) ? 1u : 0u;
-        }
-        if (req->args.disk_index == 0u ||
+        if (drive > 1u ||
+            req->args.disk_index == 0u ||
             !runtime_client_media_swap(
                 client, slot, drive, (int32_t)req->args.disk_index, false)) {
             post_error(disp, req->id, "bad-args", "select-disk");
@@ -1429,10 +1432,8 @@ static void handle_request(control_dispatch_t *disp, control_request *req)
     case CONTROL_COMMAND_SET_DISK_WRITABLE: {
         uint8_t slot = req->args.slot != 0u ? req->args.slot : 6u;
         uint8_t drive = req->args.drive;
-        if (drive == 8u || drive == 9u) {
-            drive = (drive == 9u) ? 1u : 0u;
-        }
-        if (!runtime_client_set_disk_writable(
+        if (drive > 1u ||
+            !runtime_client_set_disk_writable(
                 client, slot, drive, req->args.disk_writable != 0u)) {
             post_error(disp, req->id, "bad-args", "set-disk-writable");
         } else {

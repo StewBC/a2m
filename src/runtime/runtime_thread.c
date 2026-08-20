@@ -3602,18 +3602,6 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         runtime_set_active_turbo(rt, cmd->data.set_turbo_multiplier.multiplier);
         runtime_publish_machine(rt);
         break;
-    case RUNTIME_COMMAND_MOUNT_D64: {
-        /* Append image to Disk II queue (slot 6). device: 0/8 → d0, 1/9 → d1. */
-        const char *path = cmd->data.mount_d64.path;
-        uint8_t dev = cmd->data.mount_d64.device;
-        int drive = (dev == 1u || dev == 9u) ? 1 : 0;
-
-        if (path != NULL && path[0] != '\0') {
-            (void)apple2_attach_diskii(&rt->machine, 6);
-            (void)apple2_disk_mount(&rt->machine, 6, drive, path);
-        }
-        break;
-    }
     case RUNTIME_COMMAND_MEDIA_INSERT: {
         const uint8_t slot = cmd->data.media_insert.slot;
         const uint8_t device = cmd->data.media_insert.device;
@@ -3622,10 +3610,16 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         int result = -1;
 
         if (slot >= 1u && slot <= 7u && device <= 1u) {
-            if (card_type == RUNTIME_SLOT_CARD_DISKII &&
-                rt->machine.slot_type[slot] == SLOT_TYPE_DISKII) {
-                result = apple2_disk_mount(
-                    &rt->machine, slot, device, cmd->data.media_insert.path);
+            if (card_type == RUNTIME_SLOT_CARD_DISKII) {
+                /* Empty slot: attach Disk II (same convenience the old
+                   slot-6 mount shortcut had for control mount-disk). */
+                if (rt->machine.slot_type[slot] == SLOT_TYPE_EMPTY) {
+                    (void)apple2_attach_diskii(&rt->machine, (int)slot);
+                }
+                if (rt->machine.slot_type[slot] == SLOT_TYPE_DISKII) {
+                    result = apple2_disk_mount(
+                        &rt->machine, slot, device, cmd->data.media_insert.path);
+                }
             } else if (card_type == RUNTIME_SLOT_CARD_SMARTPORT &&
                        rt->machine.slot_type[slot] == SLOT_TYPE_SMARTPORT) {
                 result = apple2_smartport_mount(

@@ -46,13 +46,6 @@ uint64_t runtime_client_alloc_request_token(runtime_client *client) {
 }
 
 
-static bool runtime_drive_device_supported(uint8_t device)
-{
-    /* Disk II drive 0/1, plus legacy C64 unit numbers 8/9. */
-    return device == 0u || device == 1u || device == 8u || device == 9u;
-}
-
-
 bool runtime_client_ping(runtime_client *client) {
     return runtime_client_send_command(client, RUNTIME_COMMAND_PING);
 }
@@ -586,29 +579,6 @@ bool runtime_client_load_state(runtime_client *client, const char *path) {
     }
 
     snprintf(command.data.state_file.path, sizeof(command.data.state_file.path), "%s", path);
-    return message_queue_push(client->command_queue, &command);
-}
-
-bool runtime_client_mount_d64(runtime_client *client, uint8_t device, const char *path) {
-    return runtime_client_mount_d64_ex(client, device, path, false);
-}
-
-bool runtime_client_mount_d64_ex(
-    runtime_client *client,
-    uint8_t device,
-    const char *path,
-    bool writable) {
-    runtime_command command = {
-        .type = RUNTIME_COMMAND_MOUNT_D64,
-    };
-
-    if (!client || !path || path[0] == '\0' || !runtime_drive_device_supported(device)) {
-        return false;
-    }
-
-    command.data.mount_d64.device = device;
-    command.data.mount_d64.writable = writable ? 1u : 0u;
-    snprintf(command.data.mount_d64.path, sizeof(command.data.mount_d64.path), "%s", path);
     return message_queue_push(client->command_queue, &command);
 }
 

@@ -1566,7 +1566,7 @@ static void dispatch_intent(
         break;
     case FRONTEND_DEBUGGER_INTENT_DISK_UNMOUNT:
         (void)runtime_client_media_eject(
-            client, 6u, intent->disk_device == 9u ? 1u : 0u);
+            client, 6u, intent->disk_device > 1u ? 0u : intent->disk_device);
         break;
     case FRONTEND_DEBUGGER_INTENT_MEDIA_INSERT_DIALOG:
         if (ui != NULL) {
@@ -1766,16 +1766,9 @@ static void dispatch_intent(
         switch (intent->file_browser_purpose) {
         case FRONTEND_DEBUGGER_INTENT_DISK_MOUNT_DIALOG:
         case FRONTEND_DEBUGGER_INTENT_DISK_ADD_DIALOG: {
-            /* drive: 0/1 (or legacy 8/9). Mount and ADD both append to the
-               machine queue; host queues track the multi-image list. */
-            uint8_t drive = intent->disk_device;
-            if (drive == 8u) {
-                drive = 0u;
-            } else if (drive == 9u) {
-                drive = 1u;
-            } else if (drive > 1u) {
-                drive = 0u;
-            }
+            /* drive: 0/1. Mount and ADD both append to the machine queue;
+               host queues track the multi-image list. */
+            uint8_t drive = intent->disk_device > 1u ? 0u : intent->disk_device;
             if (intent->file_browser_purpose == FRONTEND_DEBUGGER_INTENT_DISK_MOUNT_DIALOG &&
                 options != NULL) {
                 app_disk_slot *queue = app_options_diskii_queue(options, 6, drive);
