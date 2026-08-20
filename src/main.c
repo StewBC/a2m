@@ -1095,11 +1095,36 @@ static void host_disk_queue_add(
     (void)ui;
 }
 
+/* Prefer classic slot 7, then 6..1. Live machine slots win when available. */
+static int find_smartport_slot_for_drop(
+    const frontend_debug_state *debug,
+    const app_options *options)
+{
+    int slot;
+
+    if (debug != NULL && debug->has_apple_flags) {
+        for (slot = 7; slot >= 1; --slot) {
+            if (debug->slots[slot].card_type == RUNTIME_SLOT_CARD_SMARTPORT) {
+                return slot;
+            }
+        }
+    }
+    if (options != NULL) {
+        for (slot = 7; slot >= 1; --slot) {
+            if (options->slot_cards[slot] == APP_SLOT_CARD_SMARTPORT) {
+                return slot;
+            }
+        }
+    }
+    return 0;
+}
+
 /* Drag-and-drop onto the window (c64m host loop feature, Apple extensions). */
 static void handle_drop_file(
     runtime_client *client,
     frontend *ui,
     app_options *options,
+    const frontend_debug_state *debug,
     char *path)
 {
     if (path == NULL) {
@@ -1114,11 +1139,27 @@ static void handle_drop_file(
         } else if (path_has_extension(path, "a2state")) {
             (void)runtime_client_load_state(client, path);
         } else if (path_has_extension(path, "hdv") || path_has_extension(path, "2mg")) {
-            /* SmartPort volume: path remembered; attach needs slot config. */
-            if (options != NULL) {
-                (void)app_options_set_string(&options->hd_s7d0, path);
-                (void)app_options_apply_convenience_paths(options);
-                SDL_Log("Dropped HD image recorded for s7d0 (apply on next launch): %s", path);
+            int sp_slot = find_smartport_slot_for_drop(debug, options);
+            if (sp_slot < 1) {
+                SDL_Log(
+                    "Dropped HD image ignored (no SmartPort card installed): %s",
+                    path);
+            } else if (!runtime_client_media_insert(
+                           client,
+                           (uint8_t)sp_slot,
+                           0u,
+                           RUNTIME_SLOT_CARD_SMARTPORT,
+                           path)) {
+                SDL_Log(
+                    "Dropped HD image insert failed (slot %d unit 0): %s",
+                    sp_slot,
+                    path);
+            } else {
+                /* Options/INI mounts update via MEDIA_CHANGED. */
+                SDL_Log(
+                    "Dropped HD image inserted on SmartPort s%dd0: %s",
+                    sp_slot,
+                    path);
             }
         } else {
             SDL_Log("Drop ignored (unsupported type): %s", path);
@@ -2525,7 +2566,7 @@ int main(int argc, char **argv)
                 }
                 send_event_to_frontend = false;
             } else if (event.type == SDL_DROPFILE) {
-                handle_drop_file(client, ui, &options, event.drop.file);
+                handle_drop_file(client, ui, &options, &debug, event.drop.file);
                 send_event_to_frontend = false;
             }
 

@@ -157,7 +157,7 @@ The file extension determines how the file is handled:
 |-----------|--------|
 | `.nib` `.dsk` `.do` `.po` `.woz` | Add the image to the Disk II queue on slot 6 drive 0 |
 | `.a2state` | Load a saved machine state snapshot |
-| `.hdv` `.2mg` | Remember the path as SmartPort `s7d0` for the next launch |
+| `.hdv` `.2mg` | Live-insert on SmartPort unit 0 (scan slots 7 down to 1; ignored if no SmartPort card is installed) |
 | anything else | Ignored |
 
 Extension matching is case-insensitive.
