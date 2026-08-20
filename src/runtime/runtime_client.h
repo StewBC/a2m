@@ -52,7 +52,6 @@ bool runtime_client_step_cycle(runtime_client *client);
 bool runtime_client_step_instruction(runtime_client *client);
 bool runtime_client_run_cycles(runtime_client *client, size_t count);
 bool runtime_client_run_instructions(runtime_client *client, size_t count);
-bool runtime_client_step_frame(runtime_client *client);
 /* Allocate a non-zero request_token for solicited control/UI RPC. */
 uint64_t runtime_client_alloc_request_token(runtime_client *client);
 
@@ -99,8 +98,6 @@ bool runtime_client_request_memory_view(
 bool runtime_client_request_debug_memory(runtime_client *client, bool include_write_history);
 bool runtime_client_request_frame(runtime_client *client);
 bool runtime_client_keyboard_key(runtime_client *client, host_key key, bool pressed);
-bool runtime_client_restore(runtime_client *client);
-bool runtime_client_set_joystick(runtime_client *client, unsigned port, uint8_t inputs);
 /* Apple game port: axes[4] paddle units 0..255 (PDL0..PDL3), buttons bit0–2. */
 bool runtime_client_set_gameport(
     runtime_client *client,
@@ -137,8 +134,6 @@ bool runtime_client_clear_all_breakpoints(runtime_client *client);
 bool runtime_client_set_breakpoint_enabled(runtime_client *client, uint32_t id, bool enabled);
 bool runtime_client_rearm_oneshot_breakpoints(runtime_client *client);
 bool runtime_client_request_breakpoints(runtime_client *client);
-bool runtime_client_load_prg(runtime_client *client, const char *path);
-bool runtime_client_load_crt(runtime_client *client, const char *path);
 bool runtime_client_save_state(runtime_client *client, const char *path);
 bool runtime_client_load_state(runtime_client *client, const char *path);
 bool runtime_client_mount_d64(runtime_client *client, uint8_t device, const char *path);
@@ -179,7 +174,6 @@ bool runtime_client_assemble_file_full(
     uint16_t address,
     uint16_t run_address,
     bool auto_run,
-    bool basic_run,
     bool reset_first,
     bool auto_adjust_segments);
 bool runtime_client_poll_symbols(runtime_client *client, runtime_symbol_snapshot *out);
@@ -187,17 +181,6 @@ bool runtime_client_paste_text(runtime_client *client, const char *text, size_t 
 bool runtime_client_cycle_turbo_speed(runtime_client *client);
 /* milli_mhz: RUNTIME_TURBO_MAX (0) = max free-run; else target MHz × 1000 (1000 = 1 MHz). */
 bool runtime_client_set_turbo_multiplier(runtime_client *client, uint32_t milli_mhz);
-/* rom_paths, when non-NULL, carries the effective ROM file paths (any member may
-   be NULL/empty for "unset"); pass reload_roms=true to have the runtime re-read
-   them as part of this apply (requires reset to take visible effect). */
-typedef struct runtime_client_rom_paths {
-    const char *system_rom_path;
-    const char *basic_rom_path;
-    const char *char_rom_path;
-    const char *kernal_rom_path;
-    const char *rom1541_path;
-} runtime_client_rom_paths;
-
 bool runtime_client_apply_machine_config(
     runtime_client *client,
     const runtime_machine_config *config,
@@ -206,11 +189,8 @@ bool runtime_client_apply_machine_config(
     const char *symbol_files,
     bool reset,
     bool save_ini,
-    bool resume_running,
-    const runtime_client_rom_paths *rom_paths,
-    bool reload_roms);
-/* C64 indexed poll_frame removed; use poll_argb_frame. */
-/* Apple ARGB frame handoff (W2). Caller provides buffer large enough for w*h. */
+    bool resume_running);
+/* Apple ARGB frame handoff. Caller provides buffer large enough for w*h. */
 bool runtime_client_poll_argb_frame(
     runtime_client *client,
     uint32_t *out_pixels,
@@ -226,12 +206,6 @@ bool runtime_client_poll_breakpoints(
 bool runtime_client_step_out(runtime_client *client);
 bool runtime_client_step_over(runtime_client *client);
 bool runtime_client_run_to_cursor(runtime_client *client, uint16_t address);
-/* Run until VIC raster_line matches (and optional cycle_in_line). */
-bool runtime_client_run_to_raster(
-    runtime_client *client,
-    uint16_t raster_line,
-    bool has_cycle,
-    uint16_t cycle_in_line);
 bool runtime_client_history_info(
     runtime_client *client,
     uint64_t request_token);

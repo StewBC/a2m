@@ -3849,7 +3849,7 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         break;
 
     default:
-        /* Unimplemented C64-only commands: ignore for W2. */
+        /* Unknown / unsupported command: ignore. */
         break;
     }
 }

@@ -213,7 +213,7 @@ int main(void)
         expect_true("queue unchanged machine config",
             runtime_client_apply_machine_config(
                 client, &machine_config, NULL, NULL, NULL,
-                true, false, false, NULL, false));
+                true, false, false));
         expect_true("request state after unchanged config",
             runtime_client_request_machine_state(client));
         expect_true("unchanged config does not reset",
@@ -227,7 +227,7 @@ int main(void)
         expect_true("queue changed machine config",
             runtime_client_apply_machine_config(
                 client, &machine_config, NULL, NULL, NULL,
-                true, false, false, NULL, false));
+                true, false, false));
         expect_true("changed config power-cycle", poll_event(
             client, &event, RUNTIME_EVENT_RESET_COMPLETE, 2.0));
         expect_true("changed config machine state", poll_event(

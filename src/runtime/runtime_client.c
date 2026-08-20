@@ -48,7 +48,8 @@ uint64_t runtime_client_alloc_request_token(runtime_client *client) {
 
 static bool runtime_drive_device_supported(uint8_t device)
 {
-    return device == 8u || device == 9u;
+    /* Disk II drive 0/1, plus legacy C64 unit numbers 8/9. */
+    return device == 0u || device == 1u || device == 8u || device == 9u;
 }
 
 
@@ -145,10 +146,6 @@ bool runtime_client_run_instructions(runtime_client *client, size_t count) {
 
     command.data.run_instructions.count = count;
     return message_queue_push(client->command_queue, &command);
-}
-
-bool runtime_client_step_frame(runtime_client *client) {
-    return runtime_client_send_command(client, RUNTIME_COMMAND_STEP_FRAME);
 }
 
 bool runtime_client_request_cpu_state(runtime_client *client) {
@@ -366,24 +363,6 @@ bool runtime_client_keyboard_key(runtime_client *client, host_key key, bool pres
     return message_queue_push(client->command_queue, &command);
 }
 
-bool runtime_client_restore(runtime_client *client) {
-    return runtime_client_send_command(client, RUNTIME_COMMAND_RESTORE);
-}
-
-bool runtime_client_set_joystick(runtime_client *client, unsigned port, uint8_t inputs) {
-    runtime_command command = {
-        .type = RUNTIME_COMMAND_SET_JOYSTICK,
-    };
-
-    if (!client || port < 1u || port > 2u) {
-        return false;
-    }
-
-    command.data.set_joystick.port = (uint8_t)port;
-    command.data.set_joystick.inputs = (uint8_t)(inputs & 0x1fu);
-    return message_queue_push(client->command_queue, &command);
-}
-
 bool runtime_client_set_gameport(
     runtime_client *client,
     const uint8_t axis[4],
@@ -584,32 +563,6 @@ bool runtime_client_request_breakpoints(runtime_client *client) {
     return runtime_client_send_command(client, RUNTIME_COMMAND_REQUEST_BREAKPOINTS);
 }
 
-bool runtime_client_load_prg(runtime_client *client, const char *path) {
-    runtime_command command = {
-        .type = RUNTIME_COMMAND_LOAD_PRG,
-    };
-
-    if (!client || !path || path[0] == '\0') {
-        return false;
-    }
-
-    snprintf(command.data.load_prg.path, sizeof(command.data.load_prg.path), "%s", path);
-    return message_queue_push(client->command_queue, &command);
-}
-
-bool runtime_client_load_crt(runtime_client *client, const char *path) {
-    runtime_command command = {
-        .type = RUNTIME_COMMAND_LOAD_CRT,
-    };
-
-    if (!client || !path || path[0] == '\0') {
-        return false;
-    }
-
-    snprintf(command.data.load_crt.path, sizeof(command.data.load_crt.path), "%s", path);
-    return message_queue_push(client->command_queue, &command);
-}
-
 bool runtime_client_save_state(runtime_client *client, const char *path) {
     runtime_command command = {
         .type = RUNTIME_COMMAND_SAVE_STATE,
@@ -768,7 +721,6 @@ bool runtime_client_assemble_file_full(
     uint16_t address,
     uint16_t run_address,
     bool auto_run,
-    bool basic_run,
     bool reset_first,
     bool auto_adjust_segments) {
     runtime_command command = {
@@ -783,7 +735,6 @@ bool runtime_client_assemble_file_full(
     command.data.assemble_file.address = address;
     command.data.assemble_file.run_address = run_address;
     command.data.assemble_file.auto_run = auto_run ? 1u : 0u;
-    command.data.assemble_file.basic_run = basic_run ? 1u : 0u;
     command.data.assemble_file.reset_first = reset_first ? 1u : 0u;
     command.data.assemble_file.auto_adjust_segments =
         auto_adjust_segments ? 1u : 0u;
@@ -836,9 +787,7 @@ bool runtime_client_apply_machine_config(
     const char *symbol_files,
     bool reset,
     bool save_ini,
-    bool resume_running,
-    const runtime_client_rom_paths *rom_paths,
-    bool reload_roms) {
+    bool resume_running) {
     runtime_command command = {
         .type = RUNTIME_COMMAND_APPLY_MACHINE_CONFIG,
     };
@@ -870,32 +819,7 @@ bool runtime_client_apply_machine_config(
     command.data.apply_machine_config.reset = reset ? 1u : 0u;
     command.data.apply_machine_config.save_ini = save_ini ? 1u : 0u;
     command.data.apply_machine_config.resume_running = resume_running ? 1u : 0u;
-    command.data.apply_machine_config.reload_roms = reload_roms ? 1u : 0u;
-    if (rom_paths != NULL) {
-        snprintf(command.data.apply_machine_config.system_rom_path,
-                 sizeof(command.data.apply_machine_config.system_rom_path),
-                 "%s", rom_paths->system_rom_path != NULL ? rom_paths->system_rom_path : "");
-        snprintf(command.data.apply_machine_config.basic_rom_path,
-                 sizeof(command.data.apply_machine_config.basic_rom_path),
-                 "%s", rom_paths->basic_rom_path != NULL ? rom_paths->basic_rom_path : "");
-        snprintf(command.data.apply_machine_config.char_rom_path,
-                 sizeof(command.data.apply_machine_config.char_rom_path),
-                 "%s", rom_paths->char_rom_path != NULL ? rom_paths->char_rom_path : "");
-        snprintf(command.data.apply_machine_config.kernal_rom_path,
-                 sizeof(command.data.apply_machine_config.kernal_rom_path),
-                 "%s", rom_paths->kernal_rom_path != NULL ? rom_paths->kernal_rom_path : "");
-        snprintf(command.data.apply_machine_config.rom1541_path,
-                 sizeof(command.data.apply_machine_config.rom1541_path),
-                 "%s", rom_paths->rom1541_path != NULL ? rom_paths->rom1541_path : "");
-    }
     return message_queue_push(client->command_queue, &command);
-}
-
-bool runtime_client_poll_frame(runtime_client *client, display_frame *out_frame) {
-    /* C64 indexed frames not used after Apple graft. */
-    (void)client;
-    (void)out_frame;
-    return false;
 }
 
 bool runtime_client_poll_argb_frame(
@@ -1010,25 +934,6 @@ bool runtime_client_run_to_cursor(runtime_client *client, uint16_t address) {
     }
 
     command.data.run_to_cursor.address = address;
-    return message_queue_push(client->command_queue, &command);
-}
-
-bool runtime_client_run_to_raster(
-    runtime_client *client,
-    uint16_t raster_line,
-    bool has_cycle,
-    uint16_t cycle_in_line) {
-    runtime_command command = {
-        .type = RUNTIME_COMMAND_RUN_TO_RASTER,
-    };
-
-    if (!client) {
-        return false;
-    }
-
-    command.data.run_to_raster.raster_line = raster_line;
-    command.data.run_to_raster.has_cycle = has_cycle ? 1u : 0u;
-    command.data.run_to_raster.cycle_in_line = cycle_in_line;
     return message_queue_push(client->command_queue, &command);
 }
 

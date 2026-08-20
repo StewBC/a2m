@@ -18,13 +18,10 @@ typedef enum runtime_command_type {
     RUNTIME_COMMAND_STEP_INSTRUCTION,
     RUNTIME_COMMAND_RUN_CYCLES,
     RUNTIME_COMMAND_RUN_INSTRUCTIONS,
-    RUNTIME_COMMAND_STEP_FRAME,
-    RUNTIME_COMMAND_RUN_TO_RASTER,
     RUNTIME_COMMAND_REQUEST_CPU_STATE,
     RUNTIME_COMMAND_REQUEST_MACHINE_STATE,
     RUNTIME_COMMAND_REQUEST_FRAME,
     RUNTIME_COMMAND_KEYBOARD_KEY,
-    RUNTIME_COMMAND_RESTORE,
     RUNTIME_COMMAND_SET_CPU_REGISTER,
     RUNTIME_COMMAND_REQUEST_MEMORY,
     RUNTIME_COMMAND_REQUEST_MEMORY_VIEW,
@@ -38,7 +35,6 @@ typedef enum runtime_command_type {
     RUNTIME_COMMAND_UPDATE_BREAKPOINT,
     RUNTIME_COMMAND_DUPLICATE_BREAKPOINT,
     RUNTIME_COMMAND_REQUEST_BREAKPOINTS,
-    RUNTIME_COMMAND_LOAD_PRG,
     RUNTIME_COMMAND_MOUNT_D64,
     RUNTIME_COMMAND_SET_DISK_WRITABLE,
     RUNTIME_COMMAND_ASSEMBLE_FILE,
@@ -46,7 +42,6 @@ typedef enum runtime_command_type {
     RUNTIME_COMMAND_CYCLE_TURBO_SPEED,
     RUNTIME_COMMAND_SET_TURBO_MULTIPLIER,
     RUNTIME_COMMAND_PASTE_TEXT,
-    RUNTIME_COMMAND_SET_JOYSTICK,
     RUNTIME_COMMAND_SET_GAMEPORT,
     RUNTIME_COMMAND_STEP_OUT,
     RUNTIME_COMMAND_STEP_OVER,
@@ -56,7 +51,6 @@ typedef enum runtime_command_type {
     RUNTIME_COMMAND_REQUEST_CALL_STACK,
     RUNTIME_COMMAND_REARM_ONESHOT_BREAKPOINTS,
     RUNTIME_COMMAND_REQUEST_DEBUG_MEMORY,
-    RUNTIME_COMMAND_LOAD_CRT,
     RUNTIME_COMMAND_SAVE_STATE,
     RUNTIME_COMMAND_LOAD_STATE,
     RUNTIME_COMMAND_HISTORY_INFO,
@@ -174,14 +168,6 @@ typedef struct runtime_command {
 
         struct {
             char path[RUNTIME_COMMAND_PATH_MAX];
-        } load_prg;
-
-        struct {
-            char path[RUNTIME_COMMAND_PATH_MAX];
-        } load_crt;
-
-        struct {
-            char path[RUNTIME_COMMAND_PATH_MAX];
         } state_file;
 
         struct {
@@ -230,7 +216,6 @@ typedef struct runtime_command {
             uint16_t address;
             uint16_t run_address;
             uint8_t auto_run;
-            uint8_t basic_run;
             uint8_t reset_first;
             uint8_t auto_adjust_segments;
         } assemble_file;
@@ -245,15 +230,6 @@ typedef struct runtime_command {
             uint8_t reset;
             uint8_t save_ini;
             uint8_t resume_running;
-            /* When reload_roms is set the runtime replaces its ROM file paths with
-               these (empty == unset) and re-reads them before the reset, so ROM
-               path changes take effect on the same apply. */
-            uint8_t reload_roms;
-            char system_rom_path[RUNTIME_COMMAND_PATH_MAX];
-            char basic_rom_path[RUNTIME_COMMAND_PATH_MAX];
-            char char_rom_path[RUNTIME_COMMAND_PATH_MAX];
-            char kernal_rom_path[RUNTIME_COMMAND_PATH_MAX];
-            char rom1541_path[RUNTIME_COMMAND_PATH_MAX];
         } apply_machine_config;
 
         struct {
@@ -266,11 +242,6 @@ typedef struct runtime_command {
             size_t length;
         } paste_text;
 
-        struct {
-            uint8_t port;
-            uint8_t inputs;
-        } set_joystick;
-
         /* Apple game port: 4 paddle axes (0..255) + button mask (bit0–2). */
         struct {
             uint8_t axis[4];
@@ -280,12 +251,6 @@ typedef struct runtime_command {
         struct {
             uint16_t address;
         } run_to_cursor;
-
-        struct {
-            uint16_t raster_line;
-            uint16_t cycle_in_line; /* valid when has_cycle != 0 */
-            uint8_t has_cycle;
-        } run_to_raster;
 
         struct {
             char path[RUNTIME_COMMAND_PATH_MAX];

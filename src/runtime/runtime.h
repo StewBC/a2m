@@ -25,12 +25,6 @@ typedef struct runtime_client runtime_client;
 #define RUNTIME_TURBO_MHZ_1 1000u
 
 typedef struct runtime_config {
-    /* Legacy path fields ignored by Apple product path. */
-    const char *basic_rom_path;
-    const char *char_rom_path;
-    const char *kernal_rom_path;
-    const char *system_rom_path;
-    const char *rom1541_path;
     const char *ini_path;
     const char *symbol_files;
     bool use_ini;

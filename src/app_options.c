@@ -1033,13 +1033,6 @@ static bool discover_rom_path(
     return true;
 }
 
-/* Apple II ROMs are built into the machine; no host ROM discovery required. */
-static bool discover_default_rom_paths(app_options *options)
-{
-    (void)options;
-    return true;
-}
-
 static float config_get_float(config *cfg, const char *section, const char *key, float default_value)
 {
     const char *value;
@@ -1950,8 +1943,6 @@ static void apply_config(app_options *options, config *cfg)
         cfg, "assembler", "use_address", options->assembler_use_address);
     options->assembler_auto_run = config_get_bool(
         cfg, "assembler", "auto_run", options->assembler_auto_run);
-    options->assembler_basic_run = config_get_bool(
-        cfg, "assembler", "basic_run", options->assembler_basic_run);
     options->assembler_reset_first = config_get_bool(
         cfg, "assembler", "reset", options->assembler_reset_first);
     options->assembler_rearm_oneshots = config_get_bool(
@@ -2282,7 +2273,6 @@ void app_options_init(app_options *options)
     options->layout_split_memory_misc = A2M_DEFAULT_LAYOUT_SPLIT_MEMORY_MISC;
     options->assembler_use_address = true;
     options->assembler_auto_run = false;
-    options->assembler_basic_run = false;
     options->assembler_reset_first = true;
     options->assembler_rearm_oneshots = false;
     options->assembler_auto_adjust_segments = false;
@@ -2346,8 +2336,6 @@ bool app_options_copy(app_options *dest, const app_options *src)
     dest->defaults = src->defaults;
     dest->no_save_ini = src->no_save_ini;
     dest->autorun = src->autorun;
-    dest->emulate_1541 = src->emulate_1541;
-    dest->media_1541 = src->media_1541;
     dest->show_disk_leds = src->show_disk_leds;
     dest->pause_on_brk = src->pause_on_brk;
     dest->history_off_on_max = src->history_off_on_max;
@@ -2357,7 +2345,6 @@ bool app_options_copy(app_options *dest, const app_options *src)
     dest->crt_scanline_strength = src->crt_scanline_strength;
     dest->crt_curvature = src->crt_curvature;
     dest->crt_curvature_amount = src->crt_curvature_amount;
-    dest->rom_single_system = src->rom_single_system;
     dest->audio_smoke = src->audio_smoke;
     dest->audio_record_start_seconds = src->audio_record_start_seconds;
     dest->audio_record_duration_seconds = src->audio_record_duration_seconds;
@@ -2371,7 +2358,6 @@ bool app_options_copy(app_options *dest, const app_options *src)
 
     dest->assembler_use_address = src->assembler_use_address;
     dest->assembler_auto_run = src->assembler_auto_run;
-    dest->assembler_basic_run = src->assembler_basic_run;
     dest->assembler_reset_first = src->assembler_reset_first;
     dest->assembler_rearm_oneshots = src->assembler_rearm_oneshots;
     dest->assembler_auto_adjust_segments =
@@ -2393,13 +2379,6 @@ bool app_options_copy(app_options *dest, const app_options *src)
         !replace_string(&dest->turbo_multipliers, src->turbo_multipliers) ||
         !replace_string(&dest->symbol_files, src->symbol_files) ||
         !replace_string(&dest->video_standard, src->video_standard) ||
-        !replace_string(&dest->basic_rom_path, src->basic_rom_path) ||
-        !replace_string(&dest->char_rom_path, src->char_rom_path) ||
-        !replace_string(&dest->kernal_rom_path, src->kernal_rom_path) ||
-        !replace_string(&dest->system_rom_path, src->system_rom_path) ||
-        !replace_string(&dest->rom1541_path, src->rom1541_path) ||
-        !replace_string(&dest->crt_path, src->crt_path) ||
-        !replace_string(&dest->prg_path, src->prg_path) ||
         !replace_string(&dest->basic_path, src->basic_path) ||
         !replace_string(&dest->sna_path, src->sna_path) ||
         !replace_string(&dest->audio_record_path, src->audio_record_path) ||
@@ -2523,13 +2502,6 @@ bool app_options_load_startup(app_options *options, int argc, char **argv)
     }
 
     if (!parse_command_line_overrides(options, argc, argv)) {
-        config_destroy(cfg);
-        return false;
-    }
-
-    if (!options->defaults &&
-        (!options->use_ini || cfg == NULL) &&
-        !discover_default_rom_paths(options)) {
         config_destroy(cfg);
         return false;
     }
@@ -2749,13 +2721,6 @@ void app_options_destroy(app_options *options)
     free(options->symbol_files);
     free(options->video_standard);
     free(options->keyboard_joystick_layout);
-    free(options->basic_rom_path);
-    free(options->char_rom_path);
-    free(options->kernal_rom_path);
-    free(options->system_rom_path);
-    free(options->rom1541_path);
-    free(options->crt_path);
-    free(options->prg_path);
     free(options->basic_path);
     free(options->sna_path);
     free(options->audio_record_path);

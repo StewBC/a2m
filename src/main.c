@@ -1070,7 +1070,6 @@ static void sync_assembler_options_from_frontend(app_options *options, frontend 
         assembler.run_address[0] != '\0' ? assembler.run_address : NULL);
     options->assembler_use_address = assembler.use_address;
     options->assembler_auto_run = assembler.auto_run;
-    options->assembler_basic_run = false;
     options->assembler_reset_first = assembler.reset_first;
     options->assembler_rearm_oneshots = assembler.rearm_oneshots;
 }
@@ -1454,7 +1453,6 @@ static void dispatch_intent(
             intent->assemble_address,
             intent->assemble_run_address,
             intent->assemble_auto_run,
-            false,
             intent->assemble_reset_first,
             false);
         break;
@@ -1710,9 +1708,7 @@ static void dispatch_intent(
                         NULL,
                         true,
                         false,
-                        runtime_running,
-                        NULL,
-                        false)) {
+                        runtime_running)) {
                     SDL_Log("Configure: could not queue machine power cycle");
                 }
             }
@@ -2300,7 +2296,6 @@ int main(int argc, char **argv)
         }
         assembler.use_address = options.assembler_use_address;
         assembler.auto_run = options.assembler_auto_run;
-        assembler.basic_run = false;
         assembler.reset_first = options.assembler_reset_first;
         assembler.rearm_oneshots = options.assembler_rearm_oneshots;
         frontend_set_assembler_options(ui, &assembler);

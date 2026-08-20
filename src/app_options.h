@@ -77,41 +77,22 @@ typedef struct app_options {
     float layout_split_display_right;
     float layout_split_top_bottom;
     float layout_split_memory_misc;
-    char *basic_rom_path;
-    char *char_rom_path;
-    char *kernal_rom_path;
-    char *system_rom_path;
-    char *rom1541_path;
-    /* When true, the combined 16 KB system ROM (system_rom_path) supplies both
-       BASIC and KERNAL; when false, the separate basic_rom_path + kernal_rom_path
-       are used instead. character_rom and rom1541 are always independent. */
-    bool rom_single_system;
-    char *crt_path;
-    char *prg_path;
-    char *basic_path;
+    char *basic_path; /* Applesoft text path convenience */
     /* Startup machine snapshot (.a2state). Loaded after mount/setup when set. */
     char *sna_path;
     /* Remembered file-browser folders, indexed by frontend_browse_slot. */
     char *browse_dirs[APP_BROWSE_DIR_COUNT];
     /* When true, runtime emits a 440 Hz square wave via the audio path to
-       verify that samples reach the host audio device without needing SID. */
+       verify that samples reach the host audio device. */
     bool audio_smoke;
     char *audio_record_path;
     float audio_record_start_seconds;
     float audio_record_duration_seconds;
-    /* When true, automatically run after a PRG/BASIC/D64 load. */
+    /* When true, automatically run after a binary/BASIC load where supported. */
     bool autorun;
-    /* When true, disk I/O is routed through the genuine 1541 ROM (requires
-       rom1541_path to be set); when false, KERNAL LOAD traps handle disk I/O. */
-    bool emulate_1541;
-    /* When true (and emulate_1541), use GCR track rotation / disk-controller VIA
-       media path for physical reads instead of job-level sector intercept. */
-    bool media_1541;
     /* When true, draw shared disk activity LEDs in the UI window corner. */
     bool show_disk_leds;
-    /* When true, free-run auto-pauses when the next opcode is BRK ($00) — a
-       debugging aid. When false (default), BRK executes like hardware so carts
-       that hit a KERNAL-handled BRK during boot (e.g. Ocean's Wonderboy) run. */
+    /* When true, free-run auto-pauses when the next opcode is BRK ($00). */
     bool pause_on_brk;
     /* Assembler tab persistent state */
     char *assembler_file;
@@ -119,7 +100,6 @@ typedef struct app_options {
     char *assembler_run_address;
     bool assembler_use_address;
     bool assembler_auto_run;
-    bool assembler_basic_run;
     bool assembler_reset_first;
     bool assembler_rearm_oneshots;
     bool assembler_auto_adjust_segments;

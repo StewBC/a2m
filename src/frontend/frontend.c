@@ -1719,7 +1719,6 @@ static bool frontend_push_assemble_run_intent(
     ui->intents[ui->intent_write].assemble_address = address;
     ui->intents[ui->intent_write].assemble_run_address = run_address;
     ui->intents[ui->intent_write].assemble_auto_run = auto_run;
-    ui->intents[ui->intent_write].assemble_basic_run = false;
     ui->intents[ui->intent_write].assemble_reset_first = reset_first;
     ui->intents[ui->intent_write].assemble_rearm_oneshots = rearm_oneshots;
     ui->intent_write = next;
@@ -7760,7 +7759,6 @@ void frontend_set_assembler_options(frontend *ui, const frontend_assembler_optio
     s->use_address = opts->use_address;
     s->run_address_user_edited = (opts->run_address[0] != '\0');
     s->auto_run = opts->auto_run;
-    s->basic_run = false;
     s->reset_first = opts->reset_first;
     s->rearm_oneshots = opts->rearm_oneshots;
     s->initialized = true;
@@ -7780,7 +7778,6 @@ void frontend_get_assembler_options(frontend *ui, frontend_assembler_options *ou
     snprintf(out->run_address, sizeof(out->run_address), "%s", s->run_address_buf);
     out->use_address = s->use_address;
     out->auto_run = s->auto_run;
-    out->basic_run = false;
     out->reset_first = s->reset_first;
     out->rearm_oneshots = s->rearm_oneshots;
 }
