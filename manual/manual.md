@@ -155,7 +155,8 @@ The file extension determines how the file is handled:
 
 | Extension | Action |
 |-----------|--------|
-| `.nib` `.dsk` `.do` `.po` `.woz` | Add the image to Disk II drive 0 (prefer slot 6, else scan 7 down to 1; ignored if no Disk II card is installed) |
+| `.nib` `.dsk` `.do` `.woz` | Add the image to Disk II drive 0 (prefer slot 6, else scan 7 down to 1; ignored if no Disk II card is installed) |
+| `.po` | If the file is exactly 143360 bytes (35×16×256 floppy), treat as Disk II; otherwise live-insert as SmartPort HD (same slot scans / refuse rules as above) |
 | `.a2state` | Load a saved machine state snapshot |
 | `.hdv` `.2mg` | Live-insert on SmartPort unit 0 (scan slots 7 down to 1; ignored if no SmartPort card is installed) |
 | anything else | Ignored |

@@ -1166,6 +1166,75 @@ static int find_smartport_slot_for_drop(
     return 0;
 }
 
+/* Raw 35-track × 16-sector × 256-byte Disk II image (matches image_load_dsk). */
+enum { A2M_DROP_FLOPPY_PO_SIZE = 143360 };
+
+static void drop_floppy_image(
+    runtime_client *client,
+    frontend *ui,
+    app_options *options,
+    const frontend_debug_state *debug,
+    const char *path)
+{
+    int disk_slot = find_diskii_slot_for_drop(debug, options);
+    if (disk_slot < 1) {
+        SDL_Log(
+            "Dropped floppy ignored (no Disk II card installed): %s", path);
+        return;
+    }
+    host_disk_queue_add(client, ui, options, (uint8_t)disk_slot, 0u, path);
+    SDL_Log("Dropped floppy queued on Disk II s%dd0: %s", disk_slot, path);
+}
+
+static void drop_smartport_image(
+    runtime_client *client,
+    app_options *options,
+    const frontend_debug_state *debug,
+    const char *path)
+{
+    int sp_slot = find_smartport_slot_for_drop(debug, options);
+    (void)options;
+    if (sp_slot < 1) {
+        SDL_Log(
+            "Dropped HD image ignored (no SmartPort card installed): %s", path);
+        return;
+    }
+    if (!runtime_client_media_insert(
+            client,
+            (uint8_t)sp_slot,
+            0u,
+            RUNTIME_SLOT_CARD_SMARTPORT,
+            path)) {
+        SDL_Log(
+            "Dropped HD image insert failed (slot %d unit 0): %s",
+            sp_slot,
+            path);
+        return;
+    }
+    /* Options/INI mounts update via MEDIA_CHANGED. */
+    SDL_Log("Dropped HD image inserted on SmartPort s%dd0: %s", sp_slot, path);
+}
+
+/* .po is overloaded: classic floppy size → Disk II; anything else → SmartPort. */
+static bool drop_po_is_floppy(const char *path, bool *out_ok)
+{
+    struct stat st;
+
+    if (out_ok != NULL) {
+        *out_ok = false;
+    }
+    if (path == NULL || path[0] == '\0') {
+        return false;
+    }
+    if (stat(path, &st) != 0 || !A2M_STAT_ISREG(st.st_mode)) {
+        return false;
+    }
+    if (out_ok != NULL) {
+        *out_ok = true;
+    }
+    return st.st_size == (off_t)A2M_DROP_FLOPPY_PO_SIZE;
+}
+
 /* Drag-and-drop onto the window (c64m host loop feature, Apple extensions). */
 static void handle_drop_file(
     runtime_client *client,
@@ -1179,47 +1248,22 @@ static void handle_drop_file(
     }
     if (client != NULL) {
         if (path_has_extension(path, "nib") || path_has_extension(path, "dsk") ||
-            path_has_extension(path, "po") || path_has_extension(path, "do") ||
-            path_has_extension(path, "woz")) {
-            int disk_slot = find_diskii_slot_for_drop(debug, options);
-            if (disk_slot < 1) {
-                SDL_Log(
-                    "Dropped floppy ignored (no Disk II card installed): %s",
-                    path);
+            path_has_extension(path, "do") || path_has_extension(path, "woz")) {
+            drop_floppy_image(client, ui, options, debug, path);
+        } else if (path_has_extension(path, "po")) {
+            bool sized_ok = false;
+            bool is_floppy = drop_po_is_floppy(path, &sized_ok);
+            if (!sized_ok) {
+                SDL_Log("Dropped .po ignored (unreadable file): %s", path);
+            } else if (is_floppy) {
+                drop_floppy_image(client, ui, options, debug, path);
             } else {
-                /* Append to drive 0 on the chosen Disk II controller. */
-                host_disk_queue_add(
-                    client, ui, options, (uint8_t)disk_slot, 0u, path);
-                SDL_Log(
-                    "Dropped floppy queued on Disk II s%dd0: %s",
-                    disk_slot,
-                    path);
+                drop_smartport_image(client, options, debug, path);
             }
         } else if (path_has_extension(path, "a2state")) {
             (void)runtime_client_load_state(client, path);
         } else if (path_has_extension(path, "hdv") || path_has_extension(path, "2mg")) {
-            int sp_slot = find_smartport_slot_for_drop(debug, options);
-            if (sp_slot < 1) {
-                SDL_Log(
-                    "Dropped HD image ignored (no SmartPort card installed): %s",
-                    path);
-            } else if (!runtime_client_media_insert(
-                           client,
-                           (uint8_t)sp_slot,
-                           0u,
-                           RUNTIME_SLOT_CARD_SMARTPORT,
-                           path)) {
-                SDL_Log(
-                    "Dropped HD image insert failed (slot %d unit 0): %s",
-                    sp_slot,
-                    path);
-            } else {
-                /* Options/INI mounts update via MEDIA_CHANGED. */
-                SDL_Log(
-                    "Dropped HD image inserted on SmartPort s%dd0: %s",
-                    sp_slot,
-                    path);
-            }
+            drop_smartport_image(client, options, debug, path);
         } else {
             SDL_Log("Drop ignored (unsupported type): %s", path);
         }
