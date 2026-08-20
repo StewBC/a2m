@@ -3098,14 +3098,27 @@ static void runtime_assemble_file_command(
     uint16_t assembled_end = assembled_start;
     uint32_t assembled_count = 0u;
     runtime_assembler_options options;
+    const bool mli_launch = command->data.assemble_file.mli_launch != 0u;
+    /* MLI launch wins over a stale reset_first bit from the command. */
+    const bool do_reset =
+        command->data.assemble_file.reset_first != 0u && !mli_launch;
 
     memset(&options, 0, sizeof(options));
     options.auto_adjust_segments =
         command->data.assemble_file.auto_adjust_segments != 0u;
     options.enable_65c02 = rt->machine.model == APPLE2_MODEL_IIE_ENHANCED;
 
+    if (mli_launch && rt->exec_state == RUNTIME_EXEC_RUNNING) {
+        runtime_finish_to_instruction_boundary(rt);
+        rt->exec_state = RUNTIME_EXEC_PAUSED;
+        rt->last_stop_reason = RUNTIME_STOP_REASON_PAUSE_COMMAND;
+        runtime_publish_machine(rt);
+        runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
+        runtime_publish_cpu(rt, 0u);
+    }
+
     runtime_history_prepare_discontinuity(rt);
-    if (command->data.assemble_file.reset_first != 0u) {
+    if (do_reset) {
         apple2_reset(&rt->machine);
         if (rt->history != NULL) {
             runtime_history_status status;
@@ -3151,12 +3164,23 @@ static void runtime_assemble_file_command(
     }
     runtime_publish_symbols(rt);
     if (command->data.assemble_file.auto_run != 0u) {
-        rt->machine.cpu.cpu.pc = command->data.assemble_file.run_address;
-        rt->machine.cpu.cpu.sp = 0x01FFu;
-        rt->exec_state = RUNTIME_EXEC_RUNNING;
-        rt->last_stop_reason = RUNTIME_STOP_REASON_NONE;
-        runtime_reset_pacer(rt);
-        runtime_publish_simple(rt, RUNTIME_EVENT_RUNNING);
+        bool allow_auto_run = true;
+        if (mli_launch &&
+            apple2_debug_read(&rt->machine, 0xBF00u) != 0x4Cu) {
+            allow_auto_run = false;
+            snprintf(
+                notice,
+                sizeof(notice),
+                "MLI launch skipped: ProDOS MLI not present at $BF00");
+        }
+        if (allow_auto_run) {
+            rt->machine.cpu.cpu.pc = command->data.assemble_file.run_address;
+            rt->machine.cpu.cpu.sp = 0x01FFu;
+            rt->exec_state = RUNTIME_EXEC_RUNNING;
+            rt->last_stop_reason = RUNTIME_STOP_REASON_NONE;
+            runtime_reset_pacer(rt);
+            runtime_publish_simple(rt, RUNTIME_EVENT_RUNNING);
+        }
     }
     runtime_publish_assemble_complete(
         rt, command->data.assemble_file.path, assembled_start, notice);

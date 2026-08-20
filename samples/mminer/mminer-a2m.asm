@@ -3,32 +3,36 @@
 
 ; This is the ProDOS loader that puts the Apple2 in graphics mode and loads the "game"
 ; When using the Emulator assembler, just ignore all this
-.if AM65 .eq 1
-    .scope "loader" file ="mminer.system#FF2000"
+    .scope "mli_launch" dest = "map"
+        .include "mli_launch.s"
+    .endscope
+
+;.if AM65 .eq 1
+    .scope "loader" file ="../hostfs/mminer/mminer.system#FF2000"
         .segdef "code", $2000
         .segdef "data", $20B5
         .include "loader.s"
     .endscope
-.else
-    ; When using the Emulator assembler, AM65 == 0 (it is not undefined)
-
-    .include "apple2.inc"
-    CLR80       = $C00C ; apple2.inc has CLR80COL as $C000 - I call that CLR80STORE
-
-    ; Simulate what the loader would do, to the display
-    .org $2000      
-    sta DHIRESOFF
-    sta CLR80COL
-    sta CLR80       ; This turns off 80 col mode (turns ON 40 col mode)
-    bit TXTCLR
-    bit MIXCLR
-    bit HISCR
-    bit HIRES
-    jmp game::main  ; Start the game, like the loader would
-.endif
+;.else
+;    ; When using the Emulator assembler, AM65 == 0 (it is not undefined)
+;
+;    .include "apple2.inc"
+;    CLR80       = $C00C ; apple2.inc has CLR80COL as $C000 - I call that CLR80STORE
+;
+;    ; Simulate what the loader would do, to the display
+;    .org $2000      
+;    sta DHIRESOFF
+;    sta CLR80COL
+;    sta CLR80       ; This turns off 80 col mode (turns ON 40 col mode)
+;    bit TXTCLR
+;    bit MIXCLR
+;    bit HISCR
+;    bit HIRES
+;    jmp game::main  ; Start the game, like the loader would
+;.endif
 
 ; This is the Manic Miner Game.  The loader would load this from Floppy
-.scope "game" file="mminer#064000" dest="map"
+.scope "game" file="../hostfs/mminer/mminer#064000"
     .segdef "ZEROPAGE", $50, noemit
     .segdef "LOWMEM", $800, noemit
     .segdef "HGR", $4000

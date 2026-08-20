@@ -1943,8 +1943,16 @@ static void apply_config(app_options *options, config *cfg)
         cfg, "assembler", "use_address", options->assembler_use_address);
     options->assembler_auto_run = config_get_bool(
         cfg, "assembler", "auto_run", options->assembler_auto_run);
+    options->assembler_mli_launch = config_get_bool(
+        cfg, "assembler", "mli_launch", options->assembler_mli_launch);
     options->assembler_reset_first = config_get_bool(
         cfg, "assembler", "reset", options->assembler_reset_first);
+    if (!options->assembler_auto_run) {
+        options->assembler_mli_launch = false;
+    }
+    if (options->assembler_mli_launch) {
+        options->assembler_reset_first = false;
+    }
     options->assembler_rearm_oneshots = config_get_bool(
         cfg, "assembler", "rearm_oneshots", options->assembler_rearm_oneshots);
     options->assembler_auto_adjust_segments = config_get_bool(
@@ -2058,7 +2066,7 @@ static bool parse_command_line_overrides(app_options *options, int argc, char **
         OPT_FLOAT('\0', "audio-record-duration", &audio_record_duration, "recording duration in seconds", NULL, 0, 0),
         OPT_STRING('b', "break", &breakpoint, "install execute breakpoint at hex address", NULL, 0, 0),
         OPT_INTEGER('\0', "control-port", &control_port,
-                    "listen on localhost TCP for A2M/9 remote control (0=off)", NULL, 0, 0),
+                    "listen on localhost TCP for A2M/10 remote control (0=off)", NULL, 0, 0),
         OPT_BOOLEAN('\0', "headless", &headless,
                     "no window; short smoke exit unless --control-port is set (long-lived)",
                     NULL, 0, OPT_NONEG),
@@ -2273,6 +2281,7 @@ void app_options_init(app_options *options)
     options->layout_split_memory_misc = A2M_DEFAULT_LAYOUT_SPLIT_MEMORY_MISC;
     options->assembler_use_address = true;
     options->assembler_auto_run = false;
+    options->assembler_mli_launch = false;
     options->assembler_reset_first = true;
     options->assembler_rearm_oneshots = false;
     options->assembler_auto_adjust_segments = false;
@@ -2358,6 +2367,7 @@ bool app_options_copy(app_options *dest, const app_options *src)
 
     dest->assembler_use_address = src->assembler_use_address;
     dest->assembler_auto_run = src->assembler_auto_run;
+    dest->assembler_mli_launch = src->assembler_mli_launch;
     dest->assembler_reset_first = src->assembler_reset_first;
     dest->assembler_rearm_oneshots = src->assembler_rearm_oneshots;
     dest->assembler_auto_adjust_segments =
@@ -2642,6 +2652,7 @@ bool app_options_save_shutdown(const app_options *options)
     }
     config_set_bool(cfg, "assembler", "use_address", options->assembler_use_address);
     config_set_bool(cfg, "assembler", "auto_run", options->assembler_auto_run);
+    config_set_bool(cfg, "assembler", "mli_launch", options->assembler_mli_launch);
     /* basic_run was a C64-only paste-RUN mode and is not part of the Apple UI. */
     config_remove_prefix(cfg, "assembler", "basic_run");
     config_set_bool(cfg, "assembler", "reset", options->assembler_reset_first);

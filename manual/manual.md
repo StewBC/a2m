@@ -35,7 +35,7 @@ Useful flags:
 | `--break <addr>` / `-b` | Install an execute breakpoint at a hex address |
 | `--symbols <file>` | Load a simple symbol file (`NAME` hex per line) |
 | `--headless` | No window; short smoke exit unless `--control-port` is set |
-| `--control-port N` | Listen on localhost TCP for A2M/9 remote control (`0`=off) |
+| `--control-port N` | Listen on localhost TCP for A2M/10 remote control (`0`=off) |
 | `--audio-smoke` | Emit a 440 Hz test tone to verify audio output |
 
 By default, a2m loads `a2m.ini` from the current directory. The INI file stores
@@ -929,7 +929,8 @@ The Assembler tab provides access to the integrated two-pass 6502 assembler.
 | File Name | Path to the root assembly source file; use **Browse...** to pick |
 | Assemble at | Optional host origin. When checked, assemble with this hex default (default `$8000`). When unchecked, the source must set its own origin (`* =` / `.org`); the host supplies `$0000` as a placeholder only |
 | Auto-run at | When checked, after a successful assembly sets PC to this hex address and resumes |
-| Reset machine | If checked, resets the machine before assembling |
+| MLI launch | When checked (requires Auto-run), auto-run only if the CPU-visible byte at `$BF00` is `$4C` (ProDOS MLI JMP). Mutually exclusive with **Reset machine** |
+| Reset machine | If checked, resets the machine before assembling. Mutually exclusive with **MLI launch** |
 | Rearm one-shots | If checked, re-enables every auto-disabled one-shot breakpoint (`repeat = 0`) and resets its hit counter before assembling |
 | **[Assemble]** | Assembles the source and loads bytes into Apple RAM |
 
@@ -940,6 +941,17 @@ When **Reset machine** is checked (the default), assembly waits for the machine 
 come back from reset before writing code. When it is unchecked, the assembler writes
 directly into live RAM in whatever state the machine is in. If **Auto-run at** is
 also set, the emulator immediately jumps to that address and resumes execution.
+
+**MLI launch** does not change assemble itself — `file=` HostFS outputs and memory
+`dest=` writes still happen. It only gates the post-success auto-run chain: after a
+successful assemble, a2m reads the CPU-visible byte at `$BF00`. If it is `$4C`,
+auto-run proceeds as usual (so a user shim can `JSR $BF00`). If not, assemble still
+succeeds, auto-run is skipped, and a notice reports that ProDOS MLI was not present.
+Turning **Auto-run** off clears and disables **MLI launch**. Checking **MLI launch**
+clears **Reset machine**, and checking **Reset machine** clears **MLI launch**
+(Assembler Reset is a warm reset that remaps language-card reads to ROM, so an
+immediate MLI call would be unsafe). See `samples/asm_mli_launch/` for a SET_PREFIX
++ BIN open/read/JMP shim meant to run under live ProDOS (for example HostFS).
 
 **Rearm one-shots** is useful during iterative development: set a breakpoint with
 `repeat = 0` so it fires exactly once, then check this box so each re-assemble brings
@@ -966,6 +978,7 @@ address        = 8000                 ; hex load/assembly origin address
 use_address    = yes                  ; apply address as host origin (default: yes)
 run_address    = 8000                 ; hex auto-run address
 auto_run       = no                   ; jump to run address after assembly (default: no)
+mli_launch     = no                   ; gate auto-run on $BF00 == $4C (default: no)
 reset          = yes                  ; Reset machine before assembling (default: yes)
 rearm_oneshots = no                   ; Rearm one-shot breakpoints before assembling (default: no)
 auto_adjust_segments = no             ; Retry overlapping segment layouts (default: no)
@@ -1688,7 +1701,7 @@ combine headless mode with `--sna`:
 The server always binds to `127.0.0.1`. It accepts one client at a time. The socket
 thread performs network I/O only; runtime commands and snapshot requests are dispatched
 by the main loop, so remote control follows the same thread-ownership rules as the GUI
-debugger. The current protocol name is `A2M/9`.
+debugger. The current protocol name is `A2M/10`.
 
 Python helpers:
 
@@ -1802,15 +1815,16 @@ for low-latency automation; a windowed session is still paced by present/vsync.
 
 | Command | Response |
 |---------|----------|
-| `hello` | `ok name=a2m protocol=A2M/9` |
-| `version` | `ok protocol=A2M/9 app=a2m` |
+| `hello` | `ok name=a2m protocol=A2M/10` |
+| `version` | `ok protocol=A2M/10 app=a2m` |
 | `capabilities` | Space-separated capability names |
 | `ping` | `ok` |
 | `quit-client` | `ok`, then the server closes the client connection |
 
 `capabilities` currently includes `connection`, `introspection`, `execution`,
 `state`, `softswitches`, `step`, `turbo`, `frame`, `frame-ring`, `memory`,
-`breakpoints`, `wait`, `key`, `disk`, `snapshot`, and `history`.
+`breakpoints`, `wait`, `key`, `disk`, `snapshot`, `history`, `assemble`, and
+`symbols`.
 
 ### Execution Control
 
@@ -1959,6 +1973,65 @@ Memory modes:
 | `wait-running [timeout-ms]` | Return when the machine is running |
 | `wait-frame [delta]` | Return after `delta` frames (default 1) |
 | `wait-event <name>` | Return when a named runtime event arrives |
+
+Named wait-event tokens include `paused`, `running`, `step-complete`,
+`run-complete`, `reset-complete`, `breakpoints`, `frame`, `assemble-complete`,
+and `assemble-error`. Completion events are sticky until consumed.
+
+### Assembler and Symbols
+
+The control port can assemble a source file into the running machine and look up
+the labels that result. This drives the same assembler and settings as the Misc
+→ Assembler tab, so a script can build code, find where a routine landed, and set
+a breakpoint on it.
+
+| Command | Meaning |
+|---------|---------|
+| `assemble [address=<hex>] [run-address=<hex>] [auto-run=0\|1] [mli-launch=0\|1] [reset=0\|1] [auto-adjust-segments=0\|1] <source-path>` | Assemble a source file into the machine |
+| `find-symbol <name>` | Resolve a label from the most recent assembly |
+
+Optional `key=value` settings precede the source path and may appear in any
+order. Any token that is not a recognized option begins the source path, which
+runs to the end of the line and may contain spaces. Defaults match the Assembler
+tab:
+
+| Setting | Default | Meaning |
+|---------|---------|---------|
+| `address` | `$8000` | Host default origin; source may re-anchor with `* =` / `.org` |
+| `run-address` | same as `address` | PC used when `auto-run` is on |
+| `auto-run` | `0` | Set PC to `run-address` and resume after a successful build |
+| `mli-launch` | `0` | Gate auto-run on CPU-visible `$BF00 == $4C`; implies `auto-run=1` and forbids `reset=1` |
+| `reset` | `1` | Warm-reset the machine before assembling |
+| `auto-adjust-segments` | `0` | Allow the assembler to retry segment placement |
+
+Before assembling, the control port pauses the machine so the result lands in a
+defined state. The assembler's own reset, auto-run, and MLI-launch handling then
+applies.
+
+`assemble` is deferred. On success the reply carries the assembly address:
+
+```text
+1 assemble reset=0 address=$6000 samples/test1.asm
+1 ok address=$6000
+```
+
+On failure the reply is an error whose message is the assembler diagnostic:
+
+```text
+2 assemble reset=0 badsource.asm
+2 error assemble-error File: badsource.asm L:00001 C:012: Unexpected token after expression
+```
+
+A successful assembly publishes the resolved symbol table. `find-symbol` resolves
+a label from that table by exact name:
+
+```text
+3 find-symbol loop
+3 ok address=$6004 name=loop
+```
+
+If the name is not present the reply is `error not-found`. If no assembly has
+published symbols yet, the reply is `error not-ready`.
 
 ### Input, Disks, and Breakpoints
 

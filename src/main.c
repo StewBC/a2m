@@ -1071,6 +1071,7 @@ static void sync_assembler_options_from_frontend(app_options *options, frontend 
         assembler.run_address[0] != '\0' ? assembler.run_address : NULL);
     options->assembler_use_address = assembler.use_address;
     options->assembler_auto_run = assembler.auto_run;
+    options->assembler_mli_launch = assembler.mli_launch;
     options->assembler_reset_first = assembler.reset_first;
     options->assembler_rearm_oneshots = assembler.rearm_oneshots;
 }
@@ -1581,6 +1582,7 @@ static void dispatch_intent(
             intent->assemble_address,
             intent->assemble_run_address,
             intent->assemble_auto_run,
+            intent->assemble_mli_launch,
             intent->assemble_reset_first,
             false);
         break;
@@ -2419,6 +2421,7 @@ int main(int argc, char **argv)
         }
         assembler.use_address = options.assembler_use_address;
         assembler.auto_run = options.assembler_auto_run;
+        assembler.mli_launch = options.assembler_mli_launch;
         assembler.reset_first = options.assembler_reset_first;
         assembler.rearm_oneshots = options.assembler_rearm_oneshots;
         frontend_set_assembler_options(ui, &assembler);
@@ -2715,7 +2718,13 @@ int main(int argc, char **argv)
             }
             if (revent.type == RUNTIME_EVENT_ASSEMBLE_COMPLETE) {
                 runtime_symbol_snapshot symbols;
-                if (runtime_client_poll_symbols(client, &symbols)) {
+                /* Control dispatch owns the single-consumer symbol poll when
+                   the control port is active; otherwise poll here for the UI. */
+                if (control_active &&
+                    control_dispatch_copy_symbols(&control_disp, &symbols)) {
+                    frontend_update_symbols(ui, &symbols);
+                } else if (!control_active &&
+                           runtime_client_poll_symbols(client, &symbols)) {
                     frontend_update_symbols(ui, &symbols);
                 }
                 frontend_invalidate_disassembly_cache(ui);

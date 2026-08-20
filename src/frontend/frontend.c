@@ -1243,6 +1243,7 @@ static bool frontend_push_assemble_run_intent(
     uint16_t address,
     uint16_t run_address,
     bool auto_run,
+    bool mli_launch,
     bool reset_first,
     bool rearm_oneshots);
 
@@ -1696,6 +1697,7 @@ static bool frontend_push_assemble_run_intent(
     uint16_t address,
     uint16_t run_address,
     bool auto_run,
+    bool mli_launch,
     bool reset_first,
     bool rearm_oneshots)
 {
@@ -1719,6 +1721,7 @@ static bool frontend_push_assemble_run_intent(
     ui->intents[ui->intent_write].assemble_address = address;
     ui->intents[ui->intent_write].assemble_run_address = run_address;
     ui->intents[ui->intent_write].assemble_auto_run = auto_run;
+    ui->intents[ui->intent_write].assemble_mli_launch = mli_launch;
     ui->intents[ui->intent_write].assemble_reset_first = reset_first;
     ui->intents[ui->intent_write].assemble_rearm_oneshots = rearm_oneshots;
     ui->intent_write = next;
@@ -1740,6 +1743,7 @@ bool frontend_trigger_assembler(frontend *ui)
         snprintf(asm_state->run_address_buf, sizeof(asm_state->run_address_buf), "8000");
         asm_state->use_address = true;
         asm_state->reset_first = true;
+        asm_state->mli_launch = false;
         asm_state->initialized = true;
     }
 
@@ -1756,6 +1760,7 @@ bool frontend_trigger_assembler(frontend *ui)
         assemble_address,
         (uint16_t)strtoul(asm_state->run_address_buf, NULL, 16),
         asm_state->auto_run,
+        asm_state->mli_launch,
         asm_state->reset_first,
         asm_state->rearm_oneshots);
 }
@@ -7133,6 +7138,7 @@ static void frontend_draw_misc_assembler(frontend *ui)
         asm_state->use_address = true;
         asm_state->run_address_user_edited = false;
         asm_state->auto_run = false;
+        asm_state->mli_launch = false;
         asm_state->reset_first = true;
         asm_state->rearm_oneshots = false;
         asm_state->initialized = true;
@@ -7188,6 +7194,7 @@ static void frontend_draw_misc_assembler(frontend *ui)
     nk_layout_row_push(ctx, 0.50f);
     frontend_checkbox_bool(ctx, "Auto-run at", &asm_state->auto_run);
     if (!asm_state->auto_run) {
+        asm_state->mli_launch = false;
         nk_widget_disable_begin(ctx);
     }
     nk_layout_row_push(ctx, 0.50f);
@@ -7210,7 +7217,28 @@ static void frontend_draw_misc_assembler(frontend *ui)
     nk_layout_row_end(ctx);
 
     nk_layout_row_dynamic(ctx, 24.0f, 1);
-    frontend_checkbox_bool(ctx, "Reset machine", &asm_state->reset_first);
+    if (!asm_state->auto_run) {
+        nk_widget_disable_begin(ctx);
+    }
+    {
+        bool prev_mli = asm_state->mli_launch;
+        frontend_checkbox_bool(ctx, "MLI launch", &asm_state->mli_launch);
+        if (asm_state->mli_launch && !prev_mli) {
+            asm_state->reset_first = false;
+        }
+    }
+    if (!asm_state->auto_run) {
+        nk_widget_disable_end(ctx);
+    }
+
+    nk_layout_row_dynamic(ctx, 24.0f, 1);
+    {
+        bool prev_reset = asm_state->reset_first;
+        frontend_checkbox_bool(ctx, "Reset machine", &asm_state->reset_first);
+        if (asm_state->reset_first && !prev_reset) {
+            asm_state->mli_launch = false;
+        }
+    }
 
     nk_layout_row_dynamic(ctx, 24.0f, 1);
     frontend_checkbox_bool(ctx, "Rearm one-shots", &asm_state->rearm_oneshots);
@@ -7229,6 +7257,7 @@ static void frontend_draw_misc_assembler(frontend *ui)
                 assemble_address,
                 run_address,
                 asm_state->auto_run,
+                asm_state->mli_launch,
                 asm_state->reset_first,
                 asm_state->rearm_oneshots);
         }
@@ -7771,8 +7800,15 @@ void frontend_set_assembler_options(frontend *ui, const frontend_assembler_optio
     s->use_address = opts->use_address;
     s->run_address_user_edited = (opts->run_address[0] != '\0');
     s->auto_run = opts->auto_run;
+    s->mli_launch = opts->mli_launch;
     s->reset_first = opts->reset_first;
     s->rearm_oneshots = opts->rearm_oneshots;
+    if (!s->auto_run) {
+        s->mli_launch = false;
+    }
+    if (s->mli_launch) {
+        s->reset_first = false;
+    }
     s->initialized = true;
 }
 
@@ -7790,6 +7826,7 @@ void frontend_get_assembler_options(frontend *ui, frontend_assembler_options *ou
     snprintf(out->run_address, sizeof(out->run_address), "%s", s->run_address_buf);
     out->use_address = s->use_address;
     out->auto_run = s->auto_run;
+    out->mli_launch = s->mli_launch;
     out->reset_first = s->reset_first;
     out->rearm_oneshots = s->rearm_oneshots;
 }

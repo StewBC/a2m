@@ -59,6 +59,7 @@ typedef struct frontend_assembler_state {
     bool use_address;
     bool run_address_user_edited;
     bool auto_run;
+    bool mli_launch;
     bool reset_first;
     bool rearm_oneshots;
     bool error_dialog_open;
@@ -153,6 +154,7 @@ typedef struct frontend_debugger_intent {
     uint16_t assemble_address;
     uint16_t assemble_run_address;
     bool assemble_auto_run;
+    bool assemble_mli_launch;
     bool assemble_reset_first;
     bool assemble_rearm_oneshots;
     uint8_t disk_device;
@@ -225,6 +227,7 @@ typedef struct frontend_assembler_options {
     char run_address[8];
     bool use_address;
     bool auto_run;
+    bool mli_launch;
     bool reset_first;
     bool rearm_oneshots;
 } frontend_assembler_options;

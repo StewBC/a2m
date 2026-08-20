@@ -682,6 +682,7 @@ bool runtime_client_assemble_file_full(
     uint16_t address,
     uint16_t run_address,
     bool auto_run,
+    bool mli_launch,
     bool reset_first,
     bool auto_adjust_segments) {
     runtime_command command = {
@@ -696,6 +697,7 @@ bool runtime_client_assemble_file_full(
     command.data.assemble_file.address = address;
     command.data.assemble_file.run_address = run_address;
     command.data.assemble_file.auto_run = auto_run ? 1u : 0u;
+    command.data.assemble_file.mli_launch = mli_launch ? 1u : 0u;
     command.data.assemble_file.reset_first = reset_first ? 1u : 0u;
     command.data.assemble_file.auto_adjust_segments =
         auto_adjust_segments ? 1u : 0u;

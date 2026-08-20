@@ -24,7 +24,8 @@ typedef enum control_deferred_kind {
     CONTROL_DEFERRED_HISTORY_STATUS,
     CONTROL_DEFERRED_HISTORY_DATA,
     /* Wait for MACHINE_STATE slot map, then run media op. */
-    CONTROL_DEFERRED_MEDIA_OP
+    CONTROL_DEFERRED_MEDIA_OP,
+    CONTROL_DEFERRED_ASSEMBLE
 } control_deferred_kind;
 
 typedef struct deferred_control_response {

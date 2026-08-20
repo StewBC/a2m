@@ -528,7 +528,81 @@ static control_command_type lookup_command(const char *name)
     if (strcmp(name, "history-next") == 0) return CONTROL_COMMAND_HISTORY_NEXT;
     if (strcmp(name, "history-read") == 0) return CONTROL_COMMAND_HISTORY_READ;
     if (strcmp(name, "history-close") == 0) return CONTROL_COMMAND_HISTORY_CLOSE;
+    if (strcmp(name, "assemble") == 0) return CONTROL_COMMAND_ASSEMBLE;
+    if (strcmp(name, "find-symbol") == 0) return CONTROL_COMMAND_FIND_SYMBOL;
     return CONTROL_COMMAND_NONE;
+}
+
+/* Parse one leading "key=value" assembler option token. Returns:
+     1  a recognized option was consumed (cursor advanced past the token),
+     0  the token is not a recognized option (cursor unchanged; path begins here),
+    -1  a recognized option key carried a malformed value. */
+static int parse_assemble_option(char **cursor, control_args *args)
+{
+    char *start;
+    char *end;
+    char *value_end;
+    size_t length;
+
+    if (cursor == NULL || *cursor == NULL || args == NULL) {
+        return 0;
+    }
+    start = (char *)skip_ws(*cursor);
+    if (*start == '\0') {
+        return 0;
+    }
+    end = start;
+    while (*end != '\0' && !isspace((unsigned char)*end)) {
+        end++;
+    }
+    length = (size_t)(end - start);
+    if (length > 8 && strncmp(start, "address=", 8) == 0) {
+        if (!parse_u16_addr(start + 8, &value_end, &args->address) || value_end != end) {
+            return -1;
+        }
+    } else if (length > 12 && strncmp(start, "run-address=", 12) == 0) {
+        if (!parse_u16_addr(start + 12, &value_end, &args->run_address) ||
+            value_end != end) {
+            return -1;
+        }
+        args->has_run_address = true;
+    } else if (length > 9 && strncmp(start, "auto-run=", 9) == 0) {
+        if (length == 10 && start[9] == '0') {
+            args->auto_run = false;
+        } else if (length == 10 && start[9] == '1') {
+            args->auto_run = true;
+        } else {
+            return -1;
+        }
+    } else if (length > 11 && strncmp(start, "mli-launch=", 11) == 0) {
+        if (length == 12 && start[11] == '0') {
+            args->mli_launch = false;
+        } else if (length == 12 && start[11] == '1') {
+            args->mli_launch = true;
+        } else {
+            return -1;
+        }
+    } else if (length > 6 && strncmp(start, "reset=", 6) == 0) {
+        if (length == 7 && start[6] == '0') {
+            args->reset_first = false;
+        } else if (length == 7 && start[6] == '1') {
+            args->reset_first = true;
+        } else {
+            return -1;
+        }
+    } else if (length > 21 && strncmp(start, "auto-adjust-segments=", 21) == 0) {
+        if (length == 22 && start[21] == '0') {
+            args->auto_adjust_segments = false;
+        } else if (length == 22 && start[21] == '1') {
+            args->auto_adjust_segments = true;
+        } else {
+            return -1;
+        }
+    } else {
+        return 0;
+    }
+    *cursor = end;
+    return 1;
 }
 
 bool control_protocol_parse_request(
@@ -1044,6 +1118,87 @@ bool control_protocol_parse_request(
             return false;
         }
         strncpy(out_request->args.path, cursor, sizeof(out_request->args.path) - 1);
+        break;
+    }
+
+    case CONTROL_COMMAND_ASSEMBLE: {
+        /* Optional key=value settings precede the source path. Defaults mirror
+           the Misc->Assembler tab: address $8000, run address = address,
+           auto-run off, reset on, mli-launch off. */
+        out_request->args.address = 0x8000u;
+        out_request->args.run_address = 0x8000u;
+        out_request->args.has_run_address = false;
+        out_request->args.auto_run = false;
+        out_request->args.mli_launch = false;
+        out_request->args.reset_first = true;
+        out_request->args.auto_adjust_segments = false;
+        for (;;) {
+            int opt = parse_assemble_option(&cursor, &out_request->args);
+            if (opt < 0) {
+                if (out_error != NULL) {
+                    control_protocol_format_error(
+                        out_error, id, "bad-args", "invalid assembler option", false);
+                }
+                return false;
+            }
+            if (opt == 0) {
+                break;
+            }
+        }
+        cursor = (char *)skip_ws(cursor);
+        if (!out_request->args.has_run_address) {
+            out_request->args.run_address = out_request->args.address;
+        }
+        /* MLI launch gates auto-run and is mutually exclusive with reset. */
+        if (out_request->args.mli_launch && out_request->args.reset_first) {
+            if (out_error != NULL) {
+                control_protocol_format_error(
+                    out_error,
+                    id,
+                    "bad-args",
+                    "mli-launch and reset are mutually exclusive",
+                    false);
+            }
+            return false;
+        }
+        if (out_request->args.mli_launch) {
+            out_request->args.auto_run = true;
+            out_request->args.reset_first = false;
+        }
+        if (cursor[0] == '\0') {
+            if (out_error != NULL) {
+                control_protocol_format_error(
+                    out_error, id, "bad-args", "expected source path", false);
+            }
+            return false;
+        }
+        strncpy(out_request->args.path, cursor, sizeof(out_request->args.path) - 1);
+        break;
+    }
+
+    case CONTROL_COMMAND_FIND_SYMBOL: {
+        i = 0;
+        while (cursor[i] != '\0' && !isspace((unsigned char)cursor[i]) &&
+               i + 1 < sizeof(out_request->args.text)) {
+            out_request->args.text[i] = cursor[i];
+            i++;
+        }
+        out_request->args.text[i] = '\0';
+        if (out_request->args.text[0] == '\0') {
+            if (out_error != NULL) {
+                control_protocol_format_error(
+                    out_error, id, "bad-args", "expected symbol name", false);
+            }
+            return false;
+        }
+        cursor = (char *)skip_ws(cursor + i);
+        if (cursor[0] != '\0') {
+            if (out_error != NULL) {
+                control_protocol_format_error(
+                    out_error, id, "bad-args", "unexpected arguments", false);
+            }
+            return false;
+        }
         break;
     }
 

@@ -11,7 +11,7 @@ enum {
 };
 
 /* Product wire identity. Bump when scripts must learn new behaviour. */
-#define CONTROL_PROTOCOL_VERSION "A2M/9"
+#define CONTROL_PROTOCOL_VERSION "A2M/10"
 #define CONTROL_PROTOCOL_APP_NAME "a2m"
 
 typedef enum control_command_type {
@@ -66,7 +66,9 @@ typedef enum control_command_type {
     CONTROL_COMMAND_HISTORY_FIND,
     CONTROL_COMMAND_HISTORY_NEXT,
     CONTROL_COMMAND_HISTORY_READ,
-    CONTROL_COMMAND_HISTORY_CLOSE
+    CONTROL_COMMAND_HISTORY_CLOSE,
+    CONTROL_COMMAND_ASSEMBLE,
+    CONTROL_COMMAND_FIND_SYMBOL
 } control_command_type;
 
 typedef enum control_memory_mode {
@@ -121,6 +123,13 @@ typedef struct control_args {
     uint16_t history_after;
     /* Remainder of line for history-find key=value options. */
     char history_find_text[CONTROL_LINE_MAX];
+    /* assemble: optional key=value before source path (defaults match Assembler tab). */
+    uint16_t run_address;
+    bool has_run_address;
+    bool auto_run;
+    bool mli_launch;
+    bool reset_first;
+    bool auto_adjust_segments;
 } control_args;
 
 typedef enum control_response_type {

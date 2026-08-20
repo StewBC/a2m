@@ -2,7 +2,7 @@
 
 **Audience:** agents and humans scripting the emulator (headless or windowed).
 
-**Protocol today:** **A2M/9** (`CONTROL_PROTOCOL_VERSION` in
+**Protocol today:** **A2M/10** (`CONTROL_PROTOCOL_VERSION` in
 `src/control/control_protocol.h`).
 
 ## Source of truth
@@ -32,7 +32,7 @@ python3 -c "
 import sys; sys.path.insert(0, 'tools')
 from a2m_control_client import Ctl
 c = Ctl(port=6510)
-print(c.cmd('hello'))          # name=a2m protocol=A2M/9
+print(c.cmd('hello'))          # name=a2m protocol=A2M/10
 print(c.cmd('get-cpu'))
 c.cmd('run'); c.wait_frame(2, 5000); c.cmd('pause'); c.wait_paused(2000)
 r = c.history_find(limit=8)
@@ -58,7 +58,7 @@ Inbox: append lines to `build/debug/coop_inbox`.
 
 ---
 
-## Wire inventory (A2M/9)
+## Wire inventory (A2M/10)
 
 Framing: `<id> <command> [args]\n` → `ok` / `error` / `data` (+ binary + `\n`).
 
@@ -71,7 +71,9 @@ Framing: `<id> <command> [args]\n` → `ok` / `error` / `data` (+ binary + `\n`)
 | Frame ring | `frame-ring-info` `frame-ring-record` `frame-ring-clear` `get-frame-at frame=\|cycle=` |
 | Breakpoints | `break-create` / `break-update` / `break-list` / `break-enable` / `break-clear` / `break-clear-all` / `rearm-oneshots` / `break-exec`; `when=`; access exec/read/write |
 | History | `history-info` `history-record` `history-clear` `history-find` `history-next` `history-read` `history-close` → `data history` **HST1** |
-| Waits | `wait-paused` `wait-running` `wait-frame` `wait-event` |
+| Waits | `wait-paused` `wait-running` `wait-frame` `wait-event` (incl. `assemble-complete` / `assemble-error`) |
+| Assembler | `assemble [address=] [run-address=] [auto-run=] [mli-launch=] [reset=] [auto-adjust-segments=] <path>` (deferred) |
+| Symbols | `find-symbol <name>` → `ok address=$XXXX name=…` / `not-ready` / `not-found` |
 | Input | `key <byte>` (`$8D` / CR → Return) |
 | Snapshot | `save-state` `load-state` |
 | Media | see below |

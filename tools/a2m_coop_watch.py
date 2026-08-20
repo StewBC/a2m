@@ -483,7 +483,7 @@ class CoopWatch:
 
 def main(argv=None):
     ap = argparse.ArgumentParser(
-        description="a2m cooperative live-debug watcher (A2M/9)"
+        description="a2m cooperative live-debug watcher (A2M/10)"
     )
     ap.add_argument("--port", type=int, default=CONFIG["port"])
     ap.add_argument("--out-dir", default=CONFIG["out_dir"])

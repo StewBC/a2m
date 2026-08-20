@@ -452,6 +452,13 @@ target_compile_features(test_runtime_assembler PRIVATE c_std_99)
 target_link_libraries(test_runtime_assembler PRIVATE runtime SDL2::SDL2)
 add_test(NAME runtime_assembler COMMAND test_runtime_assembler)
 
+add_executable(test_runtime_assembler_mli
+    tests/runtime/test_runtime_assembler_mli.c
+)
+target_compile_features(test_runtime_assembler_mli PRIVATE c_std_99)
+target_link_libraries(test_runtime_assembler_mli PRIVATE runtime SDL2::SDL2)
+add_test(NAME runtime_assembler_mli COMMAND test_runtime_assembler_mli)
+
 add_test(
     NAME am65_cli_65c02
     COMMAND $<TARGET_FILE:am65> --cpu 65c02

@@ -100,6 +100,7 @@ typedef struct app_options {
     char *assembler_run_address;
     bool assembler_use_address;
     bool assembler_auto_run;
+    bool assembler_mli_launch;
     bool assembler_reset_first;
     bool assembler_rearm_oneshots;
     bool assembler_auto_adjust_segments;

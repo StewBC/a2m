@@ -165,6 +165,7 @@ bool runtime_client_assemble_file_full(
     uint16_t address,
     uint16_t run_address,
     bool auto_run,
+    bool mli_launch,
     bool reset_first,
     bool auto_adjust_segments);
 bool runtime_client_poll_symbols(runtime_client *client, runtime_symbol_snapshot *out);

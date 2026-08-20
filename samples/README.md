@@ -2,6 +2,12 @@
 
 This folder contains samples for use with the emulator and assembler.
 
+## Assembler MLI launch
+
+`asm_mli_launch/` is a small ProDOS shim for Misc → Assembler **MLI launch**:
+SET_PREFIX a HostFS volume (`HOSTFS.SsDn`), OPEN/READ/CLOSE a BIN, then JMP.
+Requires live ProDOS; see that folder's README.
+
 ## MMINER
 
 This is a version of Manic Miner that I wrote for the Apple II using cc65's

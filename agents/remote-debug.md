@@ -107,7 +107,7 @@ recorder is a bounded multi-million-record ring. Same separation as c64m.
 | Frame ring commands | **Yes — Apple frame shape** | Immediate answers; ring mutex; pause for stable scrub |
 | VIC ring | **No** (v1) | Not product center |
 | `get-debug-memory` + write_history | **Partial** | Debug memory path exists; write_history pack still missing |
-| Assembler / symbols RPC | **Later** | Prefer offline assemble until tools re-graft |
+| Assembler / symbols RPC | **Done — A2M/10** | `assemble` + `find-symbol` (c64m port; Apple `mli-launch`) |
 | Drive power / D64 mount | **Replace** | Disk II / SmartPort / multi-image queue |
 
 ---
@@ -278,7 +278,8 @@ sensible sub-slices).
 | **A2M/6** | `get-softswitches` (latched flags + beam; not `$C0xx` mem) |
 | **A2M/7** | `select-disk` (absolute queue) + `set-disk-writable` (notch) |
 | **A2M/8** | Disk II `mount-disk` / `select-disk` / `set-disk-writable` resolve installed slot (prefer 6); explicit `slot drive` forms |
-| **A2M/9** | **Current.** Unified `mount` / `unmount` with `kind=diskii\|smartport` (path infer; slot resolve); `mount-disk` kept as Disk II alias |
+| **A2M/9** | Unified `mount` / `unmount` with `kind=diskii\|smartport` (path infer; slot resolve); `mount-disk` kept as Disk II alias |
+| **A2M/10** | **Current.** Control-port `assemble` + `find-symbol` (Assembler-tab parity; Apple `mli-launch`); capabilities `assemble symbols` |
 
 Bump only when scripts must learn new behaviour; update this table and
 `CONTROL_PROTOCOL_VERSION` in the same change.
@@ -319,6 +320,14 @@ History:
 history-info  history-record <on|off>  history-clear
 history-find [key=value ...]  history-next <cursor> [limit=]
 history-read <id> [epoch=] [before=] [after=]  history-close <cursor>
+```
+
+Assembler / symbols (A2M/10):
+
+```text
+assemble [address=] [run-address=] [auto-run=] [mli-launch=] [reset=]
+         [auto-adjust-segments=] <source-path>
+find-symbol <name>
 ```
 
 Apple media / input (product-shaped; exact tokens land with C0/C5):

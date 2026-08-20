@@ -199,7 +199,59 @@ int main(void)
     expect_true("history-read id", request.args.history_id == 42ull);
     expect_u32("before", 8, request.args.history_before);
 
-    expect_true("line has A2M/9", strstr(line, "A2M/9") != NULL);
+    expect_true("line has A2M/10", strstr(line, "A2M/10") != NULL);
+
+    expect_true(
+        "assemble defaults",
+        control_protocol_parse_request(
+            "80 assemble samples/test.asm", &request, &error));
+    expect_int("assemble type", CONTROL_COMMAND_ASSEMBLE, (int)request.type);
+    expect_u32("assemble default addr", 0x8000, request.args.address);
+    expect_u32("assemble default run", 0x8000, request.args.run_address);
+    expect_true("assemble default auto-run off", !request.args.auto_run);
+    expect_true("assemble default reset on", request.args.reset_first);
+    expect_true("assemble default mli off", !request.args.mli_launch);
+    expect_string("assemble path", "samples/test.asm", request.args.path);
+
+    expect_true(
+        "assemble options",
+        control_protocol_parse_request(
+            "81 assemble address=$C000 run-address=$C010 auto-run=1 reset=0 "
+            "samples/demo.asm",
+            &request,
+            &error));
+    expect_u32("assemble addr", 0xC000, request.args.address);
+    expect_u32("assemble run", 0xC010, request.args.run_address);
+    expect_true("assemble auto-run", request.args.auto_run);
+    expect_true("assemble reset off", !request.args.reset_first);
+    expect_string("assemble path opts", "samples/demo.asm", request.args.path);
+
+    expect_true(
+        "assemble mli-launch",
+        control_protocol_parse_request(
+            "82 assemble mli-launch=1 reset=0 samples/shim.asm",
+            &request,
+            &error));
+    expect_true("mli on", request.args.mli_launch);
+    expect_true("mli implies auto-run", request.args.auto_run);
+    expect_true("mli forces reset off", !request.args.reset_first);
+
+    expect_true(
+        "assemble mli+reset rejected",
+        !control_protocol_parse_request(
+            "83 assemble mli-launch=1 reset=1 samples/shim.asm",
+            &request,
+            &error));
+
+    expect_true(
+        "find-symbol",
+        control_protocol_parse_request("84 find-symbol loop", &request, &error));
+    expect_int("find-symbol type", CONTROL_COMMAND_FIND_SYMBOL, (int)request.type);
+    expect_string("find-symbol name", "loop", request.args.text);
+
+    expect_true(
+        "find-symbol missing name rejected",
+        !control_protocol_parse_request("85 find-symbol", &request, &error));
 
     expect_true(
         "select-disk index",

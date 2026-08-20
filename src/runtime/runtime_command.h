@@ -208,6 +208,7 @@ typedef struct runtime_command {
             uint16_t address;
             uint16_t run_address;
             uint8_t auto_run;
+            uint8_t mli_launch;
             uint8_t reset_first;
             uint8_t auto_adjust_segments;
         } assemble_file;

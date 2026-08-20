@@ -14,12 +14,14 @@ help:
 	@echo "Build with: cmake -B build && cmake --build build -j"
 
 coop:
-	@echo "Cooperative remote debug (A2M/5) — two terminals:"
+	@echo "Cooperative remote debug (A2M/10) — two terminals:"
 	@echo ""
-	@echo "  Terminal A (windowed, playable):"
+	@echo "  1) Terminal A FIRST (windowed; must listen before the watcher):"
 	@echo "    ./build/a2m --control-port $(PORT)"
+	@echo "    # keep your usual INI/HostFS flags; add --control-port $(PORT)"
+	@echo "    # a2m should print: control port $(PORT) (protocol A2M/10)"
 	@echo ""
-	@echo "  Terminal B (watcher):"
+	@echo "  2) Terminal B (watcher) only after A is up:"
 	@echo "    tools/a2m_coop_watch.py --port $(PORT) --out-dir $(OUT_DIR)"
 	@echo "    # or: make coop-watch PORT=$(PORT)"
 	@echo ""

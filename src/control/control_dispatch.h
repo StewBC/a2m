@@ -35,9 +35,14 @@ typedef struct control_dispatch {
     bool latch_reset_complete;
     bool latch_breakpoints;
     bool latch_frame;
+    bool latch_assemble_complete;
+    bool latch_assemble_error;
     /* Live peripheral map from MACHINE_STATE (index 0 unused). */
     bool has_slot_map;
     runtime_slot_card_type slot_cards[RUNTIME_APPLE_SLOT_COUNT];
+    /* Cached assembler/symbol-file snapshot for find-symbol (single-consumer poll). */
+    bool has_symbols;
+    runtime_symbol_snapshot symbols;
 } control_dispatch_t;
 
 void control_dispatch_init(
@@ -57,3 +62,8 @@ void control_dispatch_poll(control_dispatch_t *disp);
 
 /* Cancel deferred on disconnect / epoch change / timeout. */
 void control_dispatch_check_session(control_dispatch_t *disp);
+
+/* Copy the latest cached symbol snapshot (after assemble / symbol publish). */
+bool control_dispatch_copy_symbols(
+    const control_dispatch_t *disp,
+    runtime_symbol_snapshot *out);

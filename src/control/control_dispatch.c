@@ -50,6 +50,30 @@ void control_dispatch_shutdown(control_dispatch_t *disp)
     memset(disp, 0, sizeof(*disp));
 }
 
+bool control_dispatch_copy_symbols(
+    const control_dispatch_t *disp,
+    runtime_symbol_snapshot *out)
+{
+    if (disp == NULL || out == NULL || !disp->has_symbols) {
+        return false;
+    }
+    *out = disp->symbols;
+    return true;
+}
+
+static void cache_symbols_from_client(control_dispatch_t *disp)
+{
+    runtime_symbol_snapshot snap;
+
+    if (disp == NULL || disp->client == NULL) {
+        return;
+    }
+    if (runtime_client_poll_symbols(disp->client, &snap)) {
+        disp->symbols = snap;
+        disp->has_symbols = true;
+    }
+}
+
 static const char *stop_reason_name(runtime_stop_reason reason)
 {
     switch (reason) {
@@ -618,6 +642,10 @@ static const char *event_name_for_type(runtime_event_type type)
         return "breakpoints";
     case RUNTIME_EVENT_FRAME_READY:
         return "frame";
+    case RUNTIME_EVENT_ASSEMBLE_COMPLETE:
+        return "assemble-complete";
+    case RUNTIME_EVENT_ASSEMBLE_ERROR:
+        return "assemble-error";
     default:
         return NULL;
     }
@@ -649,6 +677,12 @@ static bool latch_matches_event(const control_dispatch_t *disp, const char *name
     if (strcmp(name, "frame") == 0) {
         return disp->latch_frame;
     }
+    if (strcmp(name, "assemble-complete") == 0) {
+        return disp->latch_assemble_complete;
+    }
+    if (strcmp(name, "assemble-error") == 0) {
+        return disp->latch_assemble_error;
+    }
     return false;
 }
 
@@ -671,6 +705,10 @@ static void consume_latch(control_dispatch_t *disp, const char *name)
         disp->latch_breakpoints = false;
     } else if (strcmp(name, "frame") == 0) {
         disp->latch_frame = false;
+    } else if (strcmp(name, "assemble-complete") == 0) {
+        disp->latch_assemble_complete = false;
+    } else if (strcmp(name, "assemble-error") == 0) {
+        disp->latch_assemble_error = false;
     }
 }
 
@@ -741,6 +779,13 @@ void control_dispatch_on_runtime_event(
     } else if (event->type == RUNTIME_EVENT_FRAME_READY) {
         disp->latch_frame = true;
         disp->frame_number += 1u;
+    } else if (event->type == RUNTIME_EVENT_ASSEMBLE_COMPLETE) {
+        disp->latch_assemble_complete = true;
+        /* Single-consumer symbol slot: cache here so find-symbol and the UI
+           (via control_dispatch_copy_symbols) share one poll. */
+        cache_symbols_from_client(disp);
+    } else if (event->type == RUNTIME_EVENT_ASSEMBLE_ERROR) {
+        disp->latch_assemble_error = true;
     }
 
     if (event->type == RUNTIME_EVENT_CPU_STATE_RESPONSE) {
@@ -953,6 +998,30 @@ void control_dispatch_on_runtime_event(
     if (d->kind == CONTROL_DEFERRED_LOAD_STATE &&
         event->type == RUNTIME_EVENT_LOAD_STATE_COMPLETE) {
         post_ok(disp, d->request_id, "loaded");
+        control_deferred_clear(d);
+        return;
+    }
+
+    if (d->kind == CONTROL_DEFERRED_ASSEMBLE &&
+        (event->type == RUNTIME_EVENT_ASSEMBLE_COMPLETE ||
+         event->type == RUNTIME_EVENT_ASSEMBLE_ERROR)) {
+        if (event->type == RUNTIME_EVENT_ASSEMBLE_COMPLETE) {
+            char text[CONTROL_RESPONSE_TEXT_MAX];
+            snprintf(
+                text,
+                sizeof(text),
+                "address=$%04X",
+                (unsigned)event->data.assemble.address);
+            post_ok(disp, d->request_id, text);
+        } else {
+            post_error(
+                disp,
+                d->request_id,
+                "assemble-error",
+                event->data.error.message[0] != '\0'
+                    ? event->data.error.message
+                    : "assembly failed");
+        }
         control_deferred_clear(d);
         return;
     }
@@ -1748,6 +1817,73 @@ static void handle_request(control_dispatch_t *disp, control_request *req)
         if (!runtime_client_load_state(client, req->args.path)) {
             post_error(disp, req->id, "bad-args", "path");
             control_deferred_clear(d);
+        }
+        break;
+    }
+
+    case CONTROL_COMMAND_ASSEMBLE: {
+        deferred_control_response *d;
+        if (req->args.path[0] == '\0') {
+            post_error(disp, req->id, "bad-args", "expected source path");
+            break;
+        }
+        /* Auto-pause so assembly lands in a defined machine state. The
+           runtime's own reset / auto-run / MLI-launch handling then applies. */
+        (void)runtime_client_pause(client);
+        d = begin_deferred(disp, req->id, CONTROL_DEFERRED_ASSEMBLE, 10000u, 0u);
+        if (d == NULL) {
+            break;
+        }
+        if (!runtime_client_assemble_file_full(
+                client,
+                req->args.path,
+                req->args.address,
+                req->args.run_address,
+                req->args.auto_run,
+                req->args.mli_launch,
+                req->args.reset_first,
+                req->args.auto_adjust_segments)) {
+            post_error(disp, req->id, "runtime", "command rejected");
+            control_deferred_clear(d);
+        }
+        break;
+    }
+
+    case CONTROL_COMMAND_FIND_SYMBOL: {
+        size_t i;
+        bool found = false;
+
+        if (req->args.text[0] == '\0') {
+            post_error(disp, req->id, "bad-args", "expected symbol name");
+            break;
+        }
+        if (!disp->has_symbols) {
+            post_error(
+                disp,
+                req->id,
+                "not-ready",
+                "no symbols available; assemble or load symbols first");
+            break;
+        }
+        for (i = 0; i < disp->symbols.count; i++) {
+            if (strncmp(
+                    disp->symbols.entries[i].name,
+                    req->args.text,
+                    RUNTIME_SYMBOL_NAME_MAX) == 0) {
+                char text[CONTROL_RESPONSE_TEXT_MAX];
+                snprintf(
+                    text,
+                    sizeof(text),
+                    "address=$%04X name=%s",
+                    (unsigned)disp->symbols.entries[i].address,
+                    disp->symbols.entries[i].name);
+                post_ok(disp, req->id, text);
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            post_error(disp, req->id, "not-found", "symbol not found");
         }
         break;
     }
