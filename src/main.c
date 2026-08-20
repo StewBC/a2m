@@ -2413,10 +2413,10 @@ int main(int argc, char **argv)
                     } else if (change_type == RUNTIME_MEDIA_CHANGE_EJECT) {
                         (void)app_options_diskii_eject_current(
                             &options, slot_number, device);
-                    } else if (change_type == RUNTIME_MEDIA_CHANGE_SWAP &&
-                               queue != NULL && queue->count > 0) {
-                        (void)app_disk_slot_select(
-                            queue, (queue->current + 1) % queue->count);
+                    } else if (change_type == RUNTIME_MEDIA_CHANGE_SWAP) {
+                        /* Queue current is mirrored by RUNTIME_EVENT_DISK_SWAP
+                           (absolute and relative). Do not assume +1 here. */
+                        (void)queue;
                     }
                     if (slot_number == 6u) {
                         frontend_set_disk_queue(ui, device, queue);

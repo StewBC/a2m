@@ -3671,23 +3671,58 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
     case RUNTIME_COMMAND_MEDIA_SWAP: {
         const uint8_t slot = cmd->data.media_swap.slot;
         const uint8_t device = cmd->data.media_swap.device;
+        int32_t param = cmd->data.media_swap.param;
+        uint8_t relative = cmd->data.media_swap.relative;
         int result = -1;
 
+        if (param == 0) {
+            param = 1;
+            relative = 1u;
+        }
         if (slot >= 1u && slot <= 7u && device <= 1u &&
             rt->machine.slot_type[slot] == SLOT_TYPE_DISKII) {
             result = apple2_disk_swap(
                 &rt->machine,
                 slot,
                 device,
-                cmd->data.media_swap.param,
-                cmd->data.media_swap.relative != 0u);
+                param,
+                relative != 0u);
         }
         if (result != 0) {
             runtime_publish_error(rt, "Disk II swap failed");
+        } else {
+            /* Host options mirror absolute/relative via DISK_SWAP (not MEDIA_CHANGED). */
+            runtime_event ev;
+            memset(&ev, 0, sizeof(ev));
+            ev.type = RUNTIME_EVENT_DISK_SWAP;
+            ev.data.disk_swap.slot = slot;
+            ev.data.disk_swap.device = device;
+            ev.data.disk_swap.swap_param = param;
+            ev.data.disk_swap.swap_relative = relative;
+            runtime_publish_event(rt, &ev);
         }
         runtime_publish_media_changed(
             rt, RUNTIME_MEDIA_CHANGE_SWAP, slot, device,
             RUNTIME_SLOT_CARD_DISKII, result == 0, NULL);
+        runtime_publish_machine(rt);
+        break;
+    }
+    case RUNTIME_COMMAND_SET_DISK_WRITABLE: {
+        const uint8_t slot = cmd->data.disk_writable.slot;
+        const uint8_t device = cmd->data.disk_writable.device;
+        int result = -1;
+
+        if (slot >= 1u && slot <= 7u && device <= 1u &&
+            rt->machine.slot_type[slot] == SLOT_TYPE_DISKII) {
+            result = apple2_disk_set_writable(
+                &rt->machine,
+                slot,
+                device,
+                cmd->data.disk_writable.writable != 0u);
+        }
+        if (result != 0) {
+            runtime_publish_error(rt, "Disk II set-writable failed");
+        }
         runtime_publish_machine(rt);
         break;
     }

@@ -199,7 +199,36 @@ int main(void)
     expect_true("history-read id", request.args.history_id == 42ull);
     expect_u32("before", 8, request.args.history_before);
 
-    expect_true("line has A2M/6", strstr(line, "A2M/6") != NULL);
+    expect_true("line has A2M/7", strstr(line, "A2M/7") != NULL);
+
+    expect_true(
+        "select-disk index",
+        control_protocol_parse_request("40 select-disk 3", &request, &error));
+    expect_int("select type", CONTROL_COMMAND_SELECT_DISK, (int)request.type);
+    expect_u32("select slot default", 6, request.args.slot);
+    expect_u32("select drive default", 0, request.args.drive);
+    expect_u32("select index", 3, request.args.disk_index);
+
+    expect_true(
+        "select-disk slot drive index",
+        control_protocol_parse_request("41 select-disk 5 1 2", &request, &error));
+    expect_u32("select slot", 5, request.args.slot);
+    expect_u32("select drive", 1, request.args.drive);
+    expect_u32("select index 2", 2, request.args.disk_index);
+
+    expect_true(
+        "set-disk-writable",
+        control_protocol_parse_request("42 set-disk-writable 0", &request, &error));
+    expect_int(
+        "writable type", CONTROL_COMMAND_SET_DISK_WRITABLE, (int)request.type);
+    expect_u32("writable flag", 0, request.args.disk_writable);
+
+    expect_true(
+        "set-disk-writable slot drive",
+        control_protocol_parse_request("43 set-disk-writable 6 1 1", &request, &error));
+    expect_u32("writable slot", 6, request.args.slot);
+    expect_u32("writable drive", 1, request.args.drive);
+    expect_u32("writable on", 1, request.args.disk_writable);
 
     {
         runtime_breakpoint_definition definition;

@@ -240,6 +240,8 @@ int apple2_disk_swap(
     int drive,
     int32_t param,
     bool relative);
+/* Remote/host write-protect notch: writable=true clears protect. */
+int apple2_disk_set_writable(apple2_t *m, int slot, int drive, bool writable);
 
 /* Mockingboard (default slot 4). */
 bool apple2_attach_mockingboard(apple2_t *m, int slot);

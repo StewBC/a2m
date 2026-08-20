@@ -659,69 +659,22 @@ bool runtime_client_mount_d64_ex(
     return message_queue_push(client->command_queue, &command);
 }
 
-bool runtime_client_set_disk_writable(runtime_client *client, uint8_t device, bool writable) {
+bool runtime_client_set_disk_writable(
+    runtime_client *client,
+    uint8_t slot,
+    uint8_t device,
+    bool writable) {
     runtime_command command = {
         .type = RUNTIME_COMMAND_SET_DISK_WRITABLE,
     };
 
-    if (!client || !runtime_drive_device_supported(device)) {
+    if (!client || slot < 1u || slot > 7u || device > 1u) {
         return false;
     }
 
-    command.data.disk_device.device = device;
-    command.data.disk_device.writable = writable ? 1u : 0u;
-    return message_queue_push(client->command_queue, &command);
-}
-
-bool runtime_client_unmount_disk(runtime_client *client, uint8_t device) {
-    runtime_command command = {
-        .type = RUNTIME_COMMAND_UNMOUNT_DISK,
-    };
-
-    if (!client || !runtime_drive_device_supported(device)) {
-        return false;
-    }
-
-    command.data.disk_device.device = device;
-    return message_queue_push(client->command_queue, &command);
-}
-
-bool runtime_client_power_on_drive(runtime_client *client, uint8_t device) {
-    runtime_command command = {
-        .type = RUNTIME_COMMAND_POWER_ON_DRIVE,
-    };
-
-    if (!client || !runtime_drive_device_supported(device)) {
-        return false;
-    }
-
-    command.data.disk_device.device = device;
-    return message_queue_push(client->command_queue, &command);
-}
-
-bool runtime_client_power_off_drive(runtime_client *client, uint8_t device) {
-    runtime_command command = {
-        .type = RUNTIME_COMMAND_POWER_OFF_DRIVE,
-    };
-
-    if (!client || !runtime_drive_device_supported(device)) {
-        return false;
-    }
-
-    command.data.disk_device.device = device;
-    return message_queue_push(client->command_queue, &command);
-}
-
-bool runtime_client_request_disk_status(runtime_client *client, uint8_t device) {
-    runtime_command command = {
-        .type = RUNTIME_COMMAND_REQUEST_DISK_STATUS,
-    };
-
-    if (!client || !runtime_drive_device_supported(device)) {
-        return false;
-    }
-
-    command.data.disk_device.device = device;
+    command.data.disk_writable.slot = slot;
+    command.data.disk_writable.device = device;
+    command.data.disk_writable.writable = writable ? 1u : 0u;
     return message_queue_push(client->command_queue, &command);
 }
 

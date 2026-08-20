@@ -275,7 +275,8 @@ sensible sub-slices).
 | **A2M/3** | Full breakpoint RPC (P5): create/update/list/enable/clear/rearm + when= |
 | **A2M/4** | Frame ring commands + ARGB product ring |
 | **A2M/5** | History / HST1 commands |
-| **A2M/6** | **Current.** `get-softswitches` (latched flags + beam; not `$C0xx` mem) |
+| **A2M/6** | `get-softswitches` (latched flags + beam; not `$C0xx` mem) |
+| **A2M/7** | **Current.** `select-disk` (absolute queue) + `set-disk-writable` (notch) |
 
 Bump only when scripts must learn new behaviour; update this table and
 `CONTROL_PROTOCOL_VERSION` in the same change.

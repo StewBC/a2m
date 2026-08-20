@@ -35,7 +35,7 @@ Useful flags:
 | `--break <addr>` / `-b` | Install an execute breakpoint at a hex address |
 | `--symbols <file>` | Load a simple symbol file (`NAME` hex per line) |
 | `--headless` | No window; short smoke exit unless `--control-port` is set |
-| `--control-port N` | Listen on localhost TCP for A2M/6 remote control (`0`=off) |
+| `--control-port N` | Listen on localhost TCP for A2M/7 remote control (`0`=off) |
 | `--audio-smoke` | Emit a 440 Hz test tone to verify audio output |
 
 By default, a2m loads `a2m.ini` from the current directory. The INI file stores
@@ -1680,7 +1680,7 @@ combine headless mode with `--sna`:
 The server always binds to `127.0.0.1`. It accepts one client at a time. The socket
 thread performs network I/O only; runtime commands and snapshot requests are dispatched
 by the main loop, so remote control follows the same thread-ownership rules as the GUI
-debugger. The current protocol name is `A2M/6`.
+debugger. The current protocol name is `A2M/7`.
 
 Python helpers:
 
@@ -1794,8 +1794,8 @@ for low-latency automation; a windowed session is still paced by present/vsync.
 
 | Command | Response |
 |---------|----------|
-| `hello` | `ok name=a2m protocol=A2M/6` |
-| `version` | `ok protocol=A2M/6 app=a2m` |
+| `hello` | `ok name=a2m protocol=A2M/7` |
+| `version` | `ok protocol=A2M/7 app=a2m` |
 | `capabilities` | Space-separated capability names |
 | `ping` | `ok` |
 | `quit-client` | `ok`, then the server closes the client connection |
@@ -1958,6 +1958,8 @@ Memory modes:
 |---------|---------|
 | `key <byte>` | Inject one Apple keystroke (`$C000` path). `$8D` / CR becomes Return |
 | `mount-disk <drive> <path>` | Mount a Disk II image on slot 6 drive `0` or `1` (legacy `8`/`9` also accepted) |
+| `select-disk [slot] [drive] <index>` | Make the 1-based queued Disk II image current (defaults: slot 6, drive 0) |
+| `set-disk-writable [slot] [drive] <0\|1>` | Set the Disk II write-protect notch (`0`=read-only, `1`=writable; defaults: slot 6, drive 0) |
 | `break-exec <addr>` | Set an execute breakpoint |
 | `break-create <definition>` | Create a full breakpoint (same tokens as `[DEBUG]`) |
 | `break-update <id> <definition>` | Replace an existing breakpoint |

@@ -40,10 +40,6 @@ typedef enum runtime_command_type {
     RUNTIME_COMMAND_REQUEST_BREAKPOINTS,
     RUNTIME_COMMAND_LOAD_PRG,
     RUNTIME_COMMAND_MOUNT_D64,
-    RUNTIME_COMMAND_UNMOUNT_DISK,
-    RUNTIME_COMMAND_POWER_ON_DRIVE,
-    RUNTIME_COMMAND_POWER_OFF_DRIVE,
-    RUNTIME_COMMAND_REQUEST_DISK_STATUS,
     RUNTIME_COMMAND_SET_DISK_WRITABLE,
     RUNTIME_COMMAND_ASSEMBLE_FILE,
     RUNTIME_COMMAND_APPLY_MACHINE_CONFIG,
@@ -222,10 +218,12 @@ typedef struct runtime_command {
             uint8_t enabled;
         } set_display_override;
 
+        /* Disk II write-protect notch (slot 1–7, drive 0/1). */
         struct {
+            uint8_t slot;
             uint8_t device;
-            uint8_t writable;
-        } disk_device;
+            uint8_t writable; /* 1 = writable, 0 = read-only */
+        } disk_writable;
 
         struct {
             char path[RUNTIME_COMMAND_PATH_MAX];

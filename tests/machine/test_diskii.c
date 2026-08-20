@@ -120,6 +120,34 @@ static void test_multi_image_swap(void)
     printf("diskii: multi-image swap ok\n");
 }
 
+static void test_set_writable_notch(void)
+{
+    apple2_t m;
+    DISKII_DRIVE *d0;
+
+    if (!apple2_init(&m)) {
+        fail("init writable");
+    }
+    d0 = &m.diskii_controller[6].diskii_drive[0];
+    if (apple2_disk_set_writable(&m, 6, 0, false) != 0) {
+        fail("set readonly");
+    }
+    if (d0->sensor_protect != 1u) {
+        fail("protect set");
+    }
+    if (apple2_disk_set_writable(&m, 6, 0, true) != 0) {
+        fail("set writable");
+    }
+    if (d0->sensor_protect != 0u) {
+        fail("protect cleared");
+    }
+    if (apple2_disk_set_writable(&m, 9, 0, true) == 0) {
+        fail("bad slot should fail");
+    }
+    apple2_shutdown(&m);
+    printf("diskii: set-writable notch ok\n");
+}
+
 static void test_swap_flushes_dirty_image(void)
 {
     apple2_t m;
@@ -244,6 +272,7 @@ int main(void)
 {
     test_mount_nib();
     test_multi_image_swap();
+    test_set_writable_notch();
     test_swap_flushes_dirty_image();
     test_dos_boot_hint();
     printf("diskii: all tests passed\n");

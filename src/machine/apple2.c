@@ -580,6 +580,22 @@ int apple2_disk_swap(
     return diskii_swap_image(m, slot, drive, param, relative ? 1 : 0);
 }
 
+int apple2_disk_set_writable(apple2_t *m, int slot, int drive, bool writable)
+{
+    DISKII_DRIVE *dd;
+
+    if (m == NULL || slot < 1 || slot > 7 || drive < 0 || drive > 1) {
+        return -1;
+    }
+    if (!m->diskii_present[slot]) {
+        return -1;
+    }
+    dd = &m->diskii_controller[slot].diskii_drive[drive];
+    /* sensor_protect: 0 = writes enabled, 1 = notch protected. */
+    dd->sensor_protect = writable ? 0u : 1u;
+    return 0;
+}
+
 bool apple2_flush_media(apple2_t *m)
 {
     return m != NULL && diskii_flush_all(m) == A2_OK && sp_flush_all(m) == A2_OK;

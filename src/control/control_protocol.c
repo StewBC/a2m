@@ -289,6 +289,8 @@ static control_command_type lookup_command(const char *name)
     if (strcmp(name, "load-state") == 0) return CONTROL_COMMAND_LOAD_STATE;
     if (strcmp(name, "key") == 0) return CONTROL_COMMAND_KEY;
     if (strcmp(name, "mount-disk") == 0) return CONTROL_COMMAND_MOUNT_DISK;
+    if (strcmp(name, "select-disk") == 0) return CONTROL_COMMAND_SELECT_DISK;
+    if (strcmp(name, "set-disk-writable") == 0) return CONTROL_COMMAND_SET_DISK_WRITABLE;
     if (strcmp(name, "history-info") == 0) return CONTROL_COMMAND_HISTORY_INFO;
     if (strcmp(name, "history-record") == 0) return CONTROL_COMMAND_HISTORY_RECORD;
     if (strcmp(name, "history-clear") == 0) return CONTROL_COMMAND_HISTORY_CLEAR;
@@ -851,6 +853,120 @@ bool control_protocol_parse_request(
             return false;
         }
         strncpy(out_request->args.path, cursor, sizeof(out_request->args.path) - 1);
+        break;
+    }
+
+    case CONTROL_COMMAND_SELECT_DISK: {
+        /* Forms: select-disk <index> |
+                  select-disk <drive> <index> |
+                  select-disk <slot> <drive> <index>
+           Defaults: slot 6, drive 0. Index is 1-based. */
+        uint32_t a = 0;
+        uint32_t b = 0;
+        uint32_t c = 0;
+        char *e1 = NULL;
+        char *p2;
+        char *e2 = NULL;
+        char *p3;
+        char *e3 = NULL;
+
+        out_request->args.slot = 6u;
+        out_request->args.drive = 0u;
+        if (!parse_u32(cursor, &e1, &a) || e1 == cursor) {
+            if (out_error != NULL) {
+                control_protocol_format_error(out_error, id, "bad-args", "index", false);
+            }
+            return false;
+        }
+        p2 = (char *)skip_ws(e1);
+        if (*p2 == '\0') {
+            out_request->args.disk_index = a;
+            break;
+        }
+        if (!parse_u32(p2, &e2, &b) || e2 == p2) {
+            if (out_error != NULL) {
+                control_protocol_format_error(out_error, id, "bad-args", "index", false);
+            }
+            return false;
+        }
+        p3 = (char *)skip_ws(e2);
+        if (*p3 == '\0') {
+            /* drive index */
+            out_request->args.drive = (uint8_t)a;
+            out_request->args.disk_index = b;
+            break;
+        }
+        if (!parse_u32(p3, &e3, &c) || e3 == p3 || *skip_ws(e3) != '\0') {
+            if (out_error != NULL) {
+                control_protocol_format_error(out_error, id, "bad-args", "index", false);
+            }
+            return false;
+        }
+        out_request->args.slot = (uint8_t)a;
+        out_request->args.drive = (uint8_t)b;
+        out_request->args.disk_index = c;
+        break;
+    }
+
+    case CONTROL_COMMAND_SET_DISK_WRITABLE: {
+        /* Forms: set-disk-writable <0|1> |
+                  set-disk-writable <drive> <0|1> |
+                  set-disk-writable <slot> <drive> <0|1> */
+        uint32_t a = 0;
+        uint32_t b = 0;
+        uint32_t c = 0;
+        char *e1 = NULL;
+        char *p2;
+        char *e2 = NULL;
+        char *p3;
+        char *e3 = NULL;
+
+        out_request->args.slot = 6u;
+        out_request->args.drive = 0u;
+        if (!parse_u32(cursor, &e1, &a) || e1 == cursor) {
+            if (out_error != NULL) {
+                control_protocol_format_error(out_error, id, "bad-args", "writable", false);
+            }
+            return false;
+        }
+        p2 = (char *)skip_ws(e1);
+        if (*p2 == '\0') {
+            if (a > 1u) {
+                if (out_error != NULL) {
+                    control_protocol_format_error(out_error, id, "bad-args", "writable", false);
+                }
+                return false;
+            }
+            out_request->args.disk_writable = (uint8_t)a;
+            break;
+        }
+        if (!parse_u32(p2, &e2, &b) || e2 == p2) {
+            if (out_error != NULL) {
+                control_protocol_format_error(out_error, id, "bad-args", "writable", false);
+            }
+            return false;
+        }
+        p3 = (char *)skip_ws(e2);
+        if (*p3 == '\0') {
+            if (b > 1u) {
+                if (out_error != NULL) {
+                    control_protocol_format_error(out_error, id, "bad-args", "writable", false);
+                }
+                return false;
+            }
+            out_request->args.drive = (uint8_t)a;
+            out_request->args.disk_writable = (uint8_t)b;
+            break;
+        }
+        if (!parse_u32(p3, &e3, &c) || e3 == p3 || *skip_ws(e3) != '\0' || c > 1u) {
+            if (out_error != NULL) {
+                control_protocol_format_error(out_error, id, "bad-args", "writable", false);
+            }
+            return false;
+        }
+        out_request->args.slot = (uint8_t)a;
+        out_request->args.drive = (uint8_t)b;
+        out_request->args.disk_writable = (uint8_t)c;
         break;
     }
 

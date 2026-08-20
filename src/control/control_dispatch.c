@@ -1409,6 +1409,38 @@ static void handle_request(control_dispatch_t *disp, control_request *req)
         }
         break;
 
+    case CONTROL_COMMAND_SELECT_DISK: {
+        uint8_t slot = req->args.slot != 0u ? req->args.slot : 6u;
+        uint8_t drive = req->args.drive;
+        /* Legacy C64 unit numbers on the drive field. */
+        if (drive == 8u || drive == 9u) {
+            drive = (drive == 9u) ? 1u : 0u;
+        }
+        if (req->args.disk_index == 0u ||
+            !runtime_client_media_swap(
+                client, slot, drive, (int32_t)req->args.disk_index, false)) {
+            post_error(disp, req->id, "bad-args", "select-disk");
+        } else {
+            post_ok(disp, req->id, "accepted=1");
+        }
+        break;
+    }
+
+    case CONTROL_COMMAND_SET_DISK_WRITABLE: {
+        uint8_t slot = req->args.slot != 0u ? req->args.slot : 6u;
+        uint8_t drive = req->args.drive;
+        if (drive == 8u || drive == 9u) {
+            drive = (drive == 9u) ? 1u : 0u;
+        }
+        if (!runtime_client_set_disk_writable(
+                client, slot, drive, req->args.disk_writable != 0u)) {
+            post_error(disp, req->id, "bad-args", "set-disk-writable");
+        } else {
+            post_ok(disp, req->id, "accepted=1");
+        }
+        break;
+    }
+
     case CONTROL_COMMAND_HISTORY_INFO: {
         uint64_t token = runtime_client_alloc_request_token(client);
         deferred_control_response *d = begin_deferred(

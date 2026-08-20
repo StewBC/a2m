@@ -1836,26 +1836,6 @@ static bool frontend_push_file_browser_result_intent(
     return true;
 }
 
-static bool frontend_push_disk_intent(frontend *ui, frontend_debugger_intent_type type, uint8_t device)
-{
-    size_t next;
-
-    if (ui == NULL || type == FRONTEND_DEBUGGER_INTENT_NONE) {
-        return false;
-    }
-
-    next = (ui->intent_write + 1u) % FRONTEND_DEBUGGER_INTENT_CAPACITY;
-    if (next == ui->intent_read) {
-        return false;
-    }
-
-    memset(&ui->intents[ui->intent_write], 0, sizeof(ui->intents[ui->intent_write]));
-    ui->intents[ui->intent_write].type = type;
-    ui->intents[ui->intent_write].disk_device = device;
-    ui->intent_write = next;
-    return true;
-}
-
 static bool frontend_push_media_intent(
     frontend *ui,
     frontend_debugger_intent_type type,
@@ -1877,48 +1857,6 @@ static bool frontend_push_media_intent(
     ui->intents[ui->intent_write].disk_slot = slot;
     ui->intents[ui->intent_write].disk_device = device;
     ui->intents[ui->intent_write].disk_card_type = card_type;
-    ui->intent_write = next;
-    return true;
-}
-
-static bool frontend_push_disk_select_intent(frontend *ui, uint8_t device, int index)
-{
-    size_t next;
-
-    if (ui == NULL) {
-        return false;
-    }
-
-    next = (ui->intent_write + 1u) % FRONTEND_DEBUGGER_INTENT_CAPACITY;
-    if (next == ui->intent_read) {
-        return false;
-    }
-
-    memset(&ui->intents[ui->intent_write], 0, sizeof(ui->intents[ui->intent_write]));
-    ui->intents[ui->intent_write].type = FRONTEND_DEBUGGER_INTENT_DISK_SELECT;
-    ui->intents[ui->intent_write].disk_device = device;
-    ui->intents[ui->intent_write].disk_queue_index = index;
-    ui->intent_write = next;
-    return true;
-}
-
-static bool frontend_push_disk_writable_intent(frontend *ui, uint8_t device, bool writable)
-{
-    size_t next;
-
-    if (ui == NULL) {
-        return false;
-    }
-
-    next = (ui->intent_write + 1u) % FRONTEND_DEBUGGER_INTENT_CAPACITY;
-    if (next == ui->intent_read) {
-        return false;
-    }
-
-    memset(&ui->intents[ui->intent_write], 0, sizeof(ui->intents[ui->intent_write]));
-    ui->intents[ui->intent_write].type = FRONTEND_DEBUGGER_INTENT_DISK_SET_WRITABLE;
-    ui->intents[ui->intent_write].disk_device = device;
-    ui->intents[ui->intent_write].disk_writable = writable;
     ui->intent_write = next;
     return true;
 }
@@ -8536,8 +8474,6 @@ static int frontend_file_browser_slot_for(const frontend *ui, frontend_debugger_
         case FRONTEND_DEBUGGER_INTENT_DISK_MOUNT_DIALOG:
         case FRONTEND_DEBUGGER_INTENT_DISK_ADD_DIALOG:
             return FRONTEND_BROWSE_SLOT_FLOPPY;
-        case FRONTEND_DEBUGGER_INTENT_PROGRAM_LOAD_PRG_DIALOG:
-            return FRONTEND_BROWSE_SLOT_BINARY;
         case FRONTEND_DEBUGGER_INTENT_STATE_SAVE_AS_DIALOG:
         case FRONTEND_DEBUGGER_INTENT_STATE_LOAD_DIALOG:
             return FRONTEND_BROWSE_SLOT_SNAPSHOT;

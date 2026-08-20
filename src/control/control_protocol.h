@@ -11,7 +11,7 @@ enum {
 };
 
 /* Product wire identity. Bump when scripts must learn new behaviour. */
-#define CONTROL_PROTOCOL_VERSION "A2M/6"
+#define CONTROL_PROTOCOL_VERSION "A2M/7"
 #define CONTROL_PROTOCOL_APP_NAME "a2m"
 
 typedef enum control_command_type {
@@ -56,6 +56,8 @@ typedef enum control_command_type {
     CONTROL_COMMAND_LOAD_STATE,
     CONTROL_COMMAND_KEY,
     CONTROL_COMMAND_MOUNT_DISK,
+    CONTROL_COMMAND_SELECT_DISK,
+    CONTROL_COMMAND_SET_DISK_WRITABLE,
     CONTROL_COMMAND_HISTORY_INFO,
     CONTROL_COMMAND_HISTORY_RECORD,
     CONTROL_COMMAND_HISTORY_CLEAR,
@@ -82,6 +84,8 @@ typedef struct control_args {
     uint8_t key;
     uint8_t slot;
     uint8_t drive;
+    uint32_t disk_index; /* select-disk: 1-based queue index */
+    uint8_t disk_writable; /* set-disk-writable: 0=RO 1=RW */
     uint32_t break_id; /* 0 = all for break-clear */
     uint8_t break_enable; /* break-enable 0|1 */
     /* set-turbo: milli-MHz (1000 = 1 MHz) or 0 = max. */
