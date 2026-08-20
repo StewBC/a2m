@@ -44,9 +44,10 @@ A named scope becomes a separate output target when it has `file=` or `dest=`:
 
 The assembler core passes both attributes to its host. Standalone `am65` uses
 `file=` to create a binary and accepts but ignores `dest=`. Emulator hosts
-ignore `file=`, advertise and validate their own destination names, and place
-each emitted byte through an opaque host target. This keeps machine banking out
-of the shared assembler.
+advertise and validate their own destination names. In a2m the attributes are
+orthogonal: `dest=` writes machine memory, `file=` writes a host file beside the
+source, and both together do both. A `file=`-only scope does not poke memory.
+This keeps machine banking out of the shared assembler.
 
 Standalone `am65` predefines `AM65=1` and no machine symbol. Emulator hosts
 predefine `AM65=0` plus their machine symbol, currently `APPLE2=1` in a2m and

@@ -9,10 +9,11 @@
 
 #define HOSTFS_BLOCK_SIZE 512u
 #define HOSTFS_TOTAL_BLOCKS 65535u
-#define HOSTFS_MAX_FILES 256
+#define HOSTFS_MAX_FILES 256 /* total nodes: files + directories */
+#define HOSTFS_MAX_DEPTH 8
 #define HOSTFS_PATH_MAX 1024
 #define HOSTFS_NAME_MAX 16 /* ProDOS name + NUL */
-/* Optional catalog-order manifest in the HostFS folder (non-NAPS; not mounted). */
+/* Optional catalog-order manifest in a HostFS directory (not mounted as a file). */
 #define HOSTFS_ORDER_FILENAME "hostfs.order"
 
 typedef struct hostfs_volume hostfs_volume;

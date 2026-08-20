@@ -1232,10 +1232,21 @@ The assembler core passes `file=` and `dest=` to its host. Command-line `am65` u
 `file=` to create a separate binary and accepts but ignores `dest=`. A `dest=`-only
 scope therefore continues writing into its parent file image.
 
-The in-emulator host ignores `file=` and uses `dest=` to place bytes. Valid Apple II
-destinations are `map`, `main`, `aux`, `lc1`, and `lc2` (case-insensitive), and
-independent selections may be combined, for example `dest="aux,lc2"`. A scope with
-`file=` but no `dest=` defaults to `map`. Unsupported names are assembly errors.
+In the emulator the attributes are orthogonal:
+
+| Attributes | Effect |
+|---|---|
+| `dest=` only | Write bytes into the named memory bank(s) |
+| `file=` only | Write a host file beside the assembled source; do not poke memory |
+| both | Write memory and a host file |
+| neither | Default unnamed output (current map view) |
+
+Valid Apple II destinations are `map`, `main`, `aux`, `lc1`, and `lc2`
+(case-insensitive), and independent selections may be combined, for example
+`dest="aux,lc2"`. Unsupported names are assembly errors. Relative `file=` paths
+resolve against the directory of the assembled source. If that directory is also
+a HostFS mount root (or under one), the volume is rescanned so the guest sees the
+new file.
 
 ### Build-Time Detection
 

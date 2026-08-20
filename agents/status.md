@@ -59,7 +59,7 @@ Keyboard stick (when on): Option/KP0 and Space are fire keys (optional swap in C
 | Breakpoints | Epic: [`breakpoints.md`](breakpoints.md). **0–3 + P4a–P4e + P5 wire done**. **P4b TRON deferred** (C5b) |
 | Machine domain | softswitch, rom_boot, video_beam, diskii, peripherals, cxxx_map, memview |
 | a2audit CXXX | Softswitch section pass; INTCXROM hides MB `$Cn`; C800 latch survives SETC3ROM |
-| Disk II / SmartPort | Cards in slots 1–7; Configure persists and live-applies model/per-slot Empty/Disk II/SmartPort/Mockingboard selection via power-cycle reset; live insert/eject + slot boot; INI `[SmartPort] boot_slot=N` startup; Disk II multi-image queue/swap with dirty flush; ProDOS `$C0s4/5`; pure SP `$C800` trap; **HostFS** directory mount (NAPS, live refresh, write-through) |
+| Disk II / SmartPort | Cards in slots 1–7; Configure persists and live-applies model/per-slot Empty/Disk II/SmartPort/Mockingboard selection via power-cycle reset; live insert/eject + slot boot; INI `[SmartPort] boot_slot=N` startup; Disk II multi-image queue/swap with dirty flush; ProDOS `$C0s4/5`; pure SP `$C800` trap; **HostFS** directory mount (NAPS, nested host dirs as ProDOS folders, live refresh, file + directory write-through) |
 | Gameport | Paddles, buttons, kbd stick, SDL pads, motor LEDs |
 
 ## Build

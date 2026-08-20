@@ -13,19 +13,19 @@ This is what the `mminer-a2m.asm` file looks like. It defines two targets. The f
 
 The second target sets up the game segments and includes the main assembly file written for `ca65`.
 ```
-; When using the command line assembler, asm6502, _asm6502_tool == 1 and the file= 
+; When using the command line assembler, asm6502, AM65 == 1 and the file= 
 ; parameter writes the compiled binary to that file.
 
 ; This is the ProDOS loader that puts the Apple2 in graphics mode and loads the "game"
 ; When using the Emulator assembler, just ignore all this
-.if _asm6502_tool .eq 1
+.if AM65 .eq 1
     .scope "loader" file ="mminer.system#FF2000"
         .segdef "code", $2000
         .segdef "data", $20B5
         .include "loader.s"
     .endscope
 .else
-    ; When using the Emulator assembler, _asm6502_tool == 0 (it is not undefined)
+    ; When using the Emulator assembler, AM65 == 0 (it is not undefined)
 
     .include "apple2.inc"
     CLR80       = $C00C ; apple2.inc has CLR80COL as $C000 - I call that CLR80STORE

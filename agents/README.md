@@ -53,7 +53,7 @@ Open the component note only when the task touches that area:
 | `frontend.md` | Host keys + frontend files |
 | `runtime.md` | Runtime client / turbo / frames |
 | `disk.md` | Disk II + SmartPort mount surface |
-| `hostfs.md` | Phase 0–3 done: SmartPort HostFS (NAPS, live refresh, write-through) |
+| `hostfs.md` | Phase 0–3 + 5a/5b done: SmartPort HostFS (NAPS, nested dirs, live refresh, file+dir write-through) |
 
 ## Manual (users, not agents)
 

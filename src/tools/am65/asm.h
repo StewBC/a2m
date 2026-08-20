@@ -33,6 +33,8 @@ typedef void (*asm_output_byte_fn)(void *target, uint16_t addr, uint8_t val);
 // Returns an opaque per-target context (passed back to output_byte / target_release),
 // or NULL to signal the redirect could not be honoured. May be NULL in the callback
 // struct, in which case `.scope` with file=/dest= is rejected with an error.
+// Hosts decide how file= and dest= compose (CLI: file= only; a2m emulator: each
+// independently selects a file write and/or a memory bank).
 typedef void *(*asm_target_open_fn)(
     void *user,
     const char *name, int name_len,

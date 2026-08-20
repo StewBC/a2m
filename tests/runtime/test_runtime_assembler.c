@@ -100,12 +100,19 @@ int main(void)
     }
 
     {
+        char file_only_path[160];
+        char dual_path[160];
+        const char *slash;
         const char *targets_source =
             ".if AM65 .eq 0\n"
             "    .if APPLE2 .eq 1\n"
-            "        .scope mapped file=\"ignored.bin\"\n"
+            "        .scope file_only file=\"file_only.bin\"\n"
             "            .org $3100\n"
             "            .byte $a2\n"
+            "        .endscope\n"
+            "        .scope dual file=\"dual.bin\" dest=\"aux\"\n"
+            "            .org $3400\n"
+            "            .byte $ad\n"
             "        .endscope\n"
             "    .endif\n"
             ".endif\n"
@@ -129,6 +136,32 @@ int main(void)
                 targets_source) != 0) {
             fail("target temp file");
         }
+        slash = strrchr(targets_path, '/');
+#if defined(_WIN32)
+        {
+            const char *backslash = strrchr(targets_path, '\\');
+            if (backslash != NULL && (slash == NULL || backslash > slash)) {
+                slash = backslash;
+            }
+        }
+#endif
+        if (slash == NULL) {
+            snprintf(file_only_path, sizeof(file_only_path), "file_only.bin");
+            snprintf(dual_path, sizeof(dual_path), "dual.bin");
+        } else {
+            snprintf(
+                file_only_path,
+                sizeof(file_only_path),
+                "%.*sfile_only.bin",
+                (int)(slash - targets_path + 1),
+                targets_path);
+            snprintf(
+                dual_path,
+                sizeof(dual_path),
+                "%.*sdual.bin",
+                (int)(slash - targets_path + 1),
+                targets_path);
+        }
         if (!runtime_client_assemble_file(client, targets_path, 0x3000)) {
             fail("target assemble request");
         }
@@ -136,11 +169,44 @@ int main(void)
             fail("target ASSEMBLE_COMPLETE");
         }
 
+        /* file= alone writes a host file and must not poke memory. */
         if (!runtime_client_request_memory(client, 0x3100, 1, RUNTIME_MEMORY_MODE_MAP) ||
             !poll_event(client, &event, RUNTIME_EVENT_MEMORY_RESPONSE, 2.0) ||
-            event.data.memory.bytes[0] != 0xA2) {
-            fail("file-only scope did not default to map");
+            event.data.memory.bytes[0] == 0xA2) {
+            fail("file-only scope poked memory");
         }
+        {
+            FILE *fp = fopen(file_only_path, "rb");
+            unsigned char byte = 0;
+
+            if (fp == NULL || fread(&byte, 1, 1, fp) != 1 || byte != 0xA2) {
+                if (fp != NULL) {
+                    fclose(fp);
+                }
+                fail("file-only scope did not write file_only.bin");
+            }
+            fclose(fp);
+        }
+
+        /* file= + dest= writes memory and a host file. */
+        if (!runtime_client_request_memory(client, 0x3400, 1, RUNTIME_MEMORY_MODE_AUX) ||
+            !poll_event(client, &event, RUNTIME_EVENT_MEMORY_RESPONSE, 2.0) ||
+            event.data.memory.bytes[0] != 0xAD) {
+            fail("dual file+dest memory write");
+        }
+        {
+            FILE *fp = fopen(dual_path, "rb");
+            unsigned char byte = 0;
+
+            if (fp == NULL || fread(&byte, 1, 1, fp) != 1 || byte != 0xAD) {
+                if (fp != NULL) {
+                    fclose(fp);
+                }
+                fail("dual file+dest did not write dual.bin");
+            }
+            fclose(fp);
+        }
+
         if (!runtime_client_request_memory(client, 0x3200, 1, RUNTIME_MEMORY_MODE_AUX) ||
             !poll_event(client, &event, RUNTIME_EVENT_MEMORY_RESPONSE, 2.0) ||
             event.data.memory.bytes[0] != 0xA8) {
@@ -156,6 +222,9 @@ int main(void)
             event.data.memory.bytes[0] != 0xAC) {
             fail("combined aux,lc2 destination");
         }
+
+        a2m_test_remove_file(file_only_path);
+        a2m_test_remove_file(dual_path);
     }
 
     {

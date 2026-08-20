@@ -111,8 +111,9 @@ two copies in step (they differ only in the `HELP_PALETTE_*` macro names).
 Misc → Assembler loads and saves its source filename as `[assembler] file=...`.
 Browse opens beside the filename currently shown; when the filename is empty it
 uses Configure → Paths → Assembler. The C64-only “Run BASIC (paste RUN)” mode is
-not exposed on Apple II. Runtime named targets ignore `file=` and accept the
-host destinations `map`, `main`, `aux`, `lc1`, and `lc2`, including combinations
-such as `aux,lc2`; file-only targets default to `map`. **Opt+Shift+A** globally
-queues the same configured Assemble action, including reset, auto-run, and
-one-shot rearm options.
+not exposed on Apple II. Runtime named targets treat `file=` and `dest=` as
+orthogonal: `dest=` writes `map` / `main` / `aux` / `lc1` / `lc2` (including
+combinations such as `aux,lc2`), `file=` writes a host file beside the source,
+and both together do both. A `file=`-only scope does not poke memory.
+**Opt+Shift+A** globally queues the same configured Assemble action, including
+reset, auto-run, and one-shot rearm options.

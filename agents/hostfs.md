@@ -1,6 +1,6 @@
 # HostFS — SmartPort folder volume
 
-**Status:** Phase 0–3 done (read/write NAPS HostFS + live host refresh). Phase 4 optional.  
+**Status:** Phase 0–3 + 5a/5b done (NAPS HostFS, nested dirs, live refresh, file + directory write-through). Phase 4 optional polish.  
 **Related:** [`disk.md`](disk.md) · [`machine.md`](machine.md) · [`rules.md`](rules.md) · [`testing.md`](testing.md).
 
 HostFS mounts a **host directory** as a ProDOS 8 volume on an existing
@@ -52,8 +52,10 @@ inside a2m UI. Operators prepare the directory by hand (copy tagged files).
 | How to select HostFS | Mount path is a **directory** → HostFS backend; file → existing image backend. |
 | Mixed media on one card | **Yes**, per unit (`s7d0=./host/d0`, `s7d1=disk.po`). |
 | Phase 1 I/O | **Read-only** guest view of host files (writes → error or no-op with protect). |
-| Phase 1 layout | **Flat root only**; skip host subdirectories. |
-| Phase 1 metadata | **NAPS only**; non-NAPS names are **skipped** (not mounted). |
+| Phase 1 layout | **Flat root only**; skip host subdirectories. Superseded by Phase 5a. |
+| Phase 1 metadata | **NAPS only** for files; non-NAPS names are **skipped**. |
+| Phase 5a dirs | Host subdirectories → ProDOS DIR (`$0F` / storage `$0D`); **plain mangled** names (no NAPS on folders). Recursive, depth cap **8**. |
+| Phase 5b dirs | Guest CREATE/DESTROY/RENAME DIR → host mkdir/rmdir/rename (not started with 5a). |
 | Capacity | Advertise a large ProDOS volume (target **65535** blocks, ~32 MB). |
 | Block identity | **Stable** file→block assignment across rescans when possible. Never recycle overlapping block numbers. |
 | Data storage | Metadata (boot/dir/bitmap/index) in RAM; file **data** blocks map to host file offsets (optional small LRU cache). Not a full 32 MB RAM disk. |
@@ -214,6 +216,31 @@ directory; remount or rescan still consistent.
 - Cross-links in manual + [`disk.md`](disk.md) empirical table.  
 - Volume name, size overrides, read-only flag in INI.
 
+### Phase 5a — Host subdirectories → ProDOS folders (read + refresh)  ★ done
+
+**Intent:** Host directory trees appear as ProDOS folders; live rescan updates nested content.
+
+- Recursive scan (depth ≤ 8). Skip `.`, `..`, `hostfs.order`, dot-names.  
+- Dirs: plain mangled basename → ProDOS DIR (`type $0F`, `storage $0D`).  
+- Files: NAPS only (unchanged).  
+- Subdir key blocks with `$0E` headers and correct parent back-pointers.  
+- Name uniqueness **per parent directory**.  
+- Per-directory optional `hostfs.order` (sibling basenames: NAPS files + dir names).  
+- Rescan/poll adds/removes nested files and dirs without full volume renumber.
+
+**Exit:** Nested fixture mounts; `CAT`/`PREFIX` into host-backed folders; nested NAPS files load; flat boot/regression green. **No** guest CREATE DIR → host yet.
+
+### Phase 5b — Directory write-through  ★ done
+
+**Intent:** Guest CREATE/DESTROY/RENAME of directories (and file ops inside them) update the host tree.
+
+- Reconcile every directory chain, not only the volume directory.  
+- `$0D` CREATE → `mkdir`; DESTROY → `rmdir` (drops `hostfs.order` first); soft-fail log if non-empty.  
+- RENAME/move → `rename` + rewrite descendant host paths.  
+- File CREATE/DESTROY/RENAME under a subdir uses that dir’s host path.
+
+**Exit:** ProDOS mkdir/rmdir/rename visible on host; remount consistent.
+
 ---
 
 ## Non-goals (explicit)
@@ -221,7 +248,7 @@ directory; remount or rescan still consistent.
 - Disk II nibble-level “host floppy.”  
 - Overlapping/recycled ProDOS block numbers to fake capacity.  
 - GS/OS / forked files.  
-- Host subdirectories as ProDOS dirs in Phase 1–2 (revisit later).  
+- Host subdirectories as ProDOS dirs before Phase 5 (Phase 5a/5b is the revisit).  
 - AppleSingle intake in Phase 1 (NAPS only; AppleSingle may join Phase 4+).  
 - Replacing image-backed SmartPort.  
 - MLI call interception as the primary design (block device only).
@@ -269,7 +296,10 @@ checked-in or generated boot/PRODOS bytes — do not require a 32 MB file).
 | Phase 3 DESTROY | **`unlink`** host file |
 | Phase 3 EOF shrink | **Truncate** host file |
 | Phase 3 catalog sync | Dir-diff reconcile after directory block WRITEs |
-| Catalog order | Optional `hostfs.order` in the folder (one NAPS basename per line). Mount applies listed order then appends unlisted NAPS files (alpha). Guest reorder (e.g. CAT.DOCTOR) or rescan composition change rewrites the file. Missing entries skipped. |
+| Catalog order | Optional `hostfs.order` per directory (sibling basenames: NAPS files and plain dir names). Mount applies listed order then appends unlisted siblings (alpha). Guest reorder or rescan composition change rewrites that directory’s file. Missing entries skipped. |
+| Dir naming (5a) | Plain mangled host folder names; no NAPS required for directories |
+| Nesting (5a) | Recursive; depth cap 8 |
+| Dir write-through | Phase 5b: guest CREATE/DESTROY/RENAME DIR → mkdir/rmdir/rename; nested file ops use parent host path |
 
 ---
 
@@ -281,3 +311,6 @@ checked-in or generated boot/PRODOS bytes — do not require a 32 MB file).
 | 2026-08-19 | Phase 0 + Phase 1 implemented: `hostfs.c`, SmartPort backend dispatch, fixtures, `ctest` `hostfs`. |
 | 2026-08-19 | Phase 2 + Phase 3: live host rescan/poll, write-through, dir-diff CREATE/DESTROY/RENAME. |
 | 2026-08-19 | Optional `hostfs.order` manifest preserves ProDOS catalog order across remount. |
+| 2026-08-19 | Phase 5 planned: host subdirs → ProDOS folders (5a read/refresh, 5b write-through). |
+| 2026-08-19 | Phase 5a: recursive host dirs as ProDOS `$0D` folders, `$0E` headers, nested rescan, fixtures/tests. |
+| 2026-08-19 | Phase 5b: guest DIR mkdir/rmdir/rename write-through; nested file CREATE/DESTROY; multi-dir reconcile. |

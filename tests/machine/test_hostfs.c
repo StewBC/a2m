@@ -684,13 +684,432 @@ static void test_order_manifest(void)
     rmdir(dir);
 }
 
+static int find_entry_in_dir_block(
+    const uint8_t *block, const char *name, uint8_t *out_st, uint16_t *out_key, uint8_t *out_type)
+{
+    int i;
+    for (i = 1; i < 13; ++i) {
+        const uint8_t *e = block + 4 + i * 39;
+        uint8_t nl = e[0] & 0x0Fu;
+        char nm[16];
+        if (e[0] == 0) {
+            continue;
+        }
+        memcpy(nm, e + 1, nl);
+        nm[nl] = '\0';
+        if (strcmp(nm, name) == 0) {
+            if (out_st != NULL) {
+                *out_st = (uint8_t)(e[0] >> 4);
+            }
+            if (out_key != NULL) {
+                *out_key = (uint16_t)(e[0x11] | (e[0x12] << 8));
+            }
+            if (out_type != NULL) {
+                *out_type = e[0x10];
+            }
+            return 1;
+        }
+    }
+    /* continuation blocks start at slot 0 */
+    for (i = 0; i < 13; ++i) {
+        const uint8_t *e = block + 4 + i * 39;
+        uint8_t nl = e[0] & 0x0Fu;
+        char nm[16];
+        if (e[0] == 0) {
+            continue;
+        }
+        memcpy(nm, e + 1, nl);
+        nm[nl] = '\0';
+        if (strcmp(nm, name) == 0) {
+            if (out_st != NULL) {
+                *out_st = (uint8_t)(e[0] >> 4);
+            }
+            if (out_key != NULL) {
+                *out_key = (uint16_t)(e[0x11] | (e[0x12] << 8));
+            }
+            if (out_type != NULL) {
+                *out_type = e[0x10];
+            }
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static void test_nested_directories(void)
+{
+    char path[1024];
+    hostfs_volume *vol;
+    uint8_t block[512];
+    uint8_t st = 0;
+    uint8_t type = 0;
+    uint16_t utils_key = 0;
+    uint16_t nested_key = 0;
+    uint16_t tool_key = 0;
+    uint8_t data[512];
+
+    snprintf(path, sizeof(path), "%s/hostfs", A2M_FIXTURE_DIR);
+    vol = hostfs_mount(path, "HOSTFS.S7D0");
+    if (vol == NULL) {
+        fail("nested mount");
+    }
+
+    if (hostfs_read_block(vol, 2, block) != 0) {
+        fail("read volume dir");
+    }
+    if (!find_entry_in_dir_block(block, "UTILS", &st, &utils_key, &type)) {
+        fail("UTILS dir missing from volume");
+    }
+    if (st != 0x0Du || type != 0x0Fu || utils_key == 0) {
+        fail("UTILS should be subdirectory storage/type");
+    }
+    if (find_entry_in_dir_block(block, "NOTES", &st, &utils_key, &type) ||
+        find_entry_in_dir_block(block, "HIDDENDIR", &st, &utils_key, &type)) {
+        fail("non-NAPS / dotdir should not appear at root");
+    }
+
+    if (hostfs_read_block(vol, utils_key, block) != 0) {
+        fail("read UTILS key");
+    }
+    if ((block[4] >> 4) != 0x0Eu) {
+        fail("UTILS subdirectory header storage $0E");
+    }
+    if (block[4 + 0x10] != 0x75) {
+        fail("UTILS header marker $75");
+    }
+    if (!find_entry_in_dir_block(block, "TOOL", &st, &tool_key, &type)) {
+        fail("TOOL missing in UTILS");
+    }
+    if (st != 0x01u || type != 0x06u) {
+        fail("TOOL type/storage");
+    }
+    if (!find_entry_in_dir_block(block, "NESTED", &st, &nested_key, &type)) {
+        fail("NESTED missing in UTILS");
+    }
+    if (st != 0x0Du || type != 0x0Fu) {
+        fail("NESTED should be DIR");
+    }
+    if (find_entry_in_dir_block(block, "NOTES", &st, &tool_key, &type)) {
+        fail("notes.txt must not appear in UTILS");
+    }
+
+    if (hostfs_read_block(vol, tool_key, data) != 0) {
+        fail("read TOOL data");
+    }
+    if (memcmp(data, "tool", 4) != 0) {
+        fail("TOOL payload");
+    }
+
+    if (hostfs_read_block(vol, nested_key, block) != 0) {
+        fail("read NESTED key");
+    }
+    if ((block[4] >> 4) != 0x0Eu) {
+        fail("NESTED header");
+    }
+    {
+        uint16_t deep_key = 0;
+        if (!find_entry_in_dir_block(block, "DEEP", &st, &deep_key, &type)) {
+            fail("DEEP missing");
+        }
+        if (hostfs_read_block(vol, deep_key, data) != 0 || memcmp(data, "deep", 4) != 0) {
+            fail("DEEP payload");
+        }
+    }
+
+    hostfs_eject(vol);
+}
+
+static void test_nested_rescan(void)
+{
+    const char *dir = "test_hostfs_nested_rescan";
+    hostfs_volume *vol;
+    uint8_t block[512];
+    uint8_t st = 0;
+    uint8_t type = 0;
+    uint16_t sub_key = 0;
+    char path[512];
+
+    HOSTFS_MKDIR(dir);
+    write_file("test_hostfs_nested_rescan/ROOT#060000", "r", 1);
+    HOSTFS_MKDIR("test_hostfs_nested_rescan/SUB");
+    write_file("test_hostfs_nested_rescan/SUB/IN#040000", "in", 2);
+
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL) {
+        fail("nested rescan mount");
+    }
+    if (hostfs_read_block(vol, 2, block) != 0 ||
+        !find_entry_in_dir_block(block, "SUB", &st, &sub_key, &type)) {
+        fail("SUB at mount");
+    }
+
+    write_file("test_hostfs_nested_rescan/SUB/NEW#060800", "xy", 2);
+    if (hostfs_rescan(vol) != 0) {
+        fail("nested rescan");
+    }
+    if (hostfs_read_block(vol, sub_key, block) != 0 ||
+        !find_entry_in_dir_block(block, "NEW", &st, &sub_key, &type)) {
+        fail("NEW not visible after rescan");
+    }
+
+    HOSTFS_MKDIR("test_hostfs_nested_rescan/ADDED");
+    if (hostfs_rescan(vol) != 0) {
+        fail("rescan add dir");
+    }
+    if (hostfs_read_block(vol, 2, block) != 0 ||
+        !find_entry_in_dir_block(block, "ADDED", &st, &sub_key, &type) || st != 0x0Du) {
+        fail("ADDED dir missing after rescan");
+    }
+
+    remove("test_hostfs_nested_rescan/SUB/NEW#060800");
+    if (hostfs_rescan(vol) != 0) {
+        fail("rescan remove nested file");
+    }
+    /* Remount SUB key from volume dir (may be unchanged). */
+    if (hostfs_read_block(vol, 2, block) != 0 ||
+        !find_entry_in_dir_block(block, "SUB", &st, &sub_key, &type)) {
+        fail("SUB after delete rescan");
+    }
+    if (hostfs_read_block(vol, sub_key, block) != 0 ||
+        find_entry_in_dir_block(block, "NEW", &st, &sub_key, &type)) {
+        fail("NEW should be gone");
+    }
+
+    hostfs_eject(vol);
+    remove("test_hostfs_nested_rescan/ROOT#060000");
+    remove("test_hostfs_nested_rescan/SUB/IN#040000");
+    rmdir("test_hostfs_nested_rescan/SUB");
+    rmdir("test_hostfs_nested_rescan/ADDED");
+    remove("test_hostfs_nested_rescan/" HOSTFS_ORDER_FILENAME);
+    rmdir(dir);
+    (void)path;
+}
+
+static void fill_dir_entry(
+    uint8_t *e,
+    uint8_t storage_type,
+    const char *name,
+    uint8_t file_type,
+    uint16_t key,
+    uint16_t blocks_used,
+    uint32_t eof,
+    uint16_t aux,
+    uint16_t header_ptr)
+{
+    size_t nlen = strlen(name);
+    memset(e, 0, 39);
+    e[0] = (uint8_t)((storage_type << 4) | (nlen & 0x0Fu));
+    memcpy(e + 1, name, nlen);
+    e[0x10] = file_type;
+    e[0x11] = (uint8_t)(key & 0xFFu);
+    e[0x12] = (uint8_t)((key >> 8) & 0xFFu);
+    e[0x13] = (uint8_t)(blocks_used & 0xFFu);
+    e[0x14] = (uint8_t)((blocks_used >> 8) & 0xFFu);
+    e[0x15] = (uint8_t)(eof & 0xFFu);
+    e[0x16] = (uint8_t)((eof >> 8) & 0xFFu);
+    e[0x17] = (uint8_t)((eof >> 16) & 0xFFu);
+    e[0x1E] = 0xC3;
+    e[0x1F] = (uint8_t)(aux & 0xFFu);
+    e[0x20] = (uint8_t)((aux >> 8) & 0xFFu);
+    e[0x25] = (uint8_t)(header_ptr & 0xFFu);
+    e[0x26] = (uint8_t)((header_ptr >> 8) & 0xFFu);
+}
+
+static void wipe_tree(const char *path)
+{
+    char cmd[512];
+    snprintf(cmd, sizeof(cmd), "rm -rf '%s'", path);
+    (void)system(cmd);
+}
+
+static void test_dir_write_through(void)
+{
+    const char *dir = "test_hostfs_dir_wt";
+    hostfs_volume *vol;
+    uint8_t dirblk[512];
+    uint8_t subblk[512];
+    uint8_t data[512];
+    uint16_t games_key = 120;
+    uint16_t file_key = 130;
+    char path[512];
+    struct stat st;
+    int i;
+    uint8_t stype = 0;
+    uint8_t ftype = 0;
+    uint16_t key = 0;
+
+    wipe_tree(dir);
+    HOSTFS_MKDIR(dir);
+    write_file("test_hostfs_dir_wt/SEED#060000", "x", 1);
+
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL) {
+        fail("dir wt mount");
+    }
+
+    /* CREATE empty subdirectory key block with $0E header. */
+    memset(subblk, 0, sizeof(subblk));
+    subblk[4] = (uint8_t)((0x0Eu << 4) | 5u);
+    memcpy(subblk + 5, "GAMES", 5);
+    subblk[4 + 0x10] = 0x75;
+    subblk[4 + 0x1E] = 0xC3;
+    subblk[4 + 0x1F] = 39;
+    subblk[4 + 0x20] = 13;
+    if (hostfs_write_block(vol, games_key, subblk) != 0) {
+        fail("write GAMES key");
+    }
+
+    if (hostfs_read_block(vol, 2, dirblk) != 0) {
+        fail("read vol dir");
+    }
+    for (i = 1; i < 13; ++i) {
+        uint8_t *e = dirblk + 4 + i * 39;
+        if (e[0] != 0) {
+            continue;
+        }
+        fill_dir_entry(e, 0x0D, "GAMES", 0x0F, games_key, 1, 512, 0, 2);
+        break;
+    }
+    if (hostfs_write_block(vol, 2, dirblk) != 0) {
+        fail("publish GAMES entry");
+    }
+
+    snprintf(path, sizeof(path), "%s/GAMES", dir);
+    if (stat(path, &st) != 0 || !S_ISDIR(st.st_mode)) {
+        fail("CREATE DIR did not mkdir GAMES");
+    }
+
+    /* CREATE seedling file inside GAMES. */
+    memset(data, 0xAB, sizeof(data));
+    data[0] = 'H';
+    data[1] = 'I';
+    if (hostfs_write_block(vol, file_key, data) != 0) {
+        fail("write nested data");
+    }
+    if (hostfs_read_block(vol, games_key, subblk) != 0) {
+        fail("read GAMES dir");
+    }
+    for (i = 1; i < 13; ++i) {
+        uint8_t *e = subblk + 4 + i * 39;
+        if (e[0] != 0) {
+            continue;
+        }
+        fill_dir_entry(e, 0x01, "HI", 0x06, file_key, 1, 2, 0x0800, games_key);
+        break;
+    }
+    /* bump active count in subdir header */
+    subblk[4 + 0x21] = 1;
+    subblk[4 + 0x22] = 0;
+    if (hostfs_write_block(vol, games_key, subblk) != 0) {
+        fail("publish HI in GAMES");
+    }
+    snprintf(path, sizeof(path), "%s/GAMES/HI#060800", dir);
+    if (stat(path, &st) != 0 || !S_ISREG(st.st_mode)) {
+        fail("nested CREATE did not make NAPS file");
+    }
+
+    /* RENAME GAMES -> FUN */
+    if (hostfs_read_block(vol, 2, dirblk) != 0) {
+        fail("read vol for rename");
+    }
+    if (!find_entry_in_dir_block(dirblk, "GAMES", &stype, &key, &ftype)) {
+        fail("GAMES missing before rename");
+    }
+    for (i = 1; i < 13; ++i) {
+        uint8_t *e = dirblk + 4 + i * 39;
+        uint8_t nl = e[0] & 0x0Fu;
+        char nm[16];
+        if (e[0] == 0) {
+            continue;
+        }
+        memcpy(nm, e + 1, nl);
+        nm[nl] = '\0';
+        if (strcmp(nm, "GAMES") == 0) {
+            memset(e + 1, 0, 15);
+            memcpy(e + 1, "FUN", 3);
+            e[0] = (uint8_t)((0x0Du << 4) | 3u);
+            break;
+        }
+    }
+    if (hostfs_write_block(vol, 2, dirblk) != 0) {
+        fail("rename GAMES->FUN");
+    }
+    if (stat("test_hostfs_dir_wt/FUN", &st) != 0 || !S_ISDIR(st.st_mode)) {
+        fail("RENAME DIR did not rename host folder");
+    }
+    if (stat("test_hostfs_dir_wt/FUN/HI#060800", &st) != 0) {
+        fail("child path not updated after dir rename");
+    }
+    if (stat("test_hostfs_dir_wt/GAMES", &st) == 0) {
+        fail("old GAMES path still exists");
+    }
+
+    /* DESTROY nested file then directory. */
+    if (hostfs_read_block(vol, 2, dirblk) != 0 ||
+        !find_entry_in_dir_block(dirblk, "FUN", &stype, &key, &ftype)) {
+        fail("FUN key lookup");
+    }
+    if (hostfs_read_block(vol, key, subblk) != 0) {
+        fail("read FUN");
+    }
+    for (i = 1; i < 13; ++i) {
+        uint8_t *e = subblk + 4 + i * 39;
+        uint8_t nl = e[0] & 0x0Fu;
+        char nm[16];
+        if (e[0] == 0) {
+            continue;
+        }
+        memcpy(nm, e + 1, nl);
+        nm[nl] = '\0';
+        if (strcmp(nm, "HI") == 0) {
+            memset(e, 0, 39);
+        }
+    }
+    subblk[4 + 0x21] = 0;
+    if (hostfs_write_block(vol, key, subblk) != 0) {
+        fail("destroy HI");
+    }
+    if (stat("test_hostfs_dir_wt/FUN/HI#060800", &st) == 0) {
+        fail("DESTROY nested file left host file");
+    }
+
+    if (hostfs_read_block(vol, 2, dirblk) != 0) {
+        fail("read vol for destroy dir");
+    }
+    for (i = 1; i < 13; ++i) {
+        uint8_t *e = dirblk + 4 + i * 39;
+        uint8_t nl = e[0] & 0x0Fu;
+        char nm[16];
+        if (e[0] == 0) {
+            continue;
+        }
+        memcpy(nm, e + 1, nl);
+        nm[nl] = '\0';
+        if (strcmp(nm, "FUN") == 0) {
+            memset(e, 0, 39);
+        }
+    }
+    if (hostfs_write_block(vol, 2, dirblk) != 0) {
+        fail("destroy FUN");
+    }
+    if (stat("test_hostfs_dir_wt/FUN", &st) == 0) {
+        fail("DESTROY DIR left host folder");
+    }
+
+    hostfs_eject(vol);
+    wipe_tree(dir);
+}
+
 int main(void)
 {
     test_naps_and_mangle();
     test_volume_map();
+    test_nested_directories();
+    test_nested_rescan();
     test_smartport_hostfs_and_mixed();
     test_write_through_and_rescan();
     test_create_reconcile();
+    test_dir_write_through();
     test_order_manifest();
     printf("hostfs tests ok\n");
     return 0;
