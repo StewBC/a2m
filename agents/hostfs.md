@@ -1,6 +1,6 @@
 # HostFS — SmartPort folder volume
 
-**Status:** Phase 0–3 + 5a/5b done (NAPS HostFS, nested dirs, live refresh, file + directory write-through). Phase 4 optional polish.  
+**Status:** Phase 0–3 + 5a/5b done (NAPS HostFS, nested dirs, live refresh, file + directory write-through). Phase 4: SmartPort Insert folder select done; remaining items still optional polish.  
 **Related:** [`disk.md`](disk.md) · [`machine.md`](machine.md) · [`rules.md`](rules.md) · [`testing.md`](testing.md).
 
 HostFS mounts a **host directory** as a ProDOS 8 volume on an existing
@@ -209,7 +209,9 @@ directory; remount or rescan still consistent.
 
 ### Phase 4 — Product polish (optional)
 
-- UI: browse/insert **folder** as SmartPort media (not only files).  
+- UI: browse/insert **folder** as SmartPort media (not only files). **Done** —
+  SmartPort **[Insert]** offers **[Use This Folder]** beside **[Open]**; path kind
+  still selects HostFS vs image. Disk II Insert unchanged (file-only).  
 - Optional “seed ProDOS into folder” helper (explicitly deferred from Phase 1).  
 - Native directory watchers instead of poll.  
 - Snapshot story: reference folder path like external media refs.  
@@ -314,3 +316,4 @@ checked-in or generated boot/PRODOS bytes — do not require a 32 MB file).
 | 2026-08-19 | Phase 5 planned: host subdirs → ProDOS folders (5a read/refresh, 5b write-through). |
 | 2026-08-19 | Phase 5a: recursive host dirs as ProDOS `$0D` folders, `$0E` headers, nested rescan, fixtures/tests. |
 | 2026-08-19 | Phase 5b: guest DIR mkdir/rmdir/rename write-through; nested file CREATE/DESTROY; multi-dir reconcile. |
+| 2026-08-19 | Phase 4 UI: SmartPort Insert **Use This Folder** mounts HostFS; Open still mounts image files. |

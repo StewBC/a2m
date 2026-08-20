@@ -122,8 +122,10 @@ example with CAT.DOCTOR) rewrites `hostfs.order` automatically so the next launc
 keeps that order. The file is not itself a ProDOS volume entry.
 
 HostFS is selected by path kind only (directory vs file). Mount it from the command
-line or `[SmartPort]` in the INI. The Machine **[Insert]** browser still selects
-image files; folder insert from the UI is not provided yet.
+line, `[SmartPort]` in the INI, or Machine **[Insert]** on a SmartPort unit:
+**[Open]** mounts a selected image file; **[Use This Folder]** mounts the directory
+currently shown as HostFS (same button as Configure → Paths). Disk II Insert stays
+file-only.
 
 ### Machine Snapshots
 
@@ -617,8 +619,10 @@ Slot 6: Disk II
 **[N.0]** boots device 0 of that slot (jumps to `$CN00`). Drive 1 is labelled but
 is not a boot button.
 
-**[Insert]** opens a file browser and mounts the selected image. For Disk II, more
-than one file can be queued; a **[Swap (current/total)]** button then appears.
+**[Insert]** opens a file browser. For Disk II it mounts the selected image; more
+than one file can be queued and a **[Swap (current/total)]** button then appears.
+For SmartPort, **[Open]** mounts a selected image file and **[Use This Folder]**
+mounts the current directory as HostFS.
 
 **[Swap]** advances to the next image in that drive's queue (wraps).
 

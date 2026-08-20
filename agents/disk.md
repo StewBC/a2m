@@ -48,6 +48,8 @@ configured SmartPort card. SmartPort does not use a multi-image queue.
 Live insert/eject updates the options used for Save INI / quit; Configure does
 not own media mounts (Misc → Machine does), so Apply / Save INI keeps the live
 Disk II / SmartPort paths rather than a stale Configure snapshot.
+SmartPort **[Insert]** can **Open** an image file or **Use This Folder** for
+HostFS; Disk II Insert remains file-only.
 The INI-only `[SmartPort] boot_slot=N` setting redirects initial execution to `$Cn00`
 after unit 0 mounts, enabling Apple ][+ and non-slot-7 SmartPort boot. Invalid
 card or missing-media selections publish a runtime error and keep normal startup.

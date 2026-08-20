@@ -1357,7 +1357,7 @@ static void dispatch_intent(
             frontend_open_media_file_browser(
                 ui,
                 intent->disk_card_type == RUNTIME_SLOT_CARD_DISKII ?
-                    "Insert Disk II image" : "Insert SmartPort image",
+                    "Insert Disk II image" : "Insert SmartPort media",
                 intent->disk_card_type == RUNTIME_SLOT_CARD_DISKII ?
                     "nib,dsk,po,do,woz" : NULL,
                 intent->disk_slot,

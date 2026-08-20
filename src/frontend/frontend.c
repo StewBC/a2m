@@ -406,6 +406,8 @@ typedef struct frontend_file_browser_state {
     float list_visible_h;       /* measured inner height of the list group, in px */
     int browse_slot;            /* frontend_browse_slot for this session, -1 = none */
     bool pick_dir;              /* folder-select mode: commit the current directory */
+    /* SmartPort Insert: also offer Use This Folder beside Open (HostFS). */
+    bool allow_folder_mount;
 } frontend_file_browser_state;
 
 struct frontend {
@@ -8648,6 +8650,7 @@ static void frontend_open_file_browser_with_slot(
     dlg->disk_device = disk_device;
     dlg->selected = -1;
     dlg->pick_dir = (purpose == FRONTEND_DEBUGGER_INTENT_CONFIG_PICK_PATH_DIALOG);
+    dlg->allow_folder_mount = false;
 
     if (save_mode && dlg->default_extension[0] != '\0') {
         snprintf(dlg->filename, sizeof(dlg->filename), "untitled.%s", dlg->default_extension);
@@ -8753,6 +8756,22 @@ void frontend_open_media_file_browser(
         card_type == RUNTIME_SLOT_CARD_SMARTPORT ? FRONTEND_BROWSE_SLOT_SMARTPORT : -1);
     ui->file_browser.disk_slot = slot;
     ui->file_browser.disk_card_type = card_type;
+    /* Directory path → HostFS; file path → image. Disk II stays file-only. */
+    ui->file_browser.allow_folder_mount = (card_type == RUNTIME_SLOT_CARD_SMARTPORT);
+}
+
+/* Commit the directory currently shown (Paths pick_dir, or SmartPort HostFS). */
+static void frontend_file_browser_commit_folder(
+    frontend *ui, frontend_file_browser_state *dlg)
+{
+    if (dlg->current_dir[0] == '\0') {
+        snprintf(dlg->error, sizeof(dlg->error), "No folder to select");
+        return;
+    }
+    frontend_file_browser_remember_dir(ui, dlg);
+    frontend_push_file_browser_result_intent(
+        ui, dlg->purpose, dlg->current_dir, dlg->disk_device);
+    dlg->open = false;
 }
 
 /* Navigates into a directory entry, or (for a file) either fills the save-mode
@@ -9113,21 +9132,34 @@ static void frontend_draw_file_browser(frontend *ui, int width, int height)
             nk_spacing(ctx, 1);
         }
 
-        nk_layout_row_dynamic(ctx, 24.0f, 2);
-        if (nk_button_label(ctx, "Cancel")) {
-            dlg->open = false;
-        }
-        if (nk_button_label(ctx, dlg->pick_dir ? "Use This Folder" :
-                (dlg->save_mode ? "Save" : "Open"))) {
-            if (dlg->pick_dir) {
-                /* Return the currently shown directory, not a file. */
-                frontend_push_file_browser_result_intent(ui, dlg->purpose,
-                    dlg->current_dir, dlg->disk_device);
+        /* Paths: Cancel | Use This Folder.
+           SmartPort Insert: Cancel | Use This Folder | Open (file or HostFS).
+           Everything else: Cancel | Open/Save. */
+        if (dlg->allow_folder_mount && !dlg->pick_dir && !dlg->save_mode) {
+            nk_layout_row_dynamic(ctx, 24.0f, 3);
+            if (nk_button_label(ctx, "Cancel")) {
                 dlg->open = false;
-            } else if (dlg->save_mode) {
-                frontend_file_browser_commit_save(ui, dlg);
-            } else {
+            }
+            if (nk_button_label(ctx, "Use This Folder")) {
+                frontend_file_browser_commit_folder(ui, dlg);
+            }
+            if (nk_button_label(ctx, "Open")) {
                 frontend_file_browser_activate(ui, dlg, dlg->selected);
+            }
+        } else {
+            nk_layout_row_dynamic(ctx, 24.0f, 2);
+            if (nk_button_label(ctx, "Cancel")) {
+                dlg->open = false;
+            }
+            if (nk_button_label(ctx, dlg->pick_dir ? "Use This Folder" :
+                    (dlg->save_mode ? "Save" : "Open"))) {
+                if (dlg->pick_dir) {
+                    frontend_file_browser_commit_folder(ui, dlg);
+                } else if (dlg->save_mode) {
+                    frontend_file_browser_commit_save(ui, dlg);
+                } else {
+                    frontend_file_browser_activate(ui, dlg, dlg->selected);
+                }
             }
         }
 
@@ -9190,14 +9222,14 @@ static void frontend_draw_file_browser(frontend *ui, int width, int height)
                     sel_entry = &dlg->listing.entries[dlg->filtered[dlg->selected]];
                 }
                 /* A highlighted folder is always entered (like a double-click).
-                   Otherwise Enter mirrors the footer button: pick the folder in
-                   folder-select mode, Save in save mode, Open/mount otherwise. */
+                   Otherwise Enter mirrors the primary footer action: Use This
+                   Folder in Paths mode, Save in save mode, Open otherwise.
+                   SmartPort's Use This Folder is button-only so Enter never
+                   mounts a parent while browsing into a HostFS tree. */
                 if (sel_entry != NULL && sel_entry->is_dir) {
                     frontend_file_browser_activate(ui, dlg, dlg->selected);
                 } else if (dlg->pick_dir) {
-                    frontend_push_file_browser_result_intent(ui, dlg->purpose,
-                        dlg->current_dir, dlg->disk_device);
-                    dlg->open = false;
+                    frontend_file_browser_commit_folder(ui, dlg);
                 } else if (dlg->save_mode) {
                     frontend_file_browser_commit_save(ui, dlg);
                 } else {
