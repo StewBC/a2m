@@ -27,6 +27,14 @@ static void expect_u8(const char *name, uint8_t e, uint8_t a)
     }
 }
 
+static void expect_u16(const char *name, uint16_t e, uint16_t a)
+{
+    if (e != a) {
+        fprintf(stderr, "FAIL: %s: expected %04x got %04x\n", name, e, a);
+        exit(1);
+    }
+}
+
 static void test_text_page_readbacks(void)
 {
     apple2_t m;
@@ -176,6 +184,55 @@ static void test_gameport_buttons(void)
     apple2_shutdown(&m);
 }
 
+static void test_call_stack_jsr_frames(void)
+{
+    apple2_t m;
+    apple2_call_stack_entry entries[APPLE2_CALL_STACK_MAX];
+    uint8_t count;
+
+    if (!apple2_init(&m)) {
+        fail("init");
+    }
+
+    /* Empty stack → no frames. */
+    m.cpu.cpu.sp = 0x01FFu;
+    count = apple2_debug_call_stack(&m, entries, APPLE2_CALL_STACK_MAX);
+    expect_u8("empty stack", 0, count);
+
+    /* Plant JSR $20 $34 $12 at $8000 (dest $1234). JSR pushes $8002. */
+    apple2_debug_write(&m, 0x8000, 0x20);
+    apple2_debug_write(&m, 0x8001, 0x34);
+    apple2_debug_write(&m, 0x8002, 0x12);
+    /* One nested frame: outer JSR at $9000 → $ABCD, return word $9002. */
+    apple2_debug_write(&m, 0x9000, 0x20);
+    apple2_debug_write(&m, 0x9001, 0xCD);
+    apple2_debug_write(&m, 0x9002, 0xAB);
+
+    /* SP=$01FB → words at $01FC/$01FD (inner) and $01FE/$01FF (outer). */
+    apple2_debug_write(&m, 0x01FC, 0x02);
+    apple2_debug_write(&m, 0x01FD, 0x80);
+    apple2_debug_write(&m, 0x01FE, 0x02);
+    apple2_debug_write(&m, 0x01FF, 0x90);
+    m.cpu.cpu.sp = 0x01FBu;
+
+    count = apple2_debug_call_stack(&m, entries, APPLE2_CALL_STACK_MAX);
+    expect_u8("two jsr frames", 2, count);
+    expect_u16("inner jsr", 0x8000, entries[0].jsr_address);
+    expect_u16("inner dest", 0x1234, entries[0].dest_address);
+    expect_u16("outer jsr", 0x9000, entries[1].jsr_address);
+    expect_u16("outer dest", 0xABCD, entries[1].dest_address);
+
+    /* Non-JSR return word is skipped by single-byte scan. */
+    apple2_debug_write(&m, 0x01FC, 0x00);
+    apple2_debug_write(&m, 0x01FD, 0x10); /* $1000, mem[$0FFE] != $20 */
+    apple2_debug_write(&m, 0x0FFE, 0xEA);
+    count = apple2_debug_call_stack(&m, entries, APPLE2_CALL_STACK_MAX);
+    expect_u8("skip non-jsr keep outer", 1, count);
+    expect_u16("remaining jsr", 0x9000, entries[0].jsr_address);
+
+    apple2_shutdown(&m);
+}
+
 static void test_paste_kbdstrb_feed(void)
 {
     apple2_t m;
@@ -288,6 +345,7 @@ int main(void)
     test_gameport_buttons();
     test_gameport_paddle_ptrig();
     test_paste_kbdstrb_feed();
+    test_call_stack_jsr_frames();
     printf("softswitch: all tests passed\n");
     return 0;
 }

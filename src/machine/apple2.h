@@ -184,6 +184,19 @@ void apple2_map_ram_offset(apple2_t *machine, bool for_write, uint32_t host_offs
 uint8_t apple2_debug_read(const apple2_t *machine, uint16_t address);
 void apple2_debug_write(apple2_t *machine, uint16_t address, uint8_t value);
 
+/* Heuristic call stack from page-1 words above SP (legacy a2m Misc view).
+ * A stacked return address R counts as a JSR frame when mem[R-2]==$20;
+ * jsr_address=R-2 and dest_address=word at R-1. Returns entry count. */
+enum { APPLE2_CALL_STACK_MAX = 16 };
+typedef struct apple2_call_stack_entry {
+    uint16_t jsr_address;
+    uint16_t dest_address;
+} apple2_call_stack_entry;
+uint8_t apple2_debug_call_stack(
+    const apple2_t *machine,
+    apple2_call_stack_entry *out,
+    uint8_t max_entries);
+
 /* Debug R/W with a2m VIEW_FLAGS banking (Map / Main / Aux / LC / ROM). */
 uint8_t apple2_read_in_view(const apple2_t *machine, view_flags_t vf, uint16_t address);
 void apple2_write_in_view(apple2_t *machine, view_flags_t vf, uint16_t address, uint8_t value);

@@ -700,6 +700,39 @@ void apple2_debug_write(apple2_t *machine, uint16_t address, uint8_t value)
     machine->pages.write_pages[page][offset] = value;
 }
 
+uint8_t apple2_debug_call_stack(
+    const apple2_t *machine,
+    apple2_call_stack_entry *out,
+    uint8_t max_entries)
+{
+    uint16_t address;
+    uint8_t count = 0;
+
+    if (machine == NULL || out == NULL || max_entries == 0u) {
+        return 0u;
+    }
+
+    /* 6502 stack grows down in $0100–$01FF; words above SP are candidates. */
+    address = (uint16_t)(machine->cpu.cpu.sp + 1u);
+    while (address < 0x01FFu && count < max_entries) {
+        uint16_t return_addr = (uint16_t)(
+            apple2_debug_read(machine, address) |
+            ((uint16_t)apple2_debug_read(machine, (uint16_t)(address + 1u)) << 8));
+        /* JSR pushes address of its last operand byte; opcode sits two back. */
+        if (apple2_debug_read(machine, (uint16_t)(return_addr - 2u)) == 0x20u) {
+            out[count].jsr_address = (uint16_t)(return_addr - 2u);
+            out[count].dest_address = (uint16_t)(
+                apple2_debug_read(machine, (uint16_t)(return_addr - 1u)) |
+                ((uint16_t)apple2_debug_read(machine, return_addr) << 8));
+            count++;
+            address = (uint16_t)(address + 2u);
+        } else {
+            address = (uint16_t)(address + 1u);
+        }
+    }
+    return count;
+}
+
 static uint8_t apple2_read_rom_forced(const apple2_t *m, uint16_t address)
 {
     if (address >= 0xC100 && address < 0xD000) {

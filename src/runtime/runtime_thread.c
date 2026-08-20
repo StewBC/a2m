@@ -1343,6 +1343,32 @@ static void runtime_publish_cpu(runtime *rt, uint64_t token)
     runtime_publish_event(rt, &event);
 }
 
+static void runtime_publish_call_stack(runtime *rt, uint64_t token)
+{
+    runtime_event event;
+    apple2_call_stack_entry entries[APPLE2_CALL_STACK_MAX];
+    uint8_t count;
+    uint8_t i;
+    uint8_t max_entries;
+
+    memset(&event, 0, sizeof(event));
+    event.type = RUNTIME_EVENT_CALL_STACK_RESPONSE;
+    event.request_token = token;
+    event.data.call_stack.sp = (uint8_t)(rt->machine.cpu.cpu.sp & 0xFFu);
+
+    max_entries = (uint8_t)RUNTIME_CALL_STACK_MAX;
+    if (max_entries > (uint8_t)APPLE2_CALL_STACK_MAX) {
+        max_entries = (uint8_t)APPLE2_CALL_STACK_MAX;
+    }
+    count = apple2_debug_call_stack(&rt->machine, entries, max_entries);
+    event.data.call_stack.count = count;
+    for (i = 0; i < count; i++) {
+        event.data.call_stack.entries[i].jsr_address = entries[i].jsr_address;
+        event.data.call_stack.entries[i].dest_address = entries[i].dest_address;
+    }
+    runtime_publish_event(rt, &event);
+}
+
 static void runtime_publish_machine(runtime *rt)
 {
     runtime_event event;
@@ -3480,6 +3506,9 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
     case RUNTIME_COMMAND_REQUEST_DEBUG_MEMORY:
         runtime_fill_debug_memory(
             rt, cmd->data.request_debug_memory.include_write_history != 0);
+        break;
+    case RUNTIME_COMMAND_REQUEST_CALL_STACK:
+        runtime_publish_call_stack(rt, cmd->request_token);
         break;
     case RUNTIME_COMMAND_WRITE_MEMORY_BYTE:
         if (rt->exec_state != RUNTIME_EXEC_RUNNING) {

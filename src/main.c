@@ -1182,6 +1182,9 @@ static void dispatch_intent(
     case FRONTEND_DEBUGGER_INTENT_REQUEST_DEBUG_MEMORY:
         (void)runtime_client_request_debug_memory(client, intent->include_write_history);
         break;
+    case FRONTEND_DEBUGGER_INTENT_REQUEST_CALL_STACK:
+        (void)runtime_client_request_call_stack(client);
+        break;
     case FRONTEND_DEBUGGER_INTENT_MEMORY_WRITE_BYTE:
         (void)runtime_client_write_memory_byte(
             client, intent->address, (uint8_t)intent->value, intent->memory_mode);
@@ -1703,6 +1706,10 @@ static void apply_event_to_debug(
         break;
     case RUNTIME_EVENT_BREAKPOINTS_RESPONSE:
         debug->has_breakpoints = true;
+        break;
+    case RUNTIME_EVENT_CALL_STACK_RESPONSE:
+        debug->call_stack = event->data.call_stack;
+        debug->has_call_stack = true;
         break;
     default:
         break;
