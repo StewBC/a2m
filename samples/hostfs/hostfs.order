@@ -1,0 +1,4 @@
+# a2m HostFS catalog order (one NAPS basename per line)
+PRODOS#FF0000
+QUIT.SYSTEM#ff2000
+BASIC.SYSTEM#ff2000
