@@ -199,7 +199,7 @@ int main(void)
     expect_true("history-read id", request.args.history_id == 42ull);
     expect_u32("before", 8, request.args.history_before);
 
-    expect_true("line has A2M/8", strstr(line, "A2M/8") != NULL);
+    expect_true("line has A2M/9", strstr(line, "A2M/9") != NULL);
 
     expect_true(
         "select-disk index",
@@ -257,6 +257,54 @@ int main(void)
     expect_true(
         "mount-disk bad drive rejected",
         !control_protocol_parse_request("53 mount-disk 2 /tmp/d.nib", &request, &error));
+
+    expect_true(
+        "mount floppy infer",
+        control_protocol_parse_request("60 mount /tmp/a.nib", &request, &error));
+    expect_int("mount cmd", CONTROL_COMMAND_MOUNT, (int)request.type);
+    expect_u32("mount kind diskii", CONTROL_MEDIA_KIND_DISKII, request.args.media_kind);
+    expect_u32("mount resolve slot", 0, request.args.slot);
+    expect_true("mount nib path", strcmp(request.args.path, "/tmp/a.nib") == 0);
+
+    expect_true(
+        "mount smartport kind",
+        control_protocol_parse_request(
+            "61 mount kind=smartport /tmp/hd.hdv", &request, &error));
+    expect_u32(
+        "mount kind sp", CONTROL_MEDIA_KIND_SMARTPORT, request.args.media_kind);
+    expect_true("mount hdv path", strcmp(request.args.path, "/tmp/hd.hdv") == 0);
+
+    expect_true(
+        "mount smartport slot unit",
+        control_protocol_parse_request(
+            "62 mount kind=sp 7 1 /tmp/vol.2mg", &request, &error));
+    expect_u32("mount sp slot", 7, request.args.slot);
+    expect_u32("mount sp unit", 1, request.args.drive);
+
+    expect_true(
+        "mount .po without kind rejected",
+        !control_protocol_parse_request("63 mount /tmp/x.po", &request, &error));
+
+    expect_true(
+        "unmount bare",
+        control_protocol_parse_request("70 unmount", &request, &error));
+    expect_int("unmount cmd", CONTROL_COMMAND_UNMOUNT, (int)request.type);
+    expect_u32("unmount kind unset", CONTROL_MEDIA_KIND_UNSPECIFIED, request.args.media_kind);
+    expect_u32("unmount slot resolve", 0, request.args.slot);
+    expect_u32("unmount drive 0", 0, request.args.drive);
+
+    expect_true(
+        "unmount kind device",
+        control_protocol_parse_request("71 unmount kind=diskii 1", &request, &error));
+    expect_u32("unmount diskii", CONTROL_MEDIA_KIND_DISKII, request.args.media_kind);
+    expect_u32("unmount drive 1", 1, request.args.drive);
+
+    expect_true(
+        "unmount slot drive",
+        control_protocol_parse_request(
+            "72 unmount kind=smartport 7 0", &request, &error));
+    expect_u32("unmount sp slot", 7, request.args.slot);
+    expect_u32("unmount sp drive", 0, request.args.drive);
 
     {
         runtime_breakpoint_definition definition;

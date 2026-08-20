@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A2M/8 control-port client for a2m.
+"""A2M/9 control-port client for a2m.
 
 Debug/introspection helper for driving headless or windowed a2m over its
 localhost control port. Structure lifted from c64m's c64_control_client.py;
@@ -19,8 +19,8 @@ Then:
     r = c.history_find(limit=8)
     assert r["records"]  # HST1 decoded
 
-GOTCHAS (Apple A2M/8):
-  * Identity: hello -> name=a2m protocol=A2M/8
+GOTCHAS (Apple A2M/9):
+  * Identity: hello -> name=a2m protocol=A2M/9
   * Memory modes: map / main / aux / lc1 / lc2 / rom (not C64 ram/drive8/9)
   * Frames: ARGB 560x192, stride = width*4, format=argb8888 (not Pepto/indexed)
   * Softswitches: get-softswitches (Apple get-vic analogue). get-memory of $C0xx
@@ -720,7 +720,7 @@ def write_argb_png(
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    ap = argparse.ArgumentParser(description="a2m control client (A2M/8)")
+    ap = argparse.ArgumentParser(description="a2m control client (A2M/9)")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=6510)
     ap.add_argument("--timeout", type=float, default=30.0)

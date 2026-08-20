@@ -23,8 +23,8 @@ typedef enum control_deferred_kind {
     CONTROL_DEFERRED_LOAD_STATE,
     CONTROL_DEFERRED_HISTORY_STATUS,
     CONTROL_DEFERRED_HISTORY_DATA,
-    /* Wait for MACHINE_STATE slot map, then run mount/select/writable. */
-    CONTROL_DEFERRED_DISKII_OP
+    /* Wait for MACHINE_STATE slot map, then run media op. */
+    CONTROL_DEFERRED_MEDIA_OP
 } control_deferred_kind;
 
 typedef struct deferred_control_response {
@@ -40,13 +40,14 @@ typedef struct deferred_control_response {
     uint32_t wait_frame_delta;
     uint64_t wait_frame_start;
     char event_name[48];
-    /* CONTROL_DEFERRED_DISKII_OP payload (slot 0 = resolve). */
-    control_command_type diskii_op;
-    uint8_t diskii_slot;
-    uint8_t diskii_drive;
-    uint32_t diskii_index;
-    uint8_t diskii_writable;
-    char diskii_path[CONTROL_LINE_MAX];
+    /* CONTROL_DEFERRED_MEDIA_OP payload (slot 0 = resolve). */
+    control_command_type media_op;
+    uint8_t media_kind; /* control_media_kind */
+    uint8_t media_slot;
+    uint8_t media_drive;
+    uint32_t media_index;
+    uint8_t media_writable;
+    char media_path[CONTROL_LINE_MAX];
 } deferred_control_response;
 
 typedef struct deferred_control_table {

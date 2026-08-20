@@ -11,7 +11,7 @@ enum {
 };
 
 /* Product wire identity. Bump when scripts must learn new behaviour. */
-#define CONTROL_PROTOCOL_VERSION "A2M/8"
+#define CONTROL_PROTOCOL_VERSION "A2M/9"
 #define CONTROL_PROTOCOL_APP_NAME "a2m"
 
 typedef enum control_command_type {
@@ -56,6 +56,8 @@ typedef enum control_command_type {
     CONTROL_COMMAND_LOAD_STATE,
     CONTROL_COMMAND_KEY,
     CONTROL_COMMAND_MOUNT_DISK,
+    CONTROL_COMMAND_MOUNT,
+    CONTROL_COMMAND_UNMOUNT,
     CONTROL_COMMAND_SELECT_DISK,
     CONTROL_COMMAND_SET_DISK_WRITABLE,
     CONTROL_COMMAND_HISTORY_INFO,
@@ -76,6 +78,13 @@ typedef enum control_memory_mode {
     CONTROL_MEMORY_MODE_ROM = 5
 } control_memory_mode;
 
+/* mount/unmount card selection (0 = infer / resolve uniquely). */
+typedef enum control_media_kind {
+    CONTROL_MEDIA_KIND_UNSPECIFIED = 0,
+    CONTROL_MEDIA_KIND_DISKII = 1,
+    CONTROL_MEDIA_KIND_SMARTPORT = 2
+} control_media_kind;
+
 typedef struct control_args {
     uint32_t timeout_ms;
     uint16_t address;
@@ -84,6 +93,7 @@ typedef struct control_args {
     uint8_t key;
     uint8_t slot;
     uint8_t drive;
+    uint8_t media_kind; /* control_media_kind */
     uint32_t disk_index; /* select-disk: 1-based queue index */
     uint8_t disk_writable; /* set-disk-writable: 0=RO 1=RW */
     uint32_t break_id; /* 0 = all for break-clear */

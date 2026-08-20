@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 void control_request_release(control_request *request)
 {
@@ -189,6 +190,233 @@ static bool parse_u16_addr(const char *s, char **end, uint16_t *out)
     return true;
 }
 
+static bool path_ends_with_ci(const char *path, const char *ext)
+{
+    size_t path_len;
+    size_t ext_len;
+    size_t i;
+
+    if (path == NULL || ext == NULL) {
+        return false;
+    }
+    path_len = strlen(path);
+    ext_len = strlen(ext);
+    if (ext_len == 0u || path_len < ext_len + 1u) {
+        return false;
+    }
+    if (path[path_len - ext_len - 1u] != '.') {
+        return false;
+    }
+    for (i = 0; i < ext_len; ++i) {
+        char a = path[path_len - ext_len + i];
+        char b = ext[i];
+        if (tolower((unsigned char)a) != tolower((unsigned char)b)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/* Optional leading kind=diskii|smartport. Advances *inout_cursor. */
+static bool parse_optional_media_kind(
+    char **inout_cursor,
+    uint8_t *out_kind,
+    control_response *out_error,
+    uint32_t id)
+{
+    char *cursor;
+    char token[32];
+    size_t i = 0;
+
+    if (inout_cursor == NULL || out_kind == NULL) {
+        return false;
+    }
+    cursor = (char *)skip_ws(*inout_cursor);
+    if (strncmp(cursor, "kind=", 5) != 0) {
+        *out_kind = (uint8_t)CONTROL_MEDIA_KIND_UNSPECIFIED;
+        *inout_cursor = cursor;
+        return true;
+    }
+    cursor += 5;
+    while (cursor[i] != '\0' && cursor[i] != ' ' && cursor[i] != '\t' &&
+           i + 1u < sizeof(token)) {
+        token[i] = (char)tolower((unsigned char)cursor[i]);
+        i++;
+    }
+    token[i] = '\0';
+    if (strcmp(token, "diskii") == 0 || strcmp(token, "disk") == 0) {
+        *out_kind = (uint8_t)CONTROL_MEDIA_KIND_DISKII;
+    } else if (
+        strcmp(token, "smartport") == 0 || strcmp(token, "sp") == 0 ||
+        strcmp(token, "hd") == 0) {
+        *out_kind = (uint8_t)CONTROL_MEDIA_KIND_SMARTPORT;
+    } else {
+        if (out_error != NULL) {
+            control_protocol_format_error(out_error, id, "bad-args", "kind", false);
+        }
+        return false;
+    }
+    *inout_cursor = (char *)skip_ws(cursor + i);
+    return true;
+}
+
+static bool infer_media_kind_from_path(
+    const char *path,
+    uint8_t *out_kind,
+    control_response *out_error,
+    uint32_t id)
+{
+    struct stat st;
+
+    if (path == NULL || path[0] == '\0' || out_kind == NULL) {
+        if (out_error != NULL) {
+            control_protocol_format_error(out_error, id, "bad-args", "path", false);
+        }
+        return false;
+    }
+    if (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) {
+        *out_kind = (uint8_t)CONTROL_MEDIA_KIND_SMARTPORT;
+        return true;
+    }
+    if (path_ends_with_ci(path, "nib") || path_ends_with_ci(path, "dsk") ||
+        path_ends_with_ci(path, "do") || path_ends_with_ci(path, "woz")) {
+        *out_kind = (uint8_t)CONTROL_MEDIA_KIND_DISKII;
+        return true;
+    }
+    if (path_ends_with_ci(path, "hdv") || path_ends_with_ci(path, "2mg")) {
+        *out_kind = (uint8_t)CONTROL_MEDIA_KIND_SMARTPORT;
+        return true;
+    }
+    /* .po is overloaded (floppy vs volume); require kind=. */
+    if (path_ends_with_ci(path, "po")) {
+        if (out_error != NULL) {
+            control_protocol_format_error(
+                out_error, id, "bad-args", "kind= required for .po", false);
+        }
+        return false;
+    }
+    if (out_error != NULL) {
+        control_protocol_format_error(out_error, id, "bad-args", "media-kind", false);
+    }
+    return false;
+}
+
+/* Progressive [slot] [device] <path> — same shape as mount-disk. */
+static bool parse_mount_slot_drive_path(
+    char *cursor,
+    control_args *args,
+    control_response *out_error,
+    uint32_t id)
+{
+    uint32_t a = 0;
+    uint32_t b = 0;
+    char *e1 = NULL;
+    char *p2;
+    char *e2 = NULL;
+    char *p3;
+
+    if (args == NULL) {
+        return false;
+    }
+    args->slot = 0u;
+    args->drive = 0u;
+    if (parse_u32(cursor, &e1, &a) && e1 != cursor &&
+        (*e1 == ' ' || *e1 == '\t')) {
+        p2 = (char *)skip_ws(e1);
+        if (parse_u32(p2, &e2, &b) && e2 != p2 &&
+            (*e2 == ' ' || *e2 == '\t')) {
+            if (a < 1u || a > 7u || b > 1u) {
+                if (out_error != NULL) {
+                    control_protocol_format_error(
+                        out_error, id, "bad-args", "slot/drive", false);
+                }
+                return false;
+            }
+            args->slot = (uint8_t)a;
+            args->drive = (uint8_t)b;
+            cursor = (char *)skip_ws(e2);
+        } else {
+            if (a > 1u) {
+                if (out_error != NULL) {
+                    control_protocol_format_error(
+                        out_error, id, "bad-args", "drive", false);
+                }
+                return false;
+            }
+            args->drive = (uint8_t)a;
+            cursor = p2;
+        }
+    }
+    p3 = (char *)skip_ws(cursor);
+    if (p3[0] == '\0') {
+        if (out_error != NULL) {
+            control_protocol_format_error(out_error, id, "bad-args", "path", false);
+        }
+        return false;
+    }
+    strncpy(args->path, p3, sizeof(args->path) - 1u);
+    args->path[sizeof(args->path) - 1u] = '\0';
+    return true;
+}
+
+/* Progressive unmount: [device] | [slot] [device] */
+static bool parse_unmount_slot_drive(
+    char *cursor,
+    control_args *args,
+    control_response *out_error,
+    uint32_t id)
+{
+    uint32_t a = 0;
+    uint32_t b = 0;
+    char *e1 = NULL;
+    char *p2;
+    char *e2 = NULL;
+
+    if (args == NULL) {
+        return false;
+    }
+    args->slot = 0u;
+    args->drive = 0u;
+    cursor = (char *)skip_ws(cursor);
+    if (cursor[0] == '\0') {
+        return true;
+    }
+    if (!parse_u32(cursor, &e1, &a) || e1 == cursor) {
+        if (out_error != NULL) {
+            control_protocol_format_error(out_error, id, "bad-args", "drive", false);
+        }
+        return false;
+    }
+    p2 = (char *)skip_ws(e1);
+    if (*p2 == '\0') {
+        if (a > 1u) {
+            if (out_error != NULL) {
+                control_protocol_format_error(out_error, id, "bad-args", "drive", false);
+            }
+            return false;
+        }
+        args->drive = (uint8_t)a;
+        return true;
+    }
+    if (!parse_u32(p2, &e2, &b) || e2 == p2 || *skip_ws(e2) != '\0') {
+        if (out_error != NULL) {
+            control_protocol_format_error(
+                out_error, id, "bad-args", "slot/drive", false);
+        }
+        return false;
+    }
+    if (a < 1u || a > 7u || b > 1u) {
+        if (out_error != NULL) {
+            control_protocol_format_error(
+                out_error, id, "bad-args", "slot/drive", false);
+        }
+        return false;
+    }
+    args->slot = (uint8_t)a;
+    args->drive = (uint8_t)b;
+    return true;
+}
+
 static bool parse_memory_mode(const char *token, uint8_t *out_mode)
 {
     if (token == NULL || out_mode == NULL) {
@@ -289,6 +517,8 @@ static control_command_type lookup_command(const char *name)
     if (strcmp(name, "load-state") == 0) return CONTROL_COMMAND_LOAD_STATE;
     if (strcmp(name, "key") == 0) return CONTROL_COMMAND_KEY;
     if (strcmp(name, "mount-disk") == 0) return CONTROL_COMMAND_MOUNT_DISK;
+    if (strcmp(name, "mount") == 0) return CONTROL_COMMAND_MOUNT;
+    if (strcmp(name, "unmount") == 0) return CONTROL_COMMAND_UNMOUNT;
     if (strcmp(name, "select-disk") == 0) return CONTROL_COMMAND_SELECT_DISK;
     if (strcmp(name, "set-disk-writable") == 0) return CONTROL_COMMAND_SET_DISK_WRITABLE;
     if (strcmp(name, "history-info") == 0) return CONTROL_COMMAND_HISTORY_INFO;
@@ -830,56 +1060,53 @@ bool control_protocol_parse_request(
     }
 
     case CONTROL_COMMAND_MOUNT_DISK: {
-        /* Forms: mount-disk <path> |
-                  mount-disk <drive> <path> |
-                  mount-disk <slot> <drive> <path>
-           slot 0 = resolve installed Disk II at dispatch (prefer 6). */
-        uint32_t a = 0;
-        uint32_t b = 0;
-        char *e1 = NULL;
-        char *p2;
-        char *e2 = NULL;
-        char *p3;
-
-        out_request->args.slot = 0u;
-        out_request->args.drive = 0u;
-        if (parse_u32(cursor, &e1, &a) && e1 != cursor &&
-            (*e1 == ' ' || *e1 == '\t')) {
-            p2 = (char *)skip_ws(e1);
-            if (parse_u32(p2, &e2, &b) && e2 != p2 &&
-                (*e2 == ' ' || *e2 == '\t')) {
-                /* slot drive path */
-                if (a < 1u || a > 7u || b > 1u) {
-                    if (out_error != NULL) {
-                        control_protocol_format_error(
-                            out_error, id, "bad-args", "slot/drive", false);
-                    }
-                    return false;
-                }
-                out_request->args.slot = (uint8_t)a;
-                out_request->args.drive = (uint8_t)b;
-                cursor = (char *)skip_ws(e2);
-            } else {
-                /* drive path */
-                if (a > 1u) {
-                    if (out_error != NULL) {
-                        control_protocol_format_error(
-                            out_error, id, "bad-args", "drive", false);
-                    }
-                    return false;
-                }
-                out_request->args.drive = (uint8_t)a;
-                cursor = p2;
-            }
-        }
-        p3 = (char *)skip_ws(cursor);
-        if (p3[0] == '\0') {
-            if (out_error != NULL) {
-                control_protocol_format_error(out_error, id, "bad-args", "path", false);
-            }
+        /* Alias: mount kind=diskii … */
+        out_request->args.media_kind = (uint8_t)CONTROL_MEDIA_KIND_DISKII;
+        if (!parse_mount_slot_drive_path(
+                cursor, &out_request->args, out_error, id)) {
             return false;
         }
-        strncpy(out_request->args.path, p3, sizeof(out_request->args.path) - 1);
+        break;
+    }
+
+    case CONTROL_COMMAND_MOUNT: {
+        /* Forms: mount [kind=diskii|smartport] <path> |
+                  mount [kind=…] <device> <path> |
+                  mount [kind=…] <slot> <device> <path>
+           kind omitted → infer from path (dir/.hdv/.2mg → SP; floppy exts → Disk II;
+           .po requires kind=). slot 0 = resolve at dispatch. */
+        if (!parse_optional_media_kind(
+                &cursor, &out_request->args.media_kind, out_error, id)) {
+            return false;
+        }
+        if (!parse_mount_slot_drive_path(
+                cursor, &out_request->args, out_error, id)) {
+            return false;
+        }
+        if (out_request->args.media_kind == (uint8_t)CONTROL_MEDIA_KIND_UNSPECIFIED) {
+            if (!infer_media_kind_from_path(
+                    out_request->args.path,
+                    &out_request->args.media_kind,
+                    out_error,
+                    id)) {
+                return false;
+            }
+        }
+        break;
+    }
+
+    case CONTROL_COMMAND_UNMOUNT: {
+        /* Forms: unmount [kind=diskii|smartport] |
+                  unmount [kind=…] <device> |
+                  unmount [kind=…] <slot> <device>
+           kind omitted → unique installed media card at dispatch, else need-kind. */
+        if (!parse_optional_media_kind(
+                &cursor, &out_request->args.media_kind, out_error, id)) {
+            return false;
+        }
+        if (!parse_unmount_slot_drive(cursor, &out_request->args, out_error, id)) {
+            return false;
+        }
         break;
     }
 

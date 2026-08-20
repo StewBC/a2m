@@ -18,7 +18,7 @@
 | Display | ARGB **560×192** throughout (`display_frame` / runtime slot / frontend) |
 | Video paint | Beam-stepped **560×192** a2m-class: LORES, DLORES, 40/80 text, HGR colour, DHGR; max uses full-frame block paint |
 | Memory areas | Map · Main · Aux · LC1 · LC2 · ROM |
-| Control port | **A2M/8 product-wired** (BP + frame ring + history + softswitches + save/load-state + Disk II mount/select/writable with slot resolve). Epic: [`remote-debug.md`](remote-debug.md) |
+| Control port | **A2M/9 product-wired** (BP + frame ring + history + softswitches + save/load-state + `mount`/`unmount` Disk II+SmartPort + Disk II select/writable). Epic: [`remote-debug.md`](remote-debug.md) |
 | Snapshots | **`.a2state`** path save/load — drop, `--sna`, Opt+Shift+`.`/`,`, control. Epic: [`snapshots.md`](snapshots.md) |
 | Machine files | Misc → Machine unified Load/Save: snapshots, raw/NAPS/AppleSingle/legacy DOS binaries, Applesoft ASCII import/export |
 
