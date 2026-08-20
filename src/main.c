@@ -1433,7 +1433,6 @@ static void dispatch_intent(
     case FRONTEND_DEBUGGER_INTENT_MACHINE_RESET:
         (void)runtime_client_reset_ex_with_resume(
             client,
-            intent->machine_reset_detach_cartridge,
             intent->machine_reset_resume_running);
         if (ui != NULL) {
             frontend_clear_disk_activity_leds(ui);

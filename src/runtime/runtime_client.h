@@ -36,15 +36,12 @@ bool runtime_client_quit(runtime_client *client);
 bool runtime_client_reset(runtime_client *client);
 /* Cold reset (CTRL+Open-Apple+RESET). Preserves run/pause. */
 bool runtime_client_cold_reset(runtime_client *client);
-bool runtime_client_reset_ex(runtime_client *client, bool detach_cartridge);
 bool runtime_client_reset_ex_with_resume(
     runtime_client *client,
-    bool detach_cartridge,
     bool resume_running);
 bool runtime_client_reset_with_options(
     runtime_client *client,
     bool cold,
-    bool detach_cartridge,
     uint8_t resume_running);
 bool runtime_client_run(runtime_client *client);
 bool runtime_client_pause(runtime_client *client);

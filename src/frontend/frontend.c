@@ -6523,10 +6523,7 @@ static const char *frontend_disk_label(const frontend_debug_state *debug_state, 
     return "Mounted";
 }
 
-static bool frontend_push_reset_intent(
-    frontend *ui,
-    bool detach_cartridge,
-    bool resume_running)
+static bool frontend_push_reset_intent(frontend *ui, bool resume_running)
 {
     size_t next;
 
@@ -6541,7 +6538,6 @@ static bool frontend_push_reset_intent(
 
     memset(&ui->intents[ui->intent_write], 0, sizeof(ui->intents[ui->intent_write]));
     ui->intents[ui->intent_write].type = FRONTEND_DEBUGGER_INTENT_MACHINE_RESET;
-    ui->intents[ui->intent_write].machine_reset_detach_cartridge = detach_cartridge;
     ui->intents[ui->intent_write].machine_reset_resume_running = resume_running;
     ui->intent_write = next;
     return true;
@@ -6697,7 +6693,6 @@ static void frontend_draw_misc_programs(frontend *ui, const frontend_debug_state
     if (nk_button_label(ctx, "Reset")) {
         frontend_push_reset_intent(
             ui,
-            false,
             debug_state != NULL &&
                 debug_state->runtime_state == FRONTEND_RUNTIME_STATE_RUNNING);
     }

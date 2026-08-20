@@ -172,7 +172,6 @@ typedef struct frontend_debugger_intent {
     uint8_t save_file_kind;
     apple2_binary_format save_bin_format;
     /* Machine reset */
-    bool machine_reset_detach_cartridge;
     bool machine_reset_resume_running;
     /* File browser result */
     frontend_debugger_intent_type file_browser_purpose;

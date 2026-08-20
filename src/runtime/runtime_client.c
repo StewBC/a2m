@@ -57,7 +57,6 @@ bool runtime_client_quit(runtime_client *client) {
 bool runtime_client_reset_with_options(
     runtime_client *client,
     bool cold,
-    bool detach_cartridge,
     uint8_t resume_running) {
     runtime_command command = {
         .type = RUNTIME_COMMAND_RESET,
@@ -67,36 +66,28 @@ bool runtime_client_reset_with_options(
         return false;
     }
 
-    command.data.reset.detach_cartridge = detach_cartridge ? 1u : 0u;
     command.data.reset.cold = cold ? 1u : 0u;
     command.data.reset.resume_running = resume_running;
     return message_queue_push(client->command_queue, &command);
 }
 
-bool runtime_client_reset_ex(runtime_client *client, bool detach_cartridge) {
-    return runtime_client_reset_with_options(
-        client, false, detach_cartridge, RUNTIME_RESET_PRESERVE_STATE);
-}
-
 bool runtime_client_reset_ex_with_resume(
     runtime_client *client,
-    bool detach_cartridge,
     bool resume_running) {
     return runtime_client_reset_with_options(
         client,
         false,
-        detach_cartridge,
         resume_running ? RUNTIME_RESET_RUNNING : RUNTIME_RESET_PAUSED);
 }
 
 bool runtime_client_reset(runtime_client *client) {
     return runtime_client_reset_with_options(
-        client, false, false, RUNTIME_RESET_PRESERVE_STATE);
+        client, false, RUNTIME_RESET_PRESERVE_STATE);
 }
 
 bool runtime_client_cold_reset(runtime_client *client) {
     return runtime_client_reset_with_options(
-        client, true, false, RUNTIME_RESET_PRESERVE_STATE);
+        client, true, RUNTIME_RESET_PRESERVE_STATE);
 }
 
 bool runtime_client_run(runtime_client *client) {

@@ -94,7 +94,6 @@ typedef struct runtime_command {
     uint64_t request_token;
     union {
         struct {
-            uint8_t detach_cartridge; /* legacy C64; ignored on Apple path */
             /* 1 = CTRL+Open-Apple+RESET (cold); 0 = CTRL+RESET (warm). */
             uint8_t cold;
             /* 0 = leave paused, 1 = resume, 2 = preserve runtime state. */
