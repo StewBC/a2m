@@ -1095,25 +1095,72 @@ static void host_disk_queue_add(
     (void)ui;
 }
 
-/* Prefer classic slot 7, then 6..1. Live machine slots win when available. */
+/* Live machine slots win when available; else Configure slot_cards. */
+static bool slot_is_diskii_for_drop(
+    const frontend_debug_state *debug,
+    const app_options *options,
+    int slot)
+{
+    if (slot < 1 || slot > 7) {
+        return false;
+    }
+    if (debug != NULL && debug->has_apple_flags) {
+        return debug->slots[slot].card_type == RUNTIME_SLOT_CARD_DISKII;
+    }
+    if (options != NULL) {
+        return options->slot_cards[slot] == APP_SLOT_CARD_DISKII;
+    }
+    return false;
+}
+
+static bool slot_is_smartport_for_drop(
+    const frontend_debug_state *debug,
+    const app_options *options,
+    int slot)
+{
+    if (slot < 1 || slot > 7) {
+        return false;
+    }
+    if (debug != NULL && debug->has_apple_flags) {
+        return debug->slots[slot].card_type == RUNTIME_SLOT_CARD_SMARTPORT;
+    }
+    if (options != NULL) {
+        return options->slot_cards[slot] == APP_SLOT_CARD_SMARTPORT;
+    }
+    return false;
+}
+
+/* Prefer classic slot 6, then 7→1 (skipping 6). */
+static int find_diskii_slot_for_drop(
+    const frontend_debug_state *debug,
+    const app_options *options)
+{
+    int slot;
+
+    if (slot_is_diskii_for_drop(debug, options, 6)) {
+        return 6;
+    }
+    for (slot = 7; slot >= 1; --slot) {
+        if (slot == 6) {
+            continue;
+        }
+        if (slot_is_diskii_for_drop(debug, options, slot)) {
+            return slot;
+        }
+    }
+    return 0;
+}
+
+/* Prefer classic slot 7, then 6→1. */
 static int find_smartport_slot_for_drop(
     const frontend_debug_state *debug,
     const app_options *options)
 {
     int slot;
 
-    if (debug != NULL && debug->has_apple_flags) {
-        for (slot = 7; slot >= 1; --slot) {
-            if (debug->slots[slot].card_type == RUNTIME_SLOT_CARD_SMARTPORT) {
-                return slot;
-            }
-        }
-    }
-    if (options != NULL) {
-        for (slot = 7; slot >= 1; --slot) {
-            if (options->slot_cards[slot] == APP_SLOT_CARD_SMARTPORT) {
-                return slot;
-            }
+    for (slot = 7; slot >= 1; --slot) {
+        if (slot_is_smartport_for_drop(debug, options, slot)) {
+            return slot;
         }
     }
     return 0;
@@ -1134,8 +1181,20 @@ static void handle_drop_file(
         if (path_has_extension(path, "nib") || path_has_extension(path, "dsk") ||
             path_has_extension(path, "po") || path_has_extension(path, "do") ||
             path_has_extension(path, "woz")) {
-            /* Drop appends to drive 0 multi-image queue (same as c64m "add"). */
-            host_disk_queue_add(client, ui, options, 6u, 0u, path);
+            int disk_slot = find_diskii_slot_for_drop(debug, options);
+            if (disk_slot < 1) {
+                SDL_Log(
+                    "Dropped floppy ignored (no Disk II card installed): %s",
+                    path);
+            } else {
+                /* Append to drive 0 on the chosen Disk II controller. */
+                host_disk_queue_add(
+                    client, ui, options, (uint8_t)disk_slot, 0u, path);
+                SDL_Log(
+                    "Dropped floppy queued on Disk II s%dd0: %s",
+                    disk_slot,
+                    path);
+            }
         } else if (path_has_extension(path, "a2state")) {
             (void)runtime_client_load_state(client, path);
         } else if (path_has_extension(path, "hdv") || path_has_extension(path, "2mg")) {

@@ -155,7 +155,7 @@ The file extension determines how the file is handled:
 
 | Extension | Action |
 |-----------|--------|
-| `.nib` `.dsk` `.do` `.po` `.woz` | Add the image to the Disk II queue on slot 6 drive 0 |
+| `.nib` `.dsk` `.do` `.po` `.woz` | Add the image to Disk II drive 0 (prefer slot 6, else scan 7 down to 1; ignored if no Disk II card is installed) |
 | `.a2state` | Load a saved machine state snapshot |
 | `.hdv` `.2mg` | Live-insert on SmartPort unit 0 (scan slots 7 down to 1; ignored if no SmartPort card is installed) |
 | anything else | Ignored |
