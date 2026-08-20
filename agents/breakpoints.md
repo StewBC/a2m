@@ -55,7 +55,7 @@ Phase 3 is (1) only.
 | Exec match: range wrap, counter, condition, BREAK | **Restore / adapt** | Pure runtime + Apple CPU/map read |
 | Composite Apple mapping | **Done (P2)** | Shared `VIEW_FLAGS`: RAM Map/Main/Aux, C100 Map/ROM, D000 Map/LC1/LC2/ROM |
 | Condition A/X/Y/SP/P/flags/value/mem | **Yes** | Fill eval context from `apple2_t` |
-| Condition `raster` / `vic_cycle` | **Adapt** | Map to Apple beam `line` / `cycle_in_line` |
+| Condition `raster` / `cycle_in_line` | **Done** | Apple beam `line` / `cycle_in_line` (`vic_cycle` parse alias) |
 | READ/WRITE access match | **Needs bus hook** | Phase 3 |
 | Actions FAST/SLOW | **Done (P4a)** | FAST→max, SLOW→1 MHz (zip policy) |
 | Actions TRON/TROFF/TYPE/SWAP | **TYPE + SWAP done**; TRON deferred | Trace file later; TYPE script; Disk II multi-image SWAP |

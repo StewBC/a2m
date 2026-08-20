@@ -12,7 +12,7 @@
  * keys. If a case needs OR, arm two breakpoints.
  *
  * Parsing and evaluation are pure: evaluation reads a caller-supplied context
- * rather than the machine, so both are unit-testable without a running C64.
+ * rather than the machine, so both are unit-testable without a running emulator.
  */
 
 #include <stdbool.h>
@@ -45,8 +45,8 @@ typedef enum runtime_bp_term_lhs {
     RUNTIME_BP_LHS_VALUE,
     /* One CPU-map byte read at match time (see term.mem_address). */
     RUNTIME_BP_LHS_MEM,
-    RUNTIME_BP_LHS_RASTER,
-    RUNTIME_BP_LHS_VIC_CYCLE
+    RUNTIME_BP_LHS_RASTER,       /* Apple video beam line */
+    RUNTIME_BP_LHS_CYCLE_IN_LINE /* Apple video cycle_in_line */
 } runtime_bp_term_lhs;
 
 typedef enum runtime_bp_term_op {
@@ -83,7 +83,7 @@ typedef struct runtime_bp_eval_context {
     uint8_t value;    /* valid only when has_value */
     bool has_value;
     uint16_t raster;
-    uint16_t vic_cycle;
+    uint16_t cycle_in_line;
     runtime_bp_mem_read_fn mem_read; /* may be NULL; mem terms then fail */
     void *mem_read_user;
 } runtime_bp_eval_context;

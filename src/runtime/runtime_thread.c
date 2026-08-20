@@ -1937,9 +1937,8 @@ static bool runtime_breakpoint_condition_matches(
     context.p = rt->machine.cpu.cpu.flags;
     context.has_value = has_value;
     context.value = value;
-    /* Apple beam stands in for VIC raster/cycle condition terms. */
     context.raster = rt->machine.video.line;
-    context.vic_cycle = rt->machine.video.cycle_in_line;
+    context.cycle_in_line = rt->machine.video.cycle_in_line;
     context.mem_read = runtime_breakpoint_condition_read;
     context.mem_read_user = &rt->machine;
 

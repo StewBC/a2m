@@ -69,7 +69,7 @@ recorder is a bounded multi-million-record ring. Same separation as c64m.
 | c64m surface | Apple product meaning |
 |--------------|------------------------|
 | Memory modes `map/ram/rom/drive8/9` | **map / main / aux / lc1 / lc2 / rom** (and disk views only if product needs them) |
-| `raster` / `vic_cycle` | Beam **line** / **cycle_in_line** (condition LHS may keep aliases for shared code) |
+| `raster` / `cycle_in_line` | Beam **line** / **cycle_in_line** (`vic_cycle` still accepted as a parse alias) |
 | `get-vic` / `get-cia` / drive-cpu | Softswitch / video / Disk II / SmartPort / MB snapshots — Apple hardware, not VIC/CIA |
 | Frame payload | **560×192 ARGB** (and any future indexed form only if product adopts it) |
 | Frame ring warp rule | Turbo 3: do **not** store geometric fakes as real frames; stall ring until live paint |
