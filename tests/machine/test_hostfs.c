@@ -10,10 +10,13 @@
 
 #if defined(_WIN32)
 #include <direct.h>
+#include <windows.h>
 #define HOSTFS_MKDIR(path) _mkdir(path)
+#define HOSTFS_SLEEP_MS(ms) Sleep(ms)
 #else
 #include <unistd.h>
 #define HOSTFS_MKDIR(path) mkdir(path, 0755)
+#define HOSTFS_SLEEP_MS(ms) usleep((unsigned)(ms) * 1000u)
 #endif
 
 #ifndef A2M_FIXTURE_DIR
@@ -1100,6 +1103,98 @@ static void test_dir_write_through(void)
     wipe_tree(dir);
 }
 
+/*
+ * Access-triggered refresh: idle peripherals tick must not rescan; touches are
+ * wall-clock rate-limited; force hostfs_rescan still works inside the window.
+ */
+static void test_touch_refresh(void)
+{
+    apple2_t m;
+    const char *dir = "test_hostfs_touch_refresh";
+    hostfs_volume *vol;
+    uint8_t block[512];
+    int i;
+
+    wipe_tree(dir);
+    HOSTFS_MKDIR(dir);
+    write_file("test_hostfs_touch_refresh/SEED#060000", "s", 1);
+
+    if (!apple2_init(&m)) {
+        fail("touch refresh init");
+    }
+    if (apple2_smartport_mount(&m, 7, 0, dir) != 0) {
+        fail("touch refresh mount");
+    }
+    vol = m.sp_device[7].hostfs[0];
+    if (vol == NULL) {
+        fail("touch refresh vol");
+    }
+
+    write_file("test_hostfs_touch_refresh/IDLE#060000", "i", 1);
+
+    /* Advance plenty of emulated Φ0; peripherals must not refresh idle HostFS. */
+    m.cpu.cpu.cycles = 5000000ull;
+    for (i = 0; i < 100; ++i) {
+        apple2_peripherals_step(&m, 10000);
+    }
+    if (hostfs_read_block(vol, 2, block) != 0) {
+        fail("read dir after idle step");
+    }
+    if (find_entry_in_dir_block(block, "IDLE", NULL, NULL, NULL)) {
+        fail("idle peripherals must not rescan");
+    }
+
+    /* Still within wall-clock delta of mount — touch serves the mount cache. */
+    hostfs_maybe_refresh(vol);
+    if (hostfs_read_block(vol, 2, block) != 0) {
+        fail("read after early touch");
+    }
+    if (find_entry_in_dir_block(block, "IDLE", NULL, NULL, NULL)) {
+        fail("touch within delta must not rescan");
+    }
+
+    HOSTFS_SLEEP_MS(1100);
+
+    /* After delta, a SmartPort STATUS touch refreshes. */
+    m.sp_device[7].sp_buffer[1] = 0;
+    sp_status(&m, 7);
+    if (m.sp_device[7].sp_buffer[0] != SP_SUCCESS) {
+        fail("status after delta");
+    }
+    if (hostfs_read_block(vol, 2, block) != 0) {
+        fail("read after status touch");
+    }
+    if (!find_entry_in_dir_block(block, "IDLE", NULL, NULL, NULL)) {
+        fail("STATUS touch after delta should refresh");
+    }
+
+    write_file("test_hostfs_touch_refresh/NEXT#060000", "n", 1);
+    hostfs_maybe_refresh(vol);
+    if (hostfs_read_block(vol, 2, block) != 0) {
+        fail("read after second early touch");
+    }
+    if (find_entry_in_dir_block(block, "NEXT", NULL, NULL, NULL)) {
+        fail("second touch within delta must not rescan");
+    }
+
+    /* Explicit force path still works inside the window. */
+    if (hostfs_rescan(vol) != 0) {
+        fail("force rescan");
+    }
+    if (hostfs_read_block(vol, 2, block) != 0) {
+        fail("read after force");
+    }
+    if (!find_entry_in_dir_block(block, "NEXT", NULL, NULL, NULL)) {
+        fail("force rescan should see NEXT");
+    }
+
+    if (apple2_smartport_eject(&m, 7, 0) != 0) {
+        fail("touch refresh eject");
+    }
+    apple2_shutdown(&m);
+    wipe_tree(dir);
+}
+
 int main(void)
 {
     test_naps_and_mangle();
@@ -1111,6 +1206,7 @@ int main(void)
     test_create_reconcile();
     test_dir_write_through();
     test_order_manifest();
+    test_touch_refresh();
     printf("hostfs tests ok\n");
     return 0;
 }

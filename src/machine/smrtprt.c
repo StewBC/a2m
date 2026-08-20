@@ -210,8 +210,12 @@ void sp_read(apple2_t *m, int slot) {
 
     if(spd->backend[device] == SP_BACKEND_HOSTFS) {
         hostfs_volume *vol = spd->hostfs[device];
-        if(vol == NULL ||
-           hostfs_read_block(vol, block, &spd->sp_buffer[1]) != A2_OK) {
+        if(vol == NULL) {
+            spd->sp_buffer[0] = SP_IO_ERROR;
+            return;
+        }
+        hostfs_maybe_refresh(vol);
+        if(hostfs_read_block(vol, block, &spd->sp_buffer[1]) != A2_OK) {
             spd->sp_buffer[0] = SP_IO_ERROR;
             return;
         }
@@ -251,6 +255,7 @@ void sp_status(apple2_t *m, int slot) {
     }
 
     if(spd->backend[device] == SP_BACKEND_HOSTFS) {
+        hostfs_maybe_refresh(spd->hostfs[device]);
         blocks = hostfs_total_blocks(spd->hostfs[device]);
     } else {
         blocks = (uint16_t)(spd->sp_files[device].file_size / SP_BLOCK_SIZE);
@@ -278,8 +283,12 @@ void sp_write(apple2_t *m, int slot) {
     }
 
     if(spd->backend[device] == SP_BACKEND_HOSTFS) {
-        if(spd->hostfs[device] == NULL ||
-           hostfs_write_block(spd->hostfs[device], block, data) != A2_OK) {
+        if(spd->hostfs[device] == NULL) {
+            spd->sp_buffer[0] = SP_IO_ERROR;
+            return;
+        }
+        hostfs_maybe_refresh(spd->hostfs[device]);
+        if(hostfs_write_block(spd->hostfs[device], block, data) != A2_OK) {
             spd->sp_buffer[0] = SP_IO_ERROR;
             return;
         }
@@ -424,6 +433,7 @@ static uint8_t sp_do_status(apple2_t *m, int slot, uint8_t unit, uint16_t list,
         uint8_t gen;
 
         if (spd->backend[device] == SP_BACKEND_HOSTFS) {
+            hostfs_maybe_refresh(spd->hostfs[device]);
             blocks = hostfs_total_blocks(spd->hostfs[device]);
             gen = 0xF0u; /* block, write, read, online (no format) */
         } else {

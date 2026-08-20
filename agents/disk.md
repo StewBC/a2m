@@ -68,8 +68,9 @@ Slot configuration UI and broader write fidelity remain open.
 SP trap: min cmds only (STATUS/READ/WRITE); no full DIB / extended SP.
 
 **HostFS** (mount a host folder as a ProDOS SmartPort volume):
-Directory path mounts as a NAPS volume (host subdirs as ProDOS folders, live
-host refresh, file + directory write-through, optional `hostfs.order`).
+Directory path mounts as a NAPS volume (host subdirs as ProDOS folders,
+access-triggered host refresh on SmartPort touch with ~1s wall-clock
+rate-limit, file + directory write-through, optional `hostfs.order`).
 SmartPort Insert **Use This Folder** or CLI/INI; path kind selects HostFS vs
 image. See the user manual HostFS section for operator details.
 

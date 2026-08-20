@@ -40,7 +40,7 @@ enum {
     HOSTFS_ACCESS_FILE = 0xC3u,
     HOSTFS_ACCESS_VOL = 0xC3u,
     HOSTFS_ACCESS_DIR = 0xC3u,
-    HOSTFS_POLL_PERIOD = 1000000u, /* ~1s at 1 MHz */
+    HOSTFS_REFRESH_PERIOD_MS = 1000u, /* wall-clock; turbo-safe */
     HOSTFS_BASENAME_MAX = 256,
     HOSTFS_FILE_TYPE_DIR = 0x0Fu,
     HOSTFS_STOR_SEEDLING = 0x01u,
@@ -110,7 +110,7 @@ struct hostfs_volume {
     int map_cap;
 
     uint8_t *bitmap;
-    uint64_t last_poll_cycles;
+    uint64_t last_refresh_ms; /* 0 = never stamped (mount sets after initial scan) */
     int guest_write_depth;
     bool dirty;
     bool dir_full_warned;
@@ -123,6 +123,19 @@ struct hostfs_volume {
 
 static bool hostfs_should_skip_basename(const char *name);
 static const char *hostfs_path_basename(const char *path);
+
+static uint64_t hostfs_now_ms(void)
+{
+#if defined(_WIN32)
+    return (uint64_t)GetTickCount64();
+#else
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
+        return (uint64_t)time(NULL) * 1000ull;
+    }
+    return (uint64_t)ts.tv_sec * 1000ull + (uint64_t)(ts.tv_nsec / 1000000L);
+#endif
+}
 
 bool hostfs_path_is_dir(const char *path)
 {
@@ -2019,6 +2032,8 @@ hostfs_volume *hostfs_mount(const char *root_path, const char *volume_name)
         hostfs_eject(vol);
         return NULL;
     }
+    /* Mount scan counts as a successful refresh; first touch within delta is free. */
+    vol->last_refresh_ms = hostfs_now_ms();
     return vol;
 }
 
@@ -2996,6 +3011,9 @@ int hostfs_rescan(hostfs_volume *vol)
         return A2_OK;
     }
 
+    /* Stamp before the walk so a slow/failing rescan still rate-limits touches. */
+    vol->last_refresh_ms = hostfs_now_ms();
+
     memset(matched, 0, sizeof(matched));
     if (hostfs_rescan_dir(vol, vol->root_path, -1, matched) != A2_OK) {
         return A2_ERR;
@@ -3021,15 +3039,17 @@ int hostfs_rescan(hostfs_volume *vol)
     return A2_OK;
 }
 
-void hostfs_poll(hostfs_volume *vol, uint64_t cycles)
+void hostfs_maybe_refresh(hostfs_volume *vol)
 {
+    uint64_t now;
+
     if (vol == NULL || vol->guest_write_depth > 0) {
         return;
     }
-    if (vol->last_poll_cycles != 0u &&
-        cycles - vol->last_poll_cycles < (uint64_t)HOSTFS_POLL_PERIOD) {
+    now = hostfs_now_ms();
+    if (vol->last_refresh_ms != 0u &&
+        now - vol->last_refresh_ms < (uint64_t)HOSTFS_REFRESH_PERIOD_MS) {
         return;
     }
-    vol->last_poll_cycles = cycles;
     (void)hostfs_rescan(vol);
 }

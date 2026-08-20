@@ -41,11 +41,11 @@ int hostfs_read_block(hostfs_volume *vol, uint32_t block, uint8_t *out);
 int hostfs_write_block(hostfs_volume *vol, uint32_t block, const uint8_t *data);
 
 /*
- * Phase 2: poll host folder for mtime/size / add / delete / rename.
- * cycles is a monotonic machine-cycle counter used to rate-limit.
- * Skipped while guest write-through is active.
+ * Phase 2: rate-limited host refresh on SmartPort touch (STATUS / READ / WRITE).
+ * Wall-clock delta (~1s host time) so max turbo does not multiply rescans.
+ * Skipped while guest write-through is active. Idle mounted volumes do nothing.
  */
-void hostfs_poll(hostfs_volume *vol, uint64_t cycles);
+void hostfs_maybe_refresh(hostfs_volume *vol);
 
 /* Force a host rescan now (ignores rate limit; still skips during guest write). */
 int hostfs_rescan(hostfs_volume *vol);

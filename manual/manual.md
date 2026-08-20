@@ -111,15 +111,16 @@ HostFS unit is mounted.
 
 HostFS is read/write: ProDOS data writes update the host files, and create / delete /
 rename in the catalog create, remove, or rename NAPS files in the folder. External
-edits to files already on the volume are picked up by a periodic rescan (remount if
-the directory was full when new files appeared).
+edits to files already on the volume are picked up on the next SmartPort access to
+that unit (STATUS / READ / WRITE), rate-limited to about once per second of host
+time (remount if the directory was full when new files appeared).
 
 ProDOS catalog **order** (which `.SYSTEM` file comes first, and so on) is remembered in
-an optional `hostfs.order` text file in the folder - one NAPS basename per line, `#`
-comments allowed. If the file is present at mount, those names are added in that
-order and any other NAPS files are appended. Reordering the catalog in ProDOS (for
-example with CAT.DOCTOR) rewrites `hostfs.order` automatically so the next launch
-keeps that order. The file is not itself a ProDOS volume entry.
+an optional `hostfs.order` text file in the folder - one basename per line (NAPS files
+and directory names), `#` comments allowed. If the file is present at mount, those
+names are added in that order and any other entries are appended. Reordering the
+catalog in ProDOS (for example with CAT.DOCTOR) rewrites `hostfs.order` automatically
+so the next launch keeps that order. The file is not itself a ProDOS volume entry.
 
 HostFS is selected by path kind only (directory vs file). Mount it from the command
 line, `[SmartPort]` in the INI, or Machine **[Insert]** on a SmartPort unit:
@@ -2022,8 +2023,8 @@ an ordered multi-image queue; only one image is mounted at a time.
 A SmartPort card exposes two block units. ProDOS `$C0s4` / `$C0s5` and the `$C800`
 trap handle the common read/write/status commands. `boot_slot` starts execution at
 `$CN00` after unit 0 of that slot has mounted. Each unit is either an image file or
-a HostFS directory (ProDOS map over NAPS-tagged host files, with live refresh and
-write-through).
+a HostFS directory (ProDOS map over NAPS-tagged host files, with access-triggered
+refresh and write-through).
 
 ### Mockingboard
 

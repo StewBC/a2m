@@ -1,4 +1,5 @@
-# a2m HostFS catalog order (one NAPS basename per line)
+# a2m HostFS catalog order (NAPS files and directory basenames)
 PRODOS#FF0000
 QUIT.SYSTEM#ff2000
 BASIC.SYSTEM#ff2000
+cc65Chess
