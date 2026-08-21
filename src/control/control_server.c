@@ -28,6 +28,9 @@ struct control_server {
     bool owns_self; /* true if create() allocated */
     mutex *lock;
     platform_socket_listener *listener;
+    /* Active client socket; only touch under lock. stop() closes it to wake
+       blocked I/O; the worker still owns destroy after handle_connection. */
+    platform_socket_connection *connection;
     message_queue *requests;
     message_queue *responses;
     thread *worker;
@@ -424,31 +427,24 @@ static void control_server_handle_connection(
         control_server_discard_pending_responses(server);
     }
 
+    /* Close only: worker destroys under the lock so stop() cannot free the
+       same pointer concurrently (see control_server_worker / stop). */
     platform_socket_connection_close(connection);
-    platform_socket_connection_destroy(connection);
 }
 
 static int control_server_worker(void *userdata)
 {
     control_server_t *server = (control_server_t *)userdata;
 
-    if (!platform_socket_startup()) {
-        return 1;
-    }
-
-    server->listener = platform_socket_listen_localhost(server->port);
-    if (server->listener == NULL) {
-        platform_socket_shutdown();
+    if (server == NULL) {
         return 1;
     }
 
     while (!control_server_is_stopping(server)) {
         platform_socket_connection *conn = platform_socket_accept(server->listener);
         if (conn == NULL) {
-            if (control_server_is_stopping(server)) {
-                break;
-            }
-            continue;
+            /* Listener closed by stop(), or accept error — exit the loop. */
+            break;
         }
 
         mutex_lock(server->lock);
@@ -456,17 +452,19 @@ static int control_server_worker(void *userdata)
         if (server->connection_epoch == 0u) {
             server->connection_epoch = 1u;
         }
+        server->connection = conn;
         mutex_unlock(server->lock);
 
         control_server_handle_connection(server, conn);
+
+        /* Clear and free under the lock so this destroy cannot race stop()
+           closing the same pointer from the main thread. */
+        mutex_lock(server->lock);
+        server->connection = NULL;
+        platform_socket_connection_destroy(conn);
+        mutex_unlock(server->lock);
     }
 
-    if (server->listener != NULL) {
-        platform_socket_listener_close(server->listener);
-        platform_socket_listener_destroy(server->listener);
-        server->listener = NULL;
-    }
-    platform_socket_shutdown();
     return 0;
 }
 
@@ -529,17 +527,33 @@ bool control_server_start(control_server_t *server)
         return false;
     }
 
+    if (!platform_socket_startup()) {
+        return false;
+    }
+
     server->lock = mutex_create();
     server->requests = message_queue_create(sizeof(control_request), CONTROL_QUEUE_CAPACITY);
     server->responses = message_queue_create(sizeof(control_response), CONTROL_QUEUE_CAPACITY);
     if (server->lock == NULL || server->requests == NULL || server->responses == NULL) {
         control_server_stop(server);
+        platform_socket_shutdown();
         return false;
     }
 
     server->stopping = false;
+    server->connection = NULL;
+    /* Listener is created on the starter thread and destroyed only in stop()
+       after join — never by the worker (avoids UAF with concurrent close). */
+    server->listener = platform_socket_listen_localhost(server->port);
+    if (server->listener == NULL) {
+        control_server_stop(server);
+        platform_socket_shutdown();
+        return false;
+    }
+
     server->worker = thread_create("a2m-control", control_server_worker, server);
     if (server->worker == NULL) {
+        /* stop() destroys the listener and calls platform_socket_shutdown(). */
         control_server_stop(server);
         return false;
     }
@@ -556,14 +570,26 @@ void control_server_stop(control_server_t *server)
         return;
     }
 
+    if (!server->started && server->worker == NULL && server->listener == NULL &&
+        server->lock == NULL && server->requests == NULL && server->responses == NULL) {
+        return;
+    }
+
     if (server->lock != NULL) {
         mutex_lock(server->lock);
         server->stopping = true;
+        /* Close the active client under the lock so we cannot close a pointer
+           the worker is concurrently destroying. Close is idempotent and only
+           shuts the socket to wake blocked poll/recv; worker still owns free. */
+        if (server->connection != NULL) {
+            platform_socket_connection_close(server->connection);
+        }
         mutex_unlock(server->lock);
     } else {
         server->stopping = true;
     }
 
+    /* Wake a blocking accept() without freeing the listener object yet. */
     if (server->listener != NULL) {
         platform_socket_listener_close(server->listener);
     }
@@ -578,6 +604,13 @@ void control_server_stop(control_server_t *server)
         thread_join(server->worker);
         thread_destroy(server->worker);
         server->worker = NULL;
+    }
+
+    /* Exclusive ownership after join. */
+    if (server->listener != NULL) {
+        platform_socket_listener_destroy(server->listener);
+        server->listener = NULL;
+        platform_socket_shutdown();
     }
 
     if (server->requests != NULL) {
@@ -599,6 +632,7 @@ void control_server_stop(control_server_t *server)
         server->lock = NULL;
     }
 
+    server->connection = NULL;
     server->started = false;
     server->has_client = false;
 }
