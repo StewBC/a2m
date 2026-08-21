@@ -1836,7 +1836,7 @@ for low-latency automation; a windowed session is still paced by present/vsync.
 
 The TCP client is bound to one runtime **session** (history FIND/NEXT cursor
 state). Disconnect frees that session. Mutations (step, run, poke, reset, …)
-invalidate all history cursors and may emit `0 event state-changed …` so other
+invalidate all history cursors and may emit `0 event state-changed ...` so other
 askers notice (awareness only; no permission lock).
 
 ### Execution Control

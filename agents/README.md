@@ -59,3 +59,4 @@ Open the component note only when the task touches that area:
 ## Manual (users, not agents)
 
 `manual/manual.md`, `RELEASE.md`, root `README.md`.
+Before making changes to `manual/manual.md`, read `manual/HELP_MARKDOWN.md`.
