@@ -128,6 +128,31 @@ static void post_error(
     (void)control_server_post_response(disp->server, &response);
 }
 
+static const char *state_changed_reason_name(runtime_state_changed_reason reason)
+{
+    switch (reason) {
+    case RUNTIME_STATE_CHANGED_STEP:
+        return "step";
+    case RUNTIME_STATE_CHANGED_RUN:
+        return "run";
+    case RUNTIME_STATE_CHANGED_PAUSE:
+        return "pause";
+    case RUNTIME_STATE_CHANGED_POKE:
+        return "poke";
+    case RUNTIME_STATE_CHANGED_RESET:
+        return "reset";
+    case RUNTIME_STATE_CHANGED_LOAD_STATE:
+        return "load-state";
+    case RUNTIME_STATE_CHANGED_HISTORY_CLEAR:
+        return "history-clear";
+    case RUNTIME_STATE_CHANGED_MEDIA:
+        return "media";
+    case RUNTIME_STATE_CHANGED_OTHER:
+    default:
+        return "other";
+    }
+}
+
 /* Close the bound control session without waiting (fire-and-forget). */
 static void control_dispatch_release_session(control_dispatch_t *disp)
 {
@@ -140,6 +165,31 @@ static void control_dispatch_release_session(control_dispatch_t *disp)
     (void)runtime_client_session_close(disp->client, disp->session_id, token);
     disp->session_id = 0u;
     disp->session_epoch = 0u;
+    runtime_client_set_command_session(disp->client, 0u);
+}
+
+static void control_dispatch_post_state_changed(
+    control_dispatch_t *disp,
+    const runtime_event *event)
+{
+    control_response response;
+    char text[CONTROL_RESPONSE_TEXT_MAX];
+
+    if (disp == NULL || event == NULL || disp->server == NULL) {
+        return;
+    }
+    /* Always push: awareness only. Clients ignore or log; Ctl skips in cmd(). */
+    snprintf(
+        text,
+        sizeof(text),
+        "state-changed reason=%s session=%u cycles=%llu frame=%llu epoch=%llu",
+        state_changed_reason_name(event->data.state_changed.reason),
+        (unsigned)event->data.state_changed.source_session_id,
+        (unsigned long long)event->data.state_changed.cycles,
+        (unsigned long long)event->data.state_changed.frame,
+        (unsigned long long)event->data.state_changed.history_epoch);
+    control_protocol_format_event(&response, 0u, text);
+    (void)control_server_post_response(disp->server, &response);
 }
 
 /*
@@ -184,6 +234,8 @@ static bool control_dispatch_ensure_session(control_dispatch_t *disp)
                     event.data.session.session_id != 0u) {
                     disp->session_id = event.data.session.session_id;
                     disp->session_epoch = epoch;
+                    runtime_client_set_command_session(
+                        disp->client, disp->session_id);
                     return true;
                 }
                 return false;
@@ -868,6 +920,8 @@ void control_dispatch_on_runtime_event(
         cache_symbols_from_client(disp);
     } else if (event->type == RUNTIME_EVENT_ASSEMBLE_ERROR) {
         disp->latch_assemble_error = true;
+    } else if (event->type == RUNTIME_EVENT_STATE_CHANGED) {
+        control_dispatch_post_state_changed(disp, event);
     }
 
     if (event->type == RUNTIME_EVENT_CPU_STATE_RESPONSE) {

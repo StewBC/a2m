@@ -184,6 +184,71 @@ static void runtime_history_invalidate_cursor(runtime *rt)
     }
 }
 
+static runtime_state_changed_reason runtime_state_changed_reason_for_command(
+    runtime_command_type type)
+{
+    switch (type) {
+    case RUNTIME_COMMAND_STEP_CYCLE:
+    case RUNTIME_COMMAND_STEP_INSTRUCTION:
+    case RUNTIME_COMMAND_STEP_OVER:
+    case RUNTIME_COMMAND_STEP_OUT:
+        return RUNTIME_STATE_CHANGED_STEP;
+    case RUNTIME_COMMAND_RUN:
+    case RUNTIME_COMMAND_RUN_CYCLES:
+    case RUNTIME_COMMAND_RUN_INSTRUCTIONS:
+    case RUNTIME_COMMAND_RUN_TO_CURSOR:
+        return RUNTIME_STATE_CHANGED_RUN;
+    case RUNTIME_COMMAND_PAUSE:
+        return RUNTIME_STATE_CHANGED_PAUSE;
+    case RUNTIME_COMMAND_WRITE_MEMORY_BYTE:
+    case RUNTIME_COMMAND_WRITE_MEMORY:
+    case RUNTIME_COMMAND_SET_CPU_REGISTER:
+        return RUNTIME_STATE_CHANGED_POKE;
+    case RUNTIME_COMMAND_RESET:
+        return RUNTIME_STATE_CHANGED_RESET;
+    case RUNTIME_COMMAND_LOAD_STATE:
+    case RUNTIME_COMMAND_LOAD_BIN:
+        return RUNTIME_STATE_CHANGED_LOAD_STATE;
+    case RUNTIME_COMMAND_HISTORY_CLEAR:
+    case RUNTIME_COMMAND_HISTORY_RECORD:
+        return RUNTIME_STATE_CHANGED_HISTORY_CLEAR;
+    case RUNTIME_COMMAND_MEDIA_INSERT:
+    case RUNTIME_COMMAND_MEDIA_EJECT:
+    case RUNTIME_COMMAND_MEDIA_SWAP:
+    case RUNTIME_COMMAND_BOOT_SLOT:
+        return RUNTIME_STATE_CHANGED_MEDIA;
+    default:
+        return RUNTIME_STATE_CHANGED_OTHER;
+    }
+}
+
+static void runtime_publish_state_changed(
+    runtime *rt,
+    runtime_state_changed_reason reason,
+    uint32_t source_session_id)
+{
+    runtime_event event;
+    runtime_history_status history_status;
+
+    if (rt == NULL) {
+        return;
+    }
+    memset(&event, 0, sizeof(event));
+    event.type = RUNTIME_EVENT_STATE_CHANGED;
+    event.request_token = 0u;
+    event.data.state_changed.reason = reason;
+    event.data.state_changed.source_session_id = source_session_id;
+    if (rt->machine_ready) {
+        event.data.state_changed.cycles = apple2_cycles(&rt->machine);
+    }
+    event.data.state_changed.frame = rt->frame_slot.frame_number;
+    if (rt->history != NULL) {
+        runtime_history_get_status(rt->history, &history_status);
+        event.data.state_changed.history_epoch = history_status.epoch;
+    }
+    runtime_publish_event(rt, &event);
+}
+
 static uint64_t runtime_history_allocate_cursor_id(runtime *rt)
 {
     uint64_t id = ++rt->next_history_cursor_id;
@@ -3318,6 +3383,10 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
 {
     if (runtime_history_command_invalidates_cursor(cmd->type)) {
         runtime_history_invalidate_cursor(rt);
+        runtime_publish_state_changed(
+            rt,
+            runtime_state_changed_reason_for_command(cmd->type),
+            cmd->session_id);
     }
     switch (cmd->type) {
     case RUNTIME_COMMAND_PING: {
@@ -3515,6 +3584,8 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
             runtime_publish_machine(rt);
             runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
             runtime_publish_cpu(rt, 0u);
+            runtime_publish_state_changed(
+                rt, RUNTIME_STATE_CHANGED_PAUSE, cmd->session_id);
         }
         break;
     case RUNTIME_COMMAND_RUN_CYCLES: {

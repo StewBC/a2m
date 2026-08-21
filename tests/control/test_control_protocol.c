@@ -150,6 +150,22 @@ int main(void)
         "fmt ok",
         control_protocol_write_response_line(line, sizeof(line), &response));
     expect_true(
+        "fmt ok text",
+        strstr(line, "protocol=" CONTROL_PROTOCOL_VERSION) != NULL);
+
+    control_protocol_format_event(
+        &response,
+        0,
+        "state-changed reason=step session=2 cycles=12345 frame=1 epoch=1");
+    expect_true(
+        "fmt event",
+        control_protocol_write_response_line(line, sizeof(line), &response));
+    expect_true(
+        "event line",
+        strcmp(
+            line,
+            "0 event state-changed reason=step session=2 cycles=12345 frame=1 epoch=1\n") == 0);
+    expect_true(
         "break-create",
         control_protocol_parse_request(
             "21 break-create exec $C000 actions=break when=a==0",
@@ -198,8 +214,6 @@ int main(void)
             "27 history-read 42 epoch=1 before=8 after=4", &request, &error));
     expect_true("history-read id", request.args.history_id == 42ull);
     expect_u32("before", 8, request.args.history_before);
-
-    expect_true("line has A2M/10", strstr(line, "A2M/10") != NULL);
 
     expect_true(
         "assemble defaults",

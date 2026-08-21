@@ -30,6 +30,10 @@ typedef struct runtime_symbol_snapshot {
 
 typedef struct runtime_client runtime_client;
 
+/* Stamp source session id onto subsequent commands (0 = unknown). */
+void runtime_client_set_command_session(runtime_client *client, uint32_t session_id);
+uint32_t runtime_client_get_command_session(const runtime_client *client);
+
 bool runtime_client_ping(runtime_client *client);
 bool runtime_client_quit(runtime_client *client);
 /* Warm reset (CTRL+RESET). Preserves run/pause. */

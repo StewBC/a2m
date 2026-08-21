@@ -94,6 +94,8 @@ typedef struct runtime_command {
     /* Opaque correlation id for solicited work. 0 = unsolicited / lossy telemetry.
        Echoed on matching completion and error events. See agents/runtime.md. */
     uint64_t request_token;
+    /* Source asker for state-changed inform; 0 = unknown / internal. */
+    uint32_t session_id;
     union {
         struct {
             /* 1 = CTRL+Open-Apple+RESET (cold); 0 = CTRL+RESET (warm). */

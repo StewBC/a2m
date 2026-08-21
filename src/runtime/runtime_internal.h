@@ -128,6 +128,8 @@ struct runtime_client {
     runtime_rpc_payload_pool *rpc_payload_pool;
     runtime_frame_ring *frame_ring;
     uint64_t next_request_token;
+    /* Stamped onto outgoing commands as source session (0 = unknown). */
+    uint32_t command_session_id;
 };
 
 typedef struct runtime_breakpoint {

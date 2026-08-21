@@ -82,8 +82,21 @@ typedef enum runtime_event_type {
     RUNTIME_EVENT_HISTORY_STATUS_RESPONSE,
     RUNTIME_EVENT_HISTORY_RESULT_RESPONSE,
     RUNTIME_EVENT_SESSION_RESPONSE,
+    RUNTIME_EVENT_STATE_CHANGED,
     RUNTIME_EVENT_MEDIA_CHANGED
 } runtime_event_type;
+
+typedef enum runtime_state_changed_reason {
+    RUNTIME_STATE_CHANGED_STEP = 0,
+    RUNTIME_STATE_CHANGED_RUN,
+    RUNTIME_STATE_CHANGED_PAUSE,
+    RUNTIME_STATE_CHANGED_POKE,
+    RUNTIME_STATE_CHANGED_RESET,
+    RUNTIME_STATE_CHANGED_LOAD_STATE,
+    RUNTIME_STATE_CHANGED_HISTORY_CLEAR,
+    RUNTIME_STATE_CHANGED_MEDIA,
+    RUNTIME_STATE_CHANGED_OTHER
+} runtime_state_changed_reason;
 
 typedef enum runtime_session_kind {
     RUNTIME_SESSION_KIND_NONE = 0,
@@ -419,5 +432,12 @@ typedef struct runtime_event {
             uint32_t session_id;
             uint8_t kind; /* runtime_session_kind */
         } session;
+        struct {
+            runtime_state_changed_reason reason;
+            uint32_t source_session_id;
+            uint64_t cycles;
+            uint64_t frame;
+            uint64_t history_epoch;
+        } state_changed;
     } data;
 } runtime_event;

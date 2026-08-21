@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A2M/10 control-port client for a2m.
+"""A2M/11 control-port client for a2m.
 
 Debug/introspection helper for driving headless or windowed a2m over its
 localhost control port. Structure lifted from c64m's c64_control_client.py;
@@ -22,8 +22,10 @@ Then:
     c.mount("disks/hd.hdv", kind="smartport")      # or omit kind for .hdv
     c.unmount(kind="diskii", drive=0)
 
-GOTCHAS (Apple A2M/10):
-  * Identity: hello -> name=a2m protocol=A2M/10
+GOTCHAS (Apple A2M/11):
+  * Identity: hello -> name=a2m protocol=A2M/11
+  * Unsolicited events use request id 0: `0 event state-changed …`.
+    cmd()/pipeline() skip them (see drain_events / events list).
   * Assembler: assemble [address=] [run-address=] [auto-run=] [mli-launch=]
     [reset=] [auto-adjust-segments=] <path> (deferred); find-symbol <name>
   * Memory modes: map / main / aux / lc1 / lc2 / rom (not C64 ram/drive8/9)
@@ -104,6 +106,8 @@ class Ctl:
         self.s.settimeout(timeout)
         self.buf = b""
         self.id = 0
+        # Unsolicited `0 event …` lines collected here (newest last).
+        self.events: List[str] = []
 
     def _readline(self) -> str:
         while b"\n" not in self.buf:
@@ -131,9 +135,12 @@ class Ctl:
     ) -> Tuple[int, tuple]:
         parts = line.split(" ")
         rid = int(parts[0])
+        kind = parts[1]
+        if kind == "event":
+            # Unsolicited / out-of-band (normally id 0).
+            return rid, ("event", " ".join(parts[2:]))
         if expect_id is not None:
             assert rid == expect_id, f"id mismatch: {line!r}"
-        kind = parts[1]
         if kind == "ok":
             return rid, ("ok", " ".join(parts[2:]))
         if kind == "error":
@@ -146,23 +153,58 @@ class Ctl:
             return rid, ("data", meta, payload)
         raise ValueError(f"unknown response: {line!r}")
 
+    def _note_event(self, text: str) -> None:
+        self.events.append(text)
+
+    def drain_events(self, wait: float = 0.0) -> List[str]:
+        """Return and clear queued events; optionally wait briefly for more."""
+        if wait > 0:
+            old = self.s.gettimeout()
+            try:
+                self.s.settimeout(wait)
+                while True:
+                    try:
+                        line = self._readline()
+                    except (socket.timeout, TimeoutError):
+                        break
+                    rid, result = self._parse_response_header(line)
+                    if result[0] == "event":
+                        self._note_event(result[1])
+                        continue
+                    raise RuntimeError(
+                        f"unexpected non-event while draining: id={rid} {result!r}"
+                    )
+            finally:
+                self.s.settimeout(old)
+        out = list(self.events)
+        self.events.clear()
+        return out
+
     def cmd(self, text: str, payload: Optional[bytes] = None) -> tuple:
-        """Send one command; return ('ok', text) | ('error', text) | ('data', meta, body)."""
+        """Send one command; return ('ok', text) | ('error', text) | ('data', meta, body).
+
+        Skips intervening `event` lines (stores them on self.events).
+        """
         self.id += 1
         rid = self.id
         self.s.sendall(f"{rid} {text}\n".encode("latin1"))
         if payload is not None:
             self.s.sendall(payload)
             self.s.sendall(b"\n")
-        line = self._readline()
-        _, result = self._parse_response_header(line, expect_id=rid)
-        return result
+        while True:
+            line = self._readline()
+            got_id, result = self._parse_response_header(line)
+            if result[0] == "event":
+                self._note_event(result[1])
+                continue
+            assert got_id == rid, f"id mismatch: {line!r}"
+            return result
 
     def pipeline(self, commands: Sequence[str]) -> List[tuple]:
         """Send many requests without waiting, then collect responses by id.
 
         Server may complete out of order; returns results in the same order as
-        `commands`.
+        `commands`. Unsolicited events are skipped into self.events.
         """
         ids: List[int] = []
         for text in commands:
@@ -175,6 +217,9 @@ class Ctl:
         while pending:
             line = self._readline()
             rid, result = self._parse_response_header(line)
+            if result[0] == "event":
+                self._note_event(result[1])
+                continue
             if rid not in pending:
                 raise RuntimeError(f"unexpected response id {rid}: {line!r}")
             by_id[rid] = result
@@ -870,7 +915,7 @@ def write_argb_png(
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    ap = argparse.ArgumentParser(description="a2m control client (A2M/10)")
+    ap = argparse.ArgumentParser(description="a2m control client (A2M/11)")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=6510)
     ap.add_argument("--timeout", type=float, default=30.0)

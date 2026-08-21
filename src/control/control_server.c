@@ -120,7 +120,36 @@ static bool control_server_peer_gone(platform_socket_connection *connection)
     return true;
 }
 
+static bool control_server_send_response(
+    platform_socket_connection *connection,
+    const control_response *response);
+
+static bool control_server_flush_unsolicited(
+    control_server_t *server,
+    platform_socket_connection *connection)
+{
+    control_response response;
+
+    if (server == NULL || connection == NULL || server->responses == NULL) {
+        return true;
+    }
+    while (message_queue_try_pop(server->responses, &response)) {
+        if (!control_server_send_response(connection, &response)) {
+            if (response.payload != NULL) {
+                free(response.payload);
+            }
+            return false;
+        }
+        if (response.payload != NULL) {
+            free(response.payload);
+            response.payload = NULL;
+        }
+    }
+    return true;
+}
+
 static bool control_server_read_line(
+    control_server_t *server,
     platform_socket_connection *connection,
     char *out,
     size_t out_size)
@@ -135,8 +164,11 @@ static bool control_server_read_line(
         char ch;
         int n = platform_socket_read(connection, &ch, 1);
         if (n == -2) {
-            /* Would block: wait for peer data or close. */
-            if (platform_socket_wait_readable(connection, 1000u) < 0) {
+            /* Would block: flush events, then wait for peer data or close. */
+            if (!control_server_flush_unsolicited(server, connection)) {
+                return false;
+            }
+            if (platform_socket_wait_readable(connection, 50u) < 0) {
                 return false;
             }
             continue;
@@ -230,7 +262,7 @@ static void control_server_handle_connection(
         memset(&error, 0, sizeof(error));
         memset(&response, 0, sizeof(response));
 
-        if (!control_server_read_line(connection, line, sizeof(line))) {
+        if (!control_server_read_line(server, connection, line, sizeof(line))) {
             peer_disconnected = true;
             break;
         }
@@ -292,7 +324,7 @@ static void control_server_handle_connection(
                 request.id,
                 "connection introspection execution state softswitches step "
                 "turbo frame frame-ring memory breakpoints wait key disk "
-                "snapshot history assemble symbols");
+                "snapshot history assemble symbols sessions state-changed");
             (void)control_server_send_response(connection, &response);
             control_request_release(&request);
             continue;
@@ -316,12 +348,29 @@ static void control_server_handle_connection(
         }
 
         /* Wait for deferred reply OR peer close — never spin only on the
-           response queue (that wedges the single client slot until timeout). */
+           response queue (that wedges the single client slot until timeout).
+           Unsolicited EVENT lines (id 0) may arrive first; flush them and keep
+           waiting for the matching request reply. */
         while (!control_server_is_stopping(server)) {
             if (message_queue_wait_pop_timeout(
                     server->responses,
                     &response,
                     CONTROL_RESPONSE_WAIT_SLICE_MS)) {
+                if (response.type == CONTROL_RESPONSE_EVENT || response.id == 0u) {
+                    if (!control_server_send_response(connection, &response)) {
+                        if (response.payload != NULL) {
+                            free(response.payload);
+                            response.payload = NULL;
+                        }
+                        peer_disconnected = true;
+                        break;
+                    }
+                    if (response.payload != NULL) {
+                        free(response.payload);
+                        response.payload = NULL;
+                    }
+                    continue;
+                }
                 got_response = true;
                 break;
             }

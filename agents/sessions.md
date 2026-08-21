@@ -249,7 +249,10 @@ slot. Ctl history-find/next smoke green (scripts still omit session syntax).
   works
 - `make` / existing coop smoke still works; watcher may log events
 
-**Landed:** _pending_
+**Landed:** `RUNTIME_EVENT_STATE_CHANGED` + wire `0 event state-changed …`;
+A2M/11; capabilities `sessions state-changed`; control flushes events without
+stealing deferred replies; `Ctl` skips/queues events; `runtime_state_changed`
+ctest (step inform + CURSOR_STALE + re-FIND).
 
 ---
 
