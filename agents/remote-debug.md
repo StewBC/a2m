@@ -215,7 +215,7 @@ Python helper / coop_watch: **landed** — [`control-tools.md`](control-tools.md
 | **C5a** | `write_history[addr]` | **Done** | Last writer PC pack on bus write; debug_memory fill |
 | **C5b** | TRON / TROFF (P4b) | **Done** | File log on insn complete while enabled |
 | C5c | Richer hardware snapshots | **Parked** | Softswitch / Disk II / SP dumps later |
-| C5d | History UI browser | **Parked** | Remote API first; UI follow-up |
+| C5d | History UI browser / Inspector | **Parked** | Needs [`sessions.md`](sessions.md) foundation first; UI follow-up after S0–S4 |
 | C5e | Softswitch / beam line ring | **Parked** | Only if frame+history prove insufficient |
 
 ### Acceptance bar (support system, not a sample game)

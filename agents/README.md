@@ -26,6 +26,7 @@ Siblings (not submodules): `../a2m` (Apple domain / paint reference),
 | 5 | **[`remote-debug.md`](remote-debug.md)** | Closed epic: control / frame ring / history wire |
 | 6 | **[`control-tools.md`](control-tools.md)** | **Drive a2m over the control port** (A2M/10 ops brief) |
 | 7 | **[`turbo-zip.md`](turbo-zip.md)** | Closed: Zip MHz + max block paint |
+| 8 | **[`sessions.md`](sessions.md)** | **Active:** multi-asker sessions (Inspector prep; no UI) |
 
 Open the component note only when the task touches that area:
 [`video.md`](video.md) · [`video-paint.md`](video-paint.md) ·
@@ -33,7 +34,7 @@ Open the component note only when the task touches that area:
 [`disk.md`](disk.md) · [`breakpoints.md`](breakpoints.md) ·
 [`snapshots.md`](snapshots.md) ·
 [`remote-debug.md`](remote-debug.md) · [`control-tools.md`](control-tools.md) ·
-[`turbo-zip.md`](turbo-zip.md).
+[`turbo-zip.md`](turbo-zip.md) · [`sessions.md`](sessions.md).
 
 ## Document set
 
@@ -45,6 +46,7 @@ Open the component note only when the task touches that area:
 | `turbo-zip.md` | Closed: Zip MHz ladder + max presentation (block) paint |
 | `control-tools.md` | Agent ops: control-port scripting via `Ctl` + coop_watch (A2M/10) |
 | `remote-debug.md` | Closed epic record: control/history/frame-ring wire |
+| `sessions.md` | Active: runtime sessions + state-changed (Inspector foundation) |
 | `breakpoints.md` | Debugger BP product path (done through P5 + TRON) |
 | `video-paint.md` | Closed epic record: a2m-class paint into the beam |
 | `testing.md` | Gate, fixtures, deferred tests |

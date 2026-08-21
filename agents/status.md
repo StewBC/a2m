@@ -4,7 +4,8 @@
 
 **Rules:** [`rules.md`](rules.md)  
 **Closed:** paint; SP `$C800`; BP 0–4e + P4b TRON; remote-debug **C0–C5b**; control tools **T1–T5**; `get-softswitches`; **turbo-zip**; **max free-run S2**; **snapshots** ([`snapshots.md`](snapshots.md) — `.a2state` save/load, drop, `--sna`, Opt+Shift+./,)  
-**Look-later (not active):** debug ergonomics (mem workshop → live remount → state rewind UI → frame gate / HW snaps).
+**Active:** [`sessions.md`](sessions.md) — multi-asker sessions + `state-changed` (Inspector prep; no UI yet).  
+**Look-later (not active):** Inspector UI (after sessions); debug ergonomics (mem workshop → live remount → state rewind UI → frame gate / HW snaps).
 
 ---
 
