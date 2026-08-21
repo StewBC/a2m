@@ -8,7 +8,7 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-Expect **53** green. Run from repo root.
+Expect **54** green. Run from repo root.
 
 ## Registered tests (product gate)
 
@@ -49,6 +49,7 @@ Expect **53** green. Run from repo root.
 | `runtime_history_basic` | Flight recorder free-run records (C3) |
 | `runtime_history_commands` | HISTORY_INFO/RECORD/CLEAR (C4a) |
 | `runtime_history_query` | FIND/READ/CLOSE + HST1 (C4b) |
+| `runtime_history_sessions` | Dual session FIND/NEXT isolation (S0/S1) |
 | `control_protocol` | A2M parse + format (`src/control`) |
 | `assembler_*` | expressions/conditionals/loops/macros/scopes/targets/CPU profiles/multifile |
 | `runtime_assembler` | live RAM assembly + runtime event path |

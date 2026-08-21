@@ -59,6 +59,8 @@ typedef enum runtime_command_type {
     RUNTIME_COMMAND_HISTORY_NEXT,
     RUNTIME_COMMAND_HISTORY_READ,
     RUNTIME_COMMAND_HISTORY_CLOSE,
+    RUNTIME_COMMAND_SESSION_OPEN,
+    RUNTIME_COMMAND_SESSION_CLOSE,
     RUNTIME_COMMAND_SET_HISTORY_OFF_ON_MAX,
     RUNTIME_COMMAND_MEDIA_INSERT,
     RUNTIME_COMMAND_MEDIA_EJECT,
@@ -273,25 +275,37 @@ typedef struct runtime_command {
         struct {
             runtime_history_query query;
             uint64_t from_id;
+            uint32_t session_id; /* 0 = default session */
             uint8_t from_kind;
             uint16_t limit;
         } history_find;
 
         struct {
             uint64_t cursor;
+            uint32_t session_id; /* 0 = default session */
             uint16_t limit;
         } history_next;
 
         struct {
             uint64_t epoch;
             uint64_t id;
+            uint32_t session_id; /* 0 = default session; ignored for absolute read */
             uint16_t before;
             uint16_t after;
         } history_read;
 
         struct {
             uint64_t cursor;
+            uint32_t session_id; /* 0 = default session */
         } history_close;
+
+        struct {
+            uint8_t kind; /* runtime_session_kind: ui or control */
+        } session_open;
+
+        struct {
+            uint32_t session_id;
+        } session_close;
 
         struct {
             uint8_t enabled;

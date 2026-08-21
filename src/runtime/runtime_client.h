@@ -210,8 +210,10 @@ bool runtime_client_set_history_off_on_max(runtime_client *client, bool enabled)
 bool runtime_client_history_clear(
     runtime_client *client,
     uint64_t request_token);
+/* session_id 0 = default session (compat). */
 bool runtime_client_history_find(
     runtime_client *client,
+    uint32_t session_id,
     const runtime_history_query *query,
     runtime_history_from_kind from_kind,
     uint64_t from_id,
@@ -219,11 +221,13 @@ bool runtime_client_history_find(
     uint64_t request_token);
 bool runtime_client_history_next(
     runtime_client *client,
+    uint32_t session_id,
     uint64_t cursor,
     uint16_t limit,
     uint64_t request_token);
 bool runtime_client_history_read(
     runtime_client *client,
+    uint32_t session_id,
     uint64_t epoch,
     uint64_t id,
     uint16_t before,
@@ -231,7 +235,17 @@ bool runtime_client_history_read(
     uint64_t request_token);
 bool runtime_client_history_close(
     runtime_client *client,
+    uint32_t session_id,
     uint64_t cursor,
+    uint64_t request_token);
+/* Worker-allocated session; reply via RUNTIME_EVENT_SESSION_RESPONSE. */
+bool runtime_client_session_open(
+    runtime_client *client,
+    runtime_session_kind kind,
+    uint64_t request_token);
+bool runtime_client_session_close(
+    runtime_client *client,
+    uint32_t session_id,
     uint64_t request_token);
 bool runtime_client_request_call_stack(runtime_client *client);
 

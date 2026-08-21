@@ -302,6 +302,15 @@ runtime *runtime_create(const runtime_config *config)
     rt->client.next_request_token = 0;
     rt->next_breakpoint_id = 1;
 
+    /* Default session for omit-session_id commands (compat / single asker). */
+    rt->next_session_id = 1u;
+    rt->sessions[0].id = 1u;
+    rt->sessions[0].kind = RUNTIME_SESSION_KIND_UI;
+    rt->sessions[0].active = 1u;
+    rt->sessions[0].endpoint_epoch = 0u;
+    rt->default_session_id = 1u;
+    rt->next_session_id = 2u;
+
     if (config != NULL) {
         int i;
 

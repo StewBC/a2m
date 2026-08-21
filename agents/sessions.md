@@ -161,7 +161,9 @@ default session preserves today’s behaviour.
 - Global `rt->history_cursor` removed (or reduced to a deprecated alias removed
   in the same phase — prefer delete)
 
-**Landed:** _pending_
+**Landed:** Session table `sessions[4]`; default UI session at create; FIND/NEXT/CLOSE
+per-session cursor; invalidate-all on mutation; `runtime_history_sessions` ctest;
+global `rt->history_cursor` deleted.
 
 ---
 
@@ -183,7 +185,9 @@ default session preserves today’s behaviour.
 - Test opens two sessions via client, dual FIND as in S0, then closes both
 - No frontend changes
 
-**Landed:** _pending_
+**Landed:** `runtime_client_session_open/close` + `RUNTIME_EVENT_SESSION_RESPONSE`;
+history helpers take `session_id` (0 = default); dual-session test closes both;
+control dispatch still passes 0 until S2.
 
 ---
 

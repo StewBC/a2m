@@ -130,7 +130,7 @@ int main(void)
     expect_true(
         "find while running",
         runtime_client_history_find(
-            client, &query, RUNTIME_HISTORY_FROM_NEWEST, 0, 16, token));
+            client, 0u, &query, RUNTIME_HISTORY_FROM_NEWEST, 0, 16, token));
     expect_true("busy resp", wait_history_result(client, token, &meta, &bytes, &length, 2.0));
     expect_true("machine-running", meta.status == RUNTIME_HISTORY_RPC_MACHINE_RUNNING);
     expect_true("no payload", bytes == NULL);
@@ -159,7 +159,7 @@ int main(void)
     expect_true(
         "find paused",
         runtime_client_history_find(
-            client, &query, RUNTIME_HISTORY_FROM_NEWEST, 0, 32, token));
+            client, 0u, &query, RUNTIME_HISTORY_FROM_NEWEST, 0, 32, token));
     expect_true("find ok", wait_history_result(client, token, &meta, &bytes, &length, 2.0));
     if (meta.status != RUNTIME_HISTORY_RPC_OK) {
         fprintf(stderr, "FAIL: find status=%d (expected OK)\n", (int)meta.status);
@@ -186,7 +186,7 @@ int main(void)
     token = runtime_client_alloc_request_token(client);
     expect_true(
         "read",
-        runtime_client_history_read(client, epoch, anchor_id, 8, 4, token));
+        runtime_client_history_read(client, 0u, epoch, anchor_id, 8, 4, token));
     expect_true("read ok", wait_history_result(client, token, &meta, &bytes, &length, 2.0));
     expect_true("read status", meta.status == RUNTIME_HISTORY_RPC_OK);
     expect_true("read payload", bytes != NULL && meta.count >= 1);
@@ -195,7 +195,7 @@ int main(void)
 
     /* Close is always ok. */
     token = runtime_client_alloc_request_token(client);
-    expect_true("close", runtime_client_history_close(client, 0, token));
+    expect_true("close", runtime_client_history_close(client, 0u, 0, token));
     expect_true("close ok", wait_history_result(client, token, &meta, &bytes, &length, 2.0));
     expect_true("close status", meta.status == RUNTIME_HISTORY_RPC_OK);
 

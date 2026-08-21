@@ -167,6 +167,8 @@ static void runtime_publish_history_status(runtime *rt, uint64_t request_token)
 
 static void runtime_history_invalidate_cursor(runtime *rt)
 {
+    size_t i;
+
     if (rt == NULL) {
         return;
     }
@@ -174,9 +176,11 @@ static void runtime_history_invalidate_cursor(runtime *rt)
     if (rt->history_mutation_generation == 0u) {
         rt->history_mutation_generation = 1u;
     }
-    if (rt->history_cursor.active) {
-        rt->history_cursor.active = 0u;
-        rt->history_cursor.stale = 1u;
+    for (i = 0u; i < RUNTIME_SESSION_CAPACITY; ++i) {
+        if (rt->sessions[i].active && rt->sessions[i].history_cursor.active) {
+            rt->sessions[i].history_cursor.active = 0u;
+            rt->sessions[i].history_cursor.stale = 1u;
+        }
     }
 }
 
@@ -187,6 +191,106 @@ static uint64_t runtime_history_allocate_cursor_id(runtime *rt)
         id = ++rt->next_history_cursor_id;
     }
     return id;
+}
+
+static runtime_session *runtime_session_lookup(runtime *rt, uint32_t session_id)
+{
+    size_t i;
+
+    if (rt == NULL || session_id == 0u) {
+        return NULL;
+    }
+    for (i = 0u; i < RUNTIME_SESSION_CAPACITY; ++i) {
+        if (rt->sessions[i].active && rt->sessions[i].id == session_id) {
+            return &rt->sessions[i];
+        }
+    }
+    return NULL;
+}
+
+/* session_id 0 → default session. */
+static runtime_session *runtime_session_resolve(runtime *rt, uint32_t session_id)
+{
+    if (rt == NULL) {
+        return NULL;
+    }
+    if (session_id == 0u) {
+        session_id = rt->default_session_id;
+    }
+    return runtime_session_lookup(rt, session_id);
+}
+
+static uint32_t runtime_session_allocate_id(runtime *rt)
+{
+    uint32_t id = ++rt->next_session_id;
+    if (id == 0u) {
+        id = ++rt->next_session_id;
+    }
+    return id;
+}
+
+static runtime_session *runtime_session_allocate(
+    runtime *rt,
+    runtime_session_kind kind)
+{
+    size_t i;
+
+    if (rt == NULL ||
+        (kind != RUNTIME_SESSION_KIND_UI &&
+         kind != RUNTIME_SESSION_KIND_CONTROL)) {
+        return NULL;
+    }
+    for (i = 0u; i < RUNTIME_SESSION_CAPACITY; ++i) {
+        if (!rt->sessions[i].active) {
+            memset(&rt->sessions[i], 0, sizeof(rt->sessions[i]));
+            rt->sessions[i].id = runtime_session_allocate_id(rt);
+            rt->sessions[i].kind = kind;
+            rt->sessions[i].active = 1u;
+            return &rt->sessions[i];
+        }
+    }
+    return NULL;
+}
+
+static bool runtime_session_release(runtime *rt, uint32_t session_id)
+{
+    runtime_session *session;
+
+    if (rt == NULL || session_id == 0u) {
+        return false;
+    }
+    /* Never release the default compat session. */
+    if (session_id == rt->default_session_id) {
+        session = runtime_session_lookup(rt, session_id);
+        if (session != NULL) {
+            memset(&session->history_cursor, 0, sizeof(session->history_cursor));
+        }
+        return true;
+    }
+    session = runtime_session_lookup(rt, session_id);
+    if (session == NULL) {
+        return false;
+    }
+    memset(session, 0, sizeof(*session));
+    return true;
+}
+
+static void runtime_publish_session_response(
+    runtime *rt,
+    uint64_t request_token,
+    runtime_session_status status,
+    uint32_t session_id,
+    runtime_session_kind kind)
+{
+    runtime_event event;
+
+    memset(&event, 0, sizeof(event));
+    event.type = RUNTIME_EVENT_SESSION_RESPONSE;
+    event.request_token = request_token;
+    event.data.session.status = status;
+    event.data.session.session_id = session_id;
+    event.data.session.kind = (uint8_t)kind;
+    runtime_publish_event(rt, &event);
 }
 
 static bool runtime_history_payload_active(runtime *rt)
@@ -338,6 +442,8 @@ static void runtime_history_find_command(
     const runtime_command *command)
 {
     const runtime_history_query *query = &command->data.history_find.query;
+    runtime_session *session;
+    runtime_history_cursor *cursor;
     runtime_history_record *records;
     runtime_history_page page;
     runtime_history_query_result query_result;
@@ -349,6 +455,14 @@ static void runtime_history_find_command(
     size_t encoded_count = 0u;
     bool clipped = false;
     uint64_t from_id;
+
+    session = runtime_session_resolve(rt, command->data.history_find.session_id);
+    if (session == NULL) {
+        runtime_publish_history_rpc_status(
+            rt, command->request_token, RUNTIME_HISTORY_RPC_BAD_ARGS);
+        return;
+    }
+    cursor = &session->history_cursor;
 
     if (rt->history == NULL) {
         runtime_publish_history_rpc_status(
@@ -371,7 +485,7 @@ static void runtime_history_find_command(
             rt, command->request_token, RUNTIME_HISTORY_RPC_REQUEST_ACTIVE);
         return;
     }
-    memset(&rt->history_cursor, 0, sizeof(rt->history_cursor));
+    memset(cursor, 0, sizeof(*cursor));
     records = (runtime_history_record *)calloc(
         command->data.history_find.limit, sizeof(*records));
     if (records == NULL) {
@@ -445,15 +559,15 @@ static void runtime_history_find_command(
         records, encoded_count, &meta.oldest, &meta.newest);
     meta.more = (page.more || clipped) ? 1u : 0u;
     if (meta.more) {
-        rt->history_cursor.query = *query;
-        rt->history_cursor.query.has_epoch = true;
-        rt->history_cursor.query.epoch = meta.epoch;
-        rt->history_cursor.id = runtime_history_allocate_cursor_id(rt);
-        rt->history_cursor.epoch = meta.epoch;
-        rt->history_cursor.mutation_generation = rt->history_mutation_generation;
-        rt->history_cursor.next_id = page.next_id;
-        rt->history_cursor.active = 1u;
-        meta.cursor = rt->history_cursor.id;
+        cursor->query = *query;
+        cursor->query.has_epoch = true;
+        cursor->query.epoch = meta.epoch;
+        cursor->id = runtime_history_allocate_cursor_id(rt);
+        cursor->epoch = meta.epoch;
+        cursor->mutation_generation = rt->history_mutation_generation;
+        cursor->next_id = page.next_id;
+        cursor->active = 1u;
+        meta.cursor = cursor->id;
     }
     free(records);
     (void)runtime_publish_history_payload(
@@ -464,6 +578,8 @@ static void runtime_history_next_command(
     runtime *rt,
     const runtime_command *command)
 {
+    runtime_session *session;
+    runtime_history_cursor *cursor;
     runtime_history_record *records;
     runtime_history_page page;
     runtime_history_query_result query_result;
@@ -472,6 +588,14 @@ static void runtime_history_next_command(
     uint32_t byte_length = 0u;
     size_t encoded_count = 0u;
     bool clipped = false;
+
+    session = runtime_session_resolve(rt, command->data.history_next.session_id);
+    if (session == NULL) {
+        runtime_publish_history_rpc_status(
+            rt, command->request_token, RUNTIME_HISTORY_RPC_BAD_ARGS);
+        return;
+    }
+    cursor = &session->history_cursor;
 
     if (rt->history == NULL) {
         runtime_publish_history_rpc_status(
@@ -488,9 +612,9 @@ static void runtime_history_next_command(
             rt, command->request_token, RUNTIME_HISTORY_RPC_REQUEST_ACTIVE);
         return;
     }
-    if (rt->history_cursor.id != command->data.history_next.cursor ||
-        !rt->history_cursor.active || rt->history_cursor.stale ||
-        rt->history_cursor.mutation_generation != rt->history_mutation_generation) {
+    if (cursor->id != command->data.history_next.cursor ||
+        !cursor->active || cursor->stale ||
+        cursor->mutation_generation != rt->history_mutation_generation) {
         runtime_publish_history_rpc_status(
             rt, command->request_token, RUNTIME_HISTORY_RPC_CURSOR_STALE);
         return;
@@ -504,8 +628,8 @@ static void runtime_history_next_command(
     }
     query_result = runtime_history_find(
         rt->history,
-        &rt->history_cursor.query,
-        rt->history_cursor.next_id,
+        &cursor->query,
+        cursor->next_id,
         command->data.history_next.limit,
         records,
         &page,
@@ -519,7 +643,7 @@ static void runtime_history_next_command(
         return;
     }
     if (runtime_history_wire_encode(
-            rt->history_cursor.epoch,
+            cursor->epoch,
             records,
             page.count,
             true,
@@ -536,17 +660,17 @@ static void runtime_history_next_command(
     memset(&meta, 0, sizeof(meta));
     meta.status = RUNTIME_HISTORY_RPC_OK;
     meta.byte_length = byte_length;
-    meta.epoch = rt->history_cursor.epoch;
+    meta.epoch = cursor->epoch;
     meta.count = (uint32_t)encoded_count;
     runtime_history_page_bounds(
         records, encoded_count, &meta.oldest, &meta.newest);
     meta.more = (page.more || clipped) ? 1u : 0u;
     if (meta.more) {
-        rt->history_cursor.next_id = page.next_id;
-        meta.cursor = rt->history_cursor.id;
+        cursor->next_id = page.next_id;
+        meta.cursor = cursor->id;
     } else {
-        rt->history_cursor.active = 0u;
-        rt->history_cursor.stale = 0u;
+        cursor->active = 0u;
+        cursor->stale = 0u;
     }
     free(records);
     (void)runtime_publish_history_payload(
@@ -3840,14 +3964,74 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
     case RUNTIME_COMMAND_HISTORY_READ:
         runtime_history_read_command(rt, cmd);
         break;
-    case RUNTIME_COMMAND_HISTORY_CLOSE:
-        if (cmd->data.history_close.cursor == 0u ||
-            cmd->data.history_close.cursor == rt->history_cursor.id) {
-            memset(&rt->history_cursor, 0, sizeof(rt->history_cursor));
+    case RUNTIME_COMMAND_HISTORY_CLOSE: {
+        runtime_session *session =
+            runtime_session_resolve(rt, cmd->data.history_close.session_id);
+        if (session != NULL &&
+            (cmd->data.history_close.cursor == 0u ||
+             cmd->data.history_close.cursor == session->history_cursor.id)) {
+            memset(
+                &session->history_cursor,
+                0,
+                sizeof(session->history_cursor));
         }
         runtime_publish_history_rpc_status(
             rt, cmd->request_token, RUNTIME_HISTORY_RPC_OK);
         break;
+    }
+    case RUNTIME_COMMAND_SESSION_OPEN: {
+        runtime_session_kind kind =
+            (runtime_session_kind)cmd->data.session_open.kind;
+        runtime_session *session = runtime_session_allocate(rt, kind);
+        if (session == NULL) {
+            runtime_session_status status =
+                (kind != RUNTIME_SESSION_KIND_UI &&
+                 kind != RUNTIME_SESSION_KIND_CONTROL)
+                    ? RUNTIME_SESSION_BAD_ARGS
+                    : RUNTIME_SESSION_FULL;
+            runtime_publish_session_response(
+                rt, cmd->request_token, status, 0u, kind);
+        } else {
+            runtime_publish_session_response(
+                rt,
+                cmd->request_token,
+                RUNTIME_SESSION_OK,
+                session->id,
+                session->kind);
+        }
+        break;
+    }
+    case RUNTIME_COMMAND_SESSION_CLOSE: {
+        uint32_t session_id = cmd->data.session_close.session_id;
+        runtime_session_kind kind = RUNTIME_SESSION_KIND_NONE;
+        runtime_session *session = runtime_session_lookup(rt, session_id);
+        if (session != NULL) {
+            kind = session->kind;
+        }
+        if (session_id == 0u) {
+            runtime_publish_session_response(
+                rt,
+                cmd->request_token,
+                RUNTIME_SESSION_BAD_ARGS,
+                0u,
+                RUNTIME_SESSION_KIND_NONE);
+        } else if (!runtime_session_release(rt, session_id)) {
+            runtime_publish_session_response(
+                rt,
+                cmd->request_token,
+                RUNTIME_SESSION_NOT_FOUND,
+                session_id,
+                kind);
+        } else {
+            runtime_publish_session_response(
+                rt,
+                cmd->request_token,
+                RUNTIME_SESSION_OK,
+                session_id,
+                kind);
+        }
+        break;
+    }
 
     case RUNTIME_COMMAND_SAVE_STATE:
         runtime_save_state(rt, cmd);

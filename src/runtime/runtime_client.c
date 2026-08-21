@@ -942,6 +942,7 @@ bool runtime_client_history_clear(
 
 bool runtime_client_history_find(
     runtime_client *client,
+    uint32_t session_id,
     const runtime_history_query *query,
     runtime_history_from_kind from_kind,
     uint64_t from_id,
@@ -959,6 +960,7 @@ bool runtime_client_history_find(
     }
     command.data.history_find.query = *query;
     command.data.history_find.from_id = from_id;
+    command.data.history_find.session_id = session_id;
     command.data.history_find.from_kind = (uint8_t)from_kind;
     command.data.history_find.limit = limit;
     return message_queue_push(client->command_queue, &command);
@@ -966,6 +968,7 @@ bool runtime_client_history_find(
 
 bool runtime_client_history_next(
     runtime_client *client,
+    uint32_t session_id,
     uint64_t cursor,
     uint16_t limit,
     uint64_t request_token) {
@@ -979,12 +982,14 @@ bool runtime_client_history_next(
         return false;
     }
     command.data.history_next.cursor = cursor;
+    command.data.history_next.session_id = session_id;
     command.data.history_next.limit = limit;
     return message_queue_push(client->command_queue, &command);
 }
 
 bool runtime_client_history_read(
     runtime_client *client,
+    uint32_t session_id,
     uint64_t epoch,
     uint64_t id,
     uint16_t before,
@@ -1002,6 +1007,7 @@ bool runtime_client_history_read(
     }
     command.data.history_read.epoch = epoch;
     command.data.history_read.id = id;
+    command.data.history_read.session_id = session_id;
     command.data.history_read.before = before;
     command.data.history_read.after = after;
     return message_queue_push(client->command_queue, &command);
@@ -1009,6 +1015,7 @@ bool runtime_client_history_read(
 
 bool runtime_client_history_close(
     runtime_client *client,
+    uint32_t session_id,
     uint64_t cursor,
     uint64_t request_token) {
     runtime_command command = {
@@ -1020,6 +1027,41 @@ bool runtime_client_history_close(
         return false;
     }
     command.data.history_close.cursor = cursor;
+    command.data.history_close.session_id = session_id;
+    return message_queue_push(client->command_queue, &command);
+}
+
+bool runtime_client_session_open(
+    runtime_client *client,
+    runtime_session_kind kind,
+    uint64_t request_token) {
+    runtime_command command = {
+        .type = RUNTIME_COMMAND_SESSION_OPEN,
+        .request_token = request_token,
+    };
+
+    if (client == NULL || request_token == 0u ||
+        (kind != RUNTIME_SESSION_KIND_UI &&
+         kind != RUNTIME_SESSION_KIND_CONTROL)) {
+        return false;
+    }
+    command.data.session_open.kind = (uint8_t)kind;
+    return message_queue_push(client->command_queue, &command);
+}
+
+bool runtime_client_session_close(
+    runtime_client *client,
+    uint32_t session_id,
+    uint64_t request_token) {
+    runtime_command command = {
+        .type = RUNTIME_COMMAND_SESSION_CLOSE,
+        .request_token = request_token,
+    };
+
+    if (client == NULL || session_id == 0u || request_token == 0u) {
+        return false;
+    }
+    command.data.session_close.session_id = session_id;
     return message_queue_push(client->command_queue, &command);
 }
 

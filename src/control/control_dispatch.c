@@ -2034,7 +2034,13 @@ static void handle_request(control_dispatch_t *disp, control_request *req)
             break;
         }
         if (!runtime_client_history_find(
-                client, &query, from_kind, from_id, limit, token)) {
+                client,
+                0u, /* default session until S2 binds control session */
+                &query,
+                from_kind,
+                from_id,
+                limit,
+                token)) {
             post_error(disp, req->id, "runtime", "command rejected");
             control_deferred_clear(d);
         }
@@ -2050,6 +2056,7 @@ static void handle_request(control_dispatch_t *disp, control_request *req)
         }
         if (!runtime_client_history_next(
                 client,
+                0u,
                 req->args.history_cursor,
                 req->args.history_limit,
                 token)) {
@@ -2068,6 +2075,7 @@ static void handle_request(control_dispatch_t *disp, control_request *req)
         }
         if (!runtime_client_history_read(
                 client,
+                0u,
                 req->args.history_epoch,
                 req->args.history_id,
                 req->args.history_before,
@@ -2087,7 +2095,7 @@ static void handle_request(control_dispatch_t *disp, control_request *req)
             break;
         }
         if (!runtime_client_history_close(
-                client, req->args.history_cursor, token)) {
+                client, 0u, req->args.history_cursor, token)) {
             post_error(disp, req->id, "runtime", "command rejected");
             control_deferred_clear(d);
         }

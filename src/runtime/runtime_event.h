@@ -81,8 +81,23 @@ typedef enum runtime_event_type {
     RUNTIME_EVENT_LOAD_STATE_COMPLETE,
     RUNTIME_EVENT_HISTORY_STATUS_RESPONSE,
     RUNTIME_EVENT_HISTORY_RESULT_RESPONSE,
+    RUNTIME_EVENT_SESSION_RESPONSE,
     RUNTIME_EVENT_MEDIA_CHANGED
 } runtime_event_type;
+
+typedef enum runtime_session_kind {
+    RUNTIME_SESSION_KIND_NONE = 0,
+    RUNTIME_SESSION_KIND_UI,
+    RUNTIME_SESSION_KIND_CONTROL
+} runtime_session_kind;
+
+typedef enum runtime_session_status {
+    RUNTIME_SESSION_OK = 0,
+    RUNTIME_SESSION_FULL,
+    RUNTIME_SESSION_NOT_FOUND,
+    RUNTIME_SESSION_BAD_ARGS,
+    RUNTIME_SESSION_ERROR
+} runtime_session_status;
 
 typedef enum runtime_media_change_type {
     RUNTIME_MEDIA_CHANGE_INSERT = 0,
@@ -399,5 +414,10 @@ typedef struct runtime_event {
 
         runtime_history_status history_status;
         runtime_history_rpc_meta history_rpc;
+        struct {
+            runtime_session_status status;
+            uint32_t session_id;
+            uint8_t kind; /* runtime_session_kind */
+        } session;
     } data;
 } runtime_event;

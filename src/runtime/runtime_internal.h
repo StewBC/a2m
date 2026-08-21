@@ -105,6 +105,19 @@ typedef struct runtime_history_cursor {
     uint8_t stale;
 } runtime_history_cursor;
 
+enum {
+    RUNTIME_SESSION_CAPACITY = 4
+};
+
+/* Per-asker state: history cursor + endpoint binding. No live machine pointers. */
+typedef struct runtime_session {
+    uint32_t id; /* never 0 when active */
+    runtime_session_kind kind;
+    uint8_t active;
+    uint64_t endpoint_epoch; /* control connection_epoch; 0 if unused */
+    runtime_history_cursor history_cursor;
+} runtime_session;
+
 struct runtime_client {
     message_queue *command_queue;
     message_queue *event_queue;
@@ -172,7 +185,9 @@ struct runtime {
     uint32_t history_memory_mb;
     uint64_t history_mutation_generation;
     uint64_t next_history_cursor_id;
-    runtime_history_cursor history_cursor;
+    runtime_session sessions[RUNTIME_SESSION_CAPACITY];
+    uint32_t next_session_id;
+    uint32_t default_session_id; /* omit session_id=0 resolves here; never 0 after create */
     /* When true, stop recording while turbo is max; restore on leave max. */
     bool history_off_on_max;
     /* True if we stopped history solely for max (so we may resume on leave). */
