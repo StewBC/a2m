@@ -231,7 +231,8 @@ static uint32_t runtime_session_allocate_id(runtime *rt)
 
 static runtime_session *runtime_session_allocate(
     runtime *rt,
-    runtime_session_kind kind)
+    runtime_session_kind kind,
+    uint64_t endpoint_epoch)
 {
     size_t i;
 
@@ -246,6 +247,7 @@ static runtime_session *runtime_session_allocate(
             rt->sessions[i].id = runtime_session_allocate_id(rt);
             rt->sessions[i].kind = kind;
             rt->sessions[i].active = 1u;
+            rt->sessions[i].endpoint_epoch = endpoint_epoch;
             return &rt->sessions[i];
         }
     }
@@ -3982,7 +3984,8 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
     case RUNTIME_COMMAND_SESSION_OPEN: {
         runtime_session_kind kind =
             (runtime_session_kind)cmd->data.session_open.kind;
-        runtime_session *session = runtime_session_allocate(rt, kind);
+        runtime_session *session = runtime_session_allocate(
+            rt, kind, cmd->data.session_open.endpoint_epoch);
         if (session == NULL) {
             runtime_session_status status =
                 (kind != RUNTIME_SESSION_KIND_UI &&

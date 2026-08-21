@@ -15,6 +15,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+static void control_dispatch_release_session(control_dispatch_t *disp);
+
 void control_dispatch_init(
     control_dispatch_t *disp,
     control_server_t *server,
@@ -47,6 +49,7 @@ void control_dispatch_shutdown(control_dispatch_t *disp)
         }
         control_deferred_clear(d);
     }
+    control_dispatch_release_session(disp);
     memset(disp, 0, sizeof(*disp));
 }
 
@@ -123,6 +126,85 @@ static void post_error(
     control_response response;
     control_protocol_format_error(&response, id, code, message, false);
     (void)control_server_post_response(disp->server, &response);
+}
+
+/* Close the bound control session without waiting (fire-and-forget). */
+static void control_dispatch_release_session(control_dispatch_t *disp)
+{
+    uint64_t token;
+
+    if (disp == NULL || disp->client == NULL || disp->session_id == 0u) {
+        return;
+    }
+    token = runtime_client_alloc_request_token(disp->client);
+    (void)runtime_client_session_close(disp->client, disp->session_id, token);
+    disp->session_id = 0u;
+    disp->session_epoch = 0u;
+}
+
+/*
+ * Ensure TCP client is bound to a kind=control runtime session for the current
+ * connection epoch. Opens synchronously by pumping runtime events briefly.
+ */
+static bool control_dispatch_ensure_session(control_dispatch_t *disp)
+{
+    uint64_t epoch;
+    uint64_t token;
+    uint32_t start_ms;
+    runtime_event event;
+
+    if (disp == NULL || disp->server == NULL || disp->client == NULL) {
+        return false;
+    }
+    if (!control_server_has_client(disp->server)) {
+        return false;
+    }
+
+    epoch = control_server_connection_epoch(disp->server);
+    if (disp->session_id != 0u && disp->session_epoch == epoch) {
+        return true;
+    }
+
+    if (disp->session_id != 0u) {
+        control_dispatch_release_session(disp);
+    }
+
+    token = runtime_client_alloc_request_token(disp->client);
+    if (!runtime_client_session_open(
+            disp->client, RUNTIME_SESSION_KIND_CONTROL, epoch, token)) {
+        return false;
+    }
+
+    start_ms = SDL_GetTicks();
+    while ((SDL_GetTicks() - start_ms) < 2000u) {
+        while (runtime_client_poll_event(disp->client, &event)) {
+            if (event.type == RUNTIME_EVENT_SESSION_RESPONSE &&
+                event.request_token == token) {
+                if (event.data.session.status == RUNTIME_SESSION_OK &&
+                    event.data.session.session_id != 0u) {
+                    disp->session_id = event.data.session.session_id;
+                    disp->session_epoch = epoch;
+                    return true;
+                }
+                return false;
+            }
+            /* Keep sticky latches / deferred completions coherent. */
+            control_dispatch_on_runtime_event(disp, &event);
+        }
+        SDL_Delay(1);
+    }
+    return false;
+}
+
+static uint32_t control_dispatch_history_session_id(control_dispatch_t *disp)
+{
+    if (disp == NULL) {
+        return 0u;
+    }
+    if (!control_dispatch_ensure_session(disp)) {
+        return 0u; /* fall back to default session */
+    }
+    return disp->session_id;
 }
 
 static deferred_control_response *begin_deferred(
@@ -2035,7 +2117,7 @@ static void handle_request(control_dispatch_t *disp, control_request *req)
         }
         if (!runtime_client_history_find(
                 client,
-                0u, /* default session until S2 binds control session */
+                control_dispatch_history_session_id(disp),
                 &query,
                 from_kind,
                 from_id,
@@ -2056,7 +2138,7 @@ static void handle_request(control_dispatch_t *disp, control_request *req)
         }
         if (!runtime_client_history_next(
                 client,
-                0u,
+                control_dispatch_history_session_id(disp),
                 req->args.history_cursor,
                 req->args.history_limit,
                 token)) {
@@ -2075,7 +2157,7 @@ static void handle_request(control_dispatch_t *disp, control_request *req)
         }
         if (!runtime_client_history_read(
                 client,
-                0u,
+                control_dispatch_history_session_id(disp),
                 req->args.history_epoch,
                 req->args.history_id,
                 req->args.history_before,
@@ -2095,7 +2177,10 @@ static void handle_request(control_dispatch_t *disp, control_request *req)
             break;
         }
         if (!runtime_client_history_close(
-                client, 0u, req->args.history_cursor, token)) {
+                client,
+                control_dispatch_history_session_id(disp),
+                req->args.history_cursor,
+                token)) {
             post_error(disp, req->id, "runtime", "command rejected");
             control_deferred_clear(d);
         }
@@ -2128,9 +2213,26 @@ void control_dispatch_check_session(control_dispatch_t *disp)
 {
     deferred_control_response *d;
     uint64_t now;
+    uint64_t epoch;
+    bool has_client;
 
     if (disp == NULL) {
         return;
+    }
+
+    has_client = control_server_has_client(disp->server);
+    epoch = control_server_connection_epoch(disp->server);
+
+    /* Disconnect / epoch bump: free the control session slot. */
+    if (disp->session_id != 0u &&
+        (!has_client || disp->session_epoch != epoch)) {
+        control_dispatch_release_session(disp);
+    }
+
+    /* New TCP client: bind a control session early (before history cmds). */
+    if (has_client &&
+        (disp->session_id == 0u || disp->session_epoch != epoch)) {
+        (void)control_dispatch_ensure_session(disp);
     }
 
     d = control_deferred_active(&disp->deferred);
@@ -2138,8 +2240,7 @@ void control_dispatch_check_session(control_dispatch_t *disp)
         return;
     }
 
-    if (!control_server_has_client(disp->server) ||
-        d->connection_epoch != control_server_connection_epoch(disp->server)) {
+    if (!has_client || d->connection_epoch != epoch) {
         if (d->request_token != 0u) {
             (void)runtime_client_cancel_rpc(disp->client, d->request_token);
         }

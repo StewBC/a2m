@@ -1034,6 +1034,7 @@ bool runtime_client_history_close(
 bool runtime_client_session_open(
     runtime_client *client,
     runtime_session_kind kind,
+    uint64_t endpoint_epoch,
     uint64_t request_token) {
     runtime_command command = {
         .type = RUNTIME_COMMAND_SESSION_OPEN,
@@ -1046,6 +1047,7 @@ bool runtime_client_session_open(
         return false;
     }
     command.data.session_open.kind = (uint8_t)kind;
+    command.data.session_open.endpoint_epoch = endpoint_epoch;
     return message_queue_push(client->command_queue, &command);
 }
 

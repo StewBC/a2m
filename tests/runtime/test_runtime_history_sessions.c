@@ -181,7 +181,7 @@ int main(void)
     token = runtime_client_alloc_request_token(client);
     expect_true(
         "open a",
-        runtime_client_session_open(client, RUNTIME_SESSION_KIND_UI, token));
+        runtime_client_session_open(client, RUNTIME_SESSION_KIND_UI, 0u, token));
     expect_true(
         "open a resp",
         wait_session_response(client, token, &session_status, &session_a, 2.0));
@@ -191,7 +191,7 @@ int main(void)
     token = runtime_client_alloc_request_token(client);
     expect_true(
         "open b",
-        runtime_client_session_open(client, RUNTIME_SESSION_KIND_UI, token));
+        runtime_client_session_open(client, RUNTIME_SESSION_KIND_UI, 0u, token));
     expect_true(
         "open b resp",
         wait_session_response(client, token, &session_status, &session_b, 2.0));

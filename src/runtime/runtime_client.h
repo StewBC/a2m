@@ -238,10 +238,12 @@ bool runtime_client_history_close(
     uint32_t session_id,
     uint64_t cursor,
     uint64_t request_token);
-/* Worker-allocated session; reply via RUNTIME_EVENT_SESSION_RESPONSE. */
+/* Worker-allocated session; reply via RUNTIME_EVENT_SESSION_RESPONSE.
+   endpoint_epoch is stored for control binding (0 if unused). */
 bool runtime_client_session_open(
     runtime_client *client,
     runtime_session_kind kind,
+    uint64_t endpoint_epoch,
     uint64_t request_token);
 bool runtime_client_session_close(
     runtime_client *client,

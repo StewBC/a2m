@@ -13,6 +13,9 @@ typedef struct control_dispatch {
     control_server_t *server;
     runtime_client *client;
     deferred_control_table deferred;
+    /* Runtime session bound to the current TCP client (0 = unbound). */
+    uint32_t session_id;
+    uint64_t session_epoch;
     /* Sticky execution-state for waits / get-state. */
     bool seen_paused;
     bool machine_running;

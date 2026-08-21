@@ -301,6 +301,7 @@ typedef struct runtime_command {
 
         struct {
             uint8_t kind; /* runtime_session_kind: ui or control */
+            uint64_t endpoint_epoch; /* control connection_epoch; 0 if unused */
         } session_open;
 
         struct {

@@ -208,7 +208,9 @@ control dispatch still passes 0 until S2.
 - Disconnect mid-FIND leaves no orphan cursor (slot reusable)
 - ctest / smoke via `Ctl` unchanged for happy path
 
-**Landed:** _pending_
+**Landed:** TCP client binds `kind=control` session (epoch-tracked); history
+wire uses that session id; disconnect / epoch bump / shutdown releases the
+slot. Ctl history-find/next smoke green (scripts still omit session syntax).
 
 ---
 
