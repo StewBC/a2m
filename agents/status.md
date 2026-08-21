@@ -1,11 +1,11 @@
 # Status
 
-**As of:** 2026-08-20 · **Version:** 3.0.0 · **Branch:** `master`
+**As of:** 2026-08-21 · **Version:** 3.0.0 · **Branch:** `master`
 
 **Rules:** [`rules.md`](rules.md)  
-**Closed:** paint; SP `$C800`; BP 0–4e + P4b TRON; remote-debug **C0–C5b**; control tools **T1–T5**; `get-softswitches`; **turbo-zip**; **max free-run S2**; **snapshots** ([`snapshots.md`](snapshots.md) — `.a2state` save/load, drop, `--sna`, Opt+Shift+./,)  
-**Active:** [`sessions.md`](sessions.md) — multi-asker sessions + `state-changed` (Inspector prep; no UI yet).  
-**Look-later (not active):** Inspector UI (after sessions); debug ergonomics (mem workshop → live remount → state rewind UI → frame gate / HW snaps).
+**Closed:** paint; SP `$C800`; BP 0–4e + P4b TRON; remote-debug **C0–C5b**; control tools **T1–T5**; `get-softswitches`; **turbo-zip**; **max free-run S2**; **snapshots** ([`snapshots.md`](snapshots.md) — `.a2state` save/load, drop, `--sna`, Opt+Shift+./,); **sessions foundation** ([`sessions.md`](sessions.md) — multi-asker + `state-changed`; A2M/11; no Inspector UI).  
+**Active:** _(none)_  
+**Look-later (not active):** Inspector UI (consumes sessions); debug ergonomics (mem workshop → live remount → state rewind UI → frame gate / HW snaps).
 
 ---
 
@@ -19,7 +19,7 @@
 | Display | ARGB **560×192** throughout (`display_frame` / runtime slot / frontend) |
 | Video paint | Beam-stepped **560×192** a2m-class: LORES, DLORES, 40/80 text, HGR colour, DHGR; max uses full-frame block paint |
 | Memory areas | Map · Main · Aux · LC1 · LC2 · ROM |
-| Control port | **A2M/10 product-wired** (BP + frame ring + history + softswitches + save/load-state + `mount`/`unmount` Disk II+SmartPort + Disk II select/writable + `assemble`/`find-symbol`). Epic: [`remote-debug.md`](remote-debug.md) |
+| Control port | **A2M/11 product-wired** (BP + frame ring + history + softswitches + save/load-state + `mount`/`unmount` + assemble/find-symbol + **sessions** + **state-changed**). Epic: [`remote-debug.md`](remote-debug.md) · [`sessions.md`](sessions.md) |
 | Snapshots | **`.a2state`** path save/load — drop, `--sna`, Opt+Shift+`.`/`,`, control. Epic: [`snapshots.md`](snapshots.md) |
 | Machine files | Misc → Machine unified Load/Save: snapshots, raw/NAPS/AppleSingle/legacy DOS binaries, Applesoft ASCII import/export |
 
@@ -52,7 +52,7 @@ Keyboard stick (when on): Option/KP0 and Space are fire keys (optional swap in C
 
 | Area | Evidence |
 |------|----------|
-| Build / ctest | **53 green** (`testing.md`; includes file-codec, runtime machine-file round trips, assembler MLI launch) |
+| Build / ctest | **55 green** (`testing.md`; includes sessions + state-changed, file-codec, assembler MLI launch) |
 | Assembler | Misc → Assembler: assemble to RAM / `file=` HostFS; optional Auto-run; **MLI launch** gates auto-run on CPU-visible `$BF00 == $4C` (mutually exclusive with Reset); sample shim in `samples/asm_mli_launch/` |
 | CLI / INI | model, mounts sNdN (multi-image queue), turbo MHz/`max`, lifecycle, headless; `[DEBUG] break.*` |
 | Turbo / step / reset | Opt+T (MHz/max); F10–F12 family; F8 / Opt+F8 |

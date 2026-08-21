@@ -24,9 +24,9 @@ Siblings (not submodules): `../a2m` (Apple domain / paint reference),
 | 3 | **[`testing.md`](testing.md)** | Build + ctest gate |
 | 4 | **[`snapshots.md`](snapshots.md)** | Closed: machine save/load (c64m port) |
 | 5 | **[`remote-debug.md`](remote-debug.md)** | Closed epic: control / frame ring / history wire |
-| 6 | **[`control-tools.md`](control-tools.md)** | **Drive a2m over the control port** (A2M/10 ops brief) |
+| 6 | **[`control-tools.md`](control-tools.md)** | **Drive a2m over the control port** (A2M/11 ops brief) |
 | 7 | **[`turbo-zip.md`](turbo-zip.md)** | Closed: Zip MHz + max block paint |
-| 8 | **[`sessions.md`](sessions.md)** | **Active:** multi-asker sessions (Inspector prep; no UI) |
+| 8 | **[`sessions.md`](sessions.md)** | **Closed foundation:** multi-asker sessions + state-changed (Inspector prep; no UI) |
 
 Open the component note only when the task touches that area:
 [`video.md`](video.md) · [`video-paint.md`](video-paint.md) ·
@@ -44,9 +44,9 @@ Open the component note only when the task touches that area:
 | `rules.md` | Must-not-break architecture / host rules |
 | `snapshots.md` | Closed: machine save/load — c64m reuse + Apple payload |
 | `turbo-zip.md` | Closed: Zip MHz ladder + max presentation (block) paint |
-| `control-tools.md` | Agent ops: control-port scripting via `Ctl` + coop_watch (A2M/10) |
+| `control-tools.md` | Agent ops: control-port scripting via `Ctl` + coop_watch (A2M/11) |
 | `remote-debug.md` | Closed epic record: control/history/frame-ring wire |
-| `sessions.md` | Active: runtime sessions + state-changed (Inspector foundation) |
+| `sessions.md` | Closed foundation: runtime sessions + state-changed (Inspector next) |
 | `breakpoints.md` | Debugger BP product path (done through P5 + TRON) |
 | `video-paint.md` | Closed epic record: a2m-class paint into the beam |
 | `testing.md` | Gate, fixtures, deferred tests |

@@ -215,7 +215,7 @@ Python helper / coop_watch: **landed** — [`control-tools.md`](control-tools.md
 | **C5a** | `write_history[addr]` | **Done** | Last writer PC pack on bus write; debug_memory fill |
 | **C5b** | TRON / TROFF (P4b) | **Done** | File log on insn complete while enabled |
 | C5c | Richer hardware snapshots | **Parked** | Softswitch / Disk II / SP dumps later |
-| C5d | History UI browser / Inspector | **Parked** | Needs [`sessions.md`](sessions.md) foundation first; UI follow-up after S0–S4 |
+| C5d | History UI browser / Inspector | **Parked** | Sessions foundation **closed** ([`sessions.md`](sessions.md) S0–S4); UI consumes `runtime_client` sessions + existing A2M verbs — do not invent a second history path |
 | C5e | Softswitch / beam line ring | **Parked** | Only if frame+history prove insufficient |
 
 ### Acceptance bar (support system, not a sample game)
@@ -279,7 +279,8 @@ sensible sub-slices).
 | **A2M/7** | `select-disk` (absolute queue) + `set-disk-writable` (notch) |
 | **A2M/8** | Disk II `mount-disk` / `select-disk` / `set-disk-writable` resolve installed slot (prefer 6); explicit `slot drive` forms |
 | **A2M/9** | Unified `mount` / `unmount` with `kind=diskii\|smartport` (path infer; slot resolve); `mount-disk` kept as Disk II alias |
-| **A2M/10** | **Current.** Control-port `assemble` + `find-symbol` (Assembler-tab parity; Apple `mli-launch`); capabilities `assemble symbols` |
+| **A2M/10** | Control-port `assemble` + `find-symbol` (Assembler-tab parity; Apple `mli-launch`); capabilities `assemble symbols` |
+| **A2M/11** | **Current.** Runtime sessions (N=4) + per-session history cursors; unsolicited `0 event state-changed …`; capabilities `sessions state-changed`. See [`sessions.md`](sessions.md). |
 
 Bump only when scripts must learn new behaviour; update this table and
 `CONTROL_PROTOCOL_VERSION` in the same change.

@@ -2,8 +2,9 @@
 
 **Audience:** agents and humans scripting the emulator (headless or windowed).
 
-**Protocol today:** **A2M/10** (`CONTROL_PROTOCOL_VERSION` in
-`src/control/control_protocol.h`).
+**Protocol today:** **A2M/11** (`CONTROL_PROTOCOL_VERSION` in
+`src/control/control_protocol.h`). Sessions + unsolicited `state-changed`
+events; see [`sessions.md`](sessions.md).
 
 ## Source of truth
 
@@ -19,7 +20,7 @@ the same change. Epic history lives in [`remote-debug.md`](remote-debug.md)
 (implementers); do not start there to learn scripting.
 
 Related: [`status.md`](status.md) · [`rules.md`](rules.md) ·
-[`testing.md`](testing.md).
+[`testing.md`](testing.md) · [`sessions.md`](sessions.md).
 
 ---
 
@@ -32,7 +33,7 @@ python3 -c "
 import sys; sys.path.insert(0, 'tools')
 from a2m_control_client import Ctl
 c = Ctl(port=6510)
-print(c.cmd('hello'))          # name=a2m protocol=A2M/10
+print(c.cmd('hello'))          # name=a2m protocol=A2M/11
 print(c.cmd('get-cpu'))
 c.cmd('run'); c.wait_frame(2, 5000); c.cmd('pause'); c.wait_paused(2000)
 r = c.history_find(limit=8)
@@ -58,9 +59,11 @@ Inbox: append lines to `build/debug/coop_inbox`.
 
 ---
 
-## Wire inventory (A2M/10)
+## Wire inventory (A2M/11)
 
 Framing: `<id> <command> [args]\n` → `ok` / `error` / `data` (+ binary + `\n`).
+Unsolicited: `0 event state-changed reason=… session=… cycles=… frame=… epoch=…\n`
+(request id **0** is the event channel; `Ctl.cmd` skips these into `Ctl.events`).
 
 | Surface | Commands |
 |---------|----------|
@@ -70,13 +73,14 @@ Framing: `<id> <command> [args]\n` → `ok` / `error` / `data` (+ binary + `\n`)
 | Frame | `get-frame` → ARGB **560×192**, stride = width×4, `format=argb8888` |
 | Frame ring | `frame-ring-info` `frame-ring-record` `frame-ring-clear` `get-frame-at frame=\|cycle=` |
 | Breakpoints | `break-create` / `break-update` / `break-list` / `break-enable` / `break-clear` / `break-clear-all` / `rearm-oneshots` / `break-exec`; `when=`; access exec/read/write |
-| History | `history-info` `history-record` `history-clear` `history-find` `history-next` `history-read` `history-close` → `data history` **HST1** |
+| History | `history-info` `history-record` `history-clear` `history-find` `history-next` `history-read` `history-close` → `data history` **HST1** (per TCP session cursor) |
 | Waits | `wait-paused` `wait-running` `wait-frame` `wait-event` (incl. `assemble-complete` / `assemble-error`) |
 | Assembler | `assemble [address=] [run-address=] [auto-run=] [mli-launch=] [reset=] [auto-adjust-segments=] <path>` (deferred) |
 | Symbols | `find-symbol <name>` → `ok address=$XXXX name=…` / `not-ready` / `not-found` |
 | Input | `key <byte>` (`$8D` / CR → Return) |
 | Snapshot | `save-state` `load-state` |
 | Media | see below |
+| Sessions / inform | TCP client auto-binds one runtime session; mutations publish `state-changed` (open mutation; no lock) |
 
 ### Media (Disk II + SmartPort)
 
@@ -111,8 +115,13 @@ Aliases for `kind=`: `disk` → diskii; `sp` / `hd` → smartport.
 - BP mapping axes: `ram=map|main|aux`, `c100=map|rom`, `d000=map|lc1|lc2|rom`.
 - `break-create` / clear / enable often return **data** (breakpoint list), not bare `ok` — use `Ctl.break_*` helpers.
 - BP hit → `stop=breakpoint` on `wait-paused` / `get-state`.
-- Peer disconnect mid-wait frees the client slot (no port wedge).
+- Peer disconnect mid-wait frees the client slot (no port wedge) and closes the
+  bound control session (history cursor slot reusable).
 - Addresses: prefix hex with `$` (`mem()` does this). `get-memory` length is **decimal**.
+- **Events:** `0 event state-changed …` may arrive at any time; do not treat as
+  the next reply for id N. Prefer `Ctl` (`drain_events` / `events` list).
+- History FIND/NEXT cursors are **per session**; a step/poke/reset from any
+  asker invalidates all cursors (`CURSOR_STALE` → re-FIND).
 
 ctest gate: see [`testing.md`](testing.md) (expect full green after build).
 

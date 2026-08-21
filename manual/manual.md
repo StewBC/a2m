@@ -35,7 +35,7 @@ Useful flags:
 | `--break <addr>` / `-b` | Install an execute breakpoint at a hex address |
 | `--symbols <file>` | Load a simple symbol file (`NAME` hex per line) |
 | `--headless` | No window; short smoke exit unless `--control-port` is set |
-| `--control-port N` | Listen on localhost TCP for A2M/10 remote control (`0`=off) |
+| `--control-port N` | Listen on localhost TCP for A2M/11 remote control (`0`=off) |
 | `--audio-smoke` | Emit a 440 Hz test tone to verify audio output |
 
 By default, a2m loads `a2m.ini` from the current directory. The INI file stores
@@ -1701,7 +1701,7 @@ combine headless mode with `--sna`:
 The server always binds to `127.0.0.1`. It accepts one client at a time. The socket
 thread performs network I/O only; runtime commands and snapshot requests are dispatched
 by the main loop, so remote control follows the same thread-ownership rules as the GUI
-debugger. The current protocol name is `A2M/10`.
+debugger. The current protocol name is `A2M/11`.
 
 Python helpers:
 
@@ -1735,6 +1735,13 @@ Responses begin with the same id:
 <64 raw bytes>
 5 ok addr=0400 length=4 mode=1
 6 ok
+```
+
+Unsolicited events use request id `0` and the `event` verb (not a reply to a
+command). Clients must not treat them as the next response for id N:
+
+```text
+0 event state-changed reason=step session=2 cycles=12345 frame=1 epoch=1
 ```
 
 `quit-client` closes the TCP client connection. It does not quit the emulator process.
@@ -1773,6 +1780,7 @@ Text responses are ASCII lines terminated by `\n`:
 ```text
 <id> ok [metadata...]\n
 <id> error <code> <message>\n
+0 event <name> [fields...]\n
 ```
 
 Binary responses use a header line, exactly `<byte_count>` raw payload bytes, and one
@@ -1815,16 +1823,21 @@ for low-latency automation; a windowed session is still paced by present/vsync.
 
 | Command | Response |
 |---------|----------|
-| `hello` | `ok name=a2m protocol=A2M/10` |
-| `version` | `ok protocol=A2M/10 app=a2m` |
+| `hello` | `ok name=a2m protocol=A2M/11` |
+| `version` | `ok protocol=A2M/11 app=a2m` |
 | `capabilities` | Space-separated capability names |
 | `ping` | `ok` |
 | `quit-client` | `ok`, then the server closes the client connection |
 
 `capabilities` currently includes `connection`, `introspection`, `execution`,
 `state`, `softswitches`, `step`, `turbo`, `frame`, `frame-ring`, `memory`,
-`breakpoints`, `wait`, `key`, `disk`, `snapshot`, `history`, `assemble`, and
-`symbols`.
+`breakpoints`, `wait`, `key`, `disk`, `snapshot`, `history`, `assemble`,
+`symbols`, `sessions`, and `state-changed`.
+
+The TCP client is bound to one runtime **session** (history FIND/NEXT cursor
+state). Disconnect frees that session. Mutations (step, run, poke, reset, …)
+invalidate all history cursors and may emit `0 event state-changed …` so other
+askers notice (awareness only; no permission lock).
 
 ### Execution Control
 

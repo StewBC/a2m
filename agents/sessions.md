@@ -1,9 +1,10 @@
 # Sessions: multi-asker query foundation (Inspector prep)
 
-**Status:** Active epic — foundation only. **No Inspector UI in this epic.**  
+**Status:** Closed (foundation). **No Inspector UI in this epic.**  
 **Product name (later UI):** Inspector (F9-like second view; not this campaign).  
 **Depends on:** remote-debug C0–C5b closed (A2M/10 control + history + frame ring).  
-**Unblocks:** Inspector UI discussion / C5d history browser as a host view.
+**Unblocks:** Inspector UI discussion / C5d history browser as a host view.  
+**Wire:** **A2M/11**.
 
 Related: [`remote-debug.md`](remote-debug.md) · [`control-tools.md`](control-tools.md) ·
 [`rules.md`](rules.md) · [`runtime.md`](runtime.md) · [`status.md`](status.md).
@@ -275,20 +276,21 @@ ctest (step inform + CURSOR_STALE + re-FIND).
 - Checklist below all checked
 - This file: Status → Closed (foundation); UI remains follow-up
 
-**Landed:** _pending_
+**Landed:** Docs + manual + Python A2M/11; checklist complete; epic foundation
+closed. Inspector UI remains follow-up.
 
 ---
 
 ## Acceptance checklist (foundation done)
 
-- [ ] Fixed session table (N=4) in runtime; no global history cursor
-- [ ] Two in-process sessions can page history independently
-- [ ] TCP client maps to one control session; disconnect cleans up
-- [ ] Open mutation; no permission protocol
-- [ ] `state-changed` inform reaches the socket client; `Ctl` safe with events
-- [ ] A2M version bumped + capabilities + docs
-- [ ] Full ctest green
-- [ ] **No** Inspector UI / host chord / frontend layout work required to claim done
+- [x] Fixed session table (N=4) in runtime; no global history cursor
+- [x] Two in-process sessions can page history independently
+- [x] TCP client maps to one control session; disconnect cleans up
+- [x] Open mutation; no permission protocol
+- [x] `state-changed` inform reaches the socket client; `Ctl` safe with events
+- [x] A2M version bumped + capabilities + docs
+- [x] Full ctest green
+- [x] **No** Inspector UI / host chord / frontend layout work required to claim done
 
 ---
 
