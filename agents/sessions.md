@@ -1,7 +1,7 @@
 # Sessions: multi-asker query foundation (Inspector prep)
 
 **Status:** Closed (foundation). **No Inspector UI in this epic.**  
-**Product name (later UI):** Inspector (F9-like second view; not this campaign).  
+**Product name (later UI):** Inspector — the forensic **mode** of the one debugger skin, not a second view ([`timemachine.md`](timemachine.md) D1). Not this campaign.  
 **Depends on:** remote-debug C0–C5b closed (A2M/10 control + history + frame ring).  
 **Unblocks:** Inspector UI discussion / C5d history browser as a host view.  
 **Wire:** **A2M/11**.
@@ -318,7 +318,7 @@ request/response matching correct for `Ctl.cmd`, document it, continue.
 
 Not binding — only so implementers do not “helpfully” build UI now:
 
-- Inspector toggle key (distinct from F9 debugger)
+- Inspector entry (a mode of the F9 skin — see [`timemachine.md`](timemachine.md) D15, Misc → Inspector tab)
 - Auto-pause on enter; resume policy on exit
 - Scrub UX for frame ring + history; how human says “look at frame N” to the AI
 - Whether UI talks A2M verbs locally or only `runtime_client` session APIs

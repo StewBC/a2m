@@ -26,7 +26,9 @@ Siblings (not submodules): `../a2m` (Apple domain / paint reference),
 | 5 | **[`remote-debug.md`](remote-debug.md)** | Closed epic: control / frame ring / history wire |
 | 6 | **[`control-tools.md`](control-tools.md)** | **Drive a2m over the control port** (A2M/11 ops brief) |
 | 7 | **[`turbo-zip.md`](turbo-zip.md)** | Closed: Zip MHz + max block paint |
-| 8 | **[`sessions.md`](sessions.md)** | **Closed foundation:** multi-asker sessions + state-changed (Inspector prep; no UI) |
+| 8 | **[`sessions.md`](sessions.md)** | Closed foundation: multi-asker sessions + state-changed |
+| 9 | **[`inspector.md`](inspector.md)** | **Retired F7 spine:** lessons only (join key, unified disasm) — no live code |
+| 10 | **[`timemachine.md`](timemachine.md)** | **Active epic roadmap:** forensic backend + one-skin Inspector (TM0–TM6) |
 
 Open the component note only when the task touches that area:
 [`video.md`](video.md) · [`video-paint.md`](video-paint.md) ·
@@ -34,7 +36,8 @@ Open the component note only when the task touches that area:
 [`disk.md`](disk.md) · [`breakpoints.md`](breakpoints.md) ·
 [`snapshots.md`](snapshots.md) ·
 [`remote-debug.md`](remote-debug.md) · [`control-tools.md`](control-tools.md) ·
-[`turbo-zip.md`](turbo-zip.md) · [`sessions.md`](sessions.md).
+[`turbo-zip.md`](turbo-zip.md) · [`sessions.md`](sessions.md) ·
+[`inspector.md`](inspector.md) · [`timemachine.md`](timemachine.md).
 
 ## Document set
 
@@ -46,7 +49,10 @@ Open the component note only when the task touches that area:
 | `turbo-zip.md` | Closed: Zip MHz ladder + max presentation (block) paint |
 | `control-tools.md` | Agent ops: control-port scripting via `Ctl` + coop_watch (A2M/11) |
 | `remote-debug.md` | Closed epic record: control/history/frame-ring wire |
-| `sessions.md` | Closed foundation: runtime sessions + state-changed (Inspector next) |
+| `sessions.md` | Closed foundation: runtime sessions + state-changed |
+| `inspector.md` | Retired F7 Inspector: lessons kept, code archived at `archive/f7-inspector` |
+| `timemachine.md` | **Active:** TimeMachine epic roadmap (north star + D1–D15) |
+| `TM0.md` … `TM6.md` | Implementer briefs per phase (V1 = TM0–TM4; V1.1 = TM5–TM6) |
 | `breakpoints.md` | Debugger BP product path (done through P5 + TRON) |
 | `video-paint.md` | Closed epic record: a2m-class paint into the beam |
 | `testing.md` | Gate, fixtures, deferred tests |
