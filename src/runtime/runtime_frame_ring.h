@@ -79,6 +79,19 @@ bool runtime_frame_ring_copy_by_frame(
     uint64_t frame_number,
     runtime_ring_frame *out_frame);
 
+/* Exact ring slot: index 0 = oldest retained, count-1 = newest. */
+bool runtime_frame_ring_copy_by_index(
+    runtime_frame_ring *ring,
+    uint32_t index,
+    runtime_ring_frame *out_frame);
+
+/* Metadata only — no pixel copy. index 0 = oldest retained. */
+bool runtime_frame_ring_meta_at_index(
+    runtime_frame_ring *ring,
+    uint32_t index,
+    uint64_t *out_frame_number,
+    uint64_t *out_machine_cycle);
+
 bool runtime_frame_ring_copy_by_cycle(
     runtime_frame_ring *ring,
     uint64_t machine_cycle,

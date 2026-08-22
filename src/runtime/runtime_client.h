@@ -288,6 +288,19 @@ bool runtime_client_copy_frame_at(
     bool by_cycle,
     runtime_ring_frame *out_frame);
 
+/* index 0 = oldest retained slot (handles frame-number gaps). */
+bool runtime_client_copy_frame_at_index(
+    runtime_client *client,
+    uint32_t index,
+    runtime_ring_frame *out_frame);
+
+/* Metadata only for span math (no pixel slab copy). */
+bool runtime_client_frame_meta_at_index(
+    runtime_client *client,
+    uint32_t index,
+    uint64_t *out_frame_number,
+    uint64_t *out_machine_cycle);
+
 void runtime_client_set_frame_ring_recording(runtime_client *client, bool recording);
 
 void runtime_client_clear_frame_ring(runtime_client *client);

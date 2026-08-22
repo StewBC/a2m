@@ -242,6 +242,60 @@ bool runtime_frame_ring_copy_by_frame(
     return runtime_frame_ring_copy(ring, frame_number, false, out_frame);
 }
 
+bool runtime_frame_ring_copy_by_index(
+    runtime_frame_ring *ring,
+    uint32_t index,
+    runtime_ring_frame *out_frame)
+{
+    const runtime_ring_frame *entry;
+    bool ok = false;
+
+    if (ring == NULL || out_frame == NULL) {
+        return false;
+    }
+
+    runtime_frame_ring_lock(ring);
+    if (runtime_frame_ring_usable(ring) && index < ring->count) {
+        entry = runtime_frame_ring_at(ring, index);
+        if (entry != NULL) {
+            *out_frame = *entry;
+            ok = true;
+        }
+    }
+    runtime_frame_ring_unlock(ring);
+    return ok;
+}
+
+bool runtime_frame_ring_meta_at_index(
+    runtime_frame_ring *ring,
+    uint32_t index,
+    uint64_t *out_frame_number,
+    uint64_t *out_machine_cycle)
+{
+    const runtime_ring_frame *entry;
+    bool ok = false;
+
+    if (ring == NULL) {
+        return false;
+    }
+
+    runtime_frame_ring_lock(ring);
+    if (runtime_frame_ring_usable(ring) && index < ring->count) {
+        entry = runtime_frame_ring_at(ring, index);
+        if (entry != NULL) {
+            if (out_frame_number != NULL) {
+                *out_frame_number = entry->frame_number;
+            }
+            if (out_machine_cycle != NULL) {
+                *out_machine_cycle = entry->machine_cycle;
+            }
+            ok = true;
+        }
+    }
+    runtime_frame_ring_unlock(ring);
+    return ok;
+}
+
 bool runtime_frame_ring_copy_by_cycle(
     runtime_frame_ring *ring,
     uint64_t machine_cycle,

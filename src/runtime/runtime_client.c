@@ -1190,6 +1190,28 @@ bool runtime_client_copy_frame_at(
         runtime_frame_ring_copy_by_frame(client->frame_ring, target, out_frame);
 }
 
+bool runtime_client_copy_frame_at_index(
+    runtime_client *client,
+    uint32_t index,
+    runtime_ring_frame *out_frame) {
+    if (client == NULL || client->frame_ring == NULL || out_frame == NULL) {
+        return false;
+    }
+    return runtime_frame_ring_copy_by_index(client->frame_ring, index, out_frame);
+}
+
+bool runtime_client_frame_meta_at_index(
+    runtime_client *client,
+    uint32_t index,
+    uint64_t *out_frame_number,
+    uint64_t *out_machine_cycle) {
+    if (client == NULL || client->frame_ring == NULL) {
+        return false;
+    }
+    return runtime_frame_ring_meta_at_index(
+        client->frame_ring, index, out_frame_number, out_machine_cycle);
+}
+
 void runtime_client_set_frame_ring_recording(runtime_client *client, bool recording) {
     if (client == NULL || client->frame_ring == NULL) {
         return;

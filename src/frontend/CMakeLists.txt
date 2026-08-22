@@ -21,6 +21,8 @@ add_custom_target(frontend_help_content DEPENDS "${A2M_HELP_CONTENT}")
 add_library(frontend STATIC
     debugger_layout.c
     debugger_layout.h
+    debugger_disasm.c
+    debugger_disasm.h
     crt_renderer.c
     crt_renderer.h
     disk_led_data.c
