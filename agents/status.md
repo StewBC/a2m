@@ -4,8 +4,8 @@
 
 **Rules:** [`rules.md`](rules.md)  
 **Closed:** paint; SP `$C800`; BP 0–4e + P4b TRON; remote-debug **C0–C5b**; control tools **T1–T5**; `get-softswitches`; **turbo-zip**; **max free-run S2**; **snapshots** ([`snapshots.md`](snapshots.md) — `.a2state` save/load, drop, `--sna`, Opt+Shift+./,); **sessions foundation** ([`sessions.md`](sessions.md) — multi-asker + `state-changed`; A2M/11).  
-**Active:** **TimeMachine V1 accepted** (TM0–TM4) with Inspector UX **wrong** — contract [`TMA0.md`](TMA0.md), implement [`TMA1.md`](TMA1.md) (film / land / re-execute; not HST1 `SEEK_CYCLE`). **TM5 forensic BPs landed.** Misc -> Inspector is still the forensic entry; Opt+B in forensic arms the TM store only. F7 stays unbound. **TM6** Promote is V1.1 remaining. Lessons from retired F7: [`inspector.md`](inspector.md).  
-**Look-later:** **TMA2** [`TMA2.md`](TMA2.md) delete TM1 tape-nav (required; FIND stays); TM6 Promote/Branch; TM BP conditions / sealed re-run; debug ergonomics (mem workshop, live remount, frame gate / HW snaps); drop stored film? (TMA0 A11).
+**Active:** **TMA1** — Inspector **time travel** ([`TMA0.md`](TMA0.md) / [`TMA1.md`](TMA1.md)): film / land / re-execute to **live**; one breakpoint list; Opt+Left unbound. TimeMachine V1 (TM0–TM4) accepted; TM4 Inspector UX superseded. TM5 second BP bank is leftover — TMA1 stops using it. F7 stays unbound. **Not going to TM6.** Lessons from retired F7: [`inspector.md`](inspector.md).  
+**Look-later:** **TMA2** [`TMA2.md`](TMA2.md) delete TM1 tape-nav + TM5 second BP bank (required; FIND stays); drop stored film? (TMA0 A11); debug ergonomics (mem workshop, live remount, frame gate / HW snaps). TM6 Promote/Branch is parked, not next.
 
 ---
 
@@ -29,10 +29,10 @@
 |-----|--------|
 | **F9** | Toggle debugger (starts display-only) |
 | **F8** / **Opt+F8** | Warm / cold reset |
-| **F10** / Shift+F10 | Pause/step · step out (forensic: tape step / step-out) |
-| **F11** | Step over (forensic: tape step-over) |
-| **F12** / Shift+F12 | Run · run to cursor (forensic: tape run-to cursor) |
-| **Opt+B** | Toggle execute BP at disasm cursor (forensic: Time Machine list only) |
+| **F10** / Shift+F10 | Pause/step · step out (time travel: sealed step / step-out; no-op at live) |
+| **F11** | Step over (time travel: sealed step-over; no-op at live) |
+| **F12** / Shift+F12 | Run · run to cursor (time travel: re-execute to a breakpoint or **live**; stay in Inspect) |
+| **Opt+B** | Toggle execute BP at disasm cursor (same list in live and time travel) |
 | **Opt+T** | Cycle turbo ladder (MHz / max — [`turbo-zip.md`](turbo-zip.md)) |
 | **Opt+Shift+.** / **,** | Quicksave / quickload `.a2state` |
 | **Opt+Shift+A** | Assemble configured source; honor reset / auto-run / MLI launch / one-shot options |

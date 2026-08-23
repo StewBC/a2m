@@ -1,6 +1,7 @@
 # TM1 — Query engine on existing HST1 (fast tape verbs)
 
 **Status:** Landed.  
+**TMA overlay:** Inspector time travel does not use these tape verbs ([`TMA0.md`](TMA0.md)). [`TMA2.md`](TMA2.md) deletes this query layer. HST1 FIND stays. This file is the record of the tape-nav experiment.  
 **Epic:** [`timemachine.md`](timemachine.md)  
 **Prev / Next:** [`TM0.md`](TM0.md) / [`TM2.md`](TM2.md)  
 **V1 bar:** Required.  

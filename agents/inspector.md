@@ -43,8 +43,10 @@ metadata without copying the pixel slab.
 
 **Live step APIs must never drive forensic navigation.** Calling
 `step-instruction` to move a forensic cursor mutates the machine and invalidates
-every peer history cursor. Forensic movement is query-only — TimeMachine keeps
-this as D4 read-only.
+every peer history cursor. That lesson was about HST1 FIND. Inspector **time
+travel** ([`TMA0.md`](TMA0.md)) *does* re-execute the landed Apple under a seal,
+clamped to live; pokes stay rejected (D4 overlay). Opt+Left stays unbound in
+time travel.
 
 **Unified disasm was the right instinct, one shell too late.** A single view +
 key router with mode-aware accessors (`get_focus_pc`, `fetch_bytes`, step verbs)

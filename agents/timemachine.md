@@ -1,7 +1,7 @@
 # TimeMachine: forensic debugger backend (roadmap)
 
 **Status:** Roadmap (planning). **Not implementation.**  
-**Product name:** TimeMachine — runtime-owned forensic engine; Inspector is the UI mode that drives it.  
+**Product name:** TimeMachine — runtime-owned time-travel engine (checkpoints + sealed re-execute). Inspector is the UI that drives it. HST1 is a **separate** forensic flight recorder (FIND), not the Inspector slider.  
 **Supersedes:** F7 Inspector scrub-spine ([`inspector.md`](inspector.md) I0–I5a) — **already retired and removed** in `b738cef`; lessons (join key, unified disasm) salvaged, code at tag `archive/f7-inspector`.  
 **Depends on:** remote-debug C0–C5b (history + frame ring); sessions S0–S4; **machine snapshots as the checkpoint format** ([`snapshots.md`](snapshots.md)) — TM2 uses `apple2_snapshot_save`/`load` directly and bumps its version, so that closed epic's doc is edited in TM2, not merely read.  
 **Unblocks:** One-skin live + forensic debugger; later Promote/Branch (“make this live”).
@@ -126,7 +126,9 @@ Do not re-expand full scope here — edit the phase file.
 
 ### Addendum (do not rewrite the table above)
 
-TM4 Inspector **behaviour** is superseded by **[`TMA0.md`](TMA0.md)** (film / land / re-execute). TM4 stays Landed as history. HST1 (TM1) stays in the product; it is not the Inspector slider. Implementer briefs: **[`TMA1.md`](TMA1.md)** (Inspector), **[`TMA2.md`](TMA2.md)** (delete TM1 tape-nav — required).
+**Two streams:** Time Machine = **time travel** (checkpoints, land, re-execute). HST1 = **forensic** flight recorder (FIND). Inspector is time travel. Wire `mode=forensic` is that mode’s code name.
+
+TM4 Inspector **behaviour** is superseded by **[`TMA0.md`](TMA0.md)** (film / land / re-execute to **live**; one BP list; Opt+Left unbound). TM4 stays Landed as history. HST1 (TM1) stays in the product; it is not the Inspector slider. Implementer briefs: **[`TMA1.md`](TMA1.md)** (Inspector; stop after Landed), **[`TMA2.md`](TMA2.md)** (delete TM1 tape-nav **and** the TM5 second BP bank — required). **Not going to TM6.**
 
 ---
 
@@ -214,10 +216,10 @@ Epic V1 = **TM0–TM4** closed (accepted 2026-08-22 with a recording-speed cavea
 ```text
 1. Read agents/rules.md, agents/timemachine.md (this file), then agents/TMn.md
    or agents/TMAn.md for the phase named in the human brief (only one unless told
-   to continue). Live Inspector UX is TMA0, not TM4.
+   to continue). Live Inspector UX is TMA0, not TM4. TMA1 then stop; TMA2 when
+   told. Do not start TM6.
 2. Also read deps listed in that phase doc (sessions/snapshots/remote-debug as cited).
-3. Implement that phase → Landed in TMn.md + one-line status here if useful.
-4. Stop. Do not start TM5/TM6 until TM0–TM4 V1 bar is accepted.
-5. F7 is already gone (D14) — there is nothing to retire or salvage. If a phase doc
+3. Implement that phase → Landed in TMn.md / TMAn.md + one-line status here if useful.
+4. F7 is already gone (D14) — there is nothing to retire or salvage. If a phase doc
    sends you to `frontend_inspector_*`, that anchor is stale; fix the doc.
 ```
