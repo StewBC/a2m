@@ -71,9 +71,16 @@ language):
    existing `history-record` / `frame-ring-record` control verbs — those keep working
    standalone for agents, and are the pre-TimeMachine behaviour.
 3. Turning TM on from off is what arms the recorders; an agent that then calls
-   `history-record off` gets what it asked for, and Inspector enter (TM3) fails honestly
-   because `tm_window` is empty. No hidden re-arming.
+   `history-record off` **or** `frame-ring-record off` gets what it asked for, and
+   Inspector enter (TM3) fails honestly because `tm_window` is empty. No hidden
+   re-arming. Same rule, same test for both recorders — pin 1 is one product path,
+   and D17 is the intersection, so either recorder off empties the window.
 4. UI Inspector mode (TM4) **requires** `timemachine=1`.
+5. `timemachine=1` with a required recorder budget of **0** is an **honest empty
+   tape**, not a refuse and not a silent override of the typed 0. Reuse the existing
+   `runtime_history_unavailable_reason` vocabulary (`DISABLED_BY_CONFIG` is what 0
+   already maps to). Warn once at startup; TM4 shows *why* the window is empty.
+   Garbage / out-of-range values follow existing `app_options` numeric handling.
 
 Document the dual wording honestly in `control-tools.md` while both surfaces exist.
 
@@ -82,9 +89,14 @@ Document the dual wording honestly in `control-tools.md` while both surfaces exi
 - Plumb the bool into `app_options` → runtime config (`runtime_internal` / create path).  
 - Expose read API for worker + client if needed (`runtime_client` getter or existing
   options snapshot).  
-- **No** recorder behavior change required beyond reading the flag (TM1+ consume it).  
-- ctest: options parse / INI round-trip if that is the project pattern; else a small
-  unit on parse defaults.
+- **Arm HST1 + frame ring on the TM off→on edge** (startup with `timemachine=1`, or a
+  later runtime enable). Arming is an edge, not a hold: while TM stays on, the
+  standalone `history-record` / `frame-ring-record` verbs remain the source of truth.
+  **No checkpoint work** — TM2 adds the checkpoint ring as one line in this same
+  arming function.  
+- `timemachine=0` does not stop standalone recording; it only skips the TM arm.  
+- ctest: options parse / INI round-trip; pin-3 no-rearm for **both** recorders;
+  zero-budget honest empty tape (do not assert on warning text).
 
 ### 4. Vocabulary (use these names in code comments / APIs going forward)
 
@@ -118,6 +130,8 @@ Document the dual wording honestly in `control-tools.md` while both surfaces exi
 - [ ] Master TimeMachine enable in INI + CLI; **default off**  
 - [ ] `timemachine_memory_mb` budget option plumbed (consumed in TM2)  
 - [ ] Flag reaches runtime config; readable where TM1 will gate  
+- [ ] TM off→on arms HST1 + frame ring once; no hidden re-arm after standalone off  
+- [ ] `timemachine=1` + budget `0` → honest empty tape (`DISABLED_BY_CONFIG`); one startup warning  
 - [ ] `a2m.ini.example` gains a **`[debug]` section** — it has none today (sections are window/machine/Slots/config/DiskII/SmartPort/input), so `history_memory_mb` and `frame_ring_memory_mb` are undocumented there. Add them alongside `timemachine`  
 - [ ] Doc note: off = play, on = debug recording path; state the 512 MB aggregate  
 - [ ] `control-tools.md` notes the TM master switch vs standalone `history-record` / `frame-ring-record`  
@@ -131,7 +145,8 @@ Document the dual wording honestly in `control-tools.md` while both surfaces exi
 
 ```text
 1. Read agents/rules.md, agents/timemachine.md (D1–D18), agents/TM0.md (this file).
-2. Add config flag + plumb to runtime; update ini example.
+2. Add config flag + plumb to runtime; arm HST1 + frame ring on the off→on edge;
+   update ini example. No checkpoint work.
 3. Align status/README/timemachine Landed pointers; do not implement TM1 APIs.
 4. Build + ctest. Write Landed. Stop.
 ```
