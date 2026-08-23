@@ -1,11 +1,11 @@
 # Status
 
-**As of:** 2026-08-22 · **Version:** 3.0.0 · **Branch:** `master`
+**As of:** 2026-08-23 · **Version:** 3.0.0 · **Branch:** `master`
 
 **Rules:** [`rules.md`](rules.md)  
 **Closed:** paint; SP `$C800`; BP 0–4e + P4b TRON; remote-debug **C0–C5b**; control tools **T1–T5**; `get-softswitches`; **turbo-zip**; **max free-run S2**; **snapshots** ([`snapshots.md`](snapshots.md) — `.a2state` save/load, drop, `--sna`, Opt+Shift+./,); **sessions foundation** ([`sessions.md`](sessions.md) — multi-asker + `state-changed`; A2M/11).  
-**Active:** **TimeMachine V1 accepted** (TM0–TM4). **TM5 forensic BPs landed.** Misc -> Inspector is the forensic entry; Opt+B in forensic arms the TM store only. F7 stays unbound. **TM6** Promote is V1.1 remaining. Lessons from retired F7: [`inspector.md`](inspector.md).  
-**Look-later:** TM6 Promote/Branch; TM BP conditions / sealed re-run; debug ergonomics (mem workshop, live remount, frame gate / HW snaps).
+**Active:** **TimeMachine V1 accepted** (TM0–TM4) with Inspector UX **wrong** — contract [`TMA0.md`](TMA0.md), implement [`TMA1.md`](TMA1.md) (film / land / re-execute; not HST1 `SEEK_CYCLE`). **TM5 forensic BPs landed.** Misc -> Inspector is still the forensic entry; Opt+B in forensic arms the TM store only. F7 stays unbound. **TM6** Promote is V1.1 remaining. Lessons from retired F7: [`inspector.md`](inspector.md).  
+**Look-later:** **TMA2** [`TMA2.md`](TMA2.md) delete TM1 tape-nav (required; FIND stays); TM6 Promote/Branch; TM BP conditions / sealed re-run; debug ergonomics (mem workshop, live remount, frame gate / HW snaps); drop stored film? (TMA0 A11).
 
 ---
 

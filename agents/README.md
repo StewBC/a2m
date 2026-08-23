@@ -28,7 +28,10 @@ Siblings (not submodules): `../a2m` (Apple domain / paint reference),
 | 7 | **[`turbo-zip.md`](turbo-zip.md)** | Closed: Zip MHz + max block paint |
 | 8 | **[`sessions.md`](sessions.md)** | Closed foundation: multi-asker sessions + state-changed |
 | 9 | **[`inspector.md`](inspector.md)** | **Retired F7 spine:** lessons only (join key, unified disasm) — no live code |
-| 10 | **[`timemachine.md`](timemachine.md)** | **Active epic roadmap:** forensic backend + one-skin Inspector (TM0–TM6) |
+| 10 | **[`timemachine.md`](timemachine.md)** | Epic roadmap (TM0–TM6 landed history) + **TMA addendum** |
+| 11 | **[`TMA0.md`](TMA0.md)** | Inspector contract: film / land / re-execute |
+| 12 | **[`TMA1.md`](TMA1.md)** | **Implement** TMA0 (rewire TM4 tab) |
+| 13 | **[`TMA2.md`](TMA2.md)** | Delete TM1 tape-nav (required cleanup; FIND stays) |
 
 Open the component note only when the task touches that area:
 [`video.md`](video.md) · [`video-paint.md`](video-paint.md) ·
@@ -38,7 +41,8 @@ Open the component note only when the task touches that area:
 [`remote-debug.md`](remote-debug.md) · [`control-tools.md`](control-tools.md) ·
 [`turbo-zip.md`](turbo-zip.md) · [`max-free-run.md`](max-free-run.md) ·
 [`sessions.md`](sessions.md) ·
-[`inspector.md`](inspector.md) · [`timemachine.md`](timemachine.md).
+[`inspector.md`](inspector.md) · [`timemachine.md`](timemachine.md) ·
+[`TMA0.md`](TMA0.md) · [`TMA1.md`](TMA1.md) · [`TMA2.md`](TMA2.md).
 
 ## Document set
 
@@ -53,8 +57,11 @@ Open the component note only when the task touches that area:
 | `remote-debug.md` | Closed epic record: control/history/frame-ring wire |
 | `sessions.md` | Closed foundation: runtime sessions + state-changed |
 | `inspector.md` | Retired F7 Inspector: lessons kept, code archived at `archive/f7-inspector` |
-| `timemachine.md` | **Active:** TimeMachine epic roadmap (north star + D1–D18) |
-| `TM0.md` … `TM6.md` | Implementer briefs per phase (V1 = TM0–TM4; V1.1 = TM5–TM6) |
+| `timemachine.md` | TimeMachine epic (D1–D18; TM0–TM6 history) |
+| `TM0.md` … `TM6.md` | Landed phase briefs (V1 = TM0–TM4; V1.1 = TM5–TM6) |
+| `TMA0.md` | Addendum contract: Inspector film / land / re-execute |
+| `TMA1.md` | Implementer brief for TMA0 |
+| `TMA2.md` | Delete TM1 tape-nav; keep HST1 FIND |
 | `breakpoints.md` | Debugger BP product path (done through P5 + TRON) |
 | `video-paint.md` | Closed epic record: a2m-class paint into the beam |
 | `testing.md` | Gate, fixtures, deferred tests |

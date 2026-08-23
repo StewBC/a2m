@@ -124,6 +124,10 @@ one-line pointer update here if useful.
 Phase docs are the implementer briefs (goal, non-goals, anchors, acceptance, script).
 Do not re-expand full scope here — edit the phase file.
 
+### Addendum (do not rewrite the table above)
+
+TM4 Inspector **behaviour** is superseded by **[`TMA0.md`](TMA0.md)** (film / land / re-execute). TM4 stays Landed as history. HST1 (TM1) stays in the product; it is not the Inspector slider. Implementer briefs: **[`TMA1.md`](TMA1.md)** (Inspector), **[`TMA2.md`](TMA2.md)** (delete TM1 tape-nav — required).
+
 ---
 
 ## Parallelism / ordering
@@ -209,7 +213,8 @@ Epic V1 = **TM0–TM4** closed (accepted 2026-08-22 with a recording-speed cavea
 
 ```text
 1. Read agents/rules.md, agents/timemachine.md (this file), then agents/TMn.md
-   for the phase named in the human brief (only one phase unless told to continue).
+   or agents/TMAn.md for the phase named in the human brief (only one unless told
+   to continue). Live Inspector UX is TMA0, not TM4.
 2. Also read deps listed in that phase doc (sessions/snapshots/remote-debug as cited).
 3. Implement that phase → Landed in TMn.md + one-line status here if useful.
 4. Stop. Do not start TM5/TM6 until TM0–TM4 V1 bar is accepted.
