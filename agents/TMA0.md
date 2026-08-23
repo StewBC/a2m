@@ -75,12 +75,13 @@ These overlay TM4 Inspector UX. Backend pins D5 / D5a / D12 / D16 still hold.
 | **A14** | Breakpoints | **One list.** Live and time travel share it. Opt+B and the Breakpoints tab always edit that list. Time-travel run stops on those breakpoints. The TM5 second bank is deleted in [`TMA2.md`](TMA2.md). |
 | **A15** | TM6 | **Not this campaign.** No Promote / Branch. |
 | **A16** | CRT on stop | Any F10-family / F12 / Pause that leaves the Apple **stopped** must **publish a CRT frame**. Same rule in live and time travel (one skin). **Override on** (Hardware tab) is a RAM view of a page — dump video RAM, then publish. **Override off** publishes the **beam buffer** so a mid-frame mode switch stays visible. Paint-off (max turbo, sealed F12 run) has no beam image: dump RAM. Do not leave the CRT on a vblank captured mid-routine. |
+| **A17** | Inspect chrome | While in time travel, window **headers** use dark cobalt (`nk_rgb(24, 62, 118)` / hover `32, 76, 136` / active `40, 88, 152`) so gray title text still reads. Do **not** tint the window background (TM4’s warm-brown fill is gone). |
 
 ---
 
 ## Goal
 
-Rewire Misc → Inspector so it matches A1–A16.
+Rewire Misc → Inspector so it matches A1–A17.
 
 **Win:** slam the thumb to the far left and the UI stays live; release **lands** in ~a millisecond-scale snapshot load; `±` and F10-family move that Apple by re-execute, clamped to live.
 
@@ -188,6 +189,7 @@ TM4 Landed remains true as a historical phase. This addendum supersedes **that t
 - [x] Two streams pinned; HST1 out of the Inspector loop  
 - [x] One breakpoint list; Opt+Left unbound; F12 runs to live; enter starts at live  
 - [x] A16 CRT on stop: Override / paint-off dumps RAM; else beam buffer  
+- [x] A17 Inspect chrome: cobalt headers, no background tint  
 
 Implementation acceptance lives in [`TMA1.md`](TMA1.md).
 
@@ -197,7 +199,7 @@ Implementation acceptance lives in [`TMA1.md`](TMA1.md).
 
 ```text
 TMA0: docs only (this file).
-TMA1: implement A1–A16 (Inspector is time travel; stops calling TM1). Stop for a look.
+TMA1: implement A1–A17 (Inspector is time travel; stops calling TM1). Stop for a look.
 TMA2: [`TMA2.md`](TMA2.md) delete the TM1 query engine and the TM5 second BP bank.
 Do not start TM6. Do not re-open A11 (drop film) without a new addendum.
 ```
@@ -206,4 +208,4 @@ Do not start TM6. Do not re-open A11 (drop film) without a new addendum.
 
 ## Landed
 
-Brief accepted as the Inspector contract 2026-08-23; vocabulary restated 2026-08-23 (time travel vs forensic; live end; one BP list). A16 CRT on stop added 2026-08-23. Code is TMA1.
+Brief accepted as the Inspector contract 2026-08-23; vocabulary restated 2026-08-23 (time travel vs forensic; live end; one BP list). A16 CRT on stop and A17 Inspect chrome added 2026-08-23. Code is TMA1.

@@ -10452,14 +10452,12 @@ void frontend_render(frontend *ui, bool ui_visible, const frontend_debug_state *
             if (debug_state->tm_forensic) {
                 saved_window_style = ui->ctx->style.window;
                 forensic_style = 1;
-                ui->ctx->style.window.fixed_background =
-                    nk_style_item_color(nk_rgb(42, 28, 22));
                 ui->ctx->style.window.header.normal =
-                    nk_style_item_color(nk_rgb(92, 48, 32));
+                    nk_style_item_color(nk_rgb(24, 62, 118));
                 ui->ctx->style.window.header.hover =
-                    nk_style_item_color(nk_rgb(110, 58, 38));
+                    nk_style_item_color(nk_rgb(32, 76, 136));
                 ui->ctx->style.window.header.active =
-                    nk_style_item_color(nk_rgb(120, 64, 40));
+                    nk_style_item_color(nk_rgb(40, 88, 152));
             }
             debugger_layout_compute(&ui->layout, parent, &ui->limits);
             if (!frontend_any_dialog_open(ui)) {

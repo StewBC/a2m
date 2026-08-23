@@ -3,7 +3,7 @@
 **Status:** Roadmap (implementation brief).  
 **Epic:** [`timemachine.md`](timemachine.md)  
 **Prev / Next:** [`TMA0.md`](TMA0.md) / [`TMA2.md`](TMA2.md) (delete TM1 tape-nav + second BP bank — required)  
-**Depends on:** TMA0 A1–A16 (do not re-litigate); TM2 checkpoint + seal; TM3 enter/exit NOW; TM4 Misc tab chrome.
+**Depends on:** TMA0 A1–A17 (do not re-litigate); TM2 checkpoint + seal; TM3 enter/exit NOW; TM4 Misc tab chrome.
 
 Related: [`TM4.md`](TM4.md) · [`rules.md`](rules.md) · [`testing.md`](testing.md) · [`frontend.md`](frontend.md).
 
@@ -13,7 +13,7 @@ This is the how-to. Product contract is TMA0. Do not rewrite TM0–TM6. **Stop w
 
 ## Goal
 
-Rewire Misc → Inspector to A1–A16.
+Rewire Misc → Inspector to A1–A17.
 
 **Win:** slam the thumb left — UI stays live, CRT shows film or pink, Apple does not move. Release **lands** (snapshot load, ~ms). `[-]`/`[+]` frame-step that Apple. F10-family **re-executes** toward **live**. HST1 is not on this path.
 
@@ -99,7 +99,7 @@ New worker command, e.g. `runtime_client_tm_frame_step(client, dir, token)` with
 
 Do not HST1-walk. Disable the buttons at the ends; they cannot fire during a drag.
 
-### 5. Inspector chrome (A1–A3, A12)
+### 5. Inspector chrome (A1–A3, A12, A17)
 
 `frontend_draw_misc_inspector`:
 
@@ -113,6 +113,8 @@ Do not HST1-walk. Disable the buttons at the ends; they cannot fire during a dra
 Preview must not wait on materialize. Prefer a UI-thread blit if `runtime_client` can lock the frame ring (the ring is documented as main-readable). Else a coalesced `tm_preview` worker command that only copies pixels or publishes a magenta buffer — still O(one frame), never `SEEK_CYCLE`.
 
 Frontend already coalesces `TM_SEEK_CYCLE` intents; reuse that pattern for preview/land so a slam-left is one land, not 100.
+
+**Time-travel window chrome (A17):** while `tm_forensic`, retint **headers only** — `nk_rgb(24, 62, 118)` / hover `32, 76, 136` / active `40, 88, 152`. Do **not** change `style.window.fixed_background`. TM4’s warm-brown panel fill is gone. Restore the saved window style after the debugger draw.
 
 ### 6. Display after land / stop (A16)
 
@@ -227,6 +229,7 @@ Do not add flaky UI automation. Manual smoke is the GUI gate.
 - [x] `[-]`/`[+]` = one guest frame; disabled at oldest / live  
 - [x] F10-family = sealed re-execute; F12 stops at a breakpoint or live; stay in time travel  
 - [x] Stop presents CRT (A16): Override / paint-off dumps RAM; else beam buffer (`runtime_display_stop`)  
+- [x] Inspect chrome (A17): cobalt headers, no background tint  
 - [x] Opt+Left unbound; one BP list  
 - [x] Pokes still rejected; leave restores NOW paused  
 - [x] Slam-left does not stall the worker  
@@ -240,7 +243,7 @@ Do not add flaky UI automation. Manual smoke is the GUI gate.
 ## Agent script
 
 ```text
-1. Read agents/rules.md, agents/TMA0.md (A1–A16), this file, TM3 Landed (seal / NOW).
+1. Read agents/rules.md, agents/TMA0.md (A1–A17), this file, TM3 Landed (seal / NOW).
 2. Implement in the order above (gate → land → execute → frame-step → chrome).
 3. Do not route Inspector through SEEK_CYCLE. Do not drop the frame ring.
 4. Build + ctest. Manual smoke. Update manual/status. Landed. Stop.
@@ -258,5 +261,6 @@ Do not add flaky UI automation. Manual smoke is the GUI gate.
 - Thumb follows machine cycles. `[-]`/`[+]` frame-step; F10-family sealed execute.
 - F12 runs to a breakpoint or live and stays in Inspect. Opt+Left unbound.
 - Stop presents the CRT (A16): Override or paint-off dumps RAM; otherwise the beam buffer (raster-accurate). `runtime_publish_presented_frame` / `runtime_display_stop`.
+- Inspect chrome (A17): dark cobalt headers; no window-background tint.
 - One breakpoint list. TM1 query engine is unused by the Inspector (deleted in TMA2).
 - ctest 60 green. Stop for a look before TMA2.

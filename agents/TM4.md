@@ -231,7 +231,7 @@ Forensic F12 is tape run-to, not live run. **Leave Inspector** first, then F12.
 
 ### Chrome
 
-- Window background/header tint (warm brown) while `tm_forensic`.
+- Window background/header tint (warm brown) while `tm_forensic`. **Superseded** by [`TMA0.md`](TMA0.md) A17: dark cobalt **headers** only (`nk_rgb(24, 62, 118)` / hover `32, 76, 136` / active `40, 88, 152`); no background tint.
 - Title: `TIME MACHINE oldest-newest @ focus` via `frontend_format_window_title_ex`.
 - Registers: `NK_EDIT_READ_ONLY` (same `editable` flag as running).
 - Memory footer: `read-only` while forensic (not `editable`). Hex type-in is a no-op.

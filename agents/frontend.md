@@ -43,7 +43,8 @@ Opt+Shift+0/1/2 clears solid-apple so chords do not stick BUTN0.
 ## Configure
 
 Misc tabs: Machine, Debugger, Breakpoints, Hardware, Assembler, **Inspector**
-(TimeMachine **time travel** entry; F7 unbound). One breakpoint list in live and
+(TimeMachine **time travel** entry; F7 unbound). In time travel, window headers
+are dark cobalt (A17); the panel background is not tinted. One breakpoint list in live and
 time travel (Opt+B); TMA2 removed the TM5 second bank. Configure dialog is not F2. The Machine tab starts with model plus Slot
 1–7 card selectors (Empty / Disk II / SmartPort / Mockingboard); selecting a
 Mockingboard clears the previous Mockingboard because only one is supported.
