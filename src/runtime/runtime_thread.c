@@ -1116,6 +1116,21 @@ static void runtime_publish_error(runtime *rt, const char *msg)
     runtime_publish_event(rt, &event);
 }
 
+static void runtime_publish_error_code(
+    runtime *rt, const char *code, const char *msg)
+{
+    runtime_event event;
+    memset(&event, 0, sizeof(event));
+    event.type = RUNTIME_EVENT_ERROR;
+    if (code != NULL) {
+        strncpy(event.data.error.code, code, sizeof(event.data.error.code) - 1);
+    }
+    if (msg != NULL) {
+        strncpy(event.data.error.message, msg, sizeof(event.data.error.message) - 1);
+    }
+    runtime_publish_event(rt, &event);
+}
+
 static void runtime_publish_state_file_complete(
     runtime *rt,
     runtime_event_type type,
@@ -1590,6 +1605,18 @@ static void runtime_publish_machine(runtime *rt)
         rt->machine.model == APPLE2_MODEL_II_PLUS ? 1u : 0u;
     event.data.machine_state.video_line = rt->machine.video.line;
     event.data.machine_state.video_cycle_in_line = rt->machine.video.cycle_in_line;
+    event.data.machine_state.tm_mode = (uint8_t)runtime_tm_current_mode(rt);
+    if (rt->tm_forensic && rt->tm_focus.valid) {
+        event.data.machine_state.tm_focus_cycle = rt->tm_focus.cycle;
+    } else {
+        event.data.machine_state.tm_focus_cycle = 0u;
+    }
+    {
+        runtime_tm_window window;
+        runtime_tm_window_info(rt, &window);
+        event.data.machine_state.tm_window_start_kind = (uint8_t)window.start_kind;
+        event.data.machine_state.tm_window_start_arg1 = window.start_arg1;
+    }
     for (slot = 1; slot <= 7; ++slot) {
         runtime_slot_snapshot *out = &event.data.machine_state.slots[slot];
         int device;
@@ -2842,9 +2869,12 @@ static void runtime_publish_argb_frame(runtime *rt)
     }
     mutex_unlock(rt->frame_slot.mutex);
 
-    /* Rolling screen log (C2): live frames (max uses presentation paint later). */
-    (void)runtime_frame_ring_push(
-        &rt->frame_ring, frame_number, machine_cycle, w, h, fb);
+    /* Rolling screen log (C2). Forensic publishes the live slot only — the
+       ring is a recorder and must not grow while standing on the tape. */
+    if (!rt->tm_forensic) {
+        (void)runtime_frame_ring_push(
+            &rt->frame_ring, frame_number, machine_cycle, w, h, fb);
+    }
 
     memset(&event, 0, sizeof(event));
     event.type = RUNTIME_EVENT_FRAME_READY;
@@ -3389,8 +3419,88 @@ static void runtime_assemble_file_command(
     runtime_publish_machine(rt);
 }
 
+static bool runtime_tm_command_mutates_machine(runtime_command_type type)
+{
+    switch (type) {
+    case RUNTIME_COMMAND_RESET:
+    case RUNTIME_COMMAND_RUN:
+    case RUNTIME_COMMAND_STEP_CYCLE:
+    case RUNTIME_COMMAND_STEP_INSTRUCTION:
+    case RUNTIME_COMMAND_STEP_OVER:
+    case RUNTIME_COMMAND_STEP_OUT:
+    case RUNTIME_COMMAND_RUN_CYCLES:
+    case RUNTIME_COMMAND_RUN_INSTRUCTIONS:
+    case RUNTIME_COMMAND_RUN_TO_CURSOR:
+    case RUNTIME_COMMAND_WRITE_MEMORY_BYTE:
+    case RUNTIME_COMMAND_WRITE_MEMORY:
+    case RUNTIME_COMMAND_SET_CPU_REGISTER:
+    case RUNTIME_COMMAND_LOAD_STATE:
+    case RUNTIME_COMMAND_SAVE_STATE:
+    case RUNTIME_COMMAND_LOAD_BIN:
+    case RUNTIME_COMMAND_ASSEMBLE_FILE:
+    case RUNTIME_COMMAND_MEDIA_INSERT:
+    case RUNTIME_COMMAND_MEDIA_EJECT:
+    case RUNTIME_COMMAND_MEDIA_SWAP:
+    case RUNTIME_COMMAND_BOOT_SLOT:
+    case RUNTIME_COMMAND_APPLY_MACHINE_CONFIG:
+    case RUNTIME_COMMAND_PASTE_TEXT:
+    case RUNTIME_COMMAND_KEYBOARD_KEY:
+    case RUNTIME_COMMAND_SET_GAMEPORT:
+    case RUNTIME_COMMAND_HISTORY_CLEAR:
+    case RUNTIME_COMMAND_HISTORY_RECORD:
+    case RUNTIME_COMMAND_TM_SET_ENABLED:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static void runtime_tm_reattach_live_hooks(runtime *rt)
+{
+    apple2_set_memory_access_callback(&rt->machine, runtime_on_memory_access, rt);
+    runtime_history_sync_observer(rt);
+}
+
+static void runtime_publish_tm_mode(
+    runtime *rt,
+    uint64_t token,
+    uint8_t op,
+    runtime_tm_enter_status status)
+{
+    runtime_event event;
+    runtime_tm_window window;
+
+    memset(&event, 0, sizeof(event));
+    event.type = RUNTIME_EVENT_TM_MODE;
+    event.request_token = token;
+    event.data.tm_mode.op = op;
+    event.data.tm_mode.mode = (uint8_t)runtime_tm_current_mode(rt);
+    event.data.tm_mode.status = (uint8_t)status;
+    event.data.tm_mode.focus = rt->tm_focus;
+    runtime_tm_window_info(rt, &window);
+    event.data.tm_mode.start_kind = (uint8_t)window.start_kind;
+    event.data.tm_mode.start_arg1 = window.start_arg1;
+    runtime_publish_event(rt, &event);
+}
+
+static void runtime_tm_publish_head(runtime *rt)
+{
+    runtime_publish_cpu(rt, 0u);
+    runtime_publish_machine(rt);
+    if (rt->machine.video.fb != NULL) {
+        runtime_publish_argb_frame(rt);
+    }
+}
+
 static void runtime_process_command(runtime *rt, const runtime_command *cmd, bool *alive)
 {
+    if (rt->tm_forensic && runtime_tm_command_mutates_machine(cmd->type)) {
+        runtime_publish_error_code(
+            rt,
+            RUNTIME_ERROR_READ_ONLY_FORENSIC,
+            "machine is read-only in forensic mode");
+        return;
+    }
     if (runtime_history_command_invalidates_cursor(cmd->type)) {
         runtime_history_invalidate_cursor(rt);
         runtime_publish_state_changed(
@@ -4027,6 +4137,7 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         runtime_tm_query_args args;
         runtime_tm_query_result result;
         runtime_event event;
+        runtime_tm_query_op op = (runtime_tm_query_op)cmd->data.tm_query.op;
 
         memset(&args, 0, sizeof(args));
         args.direction = cmd->data.tm_query.direction;
@@ -4035,16 +4146,102 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         args.history_id = cmd->data.tm_query.history_id;
         args.cycle = cmd->data.tm_query.cycle;
         args.epoch = cmd->data.tm_query.epoch;
-        (void)runtime_tm_query(
-            rt, (runtime_tm_query_op)cmd->data.tm_query.op, &args, &result);
+
+        if (rt->tm_forensic &&
+            (op == RUNTIME_TM_QUERY_SEEK_CYCLE || op == RUNTIME_TM_QUERY_SEEK_ID)) {
+            runtime_tm_window window;
+            runtime_tm_window_info(rt, &window);
+            if (!window.valid ||
+                (op == RUNTIME_TM_QUERY_SEEK_CYCLE &&
+                 (args.cycle < window.oldest_cycle ||
+                  args.cycle > window.newest_cycle)) ||
+                (op == RUNTIME_TM_QUERY_SEEK_ID &&
+                 (args.history_id < window.oldest_id ||
+                  args.history_id > window.newest_id))) {
+                memset(&result, 0, sizeof(result));
+                result.status = RUNTIME_TM_QUERY_NOT_RETAINED;
+                result.focus = rt->tm_focus;
+                memset(&event, 0, sizeof(event));
+                event.type = RUNTIME_EVENT_TM_FOCUS;
+                event.request_token = cmd->request_token;
+                event.data.tm_focus.op = op;
+                event.data.tm_focus.status = result.status;
+                event.data.tm_focus.focus = result.focus;
+                runtime_publish_event(rt, &event);
+                break;
+            }
+        }
+
+        (void)runtime_tm_query(rt, op, &args, &result);
+        if (rt->tm_forensic &&
+            (result.status == RUNTIME_TM_QUERY_OK ||
+             result.status == RUNTIME_TM_QUERY_END_OF_TAPE) &&
+            result.focus.valid) {
+            uint8_t *then_blob = NULL;
+            size_t then_size = 0u;
+            if (runtime_tm_snapshot_machine(rt, &then_blob, &then_size)) {
+                if (!runtime_tm_materialize_live(rt, result.focus.cycle)) {
+                    (void)runtime_tm_restore_blob(rt, then_blob, then_size);
+                    apple2_set_replay_sealed(&rt->machine, true);
+                    apple2_set_cpu_observer(&rt->machine, NULL, NULL);
+                    apple2_set_memory_access_callback(&rt->machine, NULL, NULL);
+                    result.status = RUNTIME_TM_QUERY_MATERIALIZE_FAILED;
+                    result.focus = rt->tm_focus;
+                } else {
+                    runtime_tm_publish_head(rt);
+                    runtime_publish_state_changed(
+                        rt,
+                        RUNTIME_STATE_CHANGED_FORENSIC_SEEK,
+                        cmd->session_id);
+                }
+                free(then_blob);
+            } else {
+                result.status = RUNTIME_TM_QUERY_MATERIALIZE_FAILED;
+            }
+        }
         memset(&event, 0, sizeof(event));
         event.type = RUNTIME_EVENT_TM_FOCUS;
         event.request_token = cmd->request_token;
-        event.data.tm_focus.op = (runtime_tm_query_op)cmd->data.tm_query.op;
+        event.data.tm_focus.op = op;
         event.data.tm_focus.status = result.status;
         event.data.tm_focus.focus = result.focus;
         event.data.tm_focus.clamped = result.clamped ? 1u : 0u;
         runtime_publish_event(rt, &event);
+        break;
+    }
+
+    case RUNTIME_COMMAND_TM_ENTER_FORENSIC: {
+        runtime_tm_enter_status st;
+
+        if (rt->exec_state == RUNTIME_EXEC_RUNNING) {
+            runtime_finish_to_instruction_boundary(rt);
+            rt->exec_state = RUNTIME_EXEC_PAUSED;
+            rt->last_stop_reason = RUNTIME_STOP_REASON_PAUSE_COMMAND;
+            runtime_publish_machine(rt);
+            runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
+            runtime_publish_cpu(rt, 0u);
+        }
+        st = runtime_tm_enter_forensic(rt);
+        if (st != RUNTIME_TM_ENTER_OK) {
+            runtime_tm_reattach_live_hooks(rt);
+            apple2_set_replay_sealed(&rt->machine, false);
+        } else {
+            runtime_tm_publish_head(rt);
+            runtime_publish_state_changed(
+                rt, RUNTIME_STATE_CHANGED_FORENSIC_ENTER, cmd->session_id);
+        }
+        runtime_publish_tm_mode(rt, cmd->request_token, 0u, st);
+        break;
+    }
+
+    case RUNTIME_COMMAND_TM_EXIT_FORENSIC: {
+        runtime_tm_exit_forensic(rt);
+        runtime_tm_reattach_live_hooks(rt);
+        runtime_tm_publish_head(rt);
+        runtime_publish_state_changed(
+            rt, RUNTIME_STATE_CHANGED_FORENSIC_EXIT, cmd->session_id);
+        runtime_publish_tm_mode(
+            rt, cmd->request_token, 1u, RUNTIME_TM_ENTER_OK);
         break;
     }
 
@@ -4381,8 +4578,10 @@ int runtime_thread_main(void *userdata)
         if (!alive) {
             break;
         }
-        if (rt->exec_state == RUNTIME_EXEC_RUNNING) {
+        if (rt->exec_state == RUNTIME_EXEC_RUNNING && !rt->tm_forensic) {
             runtime_free_run_batch(rt);
+        } else if (rt->tm_forensic && rt->exec_state == RUNTIME_EXEC_RUNNING) {
+            rt->exec_state = RUNTIME_EXEC_PAUSED;
         } else {
             if (!message_queue_wait_pop_timeout(rt->command_queue, &command, 10u)) {
                 continue;

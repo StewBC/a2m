@@ -244,6 +244,12 @@ bool runtime_client_tm_seek_cycle(
     runtime_client *client,
     uint64_t cycle,
     uint64_t request_token);
+bool runtime_client_tm_enter_forensic(
+    runtime_client *client,
+    uint64_t request_token);
+bool runtime_client_tm_exit_forensic(
+    runtime_client *client,
+    uint64_t request_token);
 bool runtime_client_history_clear(
     runtime_client *client,
     uint64_t request_token);

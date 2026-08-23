@@ -46,6 +46,11 @@ typedef struct control_dispatch {
     /* Cached assembler/symbol-file snapshot for find-symbol (single-consumer poll). */
     bool has_symbols;
     runtime_symbol_snapshot symbols;
+    /* TM3: cached from MACHINE_STATE so get-state / mutation rejects see mode. */
+    bool forensic;
+    uint64_t tm_focus_cycle;
+    uint8_t tm_window_start_kind;
+    uint32_t tm_window_start_arg1;
 } control_dispatch_t;
 
 void control_dispatch_init(

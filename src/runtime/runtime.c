@@ -434,6 +434,7 @@ void runtime_destroy(runtime *rt)
         rt->trace_file = NULL;
     }
     runtime_frame_ring_destroy(&rt->frame_ring);
+    runtime_tm_forensic_destroy(rt);
     runtime_tm_recorder_destroy(rt);
     runtime_history_destroy(rt->history);
     rt->history = NULL;

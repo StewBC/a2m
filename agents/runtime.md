@@ -70,8 +70,8 @@ Full epic: [`remote-debug.md`](remote-debug.md).
 
 | Item | Status |
 |------|--------|
-| Product wire | **Done** — A2M/11; `--control-port` windowed + headless |
-| A2M/11 | `src/control` (BP + frame ring + history + softswitches + mount/unmount + assemble/find-symbol + sessions + state-changed) · ops: [`control-tools.md`](control-tools.md) · foundation: [`sessions.md`](sessions.md) |
+| Product wire | **Done** — A2M/12; `--control-port` windowed + headless |
+| A2M/12 | A2M/11 + forensic `mode` / `exit-forensic` / `read-only-forensic` + forensic `state-changed` reasons · ops: [`control-tools.md`](control-tools.md) · [`TM3.md`](TM3.md) |
 | Product `src/control` | Parked c64-shaped library (not linked) |
 | Frame ring | **Done** — ARGB ring, live push, control wire |
 | CPU history | **Done through C4c** — arena, observer, worker RPC, control wire |

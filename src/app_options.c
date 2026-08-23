@@ -2089,7 +2089,7 @@ static bool parse_command_line_overrides(app_options *options, int argc, char **
         OPT_FLOAT('\0', "audio-record-duration", &audio_record_duration, "recording duration in seconds", NULL, 0, 0),
         OPT_STRING('b', "break", &breakpoint, "install execute breakpoint at hex address", NULL, 0, 0),
         OPT_INTEGER('\0', "control-port", &control_port,
-                    "listen on localhost TCP for A2M/11 remote control (0=off)", NULL, 0, 0),
+                    "listen on localhost TCP for A2M/12 remote control (0=off)", NULL, 0, 0),
         OPT_BOOLEAN('\0', "headless", &headless,
                     "no window; short smoke exit unless --control-port is set (long-lived)",
                     NULL, 0, OPT_NONEG),

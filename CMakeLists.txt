@@ -404,6 +404,13 @@ target_compile_features(test_runtime_tm_replay PRIVATE c_std_99)
 target_link_libraries(test_runtime_tm_replay PRIVATE runtime SDL2::SDL2)
 add_test(NAME runtime_tm_replay COMMAND test_runtime_tm_replay)
 
+add_executable(test_runtime_tm_forensic
+    tests/runtime/test_runtime_tm_forensic.c
+)
+target_compile_features(test_runtime_tm_forensic PRIVATE c_std_99)
+target_link_libraries(test_runtime_tm_forensic PRIVATE control runtime SDL2::SDL2)
+add_test(NAME runtime_tm_forensic COMMAND test_runtime_tm_forensic)
+
 # Control protocol (A2M product wire — src/control).
 add_executable(test_control_protocol
     tests/control/test_control_protocol.c

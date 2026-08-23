@@ -5,6 +5,7 @@
 #include "runtime_frame_ring.h"
 #include "runtime_history.h"
 #include "runtime_internal.h"
+#include "video.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -376,6 +377,9 @@ bool runtime_tm_materialize(runtime *rt, uint64_t cycle, apple2_t *dst)
     if (!apple2_snapshot_load(dst, cp->blob, cp->size)) {
         return false;
     }
+    /* Load rebuilds banking. Reseed beam from Φ0; paint as the beam runs. */
+    apple2_video_reseed_from_cycles(dst);
+    dst->video.paint_enabled = true;
     apple2_set_replay_sealed(dst, true);
     apple2_set_cpu_observer(dst, NULL, NULL);
     apple2_set_memory_access_callback(dst, NULL, NULL);
@@ -605,6 +609,11 @@ uint64_t runtime_tm_media_truncations(const runtime *rt)
 {
     return (rt != NULL && rt->tm_recorder != NULL) ?
         rt->tm_recorder->truncations : 0u;
+}
+
+bool runtime_tm_recorder_is_recording(const runtime *rt)
+{
+    return rt != NULL && rt->tm_recorder != NULL && rt->tm_recorder->recording;
 }
 
 void runtime_tm_fill_window_extras(const runtime *rt, runtime_tm_window *out)

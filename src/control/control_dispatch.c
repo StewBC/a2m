@@ -7,6 +7,7 @@
 #include "runtime_event.h"
 #include "runtime_history.h"
 #include "runtime_slot_resolve.h"
+#include "runtime_timemachine.h"
 #include "softswitch.h"
 
 #include <SDL.h>
@@ -147,9 +148,43 @@ static const char *state_changed_reason_name(runtime_state_changed_reason reason
         return "history-clear";
     case RUNTIME_STATE_CHANGED_MEDIA:
         return "media";
+    case RUNTIME_STATE_CHANGED_FORENSIC_ENTER:
+        return "forensic-enter";
+    case RUNTIME_STATE_CHANGED_FORENSIC_SEEK:
+        return "forensic-seek";
+    case RUNTIME_STATE_CHANGED_FORENSIC_EXIT:
+        return "forensic-exit";
     case RUNTIME_STATE_CHANGED_OTHER:
     default:
         return "other";
+    }
+}
+
+static bool control_command_mutates_machine(control_command_type type)
+{
+    switch (type) {
+    case CONTROL_COMMAND_RESET:
+    case CONTROL_COMMAND_RUN:
+    case CONTROL_COMMAND_STEP_CYCLE:
+    case CONTROL_COMMAND_STEP_INSTRUCTION:
+    case CONTROL_COMMAND_STEP_OVER:
+    case CONTROL_COMMAND_STEP_OUT:
+    case CONTROL_COMMAND_SET_MEMORY:
+    case CONTROL_COMMAND_SET_REG:
+    case CONTROL_COMMAND_SAVE_STATE:
+    case CONTROL_COMMAND_LOAD_STATE:
+    case CONTROL_COMMAND_KEY:
+    case CONTROL_COMMAND_MOUNT_DISK:
+    case CONTROL_COMMAND_MOUNT:
+    case CONTROL_COMMAND_UNMOUNT:
+    case CONTROL_COMMAND_SELECT_DISK:
+    case CONTROL_COMMAND_SET_DISK_WRITABLE:
+    case CONTROL_COMMAND_HISTORY_CLEAR:
+    case CONTROL_COMMAND_HISTORY_RECORD:
+    case CONTROL_COMMAND_ASSEMBLE:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -876,6 +911,10 @@ void control_dispatch_on_runtime_event(
         disp->last_sp = event->data.machine_state.sp;
         disp->last_p = event->data.machine_state.p;
         disp->turbo_mode = event->data.machine_state.active_turbo_multiplier;
+        disp->forensic = event->data.machine_state.tm_mode != 0u;
+        disp->tm_focus_cycle = event->data.machine_state.tm_focus_cycle;
+        disp->tm_window_start_kind = event->data.machine_state.tm_window_start_kind;
+        disp->tm_window_start_arg1 = event->data.machine_state.tm_window_start_arg1;
         cache_slot_map_from_machine_state(disp, &event->data.machine_state);
         if (event->data.machine_state.running == 0u) {
             disp->machine_running = false;
@@ -922,6 +961,15 @@ void control_dispatch_on_runtime_event(
         disp->latch_assemble_error = true;
     } else if (event->type == RUNTIME_EVENT_STATE_CHANGED) {
         control_dispatch_post_state_changed(disp, event);
+    } else if (event->type == RUNTIME_EVENT_TM_MODE) {
+        disp->forensic = event->data.tm_mode.mode != 0u;
+        if (event->data.tm_mode.focus.valid) {
+            disp->tm_focus_cycle = event->data.tm_mode.focus.cycle;
+        } else if (!disp->forensic) {
+            disp->tm_focus_cycle = 0u;
+        }
+        disp->tm_window_start_kind = event->data.tm_mode.start_kind;
+        disp->tm_window_start_arg1 = event->data.tm_mode.start_arg1;
     }
 
     if (event->type == RUNTIME_EVENT_CPU_STATE_RESPONSE) {
@@ -1465,6 +1513,16 @@ static void handle_request(control_dispatch_t *disp, control_request *req)
 {
     runtime_client *client = disp->client;
 
+    if (disp->forensic && control_command_mutates_machine(req->type)) {
+        post_error(
+            disp,
+            req->id,
+            RUNTIME_ERROR_READ_ONLY_FORENSIC,
+            "machine is read-only in forensic mode");
+        control_request_release(req);
+        return;
+    }
+
     switch (req->type) {
     case CONTROL_COMMAND_RESET:
         clear_execution_latches(disp);
@@ -1522,14 +1580,27 @@ static void handle_request(control_dispatch_t *disp, control_request *req)
         snprintf(
             text,
             sizeof(text),
-            "state=%s has_cpu=%d frame=%llu cycle=%llu stop=%s turbo=%s",
+            "state=%s has_cpu=%d frame=%llu cycle=%llu stop=%s turbo=%s "
+            "mode=%s focus_cycle=%llu start=%s start_arg1=%u",
             disp->machine_running ? "running" : "paused",
             disp->has_cpu ? 1 : 0,
             (unsigned long long)disp->frame_number,
             (unsigned long long)disp->cycle,
             disp->stop_reason,
-            turbo_label);
+            turbo_label,
+            disp->forensic ? "forensic" : "live",
+            (unsigned long long)disp->tm_focus_cycle,
+            runtime_tm_window_start_name(
+                (runtime_history_media_change_kind)disp->tm_window_start_kind),
+            (unsigned)disp->tm_window_start_arg1);
         post_ok(disp, req->id, text);
+        break;
+    }
+
+    case CONTROL_COMMAND_EXIT_FORENSIC: {
+        uint64_t token = runtime_client_alloc_request_token(client);
+        (void)runtime_client_tm_exit_forensic(client, token);
+        post_ok(disp, req->id, "accepted=1");
         break;
     }
 

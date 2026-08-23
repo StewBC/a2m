@@ -1060,6 +1060,20 @@ bool runtime_client_tm_seek_cycle(
         client, RUNTIME_TM_QUERY_SEEK_CYCLE, &args, request_token);
 }
 
+bool runtime_client_tm_enter_forensic(
+    runtime_client *client,
+    uint64_t request_token) {
+    return runtime_client_send_command_token(
+        client, RUNTIME_COMMAND_TM_ENTER_FORENSIC, request_token);
+}
+
+bool runtime_client_tm_exit_forensic(
+    runtime_client *client,
+    uint64_t request_token) {
+    return runtime_client_send_command_token(
+        client, RUNTIME_COMMAND_TM_EXIT_FORENSIC, request_token);
+}
+
 bool runtime_client_history_clear(
     runtime_client *client,
     uint64_t request_token) {

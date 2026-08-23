@@ -35,7 +35,7 @@ Useful flags:
 | `--break <addr>` / `-b` | Install an execute breakpoint at a hex address |
 | `--symbols <file>` | Load a simple symbol file (`NAME` hex per line) |
 | `--headless` | No window; short smoke exit unless `--control-port` is set |
-| `--control-port N` | Listen on localhost TCP for A2M/11 remote control (`0`=off) |
+| `--control-port N` | Listen on localhost TCP for A2M/12 remote control (`0`=off) |
 | `--timemachine` / `--no-timemachine` | Enable TimeMachine recording (default off) |
 | `--audio-smoke` | Emit a 440 Hz test tone to verify audio output |
 
@@ -1711,7 +1711,7 @@ combine headless mode with `--sna`:
 The server always binds to `127.0.0.1`. It accepts one client at a time. The socket
 thread performs network I/O only; runtime commands and snapshot requests are dispatched
 by the main loop, so remote control follows the same thread-ownership rules as the GUI
-debugger. The current protocol name is `A2M/11`.
+debugger. The current protocol name is `A2M/12`.
 
 Python helpers:
 
@@ -1833,8 +1833,8 @@ for low-latency automation; a windowed session is still paced by present/vsync.
 
 | Command | Response |
 |---------|----------|
-| `hello` | `ok name=a2m protocol=A2M/11` |
-| `version` | `ok protocol=A2M/11 app=a2m` |
+| `hello` | `ok name=a2m protocol=A2M/12` |
+| `version` | `ok protocol=A2M/12 app=a2m` |
 | `capabilities` | Space-separated capability names |
 | `ping` | `ok` |
 | `quit-client` | `ok`, then the server closes the client connection |
@@ -1842,7 +1842,7 @@ for low-latency automation; a windowed session is still paced by present/vsync.
 `capabilities` currently includes `connection`, `introspection`, `execution`,
 `state`, `softswitches`, `step`, `turbo`, `frame`, `frame-ring`, `memory`,
 `breakpoints`, `wait`, `key`, `disk`, `snapshot`, `history`, `assemble`,
-`symbols`, `sessions`, and `state-changed`.
+`symbols`, `sessions`, `state-changed`, and `timemachine`.
 
 The TCP client is bound to one runtime **session** (history FIND/NEXT cursor
 state). Disconnect frees that session. Mutations (step, run, poke, reset, …)
@@ -1960,7 +1960,8 @@ flight recorder for the same moment.
 
 | Command | Response |
 |---------|----------|
-| `get-state` | Text state summary: runtime state, CPU availability, frame, cycle, stop reason, turbo |
+| `get-state` | Text state summary: runtime state, CPU availability, frame, cycle, stop reason, turbo, `mode=live\|forensic`, `focus_cycle`, window `start` / `start_arg1` |
+| `exit-forensic` | Leave forensic mode and restore live NOW (does not auto-resume). Any session may call this. |
 | `get-cpu` | Text CPU snapshot |
 | `get-softswitches` | Latched soft-switch flags plus beam (not `$C0xx` memory) |
 | `get-frame` | Binary 560 x 192 ARGB frame |
@@ -1971,6 +1972,10 @@ flight recorder for the same moment.
 | `save-state <path>` | Write a `.a2state` snapshot |
 
 `get-state` is answered from the main loop's cached frontend debug state.
+While `mode=forensic`, `get-cpu` / `get-memory` / `get-frame` show the tape head
+(THEN). Mutating verbs (`run`, `set-memory`, `set-reg`, mount, reset, ...) fail
+with `error read-only-forensic`. `exit-forensic` restores live NOW and does not
+resume execution.
 `get-frame` uses the latest completed frame cached by the main loop, or requests one
 if no cached frame exists yet.
 

@@ -5,13 +5,15 @@
  *
  * TM0: master enable + recorder arming (HST1 + frame ring).
  * TM1: HST1 tape queries (step / over / out / run-to / seek). No apple2 mutate.
- * Checkpoint ring and materialize land in later phases.
+ * TM2: checkpoint ring + sealed materialize to scratch.
+ * TM3: forensic mode materializes into the live apple2_t; exit restores NOW.
  */
 
 #include "apple2.h"
 #include "runtime_history.h"
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 typedef struct runtime runtime;
@@ -67,8 +69,21 @@ typedef enum runtime_tm_query_status {
     RUNTIME_TM_QUERY_EPOCH_MISMATCH,
     RUNTIME_TM_QUERY_NOT_RETAINED,
     RUNTIME_TM_QUERY_SP_WRAP,
-    RUNTIME_TM_QUERY_INVALID
+    RUNTIME_TM_QUERY_INVALID,
+    RUNTIME_TM_QUERY_MATERIALIZE_FAILED
 } runtime_tm_query_status;
+
+typedef enum runtime_tm_mode {
+    RUNTIME_TM_MODE_LIVE = 0,
+    RUNTIME_TM_MODE_FORENSIC
+} runtime_tm_mode;
+
+typedef enum runtime_tm_enter_status {
+    RUNTIME_TM_ENTER_OK = 0,
+    RUNTIME_TM_ENTER_UNAVAILABLE,
+    RUNTIME_TM_ENTER_EMPTY,
+    RUNTIME_TM_ENTER_FAILED
+} runtime_tm_enter_status;
 
 typedef struct runtime_tm_query_args {
     int direction; /* STEP: +1 forward, -1 backward */
@@ -110,7 +125,19 @@ void runtime_tm_on_media_event(
 uint64_t runtime_tm_checkpoint_count(const runtime *rt);
 uint64_t runtime_tm_checkpoints_dropped(const runtime *rt);
 uint64_t runtime_tm_media_truncations(const runtime *rt);
+bool runtime_tm_recorder_is_recording(const runtime *rt);
 void runtime_tm_recorder_destroy(runtime *rt);
 void runtime_tm_checkpoint_bounds(
     const runtime *rt, uint64_t *oldest, uint64_t *newest, uint64_t *count);
 void runtime_tm_fill_window_extras(const runtime *rt, runtime_tm_window *out);
+
+runtime_tm_mode runtime_tm_current_mode(const runtime *rt);
+bool runtime_tm_in_forensic(const runtime *rt);
+runtime_tm_enter_status runtime_tm_can_enter(const runtime *rt);
+runtime_tm_enter_status runtime_tm_enter_forensic(runtime *rt);
+void runtime_tm_exit_forensic(runtime *rt);
+bool runtime_tm_materialize_live(runtime *rt, uint64_t cycle);
+bool runtime_tm_snapshot_machine(runtime *rt, uint8_t **blob, size_t *size);
+bool runtime_tm_restore_blob(runtime *rt, const uint8_t *blob, size_t size);
+void runtime_tm_forensic_destroy(runtime *rt);
+const char *runtime_tm_window_start_name(runtime_history_media_change_kind kind);

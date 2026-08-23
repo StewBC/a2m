@@ -555,6 +555,7 @@ static control_command_type lookup_command(const char *name)
     if (strcmp(name, "history-close") == 0) return CONTROL_COMMAND_HISTORY_CLOSE;
     if (strcmp(name, "assemble") == 0) return CONTROL_COMMAND_ASSEMBLE;
     if (strcmp(name, "find-symbol") == 0) return CONTROL_COMMAND_FIND_SYMBOL;
+    if (strcmp(name, "exit-forensic") == 0) return CONTROL_COMMAND_EXIT_FORENSIC;
     return CONTROL_COMMAND_NONE;
 }
 

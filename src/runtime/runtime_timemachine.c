@@ -1,11 +1,14 @@
 #include "runtime_timemachine.h"
 
 #include "apple2.h"
+#include "apple2_snapshot.h"
 #include "runtime_frame_ring.h"
 #include "runtime_history.h"
 #include "runtime_internal.h"
+#include "video.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static void runtime_tm_warn_zero_budget(const runtime *rt)
@@ -677,4 +680,221 @@ runtime_tm_query_status runtime_tm_query(
         result->clamped = false;
     }
     return result->status;
+}
+
+runtime_tm_mode runtime_tm_current_mode(const runtime *rt)
+{
+    return (rt != NULL && rt->tm_forensic) ?
+        RUNTIME_TM_MODE_FORENSIC : RUNTIME_TM_MODE_LIVE;
+}
+
+bool runtime_tm_in_forensic(const runtime *rt)
+{
+    return rt != NULL && rt->tm_forensic;
+}
+
+const char *runtime_tm_window_start_name(runtime_history_media_change_kind kind)
+{
+    switch (kind) {
+    case RUNTIME_HISTORY_MEDIA_CHANGE_GUEST_WRITE:
+        return "guest-write";
+    case RUNTIME_HISTORY_MEDIA_CHANGE_HOST_DIRECTORY:
+        return "host-directory";
+    case RUNTIME_HISTORY_MEDIA_CHANGE_UNKNOWN:
+    default:
+        return "unknown";
+    }
+}
+
+bool runtime_tm_snapshot_machine(runtime *rt, uint8_t **blob, size_t *size)
+{
+    size_t need;
+    uint8_t *bytes;
+    size_t written;
+
+    if (rt == NULL || blob == NULL || size == NULL || !rt->machine_ready) {
+        return false;
+    }
+    need = apple2_snapshot_size(&rt->machine);
+    if (need == 0u) {
+        return false;
+    }
+    bytes = (uint8_t *)malloc(need);
+    if (bytes == NULL) {
+        return false;
+    }
+    written = apple2_snapshot_save(&rt->machine, bytes, need);
+    if (written != need) {
+        free(bytes);
+        return false;
+    }
+    *blob = bytes;
+    *size = written;
+    return true;
+}
+
+bool runtime_tm_restore_blob(runtime *rt, const uint8_t *blob, size_t size)
+{
+    if (rt == NULL || blob == NULL || size == 0u || !rt->machine_ready) {
+        return false;
+    }
+    if (!apple2_snapshot_load(&rt->machine, blob, size)) {
+        return false;
+    }
+    apple2_video_reseed_from_cycles(&rt->machine);
+    return true;
+}
+
+void runtime_tm_forensic_destroy(runtime *rt)
+{
+    if (rt == NULL) {
+        return;
+    }
+    free(rt->tm_now_blob);
+    rt->tm_now_blob = NULL;
+    rt->tm_now_size = 0u;
+    rt->tm_forensic = false;
+}
+
+runtime_tm_enter_status runtime_tm_can_enter(const runtime *rt)
+{
+    runtime_tm_window window;
+    runtime_history_status st;
+    runtime_frame_ring_info fi;
+
+    if (rt == NULL || !rt->machine_ready) {
+        return RUNTIME_TM_ENTER_UNAVAILABLE;
+    }
+    if (rt->tm_forensic) {
+        return RUNTIME_TM_ENTER_OK;
+    }
+    if (!rt->timemachine_enabled) {
+        return RUNTIME_TM_ENTER_UNAVAILABLE;
+    }
+    if (rt->history == NULL || rt->timemachine_memory_mb == 0u ||
+        rt->frame_ring_memory_mb == 0u) {
+        return RUNTIME_TM_ENTER_EMPTY;
+    }
+    runtime_history_get_status(rt->history, &st);
+    if (!st.available || !st.recording) {
+        return RUNTIME_TM_ENTER_EMPTY;
+    }
+    runtime_frame_ring_get_info(&rt->frame_ring, &fi);
+    if (fi.capacity == 0u || !fi.recording) {
+        return RUNTIME_TM_ENTER_EMPTY;
+    }
+    if (!runtime_tm_recorder_is_recording(rt) ||
+        runtime_tm_checkpoint_count(rt) == 0u) {
+        return RUNTIME_TM_ENTER_EMPTY;
+    }
+    runtime_tm_window_info(rt, &window);
+    if (!window.valid) {
+        return RUNTIME_TM_ENTER_EMPTY;
+    }
+    return RUNTIME_TM_ENTER_OK;
+}
+
+static void tm_apply_live_seal(runtime *rt)
+{
+    apple2_set_replay_sealed(&rt->machine, true);
+    apple2_set_cpu_observer(&rt->machine, NULL, NULL);
+    apple2_set_memory_access_callback(&rt->machine, NULL, NULL);
+}
+
+bool runtime_tm_materialize_live(runtime *rt, uint64_t cycle)
+{
+    bool ok;
+
+    if (rt == NULL || !rt->machine_ready) {
+        return false;
+    }
+    tm_apply_live_seal(rt);
+    ok = runtime_tm_materialize(rt, cycle, &rt->machine);
+    /* Scratch materialize clears the seal; forensic stays sealed. */
+    tm_apply_live_seal(rt);
+    apple2_video_reseed_from_cycles(&rt->machine);
+    return ok;
+}
+
+runtime_tm_enter_status runtime_tm_enter_forensic(runtime *rt)
+{
+    runtime_tm_enter_status can;
+    runtime_tm_query_args args;
+    runtime_tm_query_result query;
+    uint8_t *now = NULL;
+    size_t now_size = 0u;
+
+    if (rt == NULL || !rt->machine_ready) {
+        return RUNTIME_TM_ENTER_UNAVAILABLE;
+    }
+    if (rt->tm_forensic) {
+        return RUNTIME_TM_ENTER_OK;
+    }
+    can = runtime_tm_can_enter(rt);
+    if (can != RUNTIME_TM_ENTER_OK) {
+        return can;
+    }
+
+    (void)runtime_tm_checkpoint_take(rt);
+    if (!runtime_tm_snapshot_machine(rt, &now, &now_size)) {
+        return RUNTIME_TM_ENTER_FAILED;
+    }
+
+    /* Stop checkpoint/input/media callbacks so replay cannot cut the tape. */
+    runtime_tm_recorder_set_enabled(rt, false);
+    tm_apply_live_seal(rt);
+
+    memset(&args, 0, sizeof(args));
+    memset(&query, 0, sizeof(query));
+    {
+        runtime_tm_window window;
+        runtime_tm_window_info(rt, &window);
+        args.cycle = window.newest_cycle;
+        (void)runtime_tm_query(
+            rt, RUNTIME_TM_QUERY_SEEK_CYCLE, &args, &query);
+    }
+    if (!query.focus.valid) {
+        runtime_tm_restore_blob(rt, now, now_size);
+        if (rt->timemachine_enabled) {
+            runtime_tm_recorder_set_enabled(rt, true);
+        }
+        free(now);
+        return RUNTIME_TM_ENTER_EMPTY;
+    }
+    if (!runtime_tm_materialize_live(rt, query.focus.cycle)) {
+        runtime_tm_restore_blob(rt, now, now_size);
+        if (rt->timemachine_enabled) {
+            runtime_tm_recorder_set_enabled(rt, true);
+        }
+        apple2_set_replay_sealed(&rt->machine, false);
+        free(now);
+        return RUNTIME_TM_ENTER_FAILED;
+    }
+
+    rt->tm_now_blob = now;
+    rt->tm_now_size = now_size;
+    rt->tm_forensic = true;
+    tm_apply_live_seal(rt);
+    return RUNTIME_TM_ENTER_OK;
+}
+
+void runtime_tm_exit_forensic(runtime *rt)
+{
+    if (rt == NULL) {
+        return;
+    }
+    if (!rt->tm_forensic) {
+        return;
+    }
+    if (rt->tm_now_blob != NULL && rt->tm_now_size > 0u) {
+        (void)runtime_tm_restore_blob(rt, rt->tm_now_blob, rt->tm_now_size);
+    }
+    apple2_set_replay_sealed(&rt->machine, false);
+    rt->tm_forensic = false;
+    free(rt->tm_now_blob);
+    rt->tm_now_blob = NULL;
+    rt->tm_now_size = 0u;
+    if (rt->timemachine_enabled) {
+        runtime_tm_recorder_set_enabled(rt, true);
+    }
 }

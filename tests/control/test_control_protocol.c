@@ -216,6 +216,14 @@ int main(void)
     expect_u32("before", 8, request.args.history_before);
 
     expect_true(
+        "exit-forensic",
+        control_protocol_parse_request("40 exit-forensic", &request, &error));
+    expect_int(
+        "exit-forensic type",
+        CONTROL_COMMAND_EXIT_FORENSIC,
+        (int)request.type);
+
+    expect_true(
         "assemble defaults",
         control_protocol_parse_request(
             "80 assemble samples/test.asm", &request, &error));
