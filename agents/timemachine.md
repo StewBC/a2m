@@ -173,17 +173,19 @@ Keep [`testing.md`](testing.md) gate green every phase.
 
 ## Acceptance bar (epic “TimeMachine V1”)
 
-Epic V1 = **TM0–TM4** closed:
+Epic V1 = **TM0–TM4** closed (accepted 2026-08-22 with a recording-speed caveat):
 
-- [ ] Opt-in recording; off path stays cheap  
-- [ ] Fast tape queries (no UI FIND loops for step-over/out/run-to), clamped to `tm_window`  
-- [ ] Checkpoint + sealed re-execution reconstructs CPU/mem/softswitches/beam/Disk II/VIA in window  
-- [ ] Seal proven: materialize leaves HST1, frame ring, watchpoints, audio and host files untouched  
-- [ ] Inspector mode replaces machine with past; views/display update under the head  
-- [ ] One debugger skin; Misc Inspector tab is the only forensic entry  
-- [ ] Read-only past; leave restores live NOW  
-- [ ] Guest media write cuts the window, with marker + honest UI text; housekeeping writes do not  
-- [ ] Cooperative one-state + `state-changed` + control-visible mode/exit (D18)  
+- [x] Opt-in recording; off path stays cheap  
+- [x] Fast tape queries (no UI FIND loops for step-over/out/run-to), clamped to `tm_window`  
+- [x] Checkpoint + sealed re-execution reconstructs CPU/mem/softswitches/beam/Disk II/VIA in window  
+- [x] Seal proven: materialize leaves HST1, frame ring, watchpoints, audio and host files untouched  
+- [x] Inspector mode replaces machine with past; views/display update under the head  
+- [x] One debugger skin; Misc Inspector tab is the only forensic entry  
+- [x] Read-only past; leave restores live NOW  
+- [x] Guest media write cuts the window, with marker + honest UI text; housekeeping writes do not  
+- [x] Cooperative one-state + `state-changed` + control-visible mode/exit (D18)  
+
+**V1 caveat (blocks “in the money”):** TM-on live recording must hold **1 MHz** (product play, not just `bench_realtime` without observers). HST1 `get_status` must stay O(blocks). Do not open TM5/TM6 until that bar is met.
 
 **TM5 / TM6** = V1.1 power features (tracked here, not required for V1 checkbox).
 

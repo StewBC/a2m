@@ -165,9 +165,13 @@ Desktop + reasonable window size; tint visible.
 
 ## Landed
 
-Handoff. TimeMachine V1 (TM0–TM4) is in the tree. F7 stays unbound. GUI smoke
-is the human accept gate (playbook in this file). Do not start TM5/TM6 until
-that is accepted.
+Handoff. TimeMachine V1 (TM0–TM4) **accepted** 2026-08-22. F7 stays unbound.
+Caveat was TM-on live recording not holding 1 MHz. Cause: `runtime_history_get_status`
+scanned every HST1 record on each machine-state tick (~33 Hz from the UI).
+Fix: status is O(blocks) via per-block `partial_count`. Debug-build headless
+measure (2026-08-22): `--turbo 1` TM off 1.021 MHz / TM on 1.020 MHz over 6 s;
+`--turbo 4` 4.082 / 4.081 MHz. Do not open TM5/TM6 until the GUI play path
+feels like 1 MHz with recording on.
 
 ### Entry
 

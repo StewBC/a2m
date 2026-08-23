@@ -26,6 +26,7 @@ typedef struct runtime_history_block {
     uint32_t timeline;
     uint32_t used;
     uint32_t record_count;
+    uint32_t partial_count;
     uint8_t occupied;
     uint8_t sealed;
 } runtime_history_block;
@@ -509,6 +510,7 @@ void runtime_history_get_status(
     out_status->timeline = history->timeline;
     out_status->wrap_count = history->wrap_count;
     out_status->truncated_accesses = history->truncated_accesses;
+    /* O(blocks), never O(records): telemetry calls this while recording. */
     for (i = 0u; i < history->block_count; ++i) {
         const runtime_history_block *block = &history->blocks[i];
         if (!block->occupied || block->epoch != history->epoch) {
@@ -516,31 +518,13 @@ void runtime_history_get_status(
         }
         out_status->used_bytes += block->used;
         out_status->record_count += block->record_count;
+        out_status->partial_records += block->partial_count;
         if (out_status->oldest_id == 0u ||
             block->first_id < out_status->oldest_id) {
             out_status->oldest_id = block->first_id;
         }
         if (block->last_id > out_status->newest_id) {
             out_status->newest_id = block->last_id;
-        }
-        {
-            size_t offset = 0u;
-            uint32_t record_index;
-            for (record_index = 0u;
-                 record_index < block->record_count;
-                 ++record_index) {
-                const uint8_t *bytes =
-                    history_block_bytes(history, i) + offset;
-                size_t size =
-                    history_record_size_from_bytes(bytes, block->used - offset);
-                if (size == 0u) {
-                    break;
-                }
-                if ((bytes[21] & HISTORY_TAG_PARTIAL) != 0u) {
-                    out_status->partial_records++;
-                }
-                offset += size;
-            }
         }
     }
     if (history->retain_oldest_id != 0u &&
@@ -609,6 +593,7 @@ bool runtime_history_begin_record(
     history->has_active_record = 1u;
     block->used += HISTORY_EXEC_HEADER_SIZE;
     block->record_count++;
+    block->partial_count++;
     if (block->record_count == 1u) {
         block->first_id = history->active_id;
     }
@@ -717,6 +702,11 @@ bool runtime_history_append_access(
 bool runtime_history_complete_record(runtime_history *history) {
     if (history == NULL || !history->has_active_record) {
         return false;
+    }
+    if ((history->active_header[21] & HISTORY_TAG_PARTIAL) != 0u &&
+        history->active_block != NULL &&
+        history->active_block->partial_count > 0u) {
+        history->active_block->partial_count--;
     }
     history->active_header[21] &= (uint8_t)~HISTORY_TAG_PARTIAL;
     history->has_active_record = 0u;
