@@ -1525,6 +1525,13 @@ static bool intent_mutates_in_forensic(frontend_debugger_intent_type type)
     case FRONTEND_DEBUGGER_INTENT_DISK_MOUNT_DIALOG:
     case FRONTEND_DEBUGGER_INTENT_DISK_ADD_DIALOG:
     case FRONTEND_DEBUGGER_INTENT_DISK_UNMOUNT:
+    case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_SET_EXECUTE:
+    case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_CLEAR:
+    case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_CLEAR_ALL:
+    case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_SET_ENABLED:
+    case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_CREATE:
+    case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_UPDATE:
+    case FRONTEND_DEBUGGER_INTENT_CONFIG_APPLY:
     case FRONTEND_DEBUGGER_INTENT_TM_SET_ENABLED:
         return true;
     default:
@@ -2654,22 +2661,27 @@ int main(int argc, char **argv)
                            frontend_input_has_option_modifier(&event.key)) {
                     /* Opt+Insert (and Opt+Shift+Insert): simple OS clipboard
                        paste into Apple $C000 via KBDSTRB feed (a2m-style). */
-                    char *text = SDL_GetClipboardText();
-                    if (text != NULL && text[0] != '\0') {
-                        (void)runtime_client_paste_text(
-                            client, text, strlen(text));
-                    }
-                    if (text != NULL) {
-                        SDL_free(text);
+                    if (!debug.tm_forensic) {
+                        char *text = SDL_GetClipboardText();
+                        if (text != NULL && text[0] != '\0') {
+                            (void)runtime_client_paste_text(
+                                client, text, strlen(text));
+                        }
+                        if (text != NULL) {
+                            SDL_free(text);
+                        }
                     }
                     send_event_to_frontend = false;
                 } else if (!frontend_help_is_open(ui) &&
                            key_is_quick_assemble_shortcut(&event.key)) {
-                    if (!frontend_trigger_assembler(ui)) {
-                        SDL_Log("quick assemble: not queued (configure an assembler source)");
+                    if (!debug.tm_forensic) {
+                        if (!frontend_trigger_assembler(ui)) {
+                            SDL_Log("quick assemble: not queued (configure an assembler source)");
+                        }
                     }
                     send_event_to_frontend = false;
-                } else if (frontend_joystick_consumes(&kbd_joystick, sym) &&
+                } else if (!debug.tm_forensic &&
+                           frontend_joystick_consumes(&kbd_joystick, sym) &&
                            (!ui_visible || frontend_routes_keyboard_to_machine(ui)) &&
                            !frontend_help_is_open(ui)) {
                     joystick_handle_key_and_solid_apple(
@@ -2690,14 +2702,16 @@ int main(int argc, char **argv)
                 } else if (sym == SDLK_F8) {
                     /* F8 stands in for CTRL+RESET (macOS eats Control+F*).
                        Option+F8 = CTRL+Open-Apple+RESET (cold). Closed-Apple TBD. */
-                    if (frontend_input_has_option_modifier(&event.key)) {
-                        (void)runtime_client_cold_reset(client);
-                    } else {
-                        (void)runtime_client_reset(client);
+                    if (!debug.tm_forensic) {
+                        if (frontend_input_has_option_modifier(&event.key)) {
+                            (void)runtime_client_cold_reset(client);
+                        } else {
+                            (void)runtime_client_reset(client);
+                        }
+                        frontend_clear_disk_activity_leds(ui);
+                        debug.disk_motor_mask = 0;
+                        request_debug_telemetry(client);
                     }
-                    frontend_clear_disk_activity_leds(ui);
-                    debug.disk_motor_mask = 0;
-                    request_debug_telemetry(client);
                     send_event_to_frontend = false;
                 } else if (sym == SDLK_h &&
                            frontend_input_has_option_modifier(&event.key)) {
@@ -2727,10 +2741,14 @@ int main(int argc, char **argv)
                 } else if (frontend_help_is_open(ui)) {
                     send_event_to_frontend = true;
                 } else if (key_is_quicksave_shortcut(&event.key)) {
-                    (void)send_quicksave(client, &options, ui);
+                    if (!debug.tm_forensic) {
+                        (void)send_quicksave(client, &options, ui);
+                    }
                     send_event_to_frontend = false;
                 } else if (key_is_quickload_shortcut(&event.key)) {
-                    (void)send_quickload(client, &options, ui);
+                    if (!debug.tm_forensic) {
+                        (void)send_quickload(client, &options, ui);
+                    }
                     send_event_to_frontend = false;
                 } else if (handle_step_key_event(client, &debug, &event.key, true)) {
                     send_event_to_frontend = false;

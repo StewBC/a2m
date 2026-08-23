@@ -116,9 +116,11 @@ Reuse shared disasm ops table pattern (`debugger_disasm` mode ops).
 ## Manual smoke (required)
 
 1. TM off → play; confirm no obvious new cost; Inspector explains how to enable.  
-2. TM on → run → Pause from tab → scrub frames → mem/regs/display match past.  
+2. TM on → run → **Pause** from tab → **Inspect (enter forensic)** → scrub the slider
+   → mem/regs/display match past. (Scrubber is forensic-only, not on live pause.)  
 3. F10/F11/F12 forensic nav without FIND lag.  
-4. Try poke mem → rejected with the read-only message.  
+4. Try poke mem → memory footer says **read-only**; registers are locked; Inspector
+   copy says memory/registers are read-only.  
 5. Exit Inspector mode → NOW restored; still paused; F12 runs live again.  
 6. **Boot a disk, scrub back through the load, exit** → drive still works; host image
    file unchanged.  
@@ -215,8 +217,14 @@ Live F10-while-running is still Pause (does **not** auto-enter forensic).
 - Window background/header tint (warm brown) while `tm_forensic`.
 - Title: `TIME MACHINE oldest-newest @ focus` via `frontend_format_window_title_ex`.
 - Registers: `NK_EDIT_READ_ONLY` (same `editable` flag as running).
-- Breakpoints tab: New disabled + "forensic breakpoints are TM5".
-- Host keys not sent to the Apple while forensic.
+- Memory footer: `read-only` while forensic (not `editable`). Hex type-in is a no-op.
+- Breakpoints tab: New / Edit / Duplicate / Enable / Disable / Clear / Clear All
+  disabled + "forensic breakpoints are TM5". **View PC** stays (navigation).
+  Opt+B unbound. BP create/update/clear/enable intents are dropped in
+  `dispatch_intent` while forensic (worker still allows control-port BP edits).
+- Host keys not sent to the Apple while forensic. F8, Opt+Insert paste,
+  quicksave/load, Opt+Shift+A, and kbd-stick also skipped (worker would
+  `read-only-forensic`). Configure OK (`CONFIG_APPLY`) is dropped too.
 
 `debugger_disasm` ops table is still unused as a drop-in for the live disasm
 panel (that view has its own router). Forensic verbs are the F-keys + Opt+Left
@@ -243,7 +251,24 @@ updated. F7 still absent from `manual/`.
 
 ### GUI smoke (human)
 
-Playbook in this file, items 1–8. Not run in this session (no desktop).
+Playbook in this file, items 1–9. **Still the V1 accept gate.** This session
+could not capture or click the SDL window (no Screen Recording / assistive
+access). Control-port checks on a windowed `--timemachine` launch: `hello`
+`protocol=A2M/12`, `capabilities` includes `timemachine`, history
+`recording=1` while live, `get-state mode=live`. Enter/seek/step stay off the
+wire, so forensic chrome (tint, slider, Inspect/Leave) needs a human.
+
+Suggested launch:
+
+```bash
+./build/a2m --noini --nosaveini --timemachine --control-port 6530 \
+  -d "tests/fixtures/Apple DOS 3.3 January 1983.nib"
+```
+
+F9 → Misc → Inspector. Off-path launch: omit `--timemachine`. For item 7,
+copy the `.nib` first so the fixture stays clean, `set-disk-writable 1` or
+Configure write-enable, SAVE a BASIC file, then Inspect and read the left-edge
+reason.
 
 ### What TM5 must not break
 
