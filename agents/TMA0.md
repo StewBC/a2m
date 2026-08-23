@@ -64,7 +64,7 @@ These overlay TM4 Inspector UX. Backend pins D5 / D5a / D12 / D16 still hold.
 | **A3** | Preview | If the frame ring has a still at that time, blit it to the CRT. Else **pink** the CRT client area. |
 | **A4** | Release | **Land:** load last checkpoint ≤ that time, paint from the reconstructed Apple. Far right = restore **live** (the NOW blob), not the last cadence checkpoint. May sit up to ~one 1 MHz frame *before* a stored still (cadence is cycle-capped, not VBL-locked). |
 | **A5** | `[-]` / `[+]` | **One guest video frame.** `[+]` = re-execute forward to the next frame + paint. `[-]` = earlier checkpoint + re-execute to the previous frame + paint (D12, no reverse CPU). Disable `[-]` at the oldest snapshot, `[+]` at **live**. While the thumb is down they cannot be clicked (one pointer). A step that would pass live **stops at live**. |
-| **A6** | F10 / F11 / Shift+F10 / F12 / Shift+F12 | **Re-execute** on the landed Apple — not HST1 TM1 queries. **F12** runs the timeline forward until a **breakpoint** or **live**, then **stops**. Stay in time travel. Do **not** exit, do **not** resume the live line, do **not** record more Time Machine history. **Shift+F12** = run-to-cursor, still stops at a breakpoint or live. |
+| **A6** | F10 / F11 / Shift+F10 / F12 / Shift+F12 | **Re-execute** on the landed Apple — not HST1 TM1 queries. **F12** runs the timeline forward until a **breakpoint** or **live**, then **stops**. Stay in time travel. Do **not** exit, do **not** resume the live line, do **not** record more Time Machine history. **Shift+F12** = run-to-cursor, still stops at a breakpoint or live. **On stop, present the CRT (A16).** |
 | **A7** | Enter Inspect | Requires **checkpoints** only. Film is optional (then most of the bar is pink). HST1 is **not** a gate. Enter **starts at live** (machine is already NOW). Do not land the last cadence checkpoint. Slider at the right. |
 | **A8** | Leave Inspect | Restore live **NOW**, still **paused**. Unchanged. |
 | **A9** | Mutation | Pokes still rejected (read-only past). Execute-forward is how the cursor moves. Nothing executes **past live**. F10 / F11 / F12 / `[+]` at live are no-ops or disabled. |
@@ -74,12 +74,13 @@ These overlay TM4 Inspector UX. Backend pins D5 / D5a / D12 / D16 still hold.
 | **A13** | Opt+Left | **Unbound** in time travel. Not poke-PC, not HST1 run-to, not sealed run-to-cursor. |
 | **A14** | Breakpoints | **One list.** Live and time travel share it. Opt+B and the Breakpoints tab always edit that list. Time-travel run stops on those breakpoints. The TM5 second bank is deleted in [`TMA2.md`](TMA2.md). |
 | **A15** | TM6 | **Not this campaign.** No Promote / Branch. |
+| **A16** | CRT on stop | Any F10-family / F12 / Pause that leaves the Apple **stopped** must **publish a CRT frame**. Same rule in live and time travel (one skin). **Override on** (Hardware tab) is a RAM view of a page — dump video RAM, then publish. **Override off** publishes the **beam buffer** so a mid-frame mode switch stays visible. Paint-off (max turbo, sealed F12 run) has no beam image: dump RAM. Do not leave the CRT on a vblank captured mid-routine. |
 
 ---
 
 ## Goal
 
-Rewire Misc → Inspector so it matches A1–A15.
+Rewire Misc → Inspector so it matches A1–A16.
 
 **Win:** slam the thumb to the far left and the UI stays live; release **lands** in ~a millisecond-scale snapshot load; `±` and F10-family move that Apple by re-execute, clamped to live.
 
@@ -119,9 +120,9 @@ Grab again  → preview again; Apple frozen until the next land.
 After land (still in time travel):
   [-] / [+]          one guest video frame (disabled at oldest / live)
   F10 / F11 / Shift+F10
-                     insn step / over / out  (no-op at live)
-  F12                re-execute to a breakpoint or live; stay in time travel
-  Shift+F12          run-to-cursor; stop at a breakpoint or live
+                     insn step / over / out  (no-op at live); CRT on stop (A16)
+  F12                re-execute to a breakpoint or live; stay in time travel; CRT on stop (A16)
+  Shift+F12          run-to-cursor; stop at a breakpoint or live; CRT on stop (A16)
   Opt+Left           unbound
   pokes              reject (read-only)
 ```
@@ -186,6 +187,7 @@ TM4 Landed remains true as a historical phase. This addendum supersedes **that t
 - [x] Vocabulary **time travel** / live / land / film / pink / frame-step pinned  
 - [x] Two streams pinned; HST1 out of the Inspector loop  
 - [x] One breakpoint list; Opt+Left unbound; F12 runs to live; enter starts at live  
+- [x] A16 CRT on stop: Override / paint-off dumps RAM; else beam buffer  
 
 Implementation acceptance lives in [`TMA1.md`](TMA1.md).
 
@@ -195,7 +197,7 @@ Implementation acceptance lives in [`TMA1.md`](TMA1.md).
 
 ```text
 TMA0: docs only (this file).
-TMA1: implement A1–A15 (Inspector is time travel; stops calling TM1). Stop for a look.
+TMA1: implement A1–A16 (Inspector is time travel; stops calling TM1). Stop for a look.
 TMA2: [`TMA2.md`](TMA2.md) delete the TM1 query engine and the TM5 second BP bank.
 Do not start TM6. Do not re-open A11 (drop film) without a new addendum.
 ```
@@ -204,4 +206,4 @@ Do not start TM6. Do not re-open A11 (drop film) without a new addendum.
 
 ## Landed
 
-Brief accepted as the Inspector contract 2026-08-23; vocabulary restated 2026-08-23 (time travel vs forensic; live end; one BP list). Code is TMA1.
+Brief accepted as the Inspector contract 2026-08-23; vocabulary restated 2026-08-23 (time travel vs forensic; live end; one BP list). A16 CRT on stop added 2026-08-23. Code is TMA1.

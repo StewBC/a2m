@@ -3,7 +3,7 @@
 **Status:** Roadmap (implementation brief).  
 **Epic:** [`timemachine.md`](timemachine.md)  
 **Prev / Next:** [`TMA0.md`](TMA0.md) / [`TMA2.md`](TMA2.md) (delete TM1 tape-nav + second BP bank — required)  
-**Depends on:** TMA0 A1–A15 (do not re-litigate); TM2 checkpoint + seal; TM3 enter/exit NOW; TM4 Misc tab chrome.
+**Depends on:** TMA0 A1–A16 (do not re-litigate); TM2 checkpoint + seal; TM3 enter/exit NOW; TM4 Misc tab chrome.
 
 Related: [`TM4.md`](TM4.md) · [`rules.md`](rules.md) · [`testing.md`](testing.md) · [`frontend.md`](frontend.md).
 
@@ -13,7 +13,7 @@ This is the how-to. Product contract is TMA0. Do not rewrite TM0–TM6. **Stop w
 
 ## Goal
 
-Rewire Misc → Inspector to A1–A15.
+Rewire Misc → Inspector to A1–A16.
 
 **Win:** slam the thumb left — UI stays live, CRT shows film or pink, Apple does not move. Release **lands** (snapshot load, ~ms). `[-]`/`[+]` frame-step that Apple. F10-family **re-executes** toward **live**. HST1 is not on this path.
 
@@ -84,7 +84,7 @@ Today `runtime_tm_command_mutates_machine` rejects live `STEP_*` / `RUN*` while 
 
 Wire `handle_step_key_event` / F12 time-travel branches to the **live** client APIs, not `runtime_client_tm_step*`. Clamp the worker so execute cannot pass live.
 
-Keep the seal (D16): observer off, no HST1 append, no `runtime_tm_after_step` checkpoints (recorder is already disarmed on enter), no frame-ring push (`publish_argb_frame` already skips the ring while `mode=forensic`). Input log still applies on a long F12 (TM2).
+Keep the seal (D16): observer off, no HST1 append, no `runtime_tm_after_step` checkpoints (recorder is already disarmed on enter), no frame-ring push (`publish_argb_frame` already skips the ring while `mode=forensic`). Input log still applies on a long F12 (TM2). **D16 is during execute.** When F10-family / F12 / Pause **stops**, present the CRT (A16 / Display after stop, below).
 
 **Breakpoints:** the live `rt->breakpoints[]` list. Do not arm or match `tm_breakpoints[]`. Time-travel F12 / run-until / Opt+B / Breakpoints tab all use that one list. Leave Inspect keeps whatever you added or cleared (debugger state, not inside the snapshot).
 
@@ -114,7 +114,7 @@ Preview must not wait on materialize. Prefer a UI-thread blit if `runtime_client
 
 Frontend already coalesces `TM_SEEK_CYCLE` intents; reuse that pattern for preview/land so a slam-left is one land, not 100.
 
-### 6. Display after land
+### 6. Display after land / stop (A16)
 
 `apple2_snapshot_load` has no framebuffer (TM3). After land on a checkpoint (replay span 0):
 
@@ -126,6 +126,16 @@ Landing **live** restores the NOW blob; paint the same way if the framebuffer is
 Mid-frame split-screen can be wrong vs a recorded still (TM3). Accepted for TMA1: we landed on a checkpoint, not on the film cell. Frame-step `[+]` then beam-paints a real guest frame.
 
 While dragging, the CRT is **film or pink**, not this paint.
+
+**Stop path (live and time travel — do not skip on a c64m port):** `runtime_publish_presented_frame` after F10 / F11 / Shift+F10 / F12 / Pause / run-complete / breakpoint. One helper, two pictures:
+
+| Condition | Present |
+|-----------|---------|
+| Hardware **Override on** | Dump video RAM (`paint_full_frame`) then publish. Override is a RAM view of a hidden page, not the CRT. |
+| Paint off (max turbo, sealed F12 run) | Dump RAM then publish. There is no beam image. |
+| Otherwise (front / CRT) | Publish the **beam buffer**. Do not dump. A TEXT→HGR write mid-scanline must still show the raster split. |
+
+D16 still holds *during* sealed F12 (paint off, no ring push). The helper runs **on stop**, then re-enable paint for the next F10. `SET_DISPLAY_OVERRIDE` always dumps (toggling PAGE2 must show the page as it is now). Gate: `runtime_display_stop`.
 
 ---
 
@@ -216,6 +226,7 @@ Do not add flaky UI automation. Manual smoke is the GUI gate.
 - [x] Release lands (`load(cp ≤ time)` or live); CRT painted; HST1 unused  
 - [x] `[-]`/`[+]` = one guest frame; disabled at oldest / live  
 - [x] F10-family = sealed re-execute; F12 stops at a breakpoint or live; stay in time travel  
+- [x] Stop presents CRT (A16): Override / paint-off dumps RAM; else beam buffer (`runtime_display_stop`)  
 - [x] Opt+Left unbound; one BP list  
 - [x] Pokes still rejected; leave restores NOW paused  
 - [x] Slam-left does not stall the worker  
@@ -229,7 +240,7 @@ Do not add flaky UI automation. Manual smoke is the GUI gate.
 ## Agent script
 
 ```text
-1. Read agents/rules.md, agents/TMA0.md (A1–A15), this file, TM3 Landed (seal / NOW).
+1. Read agents/rules.md, agents/TMA0.md (A1–A16), this file, TM3 Landed (seal / NOW).
 2. Implement in the order above (gate → land → execute → frame-step → chrome).
 3. Do not route Inspector through SEEK_CYCLE. Do not drop the frame ring.
 4. Build + ctest. Manual smoke. Update manual/status. Landed. Stop.
@@ -246,5 +257,6 @@ Do not add flaky UI automation. Manual smoke is the GUI gate.
 - Slider is oldest snapshot → live; drag previews film or pink; release lands.
 - Thumb follows machine cycles. `[-]`/`[+]` frame-step; F10-family sealed execute.
 - F12 runs to a breakpoint or live and stays in Inspect. Opt+Left unbound.
+- Stop presents the CRT (A16): Override or paint-off dumps RAM; otherwise the beam buffer (raster-accurate). `runtime_publish_presented_frame` / `runtime_display_stop`.
 - One breakpoint list. TM1 query engine is unused by the Inspector (deleted in TMA2).
 - ctest 60 green. Stop for a look before TMA2.

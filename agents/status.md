@@ -53,7 +53,7 @@ Keyboard stick (when on): Option/KP0 and Space are fire keys (optional swap in C
 
 | Area | Evidence |
 |------|----------|
-| Build / ctest | **59 green** (`testing.md`; includes sessions + state-changed, file-codec, assembler MLI launch, TM0/TM2–TM3 + TMA1/TMA2) |
+| Build / ctest | **60 green** (`testing.md`; includes sessions + state-changed, file-codec, assembler MLI launch, TM0/TM2–TM3 + TMA1/TMA2) |
 | Assembler | Misc → Assembler: assemble to RAM / `file=` HostFS; optional Auto-run; **MLI launch** gates auto-run on CPU-visible `$BF00 == $4C` (mutually exclusive with Reset); sample shim in `samples/asm_mli_launch/` |
 | CLI / INI | model, mounts sNdN (multi-image queue), turbo MHz/`max`, lifecycle, headless; `[DEBUG] break.*` |
 | Turbo / step / reset | Opt+T (MHz/max); F10–F12 family; F8 / Opt+F8 |

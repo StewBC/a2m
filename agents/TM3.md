@@ -276,6 +276,8 @@ Default path: **sealed re-execution with `paint_enabled = true`**. After CP load
 
 Live-slot publish after the head lands. **No** `runtime_frame_ring_push` while forensic (the ring is a recorder).
 
+Stop-path CRT (F10-family / F12 / Pause) is **not** this land/materialize policy. Present per [`TMA0.md`](TMA0.md) A16 / [`TMA1.md`](TMA1.md) §6: beam buffer unless Override or paint-off, then RAM dump.
+
 ### Read-only
 
 Worker rejects (before cursor-invalidate / state-changed) with `RUNTIME_EVENT_ERROR` `code=read-only-forensic`:

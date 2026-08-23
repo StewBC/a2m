@@ -8,7 +8,7 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-Expect **59** green. Run from repo root.
+Expect **60** green. Run from repo root.
 
 ## Registered tests (product gate)
 
@@ -33,6 +33,7 @@ Expect **59** green. Run from repo root.
 | `a2m_help` / `a2m_version` / `a2m_headless` | CLI smoke |
 | `app_options_mounts` | Disk II / SmartPort / model CLI |
 | `runtime_stepping` | step + run_cycles |
+| `runtime_display_stop` | stop-path CRT: Override dumps RAM; beam keeps mid-frame raster |
 | `runtime_smartport_boot` | INI-style configured SmartPort startup redirects PC to `$Cn00` after mount |
 | `runtime_step_nested` | step-over / out / run-to-cursor |
 | `runtime_memory_rpc` | token memory claim |

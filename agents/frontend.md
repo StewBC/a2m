@@ -80,8 +80,11 @@ show each switch's on-address and continuously tracked Actual state. Enabling
 Override freezes a separate editable checkbox column for 80COL, ALTCHAR, TEXT,
 MIXED, PAGE2, HIRES, and DHIRES. The override affects video paint only; real
 soft switches, CPU-visible status, memory mapping, floating bus, and snapshots
-continue using actual machine state. Banking remains read-only. Cycle, frame,
-and turbo status live only on the Debugger tab.
+continue using actual machine state. Override is a **RAM view** of a page (the
+back buffer, a forced mode): on debugger stop, dump that page and publish.
+With Override off, stop publishes the **beam buffer** so a mid-frame mode
+switch stays visible ([`TMA0.md`](TMA0.md) A16). Banking remains read-only.
+Cycle, frame, and turbo status live only on the Debugger tab.
 
 ## Memory search
 

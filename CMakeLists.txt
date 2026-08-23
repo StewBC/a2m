@@ -274,6 +274,13 @@ target_compile_features(test_runtime_stepping PRIVATE c_std_99)
 target_link_libraries(test_runtime_stepping PRIVATE runtime SDL2::SDL2)
 add_test(NAME runtime_stepping COMMAND test_runtime_stepping)
 
+add_executable(test_runtime_display_stop
+    tests/runtime/test_runtime_display_stop.c
+)
+target_compile_features(test_runtime_display_stop PRIVATE c_std_99)
+target_link_libraries(test_runtime_display_stop PRIVATE runtime SDL2::SDL2)
+add_test(NAME runtime_display_stop COMMAND test_runtime_display_stop)
+
 add_executable(test_runtime_smartport_boot
     tests/runtime/test_runtime_smartport_boot.c
 )

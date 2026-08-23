@@ -20,6 +20,7 @@
 #include <string.h>
 
 static void runtime_publish_argb_frame(runtime *rt);
+static void runtime_publish_presented_frame(runtime *rt);
 static void runtime_set_active_turbo(runtime *rt, uint32_t milli_mhz);
 
 /* One TYPE wait unit ≈ 10 ms at ~1 MHz (product pacing, not cycle-perfect). */
@@ -2419,6 +2420,10 @@ static void runtime_pause_for_breakpoint(runtime *rt)
     runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
     runtime_publish_cpu(rt, 0u);
     runtime_publish_breakpoints(rt);
+    runtime_publish_presented_frame(rt);
+    if (rt->tm_forensic) {
+        rt->machine.video.paint_enabled = true;
+    }
 }
 
 static bool runtime_pause_if_breakpoint_pending(runtime *rt)
@@ -2445,6 +2450,10 @@ static void runtime_pause_for_step(runtime *rt)
 
     runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
     runtime_publish_cpu(rt, 0u);
+    runtime_publish_presented_frame(rt);
+    if (rt->tm_forensic) {
+        rt->machine.video.paint_enabled = true;
+    }
 }
 
 static bool runtime_turbo_is_free_run(const runtime *rt)
@@ -2927,6 +2936,25 @@ static void runtime_publish_argb_frame(runtime *rt)
     runtime_publish_event(rt, &event);
 }
 
+/*
+ * Present the CRT after a stop (or on REQUEST_FRAME).
+ * Override, max turbo, and paint-off (sealed run) have no trustworthy beam
+ * image — dump video RAM. Otherwise publish the beam buffer so a mid-frame
+ * mode switch stays visible.
+ */
+static void runtime_publish_presented_frame(runtime *rt)
+{
+    if (rt == NULL || !rt->machine_ready || rt->machine.video.fb == NULL) {
+        return;
+    }
+    if (rt->machine.video.display_override_enabled ||
+        !rt->machine.video.paint_enabled ||
+        runtime_turbo_is_free_run(rt)) {
+        apple2_video_paint_full_frame(&rt->machine);
+    }
+    runtime_publish_argb_frame(rt);
+}
+
 static void runtime_maybe_frame(runtime *rt)
 {
     if (!apple2_video_take_frame_ready(&rt->machine)) {
@@ -3074,6 +3102,7 @@ static bool runtime_tm_pause_at_live(runtime *rt)
     }
     (void)runtime_tm_restore_live(rt);
     rt->temp_bp_active = false;
+    runtime_publish_presented_frame(rt);
     if (rt->exec_state == RUNTIME_EXEC_RUNNING) {
         rt->exec_state = RUNTIME_EXEC_PAUSED;
         rt->last_stop_reason = RUNTIME_STOP_REASON_RUN_COMPLETE;
@@ -3790,15 +3819,15 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
             runtime_finish_to_instruction_boundary(rt);
             rt->exec_state = RUNTIME_EXEC_PAUSED;
             rt->last_stop_reason = RUNTIME_STOP_REASON_PAUSE_COMMAND;
-            if (rt->tm_forensic) {
-                rt->machine.video.paint_enabled = true;
-                apple2_video_paint_full_frame(&rt->machine);
-            }
             runtime_publish_machine(rt);
             runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
             runtime_publish_cpu(rt, 0u);
             runtime_publish_state_changed(
                 rt, RUNTIME_STATE_CHANGED_PAUSE, cmd->session_id);
+            runtime_publish_presented_frame(rt);
+            if (rt->tm_forensic) {
+                rt->machine.video.paint_enabled = true;
+            }
         }
         break;
     case RUNTIME_COMMAND_RUN_CYCLES: {
@@ -3835,6 +3864,10 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         runtime_publish_simple(rt, RUNTIME_EVENT_RUN_COMPLETE);
         runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
         runtime_publish_cpu(rt, 0u);
+        runtime_publish_presented_frame(rt);
+        if (rt->tm_forensic) {
+            rt->machine.video.paint_enabled = true;
+        }
         break;
     }
     case RUNTIME_COMMAND_RUN_INSTRUCTIONS: {
@@ -3876,6 +3909,10 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         runtime_publish_simple(rt, RUNTIME_EVENT_RUN_COMPLETE);
         runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
         runtime_publish_cpu(rt, 0u);
+        runtime_publish_presented_frame(rt);
+        if (rt->tm_forensic) {
+            rt->machine.video.paint_enabled = true;
+        }
         break;
     }
     case RUNTIME_COMMAND_STEP_INSTRUCTION:
@@ -3926,10 +3963,7 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         runtime_publish_machine(rt);
         break;
     case RUNTIME_COMMAND_REQUEST_FRAME:
-        if (runtime_turbo_is_free_run(rt)) {
-            apple2_video_paint_full_frame(&rt->machine);
-        }
-        runtime_publish_argb_frame(rt);
+        runtime_publish_presented_frame(rt);
         break;
     case RUNTIME_COMMAND_SET_CPU_REGISTER:
         runtime_set_register(
@@ -4434,9 +4468,6 @@ static void runtime_free_run_batch(runtime *rt)
         uint64_t c0;
 
         if (rt->tm_forensic && runtime_tm_pause_at_live(rt)) {
-            rt->machine.video.paint_enabled = true;
-            apple2_video_paint_full_frame(&rt->machine);
-            runtime_tm_publish_head(rt);
             return;
         }
         if (!rt->suppress_execute_bp &&
@@ -4448,10 +4479,6 @@ static void runtime_free_run_batch(runtime *rt)
                 rt->machine.cpu.cpu.pc == rt->temp_bp_address) {
                 rt->temp_bp_skip_current = false;
             } else {
-                if (rt->tm_forensic) {
-                    rt->machine.video.paint_enabled = true;
-                    apple2_video_paint_full_frame(&rt->machine);
-                }
                 runtime_pause_for_breakpoint(rt);
                 return;
             }
