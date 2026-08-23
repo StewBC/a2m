@@ -42,7 +42,8 @@ Opt+Shift+0/1/2 clears solid-apple so chords do not stick BUTN0.
 
 ## Configure
 
-Misc / Configure dialog (not F2). The Machine tab starts with model plus Slot
+Misc tabs: Machine, Debugger, Breakpoints, Hardware, Assembler, **Inspector**
+(TimeMachine forensic entry; F7 unbound). Configure dialog is not F2. The Machine tab starts with model plus Slot
 1–7 card selectors (Empty / Disk II / SmartPort / Mockingboard); selecting a
 Mockingboard clears the previous Mockingboard because only one is supported.
 Keyboard stick and the remaining machine options follow unchanged. Slot cards

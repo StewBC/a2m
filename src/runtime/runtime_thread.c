@@ -1606,16 +1606,38 @@ static void runtime_publish_machine(runtime *rt)
     event.data.machine_state.video_line = rt->machine.video.line;
     event.data.machine_state.video_cycle_in_line = rt->machine.video.cycle_in_line;
     event.data.machine_state.tm_mode = (uint8_t)runtime_tm_current_mode(rt);
-    if (rt->tm_forensic && rt->tm_focus.valid) {
+    event.data.machine_state.tm_enabled = runtime_tm_enabled(rt) ? 1u : 0u;
+    event.data.machine_state.tm_stopped_for_max =
+        (rt->history_paused_for_max ||
+         (runtime_turbo_is_max_value(rt->active_turbo_multiplier) &&
+          rt->history_off_on_max)) ? 1u : 0u;
+    if (rt->history != NULL) {
+        runtime_history_status st;
+        runtime_history_get_status(rt->history, &st);
+        event.data.machine_state.tm_history_recording =
+            (st.available && st.recording) ? 1u : 0u;
+    }
+    {
+        runtime_frame_ring_info fi;
+        runtime_frame_ring_get_info(&rt->frame_ring, &fi);
+        event.data.machine_state.tm_frame_recording = fi.recording ? 1u : 0u;
+    }
+    event.data.machine_state.tm_recorder_recording =
+        runtime_tm_recorder_is_recording(rt) ? 1u : 0u;
+    if (rt->tm_focus.valid) {
         event.data.machine_state.tm_focus_cycle = rt->tm_focus.cycle;
-    } else {
-        event.data.machine_state.tm_focus_cycle = 0u;
+        event.data.machine_state.tm_focus_id = rt->tm_focus.history_id;
     }
     {
         runtime_tm_window window;
         runtime_tm_window_info(rt, &window);
+        event.data.machine_state.tm_window_valid = window.valid ? 1u : 0u;
         event.data.machine_state.tm_window_start_kind = (uint8_t)window.start_kind;
         event.data.machine_state.tm_window_start_arg1 = window.start_arg1;
+        event.data.machine_state.tm_oldest_cycle = window.oldest_cycle;
+        event.data.machine_state.tm_newest_cycle = window.newest_cycle;
+        event.data.machine_state.tm_oldest_id = window.oldest_id;
+        event.data.machine_state.tm_newest_id = window.newest_id;
     }
     for (slot = 1; slot <= 7; ++slot) {
         runtime_slot_snapshot *out = &event.data.machine_state.slots[slot];

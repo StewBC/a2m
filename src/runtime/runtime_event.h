@@ -278,11 +278,22 @@ typedef struct runtime_machine_snapshot {
     /* Beam position (Φ0 domain; same units as BP line/cycle_in_line). */
     uint16_t video_line;         /* 0..261 */
     uint16_t video_cycle_in_line; /* 0..64 */
-    /* TM3: one true state is past while forensic. */
+    /* TM3/TM4: forensic mode + tm_window for the Inspector scrubber. */
     uint8_t tm_mode; /* runtime_tm_mode */
-    uint64_t tm_focus_cycle;
+    uint8_t tm_enabled;
+    uint8_t tm_window_valid;
+    uint8_t tm_history_recording;
+    uint8_t tm_frame_recording;
+    uint8_t tm_recorder_recording;
+    uint8_t tm_stopped_for_max;
     uint8_t tm_window_start_kind; /* runtime_history_media_change_kind */
     uint32_t tm_window_start_arg1;
+    uint64_t tm_focus_cycle;
+    uint64_t tm_focus_id;
+    uint64_t tm_oldest_cycle;
+    uint64_t tm_newest_cycle;
+    uint64_t tm_oldest_id;
+    uint64_t tm_newest_id;
 } runtime_machine_snapshot;
 
 typedef struct runtime_memory_snapshot {

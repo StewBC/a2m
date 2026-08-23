@@ -1,6 +1,6 @@
 # TM4 — One-skin UI (Misc Inspector tab)
 
-**Status:** Not started.  
+**Status:** Landed.  
 **Epic:** [`timemachine.md`](timemachine.md)  
 **Prev / Next:** [`TM3.md`](TM3.md) / [`TM5.md`](TM5.md)  
 **V1 bar:** Required (closes TimeMachine V1 with TM0–TM3).  
@@ -134,17 +134,17 @@ Desktop + reasonable window size; tint visible.
 
 ## Acceptance checklist
 
-- [ ] Misc Inspector tab is the only forensic entry  
-- [ ] Forensic tint + read-only views  
-- [ ] Scrubber + TM verbs wired; same-skin keys  
-- [ ] Scrubber extent reflects `tm_window`, not frame-ring extent alone (D17)  
-- [ ] Live BP list not silently mutated in forensic  
-- [ ] Max-turbo behaviour surfaced honestly in the tab  
-- [ ] Window-cut reason shown at the scrubber edge when a media write truncated it  
-- [ ] `manual/manual.md` states plainly: **a disk write drops earlier history**  
-- [ ] Docs/keys/manual updated  
-- [ ] Build + ctest green; manual smoke above  
-- [ ] Landed filled — **TimeMachine V1 bar (TM0–TM4) claimable**  
+- [x] Misc Inspector tab is the only forensic entry  
+- [x] Forensic tint + read-only views  
+- [x] Scrubber + TM verbs wired; same-skin keys  
+- [x] Scrubber extent reflects `tm_window`, not frame-ring extent alone (D17)  
+- [x] Live BP list not silently mutated in forensic  
+- [x] Max-turbo behaviour surfaced honestly in the tab  
+- [x] Window-cut reason shown at the scrubber edge when a media write truncated it  
+- [x] `manual/manual.md` states plainly: **a disk write drops earlier history**  
+- [x] Docs/keys/manual updated  
+- [x] Build + ctest green; GUI smoke is the human playbook below  
+- [x] Landed filled — **TimeMachine V1 in tree; GUI smoke is the accept gate**  
 
 ---
 
@@ -163,4 +163,89 @@ Desktop + reasonable window size; tint visible.
 
 ## Landed
 
-_(empty until implemented)_
+Handoff. TimeMachine V1 (TM0–TM4) is in the tree. F7 stays unbound. GUI smoke
+is the human accept gate (playbook in this file). Do not start TM5/TM6 until
+that is accepted.
+
+### Entry
+
+Misc (F9 debugger) -> **Inspector** tab. Two rows of three tabs: Machine /
+Debugger / Breakpoints, then Hardware / Assembler / Inspector.
+
+| State | Tab |
+|-------|-----|
+| TM off | Recording checkbox + why; optional Pause |
+| Running, TM on | **Pause**; then Inspect |
+| Paused, window ready | **Inspect (enter forensic)** |
+| Forensic | Scrubber over `tm_window`; **Leave Inspector (restore NOW)** |
+| Max turbo / `history_off_on_max` | Banner: recording stopped; Opt+T discards the tape |
+| Empty window | Honest: recorder off, budget 0, or nothing recorded |
+
+No auto-resume on leave. F12 runs live after exit.
+
+Recording toggle is `runtime_client_tm_set_enabled` (TM0 off→on arm). Locked
+while forensic (TM3 rejects `TM_SET_ENABLED`).
+
+### Scrubber (D17)
+
+Slider **0..1000 maps `tm_window.oldest_cycle` .. `newest_cycle`**, from
+`machine_state` (not frame-ring extent). Seek is `runtime_client_tm_seek_cycle`.
+Left-edge text uses `tm_window_start_kind` / `start_arg1`:
+
+- guest-write: `history starts here: disk write, sNdN @ cycle C` (drive is 1-based)
+- host-directory: `history starts here: host folder change, sNdN @ cycle C`
+- else: `history starts here: <name> @ cycle C`
+
+### Keys (one skin)
+
+| Chord | Forensic |
+|-------|----------|
+| F10 | `runtime_client_tm_step(+1)` |
+| F11 | `tm_step_over` |
+| Shift+F10 | `tm_step_out` |
+| F12 / Shift+F12 | `tm_run_to` at disasm cursor |
+| Opt+Left | `tm_run_to` at disasm cursor (not poke PC) |
+| Opt+B | unbound |
+| Memory / register type-in | no-op in UI; worker would `read-only-forensic` |
+
+Live F10-while-running is still Pause (does **not** auto-enter forensic).
+
+### Chrome
+
+- Window background/header tint (warm brown) while `tm_forensic`.
+- Title: `TIME MACHINE oldest-newest @ focus` via `frontend_format_window_title_ex`.
+- Registers: `NK_EDIT_READ_ONLY` (same `editable` flag as running).
+- Breakpoints tab: New disabled + "forensic breakpoints are TM5".
+- Host keys not sent to the Apple while forensic.
+
+`debugger_disasm` ops table is still unused as a drop-in for the live disasm
+panel (that view has its own router). Forensic verbs are the F-keys + Opt+Left
+in the existing disasm handler.
+
+### Machine snapshot fields (UI source)
+
+Published on every `MACHINE_STATE_RESPONSE` and copied into
+`frontend_debug_state`: `tm_mode`, `tm_enabled`, `tm_window_valid`,
+recording flags, `tm_stopped_for_max`, start_kind/arg1, focus cycle/id,
+oldest/newest cycle.
+
+### Intents
+
+`TM_SET_ENABLED`, `TM_ENTER_FORENSIC`, `TM_EXIT_FORENSIC`, `TM_SEEK_CYCLE`,
+`TM_PAUSE`, `TM_RUN_TO`. Mutating intents are dropped in `dispatch_intent`
+while forensic.
+
+### Tests / docs
+
+ctest **59** green. No new UI automation (brief). `manual/manual.md`: Inspector
+path, disk-write drops history, max turbo, forensic F-keys. `status.md` keys
+updated. F7 still absent from `manual/`.
+
+### GUI smoke (human)
+
+Playbook in this file, items 1–8. Not run in this session (no desktop).
+
+### What TM5 must not break
+
+Forensic must not silently edit the live BP list. Opt+B stays unbound until TM5
+supplies a forensic store. Leave Inspector still restores NOW and stays paused.

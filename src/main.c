@@ -114,12 +114,22 @@ static void update_window_title(
     const char *product_label,
     uint32_t turbo_multiplier,
     frontend_runtime_state state,
-    runtime_stop_reason stop_reason)
+    runtime_stop_reason stop_reason,
+    const frontend_debug_state *debug)
 {
-    char title[96];
+    char title[160];
 
-    frontend_format_window_title(
-        title, sizeof(title), product_label, turbo_multiplier, state, stop_reason);
+    frontend_format_window_title_ex(
+        title,
+        sizeof(title),
+        product_label,
+        turbo_multiplier,
+        state,
+        stop_reason,
+        debug != NULL && debug->tm_forensic,
+        debug != NULL ? debug->tm_focus_cycle : 0u,
+        debug != NULL ? debug->tm_oldest_cycle : 0u,
+        debug != NULL ? debug->tm_newest_cycle : 0u);
     platform_window_set_title(window, title);
 }
 
@@ -609,7 +619,8 @@ static void sdl_apple_controllers_close(
     sdl_apple_gameport_publish(state, client);
 }
 
-/* F10 pause/step and F11 step-over. allow_pause=false for key-repeat (step only). */
+/* F10 pause/step and F11 step-over. allow_pause=false for key-repeat (step only).
+   Forensic: F10/F11 are TimeMachine tape verbs, never live step. */
 static bool handle_step_key_event(
     runtime_client *client,
     frontend_debug_state *debug,
@@ -621,7 +632,10 @@ static bool handle_step_key_event(
     }
 
     if (key->keysym.sym == SDLK_F10 && !frontend_input_has_shift_modifier(key)) {
-        if (debug->runtime_state == FRONTEND_RUNTIME_STATE_RUNNING) {
+        if (debug->tm_forensic) {
+            uint64_t token = runtime_client_alloc_request_token(client);
+            (void)runtime_client_tm_step(client, 1, token);
+        } else if (debug->runtime_state == FRONTEND_RUNTIME_STATE_RUNNING) {
             if (allow_pause) {
                 (void)runtime_client_pause(client);
             }
@@ -631,7 +645,12 @@ static bool handle_step_key_event(
         return true;
     }
     if (key->keysym.sym == SDLK_F11) {
-        (void)runtime_client_step_over(client);
+        if (debug->tm_forensic) {
+            uint64_t token = runtime_client_alloc_request_token(client);
+            (void)runtime_client_tm_step_over(client, token);
+        } else {
+            (void)runtime_client_step_over(client);
+        }
         return true;
     }
     return false;
@@ -1483,6 +1502,36 @@ static void apply_loaded_host_state(
         host.swap_buttons ? ", swap fire" : "");
 }
 
+static bool intent_mutates_in_forensic(frontend_debugger_intent_type type)
+{
+    switch (type) {
+    case FRONTEND_DEBUGGER_INTENT_REGISTER_SET_PC:
+    case FRONTEND_DEBUGGER_INTENT_REGISTER_SET_SP:
+    case FRONTEND_DEBUGGER_INTENT_REGISTER_SET_A:
+    case FRONTEND_DEBUGGER_INTENT_REGISTER_SET_X:
+    case FRONTEND_DEBUGGER_INTENT_REGISTER_SET_Y:
+    case FRONTEND_DEBUGGER_INTENT_REGISTER_SET_STATUS:
+    case FRONTEND_DEBUGGER_INTENT_MEMORY_WRITE_BYTE:
+    case FRONTEND_DEBUGGER_INTENT_MACHINE_RESET:
+    case FRONTEND_DEBUGGER_INTENT_ASSEMBLE_RUN:
+    case FRONTEND_DEBUGGER_INTENT_LOAD_BIN_EXECUTE:
+    case FRONTEND_DEBUGGER_INTENT_SAVE_BIN_EXECUTE:
+    case FRONTEND_DEBUGGER_INTENT_STATE_SAVE_AS_DIALOG:
+    case FRONTEND_DEBUGGER_INTENT_STATE_LOAD_DIALOG:
+    case FRONTEND_DEBUGGER_INTENT_MEDIA_INSERT_DIALOG:
+    case FRONTEND_DEBUGGER_INTENT_MEDIA_EJECT:
+    case FRONTEND_DEBUGGER_INTENT_MEDIA_SWAP:
+    case FRONTEND_DEBUGGER_INTENT_BOOT_SLOT:
+    case FRONTEND_DEBUGGER_INTENT_DISK_MOUNT_DIALOG:
+    case FRONTEND_DEBUGGER_INTENT_DISK_ADD_DIALOG:
+    case FRONTEND_DEBUGGER_INTENT_DISK_UNMOUNT:
+    case FRONTEND_DEBUGGER_INTENT_TM_SET_ENABLED:
+        return true;
+    default:
+        return false;
+    }
+}
+
 static void dispatch_intent(
     runtime_client *client,
     frontend *ui,
@@ -1490,9 +1539,13 @@ static void dispatch_intent(
     frontend_joystick_input *kbd_joystick,
     sdl_apple_controller_state *controllers,
     bool runtime_running,
+    bool forensic,
     const frontend_debugger_intent *intent)
 {
     if (client == NULL || intent == NULL) {
+        return;
+    }
+    if (forensic && intent_mutates_in_forensic(intent->type)) {
         return;
     }
 
@@ -1568,6 +1621,35 @@ static void dispatch_intent(
             frontend_clear_disk_activity_leds(ui);
         }
         break;
+    case FRONTEND_DEBUGGER_INTENT_TM_SET_ENABLED: {
+        uint64_t token = runtime_client_alloc_request_token(client);
+        (void)runtime_client_tm_set_enabled(client, intent->enabled, token);
+        break;
+    }
+    case FRONTEND_DEBUGGER_INTENT_TM_ENTER_FORENSIC: {
+        uint64_t token = runtime_client_alloc_request_token(client);
+        (void)runtime_client_tm_enter_forensic(client, token);
+        break;
+    }
+    case FRONTEND_DEBUGGER_INTENT_TM_EXIT_FORENSIC: {
+        uint64_t token = runtime_client_alloc_request_token(client);
+        (void)runtime_client_tm_exit_forensic(client, token);
+        break;
+    }
+    case FRONTEND_DEBUGGER_INTENT_TM_SEEK_CYCLE: {
+        uint64_t token = runtime_client_alloc_request_token(client);
+        (void)runtime_client_tm_seek_cycle(client, intent->tm_cycle, token);
+        break;
+    }
+    case FRONTEND_DEBUGGER_INTENT_TM_PAUSE:
+        (void)runtime_client_pause(client);
+        break;
+    case FRONTEND_DEBUGGER_INTENT_TM_RUN_TO: {
+        uint64_t token = runtime_client_alloc_request_token(client);
+        (void)runtime_client_tm_run_to(
+            client, intent->address, 0u, token);
+        break;
+    }
     case FRONTEND_DEBUGGER_INTENT_SET_DISPLAY_OVERRIDE:
         (void)runtime_client_set_display_override(
             client, intent->enabled, intent->display_override_flags);
@@ -2004,6 +2086,23 @@ static void apply_event_to_debug(
         debug->disk_motor_mask = event->data.machine_state.disk_motor_mask;
         memcpy(debug->slots, event->data.machine_state.slots, sizeof(debug->slots));
         debug->has_apple_flags = true;
+        debug->tm_forensic = event->data.machine_state.tm_mode != 0u;
+        debug->tm_enabled = event->data.machine_state.tm_enabled != 0u;
+        debug->tm_window_valid = event->data.machine_state.tm_window_valid != 0u;
+        debug->tm_history_recording =
+            event->data.machine_state.tm_history_recording != 0u;
+        debug->tm_frame_recording =
+            event->data.machine_state.tm_frame_recording != 0u;
+        debug->tm_recorder_recording =
+            event->data.machine_state.tm_recorder_recording != 0u;
+        debug->tm_stopped_for_max =
+            event->data.machine_state.tm_stopped_for_max != 0u;
+        debug->tm_window_start_kind = event->data.machine_state.tm_window_start_kind;
+        debug->tm_window_start_arg1 = event->data.machine_state.tm_window_start_arg1;
+        debug->tm_focus_cycle = event->data.machine_state.tm_focus_cycle;
+        debug->tm_focus_id = event->data.machine_state.tm_focus_id;
+        debug->tm_oldest_cycle = event->data.machine_state.tm_oldest_cycle;
+        debug->tm_newest_cycle = event->data.machine_state.tm_newest_cycle;
         /* Always refresh the CPU snapshot from machine state (c64m). */
         debug->cpu.pc = event->data.machine_state.pc;
         debug->cpu.a = event->data.machine_state.a;
@@ -2171,6 +2270,8 @@ int main(int argc, char **argv)
     runtime_stop_reason last_title_stop_reason = RUNTIME_STOP_REASON_NONE;
     uint32_t last_title_turbo = 0u;
     int last_title_model = -1;
+    bool last_title_forensic = false;
+    uint64_t last_title_focus = 0u;
     /* Keep SDL text input off unless a UI field is focused (c64m / macOS). */
     bool text_input_active = false;
     uint32_t pixels[APPLE2_VIDEO_WIDTH * APPLE2_VIDEO_HEIGHT];
@@ -2634,15 +2735,35 @@ int main(int argc, char **argv)
                 } else if (handle_step_key_event(client, &debug, &event.key, true)) {
                     send_event_to_frontend = false;
                 } else if (sym == SDLK_F10 && frontend_input_has_shift_modifier(&event.key)) {
-                    (void)runtime_client_step_out(client);
+                    if (debug.tm_forensic) {
+                        uint64_t token = runtime_client_alloc_request_token(client);
+                        (void)runtime_client_tm_step_out(client, token);
+                    } else {
+                        (void)runtime_client_step_out(client);
+                    }
                     send_event_to_frontend = false;
                 } else if (sym == SDLK_F12 && !frontend_input_has_shift_modifier(&event.key)) {
-                    (void)runtime_client_run(client);
+                    if (debug.tm_forensic) {
+                        uint16_t addr = 0;
+                        uint64_t token = runtime_client_alloc_request_token(client);
+                        if (frontend_get_disassembly_cursor(ui, &addr)) {
+                            (void)runtime_client_tm_run_to(client, addr, 0u, token);
+                        }
+                    } else {
+                        (void)runtime_client_run(client);
+                    }
                     send_event_to_frontend = false;
                 } else if (sym == SDLK_F12 && frontend_input_has_shift_modifier(&event.key)) {
                     uint16_t addr = 0;
                     if (frontend_get_disassembly_cursor(ui, &addr)) {
-                        (void)runtime_client_run_to_cursor(client, addr);
+                        if (debug.tm_forensic) {
+                            uint64_t token =
+                                runtime_client_alloc_request_token(client);
+                            (void)runtime_client_tm_run_to(
+                                client, addr, 0u, token);
+                        } else {
+                            (void)runtime_client_run_to_cursor(client, addr);
+                        }
                     }
                     send_event_to_frontend = false;
                 } else if (sym == SDLK_t &&
@@ -2653,17 +2774,21 @@ int main(int argc, char **argv)
                 } else if (ui_visible && frontend_handle_view_cycle_key(ui, &event.key)) {
                     send_event_to_frontend = false;
                 } else if (!ui_visible || frontend_routes_keyboard_to_machine(ui)) {
-                    handle_keyboard_input(&input_mapper, client, &event.key);
+                    if (!debug.tm_forensic) {
+                        handle_keyboard_input(&input_mapper, client, &event.key);
+                    }
                     send_event_to_frontend = false;
                 }
             } else if (event.type == SDL_KEYUP &&
                        !frontend_help_is_open(ui) &&
                        (!ui_visible || frontend_routes_keyboard_to_machine(ui))) {
-                if (frontend_joystick_consumes(&kbd_joystick, event.key.keysym.sym)) {
-                    joystick_handle_key_and_solid_apple(
-                        &kbd_joystick, &controllers, client, &event.key);
-                } else {
-                    handle_keyboard_input(&input_mapper, client, &event.key);
+                if (!debug.tm_forensic) {
+                    if (frontend_joystick_consumes(&kbd_joystick, event.key.keysym.sym)) {
+                        joystick_handle_key_and_solid_apple(
+                            &kbd_joystick, &controllers, client, &event.key);
+                    } else {
+                        handle_keyboard_input(&input_mapper, client, &event.key);
+                    }
                 }
                 send_event_to_frontend = false;
             } else if (event.type == SDL_DROPFILE) {
@@ -2878,17 +3003,22 @@ int main(int argc, char **argv)
                 debug.runtime_state != last_title_state ||
                 debug.stop_reason != last_title_stop_reason ||
                 debug.active_turbo_multiplier != last_title_turbo ||
-                model != last_title_model) {
+                model != last_title_model ||
+                debug.tm_forensic != last_title_forensic ||
+                debug.tm_focus_cycle != last_title_focus) {
                 update_window_title(
                     window,
                     app_model_label(model),
                     debug.active_turbo_multiplier,
                     debug.runtime_state,
-                    debug.stop_reason);
+                    debug.stop_reason,
+                    &debug);
                 last_title_state = debug.runtime_state;
                 last_title_stop_reason = debug.stop_reason;
                 last_title_turbo = debug.active_turbo_multiplier;
                 last_title_model = model;
+                last_title_forensic = debug.tm_forensic;
+                last_title_focus = debug.tm_focus_cycle;
                 title_set = true;
             }
         }
@@ -2921,6 +3051,7 @@ int main(int argc, char **argv)
                 &kbd_joystick,
                 &controllers,
                 debug.runtime_state == FRONTEND_RUNTIME_STATE_RUNNING,
+                debug.tm_forensic,
                 &intent);
             if (intent.type == FRONTEND_DEBUGGER_INTENT_CONFIG_APPLY ||
                 intent.type == FRONTEND_DEBUGGER_INTENT_SAVE_INI_NOW) {

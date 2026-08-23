@@ -4,8 +4,8 @@
 
 **Rules:** [`rules.md`](rules.md)  
 **Closed:** paint; SP `$C800`; BP 0–4e + P4b TRON; remote-debug **C0–C5b**; control tools **T1–T5**; `get-softswitches`; **turbo-zip**; **max free-run S2**; **snapshots** ([`snapshots.md`](snapshots.md) — `.a2state` save/load, drop, `--sna`, Opt+Shift+./,); **sessions foundation** ([`sessions.md`](sessions.md) — multi-asker + `state-changed`; A2M/11).  
-**Active:** **TimeMachine** ([`timemachine.md`](timemachine.md) — TM0–TM6; V1 = TM0–TM4). **TM0–TM3 landed:** opt-in recording, HST1 queries, checkpoint ring + sealed replay, forensic replace-live + A2M/12 control honesty. Next: TM4 Misc Inspector tab. F7 Inspector is **retired and removed** — lessons in [`inspector.md`](inspector.md), code at tag `archive/f7-inspector`.  
-**Look-later:** TM5 forensic BPs / TM6 Promote; debug ergonomics (mem workshop → live remount → frame gate / HW snaps).
+**Active:** **TimeMachine V1 (TM0–TM4) landed in tree** ([`timemachine.md`](timemachine.md)). Misc -> Inspector tab is the forensic entry; F7 stays unbound. Human GUI smoke (disk scrub, max turbo, media-cut reason) is the V1 accept gate. **TM5 / TM6** are V1.1 (forensic BPs / Promote). Lessons from retired F7: [`inspector.md`](inspector.md).  
+**Look-later:** TM5 forensic BPs / TM6 Promote; debug ergonomics (mem workshop, live remount, frame gate / HW snaps).
 
 ---
 
@@ -29,9 +29,9 @@
 |-----|--------|
 | **F9** | Toggle debugger (starts display-only) |
 | **F8** / **Opt+F8** | Warm / cold reset |
-| **F10** / Shift+F10 | Pause/step · step out |
-| **F11** | Step over |
-| **F12** / Shift+F12 | Run · run to cursor |
+| **F10** / Shift+F10 | Pause/step · step out (forensic: tape step / step-out) |
+| **F11** | Step over (forensic: tape step-over) |
+| **F12** / Shift+F12 | Run · run to cursor (forensic: tape run-to cursor) |
 | **Opt+T** | Cycle turbo ladder (MHz / max — [`turbo-zip.md`](turbo-zip.md)) |
 | **Opt+Shift+.** / **,** | Quicksave / quickload `.a2state` |
 | **Opt+Shift+A** | Assemble configured source; honor reset / auto-run / MLI launch / one-shot options |

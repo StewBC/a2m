@@ -1545,11 +1545,18 @@ Persists the Assembler tab state. See **Assembler INI persistence**.
 | `frame_ring_memory_mb` | Frame-ring budget; `0` or `8..4096` (default `128`) |
 
 TimeMachine is opt-in debug recording. Off is the play path. On arms the CPU
-history recorder and the frame ring; the checkpoint ring budget is reserved
-(`timemachine_memory_mb` or `--timemachine-memory`, default 128 MiB) and used by
-a later phase. With defaults, TimeMachine on is 256 + 128 + 128 = 512 MB. A
-budget of `0` disables that recorder and leaves an empty tape; it is not
-overridden back to the default.
+history recorder, the frame ring, and the checkpoint ring
+(`timemachine_memory_mb` or `--timemachine-memory`, default 128 MiB). With
+defaults, TimeMachine on is 256 + 128 + 128 = 512 MB. A budget of `0` disables
+that recorder and leaves an empty tape; it is not overridden back to the default.
+
+Open F9 debugger, Misc -> Inspector. Enable recording, Pause, then Inspect.
+The debugger tints and becomes read-only while you scrub the tape. Leave
+Inspector restores live NOW and stays paused (F12 runs again). F7 is unbound.
+
+A guest disk write that succeeds drops earlier history: the scrubber's left
+edge is that write, not data loss. Saving to a writable disk mid-session will
+cut the window. Opt+T into max also discards the tape (`history_off_on_max`).
 
 ### [DEBUG]
 
@@ -1614,11 +1621,11 @@ macOS, **Opt** = Option/Alt.
 | **Opt+H** | Toggle in-emulator help on/off |
 | **Shift+Opt+A** | Assemble the configured source file using the Assembler settings |
 | **Shift+Opt+M** | Toggle keyboard joystick mapping between Numpad and WASD |
-| **F10** | Step instruction (paused) or Pause (running) |
-| **Shift+F10** | Step out of current subroutine |
-| **F11** | Step over JSR |
-| **F12** | Run (resume execution) |
-| **Shift+F12** | Run to the cursor address in the Disassembly view |
+| **F10** | Live: step instruction (paused) or Pause (running). Forensic: tape step |
+| **Shift+F10** | Live: step out. Forensic: tape step-out |
+| **F11** | Live: step over JSR. Forensic: tape step-over |
+| **F12** | Live: run. Forensic: tape run-to disassembly cursor |
+| **Shift+F12** | Live: run to cursor. Forensic: tape run-to cursor |
 | **F8** | Warm reset (CTRL+RESET) |
 | **Opt+F8** | Cold reset (CTRL+Open-Apple+RESET) |
 | **Opt+T** | Cycle turbo mode |

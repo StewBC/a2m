@@ -8,7 +8,7 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-Expect **59** green. Run from repo root.
+Expect **59** green. Run from repo root. TM4 is UI; gate stays 59 (no new ctest).
 
 ## Registered tests (product gate)
 

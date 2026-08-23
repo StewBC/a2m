@@ -13,6 +13,8 @@
 #include "disasm_6502.h"
 #include "platform_fs.h"
 #include "runtime.h"
+#include "runtime_history.h"
+#include "runtime_timemachine.h"
 #include "softswitch.h"
 #include "symbol_table.h"
 
@@ -260,7 +262,8 @@ typedef enum frontend_misc_tab {
     FRONTEND_MISC_TAB_DEBUGGER,
     FRONTEND_MISC_TAB_BREAKPOINTS,
     FRONTEND_MISC_TAB_HARDWARE,
-    FRONTEND_MISC_TAB_ASSEMBLER
+    FRONTEND_MISC_TAB_ASSEMBLER,
+    FRONTEND_MISC_TAB_INSPECTOR
 } frontend_misc_tab;
 
 typedef struct frontend_misc_view_state {
@@ -269,6 +272,7 @@ typedef struct frontend_misc_view_state {
     bool active;
     bool display_override_enabled;
     uint32_t display_override_flags;
+    int inspector_slider; /* 0..1000 over tm_window */
 } frontend_misc_view_state;
 
 typedef enum frontend_active_view {
@@ -2921,7 +2925,8 @@ static void frontend_commit_register_edit(
     }
 
     state = &ui->registers;
-    if (debug_state->runtime_state != FRONTEND_RUNTIME_STATE_PAUSED) {
+    if (debug_state->runtime_state != FRONTEND_RUNTIME_STATE_PAUSED ||
+        debug_state->tm_forensic) {
         frontend_format_register_buffers(state, &debug_state->cpu, FRONTEND_REGISTER_FIELD_NONE);
         return;
     }
@@ -3154,7 +3159,8 @@ static void frontend_draw_registers(
     }
 
     editable = debug_state->has_cpu &&
-        debug_state->runtime_state == FRONTEND_RUNTIME_STATE_PAUSED;
+        debug_state->runtime_state == FRONTEND_RUNTIME_STATE_PAUSED &&
+        !debug_state->tm_forensic;
 
     if (!editable) {
         ui->registers.active_field = FRONTEND_REGISTER_FIELD_NONE;
@@ -4073,6 +4079,9 @@ static void frontend_disassembly_handle_key(
     shift = (mod & KMOD_SHIFT) != 0;
 
     if (alt && sym == SDLK_b) {
+        if (debug_state != NULL && debug_state->tm_forensic) {
+            return;
+        }
         frontend_disassembly_ensure_user_cursor(ui, debug_state);
         frontend_toggle_execute_breakpoint_at_cursor(ui, debug_state);
         return;
@@ -4248,8 +4257,19 @@ static void frontend_disassembly_handle_key(
     }
 
     if (sym == SDLK_LEFT) {
-        if (alt && debug_state != NULL && debug_state->runtime_state == FRONTEND_RUNTIME_STATE_PAUSED) {
-            frontend_push_debugger_intent(ui, FRONTEND_DEBUGGER_INTENT_REGISTER_SET_PC, view->cursor_address);
+        if (alt && debug_state != NULL &&
+            debug_state->runtime_state == FRONTEND_RUNTIME_STATE_PAUSED) {
+            if (debug_state->tm_forensic) {
+                frontend_push_debugger_intent(
+                    ui,
+                    FRONTEND_DEBUGGER_INTENT_TM_RUN_TO,
+                    view->cursor_address);
+            } else {
+                frontend_push_debugger_intent(
+                    ui,
+                    FRONTEND_DEBUGGER_INTENT_REGISTER_SET_PC,
+                    view->cursor_address);
+            }
         } else if (row < 0) {
             frontend_disassembly_center_cursor(ui);
         }
@@ -5246,7 +5266,9 @@ static void frontend_memory_write_byte(
 {
     frontend_memory_view_state *memory = &ui->memory_views[ui->memory_active_view_index];
 
-    if (debug_state == NULL || debug_state->runtime_state != FRONTEND_RUNTIME_STATE_PAUSED) {
+    if (debug_state == NULL ||
+        debug_state->runtime_state != FRONTEND_RUNTIME_STATE_PAUSED ||
+        debug_state->tm_forensic) {
         return;
     }
     if (!frontend_memory_mode_is_editable(memory->mode) ||
@@ -6855,8 +6877,17 @@ static void frontend_draw_misc_breakpoints(frontend *ui, const frontend_debug_st
 
     nk_layout_row_dynamic(ctx, 18.0f, 1);
     nk_label(ctx, "Breakpoints", NK_TEXT_LEFT);
+    if (debug_state != NULL && debug_state->tm_forensic) {
+        nk_layout_row_dynamic(ctx, 36.0f, 1);
+        nk_label_wrap(
+            ctx,
+            "Breakpoints are live-only while TIME MACHINE is active. "
+            "Forensic breakpoints are TM5.");
+    }
     nk_layout_row_dynamic(ctx, 24.0f, 1);
-    if (nk_button_label(ctx, "New")) {
+    if (debug_state != NULL && debug_state->tm_forensic) {
+        nk_label(ctx, "New (disabled)", NK_TEXT_LEFT);
+    } else if (nk_button_label(ctx, "New")) {
         frontend_open_breakpoint_dialog_default(ui);
     }
 
@@ -7264,6 +7295,277 @@ static void frontend_draw_misc_assembler(frontend *ui)
     }
 }
 
+static void frontend_push_tm_intent(
+    frontend *ui,
+    frontend_debugger_intent_type type,
+    bool enabled,
+    uint64_t cycle)
+{
+    size_t next;
+
+    if (ui == NULL) {
+        return;
+    }
+    next = (ui->intent_write + 1u) % FRONTEND_DEBUGGER_INTENT_CAPACITY;
+    if (next == ui->intent_read) {
+        return;
+    }
+    memset(&ui->intents[ui->intent_write], 0, sizeof(ui->intents[ui->intent_write]));
+    ui->intents[ui->intent_write].type = type;
+    ui->intents[ui->intent_write].enabled = enabled;
+    ui->intents[ui->intent_write].tm_cycle = cycle;
+    ui->intent_write = next;
+}
+
+static void frontend_format_tm_window_reason(
+    const frontend_debug_state *debug,
+    char *out,
+    size_t out_size)
+{
+    unsigned slot;
+    unsigned drive;
+    const char *kind;
+
+    if (out == NULL || out_size == 0) {
+        return;
+    }
+    out[0] = '\0';
+    if (debug == NULL || !debug->tm_window_valid) {
+        return;
+    }
+    slot = (unsigned)((debug->tm_window_start_arg1 >> 8) & 0xffu);
+    drive = (unsigned)(debug->tm_window_start_arg1 & 0xffu) + 1u;
+    kind = runtime_tm_window_start_name(
+        (runtime_history_media_change_kind)debug->tm_window_start_kind);
+    if (debug->tm_window_start_kind ==
+        RUNTIME_HISTORY_MEDIA_CHANGE_GUEST_WRITE) {
+        snprintf(
+            out,
+            out_size,
+            "history starts here: disk write, s%ud%u @ cycle %llu",
+            slot,
+            drive,
+            (unsigned long long)debug->tm_oldest_cycle);
+    } else if (debug->tm_window_start_kind ==
+        RUNTIME_HISTORY_MEDIA_CHANGE_HOST_DIRECTORY) {
+        snprintf(
+            out,
+            out_size,
+            "history starts here: host folder change, s%ud%u @ cycle %llu",
+            slot,
+            drive,
+            (unsigned long long)debug->tm_oldest_cycle);
+    } else if (debug->tm_oldest_cycle > 0u) {
+        snprintf(
+            out,
+            out_size,
+            "history starts here: %s @ cycle %llu",
+            kind,
+            (unsigned long long)debug->tm_oldest_cycle);
+    }
+}
+
+static int frontend_tm_cycle_to_slider(
+    const frontend_debug_state *debug,
+    uint64_t cycle)
+{
+    uint64_t span;
+
+    if (debug == NULL || !debug->tm_window_valid ||
+        debug->tm_newest_cycle <= debug->tm_oldest_cycle) {
+        return 1000;
+    }
+    if (cycle <= debug->tm_oldest_cycle) {
+        return 0;
+    }
+    if (cycle >= debug->tm_newest_cycle) {
+        return 1000;
+    }
+    span = debug->tm_newest_cycle - debug->tm_oldest_cycle;
+    return (int)(((cycle - debug->tm_oldest_cycle) * 1000ull) / span);
+}
+
+static uint64_t frontend_tm_slider_to_cycle(
+    const frontend_debug_state *debug,
+    int slider)
+{
+    uint64_t span;
+
+    if (debug == NULL || !debug->tm_window_valid) {
+        return 0u;
+    }
+    if (slider <= 0) {
+        return debug->tm_oldest_cycle;
+    }
+    if (slider >= 1000 || debug->tm_newest_cycle <= debug->tm_oldest_cycle) {
+        return debug->tm_newest_cycle;
+    }
+    span = debug->tm_newest_cycle - debug->tm_oldest_cycle;
+    return debug->tm_oldest_cycle + (span * (uint64_t)slider) / 1000ull;
+}
+
+static void frontend_draw_misc_inspector(
+    frontend *ui,
+    const frontend_debug_state *debug)
+{
+    struct nk_context *ctx;
+    char line[192];
+    char reason[160];
+    nk_bool rec;
+    bool running;
+    bool paused;
+    bool forensic;
+    bool can_enter;
+    int slider;
+
+    if (ui == NULL || ui->ctx == NULL) {
+        return;
+    }
+    ctx = ui->ctx;
+    running = debug != NULL &&
+        debug->runtime_state == FRONTEND_RUNTIME_STATE_RUNNING;
+    paused = debug != NULL &&
+        debug->runtime_state == FRONTEND_RUNTIME_STATE_PAUSED;
+    forensic = debug != NULL && debug->tm_forensic;
+    can_enter = paused && debug != NULL && debug->tm_enabled &&
+        debug->tm_window_valid && debug->tm_history_recording &&
+        debug->tm_frame_recording && debug->tm_recorder_recording;
+
+    nk_layout_row_dynamic(ctx, 18.0f, 1);
+    nk_label(ctx, "Inspector (TimeMachine)", NK_TEXT_LEFT);
+
+    rec = (debug != NULL && debug->tm_enabled) ? nk_true : nk_false;
+    nk_layout_row_dynamic(ctx, 22.0f, 1);
+    if (forensic) {
+        nk_label(ctx, "Recording: on (locked while forensic)", NK_TEXT_LEFT);
+    } else {
+        if (nk_checkbox_label(ctx, "TimeMachine recording", &rec)) {
+            bool want = rec != nk_false;
+            bool have = debug != NULL && debug->tm_enabled;
+            if (want != have) {
+                frontend_push_tm_intent(
+                    ui, FRONTEND_DEBUGGER_INTENT_TM_SET_ENABLED, want, 0u);
+            }
+        }
+    }
+
+    if (debug != NULL && debug->tm_stopped_for_max) {
+        nk_layout_row_dynamic(ctx, 36.0f, 1);
+        nk_label_wrap(
+            ctx,
+            "Recording is stopped in max turbo. Opt+T into max discards "
+            "the TimeMachine tape (window restarts when you leave max).");
+    }
+
+    if (debug == NULL || !debug->tm_enabled) {
+        nk_layout_row_dynamic(ctx, 48.0f, 1);
+        nk_label_wrap(
+            ctx,
+            "TimeMachine is off. Enable recording above (or --timemachine) "
+            "then Pause to scrub. Off keeps play cheap.");
+        if (running) {
+            nk_layout_row_dynamic(ctx, 24.0f, 1);
+            if (nk_button_label(ctx, "Pause")) {
+                frontend_push_tm_intent(
+                    ui, FRONTEND_DEBUGGER_INTENT_TM_PAUSE, false, 0u);
+            }
+        }
+        return;
+    }
+
+    if (running) {
+        nk_layout_row_dynamic(ctx, 24.0f, 1);
+        if (nk_button_label(ctx, "Pause")) {
+            frontend_push_tm_intent(
+                ui, FRONTEND_DEBUGGER_INTENT_TM_PAUSE, false, 0u);
+        }
+        nk_layout_row_dynamic(ctx, 32.0f, 1);
+        nk_label_wrap(ctx, "Pause, then Inspect to replace the machine with the past.");
+        return;
+    }
+
+    if (!forensic) {
+        if (!can_enter) {
+            nk_layout_row_dynamic(ctx, 48.0f, 1);
+            if (!debug->tm_window_valid || !debug->tm_history_recording ||
+                !debug->tm_frame_recording || !debug->tm_recorder_recording) {
+                nk_label_wrap(
+                    ctx,
+                    "No TimeMachine window. A recorder is off, a budget is 0, "
+                    "or nothing has been recorded yet.");
+            } else {
+                nk_label_wrap(ctx, "Pause the machine to inspect the tape.");
+            }
+        } else {
+            nk_layout_row_dynamic(ctx, 24.0f, 1);
+            if (nk_button_label(ctx, "Inspect (enter forensic)")) {
+                frontend_push_tm_intent(
+                    ui, FRONTEND_DEBUGGER_INTENT_TM_ENTER_FORENSIC, false, 0u);
+            }
+        }
+    } else {
+        nk_layout_row_dynamic(ctx, 24.0f, 1);
+        if (nk_button_label(ctx, "Leave Inspector (restore NOW)")) {
+            frontend_push_tm_intent(
+                ui, FRONTEND_DEBUGGER_INTENT_TM_EXIT_FORENSIC, false, 0u);
+        }
+        nk_layout_row_dynamic(ctx, 18.0f, 1);
+        nk_label(ctx, "Still paused after leave. F12 runs live again.", NK_TEXT_LEFT);
+    }
+
+    snprintf(
+        line,
+        sizeof(line),
+        "Focus cycle %llu  id %llu",
+        (unsigned long long)(debug != NULL ? debug->tm_focus_cycle : 0u),
+        (unsigned long long)(debug != NULL ? debug->tm_focus_id : 0u));
+    nk_layout_row_dynamic(ctx, 18.0f, 1);
+    nk_label(ctx, line, NK_TEXT_LEFT);
+
+    if (debug != NULL && debug->tm_window_valid) {
+        snprintf(
+            line,
+            sizeof(line),
+            "Window %llu .. %llu",
+            (unsigned long long)debug->tm_oldest_cycle,
+            (unsigned long long)debug->tm_newest_cycle);
+        nk_layout_row_dynamic(ctx, 18.0f, 1);
+        nk_label(ctx, line, NK_TEXT_LEFT);
+
+        frontend_format_tm_window_reason(debug, reason, sizeof(reason));
+        if (reason[0] != '\0') {
+            nk_layout_row_dynamic(ctx, 36.0f, 1);
+            nk_label_wrap(ctx, reason);
+        }
+
+        slider = ui->misc.inspector_slider;
+        if (forensic) {
+            if (!nk_input_is_mouse_down(&ctx->input, NK_BUTTON_LEFT)) {
+                slider = frontend_tm_cycle_to_slider(debug, debug->tm_focus_cycle);
+            }
+            nk_layout_row_dynamic(ctx, 22.0f, 1);
+            nk_label(ctx, "Scrub tape", NK_TEXT_LEFT);
+            nk_layout_row_dynamic(ctx, 22.0f, 1);
+            if (nk_slider_int(ctx, 0, &slider, 1000, 1)) {
+                uint64_t cycle = frontend_tm_slider_to_cycle(debug, slider);
+                if (cycle != debug->tm_focus_cycle) {
+                    frontend_push_tm_intent(
+                        ui, FRONTEND_DEBUGGER_INTENT_TM_SEEK_CYCLE, false, cycle);
+                }
+            }
+            ui->misc.inspector_slider = slider;
+        }
+    }
+
+    nk_layout_row_dynamic(ctx, 8.0f, 1);
+    nk_spacing(ctx, 1);
+    nk_layout_row_dynamic(ctx, 32.0f, 1);
+    nk_label_wrap(
+        ctx,
+        "Forensic keys: F10 step, F11 over, Shift+F10 out, F12 run-to cursor. "
+        "Memory and registers are read-only. A disk write drops earlier history.");
+}
+
 static void frontend_draw_misc_tab_button(
     frontend *ui,
     frontend_misc_tab tab,
@@ -7301,14 +7603,16 @@ static void frontend_draw_misc(frontend *ui, struct nk_rect bounds, const fronte
 
     ctx = ui->ctx;
     if (nk_begin(ctx, "Misc", bounds, NK_WINDOW_BORDER | NK_WINDOW_TITLE)) {
-        nk_layout_row_dynamic(ctx, tab_h, 5);
+        nk_layout_row_dynamic(ctx, tab_h, 3);
         frontend_draw_misc_tab_button(ui, FRONTEND_MISC_TAB_PROGRAMS, "Machine");
         frontend_draw_misc_tab_button(ui, FRONTEND_MISC_TAB_DEBUGGER, "Debugger");
         frontend_draw_misc_tab_button(ui, FRONTEND_MISC_TAB_BREAKPOINTS, "Breakpoints");
+        nk_layout_row_dynamic(ctx, tab_h, 3);
         frontend_draw_misc_tab_button(ui, FRONTEND_MISC_TAB_HARDWARE, "Hardware");
         frontend_draw_misc_tab_button(ui, FRONTEND_MISC_TAB_ASSEMBLER, "Assembler");
+        frontend_draw_misc_tab_button(ui, FRONTEND_MISC_TAB_INSPECTOR, "Inspector");
 
-        content_h = bounds.h - tab_h - 55.0f;
+        content_h = bounds.h - (tab_h * 2.0f) - 55.0f;
         if (content_h < 24.0f) {
             content_h = 24.0f;
         }
@@ -7330,6 +7634,10 @@ static void frontend_draw_misc(frontend *ui, struct nk_rect bounds, const fronte
 
                 case FRONTEND_MISC_TAB_HARDWARE:
                     frontend_draw_misc_hardware(ui, debug_state);
+                    break;
+
+                case FRONTEND_MISC_TAB_INSPECTOR:
+                    frontend_draw_misc_inspector(ui, debug_state);
                     break;
 
                 case FRONTEND_MISC_TAB_ASSEMBLER:
@@ -10052,11 +10360,25 @@ void frontend_render(frontend *ui, bool ui_visible, const frontend_debug_state *
     if (ui_visible && debug_state != NULL) {
         int min_debug_w = ui->limits.min_display_w_px + ui->limits.min_right_w_px;
         int min_debug_h = ui->limits.registers_h_px + ui->limits.min_disassembly_h_px + ui->limits.min_bottom_h_px;
+        struct nk_style_window saved_window_style;
+        int forensic_style = 0;
 
         if (width < min_debug_w || height < min_debug_h) {
             frontend_render_display_only(ui);
         } else {
             parent = nk_rect(0.0f, 0.0f, (float)width, (float)height);
+            if (debug_state->tm_forensic) {
+                saved_window_style = ui->ctx->style.window;
+                forensic_style = 1;
+                ui->ctx->style.window.fixed_background =
+                    nk_style_item_color(nk_rgb(42, 28, 22));
+                ui->ctx->style.window.header.normal =
+                    nk_style_item_color(nk_rgb(92, 48, 32));
+                ui->ctx->style.window.header.hover =
+                    nk_style_item_color(nk_rgb(110, 58, 38));
+                ui->ctx->style.window.header.active =
+                    nk_style_item_color(nk_rgb(120, 64, 40));
+            }
             debugger_layout_compute(&ui->layout, parent, &ui->limits);
             if (!frontend_any_dialog_open(ui)) {
                 debugger_scrollbar_active = ui->memory_views[ui->memory_active_view_index].scrollbar_dragging ||
@@ -10105,6 +10427,9 @@ void frontend_render(frontend *ui, bool ui_visible, const frontend_debug_state *
             frontend_draw_memory_search(ui, width, height, debug_state);
             frontend_draw_symbol_lookup(ui, width, height);
             frontend_draw_file_browser(ui, width, height);
+            if (forensic_style) {
+                ui->ctx->style.window = saved_window_style;
+            }
         }
     } else {
         frontend_render_display_only(ui);
