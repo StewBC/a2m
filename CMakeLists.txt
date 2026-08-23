@@ -101,6 +101,17 @@ target_include_directories(test_memory_search PRIVATE
 target_compile_features(test_memory_search PRIVATE c_std_99)
 add_test(NAME memory_search COMMAND test_memory_search)
 
+add_executable(test_disasm_pc_lock
+    tests/frontend/test_disasm_pc_lock.c
+    src/frontend/disasm_pc_lock.c
+)
+target_include_directories(test_disasm_pc_lock PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/frontend
+)
+target_compile_features(test_disasm_pc_lock PRIVATE c_std_99)
+target_link_libraries(test_disasm_pc_lock PRIVATE tools)
+add_test(NAME disasm_pc_lock COMMAND test_disasm_pc_lock)
+
 add_executable(test_help_view
     tests/frontend/test_help_view.c
 )

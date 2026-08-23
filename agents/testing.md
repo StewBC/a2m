@@ -8,7 +8,7 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-Expect **60** green. Run from repo root.
+Expect **61** green. Run from repo root.
 
 ## Registered tests (product gate)
 
@@ -61,6 +61,7 @@ Expect **60** green. Run from repo root.
 | `runtime_assembler` | live RAM assembly + runtime event path |
 | `runtime_assembler_mli` | Assembler MLI launch gate (`$BF00`) + auto-run skip notice |
 | `disasm_6502` | disassembler |
+| `disasm_pc_lock` | PC-centered disasm wrap ($FFFF/$0000) |
 
 ## Deferred (not in gate)
 

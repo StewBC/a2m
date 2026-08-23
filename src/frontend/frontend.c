@@ -11,6 +11,7 @@
 #include "crt_renderer.h"
 #include "disk_led_data.h"
 #include "disasm_6502.h"
+#include "disasm_pc_lock.h"
 #include "platform_fs.h"
 #include "runtime.h"
 #include "runtime_history.h"
@@ -20,7 +21,6 @@
 
 #include "stb_image.h"
 
-#include <assert.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -160,32 +160,15 @@ static const struct {
 };
 
 enum {
-    FRONTEND_DISASM_MAX_ROWS       = 128,
+    FRONTEND_DISASM_MAX_ROWS       = DISASM_PC_LOCK_MAX_ROWS,
     FRONTEND_DISASM_FETCH_BYTES    = RUNTIME_MEMORY_SNAPSHOT_MAX,
-    FRONTEND_DISASM_CENTER_LOOKBACK = 32,
-    FRONTEND_DISASM_CENTER_SLOP    = 32,
-    FRONTEND_DISASM_DP_MAX_WINDOW  = 255,
-    FRONTEND_DISASM_DP_INF         = 0xFFFF
+    FRONTEND_DISASM_CENTER_LOOKBACK = 32
 };
 
-typedef struct frontend_disassembly_line {
-    disasm_6502_line base;
-    bool is_provisional;
-} frontend_disassembly_line;
-
-typedef struct frontend_disasm_dp_node {
-    uint16_t score;
-    uint8_t  nsteps;
-    uint8_t  step;
-    bool     is_byte_edge;
-} frontend_disasm_dp_node;
+typedef disasm_pc_lock_line frontend_disassembly_line;
+typedef disasm_pc_lock_cache frontend_disasm_cache;
 
 enum { FRONTEND_DISASM_MODE_CACHE_COUNT = 6 };
-
-typedef struct frontend_disasm_cache {
-    uint8_t bytes[65536];
-    bool    valid[65536];
-} frontend_disasm_cache;
 
 typedef struct frontend_disassembly_view_state {
     uint16_t top_address;
@@ -3281,25 +3264,6 @@ static const frontend_disasm_cache *frontend_disassembly_active_cache_ro(
     return &view->mem_cache[idx];
 }
 
-static const uint8_t *frontend_disasm_cache_ptr(
-    const frontend_disasm_cache *cache,
-    uint16_t address,
-    size_t *out_available)
-{
-    if (!cache->valid[address]) {
-        *out_available = 0;
-        return NULL;
-    }
-    *out_available = 1;
-    if (cache->valid[(uint16_t)(address + 1u)]) {
-        *out_available = 2;
-        if (cache->valid[(uint16_t)(address + 2u)]) {
-            *out_available = 3;
-        }
-    }
-    return &cache->bytes[address];
-}
-
 static void frontend_disasm_cache_invalidate_range(
     frontend_disasm_cache *cache,
     uint16_t address,
@@ -3457,11 +3421,15 @@ static void frontend_disassembly_decode(frontend *ui)
     uint8_t row;
 
     for (row = 0; row < view->rows && row < FRONTEND_DISASM_MAX_ROWS; ++row) {
-        size_t available = 0;
-        const uint8_t *bytes = frontend_disasm_cache_ptr(cache, address, &available);
+        uint8_t fetched[3];
+        size_t available = disasm_pc_lock_fetch(cache, address, fetched);
 
-        view->lines[row].base = disasm_6502_decode_line(address, bytes, available, &ui->symbols);
-        view->lines[row].is_provisional = (bytes == NULL);
+        view->lines[row].base = disasm_6502_decode_line(
+            address,
+            available > 0u ? fetched : NULL,
+            available,
+            &ui->symbols);
+        view->lines[row].is_provisional = (available == 0u);
         address = (uint16_t)(address + view->lines[row].base.length);
     }
 }
@@ -3684,17 +3652,6 @@ static bool frontend_disassembly_is_pc_locked(const frontend_disassembly_view_st
     return view != NULL && view->pc_lock_active;
 }
 
-static void frontend_disassembly_emit_provisional(
-    frontend_disassembly_line *line,
-    uint16_t address)
-{
-    memset(line, 0, sizeof(*line));
-    line->base.address = address;
-    line->base.length = 1;
-    snprintf(line->base.text, sizeof(line->base.text), "???");
-    line->is_provisional = true;
-}
-
 static void frontend_disassembly_force_refresh_pc(frontend_disassembly_view_state *view)
 {
     if (view != NULL) {
@@ -3708,206 +3665,14 @@ static void frontend_disassembly_build_pc_locked_lines(
     uint8_t rows)
 {
     frontend_disassembly_view_state *view = &ui->disassembly;
-    uint8_t pc_row;
-    uint8_t pre_pc_rows;
-    uint8_t row;
-    uint16_t window_size;
-    uint16_t search_start;
-    frontend_disasm_dp_node dp[FRONTEND_DISASM_DP_MAX_WINDOW + 1];
-    uint16_t i;
 
-    if (rows == 0 || rows > FRONTEND_DISASM_MAX_ROWS) {
-        return;
-    }
-
-    pc_row = rows / 2u;
-    pre_pc_rows = pc_row;
-
-    /* --- Forward from PC: fill pc_row and all rows below it --- */
-    {
-        const frontend_disasm_cache *cache = frontend_disassembly_active_cache_ro(view);
-        uint16_t addr = pc;
-        for (row = pc_row; row < rows; ++row) {
-            size_t available = 0;
-            const uint8_t *bytes = frontend_disasm_cache_ptr(cache, addr, &available);
-            view->lines[row].base = disasm_6502_decode_line(addr, bytes, available, &ui->symbols);
-            view->lines[row].is_provisional = (bytes == NULL);
-            addr = (uint16_t)(addr + view->lines[row].base.length);
-        }
-    }
-
-    /* --- DP backward search: find best pre-PC sequence --- */
-    if (pre_pc_rows == 0) {
-        view->top_address = pc;
-        return;
-    }
-
-    window_size = (uint16_t)((uint16_t)pre_pc_rows * 3u + FRONTEND_DISASM_CENTER_SLOP);
-    if (window_size > FRONTEND_DISASM_DP_MAX_WINDOW) {
-        window_size = FRONTEND_DISASM_DP_MAX_WINDOW;
-    }
-    search_start = (uint16_t)(pc - window_size);
-
-    /* Initialize: all unreachable except PC node */
-    for (i = 0; i <= window_size; ++i) {
-        dp[i].score = (uint16_t)FRONTEND_DISASM_DP_INF;
-        dp[i].nsteps = 0;
-        dp[i].step = 0;
-        dp[i].is_byte_edge = false;
-    }
-    dp[window_size].score = 0;
-
-    /* Fill backward from PC-1 to search_start */
-    {
-        const frontend_disasm_cache *cache = frontend_disassembly_active_cache_ro(view);
-        for (i = window_size; i-- > 0; ) {
-            uint16_t addr = (uint16_t)(search_start + i);
-
-            if (!cache->valid[addr]) {
-                continue;
-            }
-
-            /* Instruction edge: requires all bytes in cache */
-            {
-                uint8_t opcode = cache->bytes[addr];
-                uint8_t len = disasm_6502_instruction_length(opcode);
-                uint16_t j = (uint16_t)(i + len);
-                bool end_valid = (len == 1u) ? true :
-                    cache->valid[(uint16_t)(addr + len - 1u)];
-                if (j <= window_size && end_valid &&
-                    dp[j].score != (uint16_t)FRONTEND_DISASM_DP_INF) {
-                    uint16_t edge_cost = disasm_6502_opcode_is_valid(opcode) ? 1u : 10u;
-                    uint16_t cand_score = (uint16_t)(edge_cost + dp[j].score);
-                    uint8_t  cand_steps = dp[j].nsteps < 254u ? (uint8_t)(dp[j].nsteps + 1u) : 255u;
-                    if (cand_score < dp[i].score) {
-                        dp[i].score = cand_score;
-                        dp[i].nsteps = cand_steps;
-                        dp[i].step = len;
-                        dp[i].is_byte_edge = false;
-                    }
-                }
-            }
-
-            /* Byte edge: costs 100, advances by 1 */
-            {
-                uint16_t j1 = (uint16_t)(i + 1u);
-                if (j1 <= window_size && dp[j1].score != (uint16_t)FRONTEND_DISASM_DP_INF) {
-                    uint16_t cand_score = (uint16_t)(100u + dp[j1].score);
-                    uint8_t  cand_steps = dp[j1].nsteps < 254u ? (uint8_t)(dp[j1].nsteps + 1u) : 255u;
-                    if (cand_score < dp[i].score) {
-                        dp[i].score = cand_score;
-                        dp[i].nsteps = cand_steps;
-                        dp[i].step = 1u;
-                        dp[i].is_byte_edge = true;
-                    }
-                }
-            }
-        }
-    }
-
-    /* Find best start with exactly pre_pc_rows steps (primary) */
-    {
-        const frontend_disasm_cache *cache = frontend_disassembly_active_cache_ro(view);
-        int best_start = -1;
-        uint16_t best_score = (uint16_t)FRONTEND_DISASM_DP_INF;
-        uint8_t best_steps = 0;
-
-        for (i = 0; i < window_size; ++i) {
-            if (dp[i].score != (uint16_t)FRONTEND_DISASM_DP_INF &&
-                dp[i].nsteps == pre_pc_rows &&
-                dp[i].score < best_score) {
-                best_score = dp[i].score;
-                best_start = (int)i;
-                best_steps = pre_pc_rows;
-            }
-        }
-
-        /* Fall back: best path with fewer steps (fill rest with provisional) */
-        if (best_start < 0) {
-            uint8_t max_steps = 0;
-            for (i = 0; i < window_size; ++i) {
-                if (dp[i].score != (uint16_t)FRONTEND_DISASM_DP_INF &&
-                    dp[i].nsteps > 0 && dp[i].nsteps < pre_pc_rows &&
-                    dp[i].nsteps > max_steps) {
-                    max_steps = dp[i].nsteps;
-                }
-            }
-            if (max_steps > 0) {
-                for (i = 0; i < window_size; ++i) {
-                    if (dp[i].score != (uint16_t)FRONTEND_DISASM_DP_INF &&
-                        dp[i].nsteps == max_steps &&
-                        dp[i].score < best_score) {
-                        best_score = dp[i].score;
-                        best_start = (int)i;
-                        best_steps = max_steps;
-                    }
-                }
-            }
-        }
-
-        if (best_start >= 0) {
-            uint8_t provisional_rows = (uint8_t)(pre_pc_rows - best_steps);
-            uint16_t path_start = (uint16_t)(search_start + (uint16_t)best_start);
-
-            /* Provisional rows above the best path */
-            for (row = 0; row < provisional_rows; ++row) {
-                uint16_t prov_addr = (uint16_t)(path_start -
-                    (uint16_t)(provisional_rows - row));
-                frontend_disassembly_emit_provisional(&view->lines[row], prov_addr);
-            }
-
-            /* Decode the best path rows */
-            {
-                uint16_t addr = path_start;
-                uint16_t node = (uint16_t)best_start;
-                for (row = provisional_rows; row < pre_pc_rows; ++row) {
-                    if (dp[node].is_byte_edge && cache->valid[addr]) {
-                        /* Force .byte output for byte-edge positions */
-                        uint8_t b = cache->bytes[addr];
-                        memset(&view->lines[row].base, 0, sizeof(view->lines[row].base));
-                        view->lines[row].base.address = addr;
-                        view->lines[row].base.length = 1;
-                        view->lines[row].base.bytes[0] = b;
-                        view->lines[row].base.forced_byte = true;
-                        snprintf(view->lines[row].base.text,
-                            sizeof(view->lines[row].base.text),
-                            ".BYTE $%02X", b);
-                        view->lines[row].is_provisional = false;
-                    } else {
-                        size_t available = 0;
-                        const uint8_t *bytes = frontend_disasm_cache_ptr(cache, addr, &available);
-                        view->lines[row].base = disasm_6502_decode_line(
-                            addr, bytes, available, &ui->symbols);
-                        view->lines[row].is_provisional = (bytes == NULL);
-                    }
-                    node = (uint16_t)(node + dp[node].step);
-                    addr = (uint16_t)(addr + view->lines[row].base.length);
-                }
-            }
-        } else {
-            /* No path at all: all pre-PC rows are provisional */
-            for (row = 0; row < pre_pc_rows; ++row) {
-                uint16_t prov_addr = (uint16_t)(pc -
-                    (uint16_t)(pre_pc_rows - row));
-                frontend_disassembly_emit_provisional(&view->lines[row], prov_addr);
-            }
-        }
-    }
-
-    /* Sync top_address from the first decoded line */
-    view->top_address = view->lines[0].base.address;
-
-#ifndef NDEBUG
-    /* Invariant: pc_row must hold PC and no pre-PC line may cross PC */
-    assert(view->lines[pc_row].base.address == pc);
-    {
-        uint8_t k;
-        for (k = 0; k < pc_row; ++k) {
-            assert((uint16_t)(view->lines[k].base.address +
-                view->lines[k].base.length) <= pc);
-        }
-    }
-#endif
+    disasm_pc_lock_build(
+        frontend_disassembly_active_cache_ro(view),
+        &ui->symbols,
+        pc,
+        rows,
+        view->lines,
+        &view->top_address);
 }
 
 static void frontend_disassembly_follow_pc(frontend *ui, const frontend_debug_state *debug_state)

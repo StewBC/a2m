@@ -23,6 +23,8 @@ add_library(frontend STATIC
     debugger_layout.h
     debugger_disasm.c
     debugger_disasm.h
+    disasm_pc_lock.c
+    disasm_pc_lock.h
     crt_renderer.c
     crt_renderer.h
     disk_led_data.c
