@@ -12,24 +12,32 @@ static void runtime_tm_warn_zero_budget(const runtime *rt)
 {
     int history_zero;
     int frame_zero;
+    int tm_zero;
 
     if (rt == NULL || !rt->timemachine_enabled) {
         return;
     }
     history_zero = (rt->history_memory_mb == 0u);
     frame_zero = (rt->frame_ring_memory_mb == 0u);
-    if (!history_zero && !frame_zero) {
+    tm_zero = (rt->timemachine_memory_mb == 0u);
+    if (!history_zero && !frame_zero && !tm_zero) {
         return;
     }
     fprintf(stderr, "a2m: timemachine=1 but");
     if (history_zero) {
         fprintf(stderr, " history_memory_mb=0");
     }
-    if (history_zero && frame_zero) {
+    if (history_zero && (frame_zero || tm_zero)) {
         fprintf(stderr, " and");
     }
     if (frame_zero) {
         fprintf(stderr, " frame_ring_memory_mb=0");
+    }
+    if ((history_zero || frame_zero) && tm_zero) {
+        fprintf(stderr, " and");
+    }
+    if (tm_zero) {
+        fprintf(stderr, " timemachine_memory_mb=0");
     }
     fprintf(stderr, "; TimeMachine window will be empty\n");
 }
@@ -43,7 +51,11 @@ void runtime_tm_set_enabled(runtime *rt, bool enabled)
     }
     was_enabled = rt->timemachine_enabled;
     rt->timemachine_enabled = enabled;
-    if (!enabled || was_enabled) {
+    if (!enabled) {
+        runtime_tm_recorder_set_enabled(rt, false);
+        return;
+    }
+    if (was_enabled) {
         return;
     }
 
@@ -61,6 +73,7 @@ void runtime_tm_set_enabled(runtime *rt, bool enabled)
     if (rt->frame_ring_memory_mb > 0u) {
         runtime_frame_ring_set_recording(&rt->frame_ring, true);
     }
+    runtime_tm_recorder_set_enabled(rt, true);
     runtime_tm_warn_zero_budget(rt);
 }
 
@@ -101,6 +114,38 @@ void runtime_tm_window_info(const runtime *rt, runtime_tm_window *out)
     out->newest_id = st.newest_id;
     out->oldest_cycle = first.machine_cycle;
     out->newest_cycle = last.machine_cycle;
+
+    /* D17: intersection with frame ring (if it has samples) and checkpoints. */
+    {
+        runtime_frame_ring_info fi;
+        uint64_t cp_old = 0u;
+        uint64_t cp_new = 0u;
+        uint64_t cp_n = 0u;
+
+        runtime_frame_ring_get_info(&rt->frame_ring, &fi);
+        if (rt->frame_ring_memory_mb > 0u && fi.capacity > 0u && fi.count > 0u) {
+            if (fi.oldest_cycle > out->oldest_cycle) {
+                out->oldest_cycle = fi.oldest_cycle;
+            }
+            if (fi.newest_cycle < out->newest_cycle) {
+                out->newest_cycle = fi.newest_cycle;
+            }
+        }
+        runtime_tm_checkpoint_bounds(rt, &cp_old, &cp_new, &cp_n);
+        if (cp_n > 0u) {
+            if (cp_old > out->oldest_cycle) {
+                out->oldest_cycle = cp_old;
+            }
+            if (cp_new < out->newest_cycle) {
+                out->newest_cycle = cp_new;
+            }
+        }
+        if (out->oldest_cycle > out->newest_cycle) {
+            memset(out, 0, sizeof(*out));
+            return;
+        }
+        runtime_tm_fill_window_extras(rt, out);
+    }
 }
 
 void runtime_tm_get_focus(const runtime *rt, runtime_tm_focus *out)

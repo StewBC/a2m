@@ -1443,7 +1443,7 @@ Default layout: slot 4 Mockingboard, slot 6 Disk II, slot 7 SmartPort, others em
 |-----|-------|
 | `Save` | `yes` -- save INI on quit |
 | `turbo_speeds` | Comma-separated turbo ladder, e.g. `1,max` |
-| `history_off_on_max` | `true`/`false`; pause flight recorder on `max` (default true) |
+| `history_off_on_max` | `true`/`false`; pause flight recorder on `max` (default true). With TimeMachine on, entering max and leaving it truncates the tape to the resume point. |
 | `scroll_wheel_lines` | Integer; lines scrolled per wheel click |
 | `original_del` | `true`/`false`; Backspace sends `$7F` instead of `$08` |
 | `symbol_files` | Comma-separated list of symbol file paths |

@@ -59,6 +59,7 @@ bool runtime_frame_ring_init(runtime_frame_ring *ring, uint64_t budget_bytes);
 void runtime_frame_ring_destroy(runtime_frame_ring *ring);
 void runtime_frame_ring_clear(runtime_frame_ring *ring);
 void runtime_frame_ring_set_recording(runtime_frame_ring *ring, bool recording);
+void runtime_frame_ring_drop_older_than(runtime_frame_ring *ring, uint64_t cycle);
 
 /* Push one completed live frame. pixels must be width*height ARGB. */
 bool runtime_frame_ring_push(

@@ -98,6 +98,23 @@ void runtime_frame_ring_set_recording(runtime_frame_ring *ring, bool recording)
     runtime_frame_ring_unlock(ring);
 }
 
+void runtime_frame_ring_drop_older_than(runtime_frame_ring *ring, uint64_t cycle)
+{
+    if (ring == NULL || !runtime_frame_ring_usable(ring)) {
+        return;
+    }
+    runtime_frame_ring_lock(ring);
+    while (ring->count > 0u) {
+        const runtime_ring_frame *oldest = runtime_frame_ring_at(ring, 0u);
+        if (oldest->machine_cycle >= cycle) {
+            break;
+        }
+        ring->count--;
+        ring->dropped++;
+    }
+    runtime_frame_ring_unlock(ring);
+}
+
 bool runtime_frame_ring_push(
     runtime_frame_ring *ring,
     uint64_t frame_number,

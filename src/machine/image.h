@@ -77,7 +77,7 @@ typedef struct {
 
 uint8_t image_get_byte(apple2_t *m, DISKII_DRIVE *d);
 int image_put_byte(apple2_t *m, DISKII_DRIVE *d, uint8_t byte);
-int image_finish_write(DISKII_DRIVE *d);
+int image_finish_write(apple2_t *m, DISKII_DRIVE *d);
 void image_reset_latch(DISKII_IMAGE *image);
 int image_save(DISKII_IMAGE *image);
 int image_is_dirty(DISKII_IMAGE *image);

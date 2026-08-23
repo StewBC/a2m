@@ -1285,6 +1285,7 @@ static void runtime_load_state(runtime *rt, const runtime_command *command)
         (void)runtime_history_clear_for_state_load(
             rt->history, apple2_cycles(&rt->machine));
     }
+    runtime_tm_on_history_invalidate(rt);
     runtime_frame_ring_clear(&rt->frame_ring);
     runtime_history_sync_observer(rt);
     apple2_paste_cancel(&rt->machine);
@@ -2440,7 +2441,13 @@ static void runtime_history_apply_max_policy(runtime *rt, bool entering_max, boo
             (void)runtime_history_resume(rt->history, cycle);
             rt->history_paused_for_max = false;
             runtime_history_sync_observer(rt);
+            runtime_tm_on_history_resume(rt);
         }
+    }
+    if (entering_max && rt->timemachine_enabled) {
+        runtime_tm_recorder_set_enabled(rt, false);
+    } else if (leaving_max && rt->timemachine_enabled) {
+        runtime_tm_recorder_set_enabled(rt, true);
     }
 }
 
@@ -2519,6 +2526,7 @@ static void runtime_free_run_max_quantum(runtime *rt)
             }
 
             ran = apple2_step_instruction_max(&rt->machine);
+            runtime_tm_after_step(rt);
             if (ran == 0u) {
                 rt->exec_state = RUNTIME_EXEC_PAUSED;
                 rt->last_stop_reason = RUNTIME_STOP_REASON_ERROR;
@@ -3428,6 +3436,7 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
                     apple2_cycles(&rt->machine));
             }
         }
+        runtime_tm_on_history_invalidate(rt);
         rt->suppress_execute_bp = false;
         rt->temp_bp_active = false;
         rt->breakpoint_hit_pending = false;
@@ -3646,6 +3655,7 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
             if (!apple2_step_instruction(&rt->machine)) {
                 break;
             }
+            runtime_tm_after_step(rt);
             c1 = rt->machine.cpu.cpu.cycles;
             if (c1 > c0) {
                 runtime_produce_audio(rt, (uint32_t)(c1 - c0));
@@ -3669,6 +3679,7 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
     case RUNTIME_COMMAND_STEP_INSTRUCTION:
         if (rt->exec_state != RUNTIME_EXEC_RUNNING) {
             (void)apple2_step_instruction(&rt->machine);
+            runtime_tm_after_step(rt);
             runtime_maybe_frame(rt);
             rt->suppress_execute_bp = false;
             if (!runtime_pause_if_breakpoint_pending(rt)) {
@@ -4056,6 +4067,7 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         if (rt->history != NULL) {
             runtime_history_prepare_discontinuity(rt);
             (void)runtime_history_clear(rt->history, cycle);
+            runtime_tm_on_history_invalidate(rt);
             runtime_history_sync_observer(rt);
         }
         runtime_publish_history_status(rt, cmd->request_token);
@@ -4203,6 +4215,9 @@ static void runtime_free_run_batch(runtime *rt)
         }
         if (rt->suppress_execute_bp && runtime_at_instruction_boundary(rt)) {
             rt->suppress_execute_bp = false;
+        }
+        if (rt->machine.instruction_complete) {
+            runtime_tm_after_step(rt);
         }
     }
 }

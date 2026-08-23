@@ -5,6 +5,7 @@
 #include "hostfs_boot.h"
 
 #include "a2_status.h"
+#include "apple2.h"
 #include "apple2_file.h"
 
 #include <stdio.h>
@@ -112,6 +113,10 @@ struct hostfs_volume {
     uint8_t *bitmap;
     uint64_t last_refresh_ms; /* 0 = never stamped (mount sets after initial scan) */
     int guest_write_depth;
+    struct apple2 *apple;
+    int slot;
+    int device;
+    int host_directory_changed;
     bool dirty;
     bool dir_full_warned;
     /* Last persisted catalog order (host basenames); used to avoid needless rewrites. */
@@ -1784,6 +1789,7 @@ static int hostfs_persist_order_manifest_in(hostfs_volume *vol, int parent_index
         fprintf(fp, "%s\n", current[i]);
     }
     fclose(fp);
+    vol->host_directory_changed = 1;
 
     if (parent_index < 0) {
         vol->order_count = count;
@@ -2626,6 +2632,10 @@ int hostfs_write_block(hostfs_volume *vol, uint32_t block, const uint8_t *data)
         return A2_ERR;
     }
 
+    if (vol->apple != NULL && vol->apple->replay_sealed) {
+        return A2_OK;
+    }
+
     vol->guest_write_depth++;
 
     idx = hostfs_map_find(vol, (uint16_t)block);
@@ -2655,6 +2665,13 @@ int hostfs_write_block(hostfs_volume *vol, uint32_t block, const uint8_t *data)
     }
 
     vol->guest_write_depth--;
+    if (rc == A2_OK) {
+        apple2_note_media_event(
+            vol->apple,
+            vol->slot,
+            vol->device,
+            APPLE2_MEDIA_EVENT_GUEST_WRITE);
+    }
     return rc;
 }
 
@@ -3039,11 +3056,24 @@ int hostfs_rescan(hostfs_volume *vol)
     return A2_OK;
 }
 
+void hostfs_bind_apple(hostfs_volume *vol, struct apple2 *m, int slot, int device)
+{
+    if (vol == NULL) {
+        return;
+    }
+    vol->apple = m;
+    vol->slot = slot;
+    vol->device = device;
+}
+
 void hostfs_maybe_refresh(hostfs_volume *vol)
 {
     uint64_t now;
 
     if (vol == NULL || vol->guest_write_depth > 0) {
+        return;
+    }
+    if (vol->apple != NULL && vol->apple->replay_sealed) {
         return;
     }
     now = hostfs_now_ms();
@@ -3052,4 +3082,12 @@ void hostfs_maybe_refresh(hostfs_volume *vol)
         return;
     }
     (void)hostfs_rescan(vol);
+    if (vol->host_directory_changed) {
+        vol->host_directory_changed = 0;
+        apple2_note_media_event(
+            vol->apple,
+            vol->slot,
+            vol->device,
+            APPLE2_MEDIA_EVENT_HOST_DIRECTORY);
+    }
 }

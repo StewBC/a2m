@@ -116,8 +116,8 @@ static uint32_t image_woz_track_length(IMAGE_WOZ *woz, uint8_t track_id) {
     return woz->tracks[track_id].bit_count;
 }
 
-static uint8_t image_woz_fake_bit(void) {
-    return (uint8_t)(rand() % 10 < 3);
+static uint8_t image_woz_fake_bit(apple2_t *m) {
+    return (uint8_t)(apple2_rand_u32(m) % 10u < 3u);
 }
 
 static uint8_t image_woz_resolve_track(IMAGE_WOZ *woz, uint32_t quater_track) {
@@ -142,14 +142,14 @@ static uint8_t image_woz_resolve_track(IMAGE_WOZ *woz, uint32_t quater_track) {
     return 0xff;
 }
 
-static uint8_t image_woz_next_bit(IMAGE_WOZ *woz) {
+static uint8_t image_woz_next_bit(apple2_t *m, IMAGE_WOZ *woz) {
     if(!woz || woz->current_track == 0xff) {
-        return image_woz_fake_bit();
+        return image_woz_fake_bit(m);
     }
 
     IMAGE_WOZ_TRACK *track = &woz->tracks[woz->current_track];
     if(!track->data || !track->byte_count || !track->bit_count) {
-        return image_woz_fake_bit();
+        return image_woz_fake_bit(m);
     }
 
     uint32_t bit_pos = woz->bit_position % track->bit_count;
@@ -163,19 +163,19 @@ static uint8_t image_woz_next_bit(IMAGE_WOZ *woz) {
 
     woz->head_window = (uint8_t)((woz->head_window << 1) | bit);
     if((woz->head_window & 0x0f) == 0) {
-        return image_woz_fake_bit();
+        return image_woz_fake_bit(m);
     }
     return (uint8_t)((woz->head_window >> 1) & 1);
 }
 
-static uint8_t image_woz_advance_bits(IMAGE_WOZ *woz, uint64_t bits) {
+static uint8_t image_woz_advance_bits(apple2_t *m, IMAGE_WOZ *woz, uint64_t bits) {
     if(!woz) {
         return 0x7f;
     }
 
     uint8_t byte = 0x7f;
     for(uint64_t i = 0; i < bits; i++) {
-        woz->latch = (uint8_t)((woz->latch << 1) | image_woz_next_bit(woz));
+        woz->latch = (uint8_t)((woz->latch << 1) | image_woz_next_bit(m, woz));
         if(woz->latch & 0x80) {
             byte = woz->latch;
             woz->latch = 0;
@@ -437,7 +437,7 @@ void image_advance_position(apple2_t *m, DISKII_DRIVE *d) {
         double cycles_per_bit = image_cycles_per_byte(image);
         uint64_t bits = delta > 0.0 ? (uint64_t)(delta / cycles_per_bit) : 0;
         if(bits) {
-            image_woz_advance_bits(woz, bits);
+            image_woz_advance_bits(m, woz, bits);
             d->q6_last_read_cycles += (double)bits * cycles_per_bit;
         }
         return;
@@ -450,7 +450,7 @@ uint8_t image_get_byte(apple2_t *m, DISKII_DRIVE *d) {
     // static int pos = 0;
     // active image is set at this point
     DISKII_IMAGE *image = d->active_image;
-    uint8_t byte = rand() & 0x7f;
+    uint8_t byte = (uint8_t)(apple2_rand_u32(m) & 0x7fu);
 
     switch(image->kind) {
         case IMG_DSK: {
@@ -470,7 +470,7 @@ uint8_t image_get_byte(apple2_t *m, DISKII_DRIVE *d) {
                 double cycles_per_bit = image_cycles_per_byte(image);
                 uint64_t bits = delta > 0.0 ? (uint64_t)(delta / cycles_per_bit) : 0;
                 if(bits) {
-                    byte = image_woz_advance_bits(woz, bits);
+                    byte = image_woz_advance_bits(m, woz, bits);
                     d->q6_last_read_cycles += (double)bits * cycles_per_bit;
                 }
             }
@@ -479,10 +479,34 @@ uint8_t image_get_byte(apple2_t *m, DISKII_DRIVE *d) {
     return byte;
 }
 
+static void image_drive_slot(apple2_t *m, DISKII_DRIVE *d, int *out_slot, int *out_drive)
+{
+    int slot;
+    int drive;
+
+    *out_slot = 0;
+    *out_drive = 0;
+    if (m == NULL || d == NULL) {
+        return;
+    }
+    for (slot = 1; slot <= 7; ++slot) {
+        for (drive = 0; drive < 2; ++drive) {
+            if (&m->diskii_controller[slot].diskii_drive[drive] == d) {
+                *out_slot = slot;
+                *out_drive = drive;
+                return;
+            }
+        }
+    }
+}
+
 int image_put_byte(apple2_t *m, DISKII_DRIVE *d, uint8_t byte) {
     DISKII_IMAGE *image = d->active_image;
     if(!image || !image->image_specifics) {
         return A2_ERR;
+    }
+    if (m != NULL && m->replay_sealed) {
+        return A2_OK;
     }
 
     switch(image->kind) {
@@ -515,6 +539,13 @@ int image_put_byte(apple2_t *m, DISKII_DRIVE *d, uint8_t byte) {
                 image->file.file_data[pos] = (char)byte;
                 nib->dirty_tracks[track] = 1;
                 nib->dirty = 1;
+                {
+                    int slot = 0;
+                    int drive = 0;
+                    image_drive_slot(m, d, &slot, &drive);
+                    apple2_note_media_event(
+                        m, slot, drive, APPLE2_MEDIA_EVENT_GUEST_WRITE);
+                }
                 nib->track_read_pos = (nib->track_read_pos + 1) % nib->track_size;
                 d->q6_last_read_cycles = (double)m->cpu.cpu.cycles;
                 d->write_active = 1;
@@ -530,8 +561,11 @@ int image_put_byte(apple2_t *m, DISKII_DRIVE *d, uint8_t byte) {
     return A2_ERR;
 }
 
-int image_finish_write(DISKII_DRIVE *d) {
+int image_finish_write(apple2_t *m, DISKII_DRIVE *d) {
     if(!d || !d->write_active || !d->active_image || d->active_image->kind != IMG_NIB || !d->active_image->image_specifics) {
+        return A2_OK;
+    }
+    if (m != NULL && m->replay_sealed) {
         return A2_OK;
     }
 
@@ -555,6 +589,12 @@ int image_finish_write(DISKII_DRIVE *d) {
 
     nib->dirty_tracks[d->write_track] = 1;
     nib->dirty = 1;
+    {
+        int slot = 0;
+        int drive = 0;
+        image_drive_slot(m, d, &slot, &drive);
+        apple2_note_media_event(m, slot, drive, APPLE2_MEDIA_EVENT_GUEST_WRITE);
+    }
     return A2_OK;
 }
 

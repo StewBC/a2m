@@ -357,7 +357,7 @@ bool apple2_snapshot_flush_media(apple2_t *m)
         for (drive = 0; drive < 2; ++drive) {
             DISKII_DRIVE *dd = &m->diskii_controller[slot].diskii_drive[drive];
             if (dd->write_active) {
-                if (image_finish_write(dd) != A2_OK) {
+                if (image_finish_write(m, dd) != A2_OK) {
                     return false;
                 }
                 dd->write_active = 0;
@@ -431,6 +431,7 @@ static void write_cpu(snapshot_writer *w, const apple2_t *m)
     w_u8(w, c->micro_is_interrupt);
     w_bool(w, m->ready);
     w_bool(w, m->instruction_complete);
+    w_u32(w, m->prng); /* v2: machine-local PRNG. v1 loaders never see this. */
     end_chunk(w, chunk);
 }
 
@@ -879,6 +880,13 @@ static bool apply_cpu(apple2_t *m, const uint8_t *p, size_t len)
     c->micro_is_interrupt = r_u8(&r);
     m->ready = r_bool(&r);
     m->instruction_complete = r_bool(&r);
+    /* v2+: PRNG. v1 CPU_ chunks end here; keep the init seed. */
+    if (r.ok && r.pos + 4u <= r.len) {
+        m->prng = r_u32(&r);
+        if (m->prng == 0u) {
+            m->prng = 0xA2A2A2A2u;
+        }
+    }
     /* Bus read/write/irq callbacks stay as set by apple2_init (static in apple2.c). */
     c->user = m;
     return r.ok;

@@ -8,12 +8,15 @@
  * Checkpoint ring and materialize land in later phases.
  */
 
+#include "apple2.h"
 #include "runtime_history.h"
 
 #include <stdbool.h>
 #include <stdint.h>
 
 typedef struct runtime runtime;
+
+enum { RUNTIME_TM_CHECKPOINT_CADENCE_CYCLES = 20000u };
 
 enum { RUNTIME_TM_OPCODE_JSR = 0x20 };
 
@@ -40,6 +43,11 @@ typedef struct runtime_tm_window {
     uint64_t newest_id;
     uint64_t oldest_cycle;
     uint64_t newest_cycle;
+    uint64_t checkpoint_count;
+    uint64_t checkpoints_dropped;
+    uint64_t media_truncations;
+    runtime_history_media_change_kind start_kind;
+    uint32_t start_arg1;
 } runtime_tm_window;
 
 typedef enum runtime_tm_query_op {
@@ -89,3 +97,20 @@ runtime_tm_query_status runtime_tm_query(
     runtime_tm_query_op op,
     const runtime_tm_query_args *args,
     runtime_tm_query_result *out_result);
+
+void runtime_tm_recorder_set_enabled(runtime *rt, bool enabled);
+bool runtime_tm_checkpoint_take(runtime *rt);
+bool runtime_tm_materialize(runtime *rt, uint64_t cycle, apple2_t *dst);
+void runtime_tm_after_step(runtime *rt);
+void runtime_tm_on_history_resume(runtime *rt);
+void runtime_tm_on_history_invalidate(runtime *rt);
+void runtime_tm_on_media_event(
+    runtime *rt, uint64_t cycle, int slot, int device, int kind);
+
+uint64_t runtime_tm_checkpoint_count(const runtime *rt);
+uint64_t runtime_tm_checkpoints_dropped(const runtime *rt);
+uint64_t runtime_tm_media_truncations(const runtime *rt);
+void runtime_tm_recorder_destroy(runtime *rt);
+void runtime_tm_checkpoint_bounds(
+    const runtime *rt, uint64_t *oldest, uint64_t *newest, uint64_t *count);
+void runtime_tm_fill_window_extras(const runtime *rt, runtime_tm_window *out);

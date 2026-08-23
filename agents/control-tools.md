@@ -73,7 +73,7 @@ Unsolicited: `0 event state-changed reason=… session=… cycles=… frame=… 
 | Frame | `get-frame` → ARGB **560×192**, stride = width×4, `format=argb8888` |
 | Frame ring | `frame-ring-info` `frame-ring-record` `frame-ring-clear` `get-frame-at frame=\|cycle=` |
 | Breakpoints | `break-create` / `break-update` / `break-list` / `break-enable` / `break-clear` / `break-clear-all` / `rearm-oneshots` / `break-exec`; `when=`; access exec/read/write |
-| History | `history-info` `history-record` `history-clear` `history-find` `history-next` `history-read` `history-close` → `data history` **HST1** (per TCP session cursor) |
+| History | `history-info` `history-record` `history-clear` `history-find` `history-next` `history-read` `history-close` → `data history` **HST1** (per TCP session cursor). Marker 13 = `MEDIA_CHANGED`; `arg0` is `0 unknown / 1 guest-write / 2 host-directory`, `arg1` is `(slot<<8)\|device`. Additive; no A2M bump. |
 | TimeMachine | **No A2M verb in TM0/TM1.** Master switch is INI `[debug] timemachine=0\|1` / CLI `--timemachine` / `--no-timemachine` (default **off**). Tape verbs (`step` / over / out / run-to / seek) are `runtime_client_tm_*` only until TM3. `history-record` and `frame-ring-record` stay as standalone agent verbs — turning either off after TM-on is respected (no hidden re-arm). |
 | Waits | `wait-paused` `wait-running` `wait-frame` `wait-event` (incl. `assemble-complete` / `assemble-error`) |
 | Assembler | `assemble [address=] [run-address=] [auto-run=] [mli-launch=] [reset=] [auto-adjust-segments=] <path>` (deferred) |

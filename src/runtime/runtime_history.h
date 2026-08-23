@@ -55,8 +55,15 @@ typedef enum runtime_history_marker_kind {
     RUNTIME_HISTORY_MARKER_DIRECT_MEMORY_WRITE = 9,
     RUNTIME_HISTORY_MARKER_KERNAL_LOAD_TRAP = 10,
     RUNTIME_HISTORY_MARKER_KERNAL_SAVE_TRAP = 11,
-    RUNTIME_HISTORY_MARKER_CLOCK_DISCONTINUITY = 12
+    RUNTIME_HISTORY_MARKER_CLOCK_DISCONTINUITY = 12,
+    RUNTIME_HISTORY_MARKER_MEDIA_CHANGED = 13
 } runtime_history_marker_kind;
+
+typedef enum runtime_history_media_change_kind {
+    RUNTIME_HISTORY_MEDIA_CHANGE_UNKNOWN = 0,
+    RUNTIME_HISTORY_MEDIA_CHANGE_GUEST_WRITE = 1,
+    RUNTIME_HISTORY_MEDIA_CHANGE_HOST_DIRECTORY = 2
+} runtime_history_media_change_kind;
 
 typedef enum runtime_history_reset_kind {
     RUNTIME_HISTORY_RESET_UNKNOWN = 0,
@@ -279,6 +286,11 @@ bool runtime_history_clear_for_state_load(
     uint64_t machine_cycle);
 bool runtime_history_transition_timeline(runtime_history *history);
 bool runtime_history_set_timeline(runtime_history *history, uint32_t timeline);
+/* Logical floor: status/first treat `id` as the new oldest retained record. */
+bool runtime_history_retain_from(
+    runtime_history *history,
+    uint64_t epoch,
+    uint64_t id);
 
 bool runtime_history_lookup(
     const runtime_history *history,

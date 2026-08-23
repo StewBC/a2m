@@ -14,6 +14,7 @@ add_library(runtime STATIC
     runtime.c
     runtime_thread.c
     runtime_timemachine.c
+    runtime_tm_recorder.c
 )
 
 target_include_directories(runtime PUBLIC

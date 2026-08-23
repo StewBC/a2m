@@ -32,6 +32,7 @@ int main(void)
     uint32_t flags_saved;
     uint16_t line_saved;
     uint16_t h_saved;
+    uint32_t prng_saved;
 
     expect_true("init", apple2_init(&m));
     apple2_debug_write(&m, 0x0400, marker[0]);
@@ -47,6 +48,8 @@ int main(void)
     flags_saved = m.state_flags;
     line_saved = m.video.line;
     h_saved = m.video.cycle_in_line;
+    (void)apple2_rand_u32(&m);
+    prng_saved = m.prng;
 
     expect_true("flush", apple2_snapshot_flush_media(&m));
     size = apple2_snapshot_size(&m);
@@ -81,6 +84,10 @@ int main(void)
     }
     if (m2.video.line != line_saved || m2.video.cycle_in_line != h_saved) {
         fail("beam not restored");
+    }
+    if (m2.prng != prng_saved) {
+        fprintf(stderr, "FAIL: prng %08x != %08x\n", m2.prng, prng_saved);
+        exit(1);
     }
     if (apple2_debug_read(&m2, 0x0400) != marker[0] ||
         apple2_debug_read(&m2, 0x0401) != marker[1] ||

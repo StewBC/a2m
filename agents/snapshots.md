@@ -85,7 +85,7 @@ then substitute Apple types. Do not invent a second snapshot architecture.
 | Extension | **`.a2state`** only (drop, quicksave, docs). Accept legacy typos only if cheap; test currently uses `.a2s` → fix to `.a2state`. |
 | Format | Versioned **chunked LE** binary (c64m style), not `memcpy` of `apple2_t`. |
 | Magic | Distinct 32-bit magic (suggest `0x41325354` = `'A''2''S''T'` LE — pick one, document in header). |
-| Version | Start at **1**; `VERSION_MIN = 1`. Bump when chunk layouts change. |
+| Version | **2** (`A2_SNAPSHOT_VERSION`). `VERSION_MIN = 1` — v1 files still load. v2 `CPU_` appends the machine PRNG (`uint32_t`, xorshift32). Absent on v1 load: keep the init seed `0xA2A2A2A2`. |
 | Media | **Referenced paths** for Disk II queue + SmartPort files. Re-open files on load. If a path is missing → fail load with clear error (do not silently boot empty). |
 | Dirty Disk II | V1: **flush dirty tracks to disk image before save** when file-backed, *or* fail save if dirty and not flushable. Prefer flush-via existing `image_save` / `diskii_save` when available. Full embedded-track self-contained mode is **V2** (flag reserved). |
 | ROM images | **Not embedded.** Use built-in product ROMs for model; optional hash check in META (warn or fail — prefer **fail on model mismatch**, soft-warn on ROM hash if easy). |
@@ -139,7 +139,7 @@ Tag names illustrative (4 bytes, same `TAG('A','B','C','D')` helper as c64m).
 | Tag | Contents | Required |
 |-----|----------|----------|
 | **META** | version aux, flags, content_mode, model, mb_slot, optional ROM hashes | Yes |
-| **CPU_** | `CPU` regs + `cpu65_t` micro state (opcode/phase/target/…) **without** function pointers (`user`, `read`, `write`, irq fns reattached after load) | Yes |
+| **CPU_** | `CPU` regs + `cpu65_t` micro state (opcode/phase/target/…) **without** function pointers (`user`, `read`, `write`, irq fns reattached after load). **v2:** trailing `uint32_t prng` | Yes |
 | **RAM_** | `ram_main` 128K + `ram_lc` 32K (][+ still stores 128K aux half zeros or only 64K — pick: always 128K+32K for simpler layout) | Yes |
 | **SOFT** | `state_flags`, `key_held`, `strobed_slot`, speaker_level, gameport axes/buttons/ptrig_cycle | Yes |
 | **VID_** | beam: `cycle_in_line`, `line`, `frame_number`, `last_video_byte`, `paint_enabled` (not fb) | Yes |

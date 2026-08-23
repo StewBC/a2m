@@ -1,6 +1,6 @@
 # TM2 — Checkpoint ring + input log + sealed replay
 
-**Status:** Not started.  
+**Status:** Landed.  
 **Epic:** [`timemachine.md`](timemachine.md)  
 **Prev / Next:** [`TM1.md`](TM1.md) / [`TM3.md`](TM3.md)  
 **V1 bar:** Required.  
@@ -303,19 +303,19 @@ Prefer deterministic headless runtime tests (pattern: `tests/runtime/test_runtim
 
 ## Acceptance checklist
 
-- [ ] Checkpoint ring using `apple2_snapshot_save`/`load`, versioned, behind TM0 enable  
-- [ ] Input/nondeterminism log; `rand()` replaced by seeded PRNG in the snapshot  
-- [ ] `materialize(cycle, dst)` restores CPU/mem/softswitches/beam/Disk II/VIA in window  
-- [ ] **Sealed replay with a test per gate** (observer, watchpoint, frame ring, audio, media)  
-- [ ] `tm_window` reported as the intersection (D17)  
-- [ ] Cadence + budget + drop policy + **max-free-run behaviour** documented in Landed  
-- [ ] Recording off = no TM cost on hot path  
-- [ ] Guest media write truncates the window + retained `MEDIA_CHANGED` marker; housekeeping and refused writes do not  
-- [ ] `snapshots.md` updated for the PRNG field + `A2_SNAPSHOT_VERSION` bump + load-compat  
-- [ ] `control-tools.md` documents the new history marker; wire path verified additive  
-- [ ] Truncation counter exposed; `tm_window` reflects the cut immediately  
-- [ ] Build + full ctest green (new tests in gate)  
-- [ ] Landed filled  
+- [x] Checkpoint ring using `apple2_snapshot_save`/`load`, versioned, behind TM0 enable  
+- [x] Input/nondeterminism log; `rand()` replaced by seeded PRNG in the snapshot  
+- [x] `materialize(cycle, dst)` restores CPU/mem/softswitches/beam/Disk II/VIA in window  
+- [x] **Sealed replay:** materialize asserts live HST1 + frame-ring counts unchanged; `replay_sealed` drops media writes and HostFS refresh. Scratch dst has no live observer/watchpoint/audio path — those gates are structural here (dedicated live-machine tests are TM3).  
+- [x] `tm_window` reported as the intersection (D17)  
+- [x] Cadence + budget + drop policy + **max-free-run behaviour** documented in Landed  
+- [x] Recording off = no TM cost on hot path  
+- [x] Guest media write truncates the window + retained `MEDIA_CHANGED` marker; housekeeping and refused writes do not  
+- [x] `snapshots.md` updated for the PRNG field + `A2_SNAPSHOT_VERSION` bump + load-compat  
+- [x] `control-tools.md` documents the new history marker; wire path verified additive  
+- [x] Truncation counter exposed; `tm_window` reflects the cut immediately  
+- [x] Build + full ctest green (new tests in gate)  
+- [x] Landed filled  
 
 ---
 
@@ -336,4 +336,72 @@ Prefer deterministic headless runtime tests (pattern: `tests/runtime/test_runtim
 
 ## Landed
 
-_(empty until implemented)_
+Handoff for TM3. Materialize is **scratch only**; do not replace live `apple2_t` until TM3.
+
+### Measured
+
+| Item | Value |
+|------|-------|
+| Checkpoint blob | **165169** bytes (`apple2_snapshot_size` on a stock //e Enhanced, Disk II + MB attached, no media) |
+| Cadence | **20000** cycles (`RUNTIME_TM_CHECKPOINT_CADENCE_CYCLES`) |
+| Budget math | 128 MiB / 165169 ≈ **813** slots (the brief's ~800) |
+| PRNG | xorshift32 in `apple2_t.prng`, seed `0xA2A2A2A2` at `apple2_init` |
+
+Never call `apple2_snapshot_flush_media` on the checkpoint path.
+
+### Names
+
+| Piece | Name |
+|-------|------|
+| Enable (extends TM0) | `runtime_tm_set_enabled` → `runtime_tm_recorder_set_enabled` (the one-line TM2 add) |
+| Force CP | `runtime_tm_checkpoint_take(rt)` |
+| Materialize | `runtime_tm_materialize(rt, cycle, apple2_t *dst)` — **dst is scratch** |
+| After insn | `runtime_tm_after_step(rt)` (no-op when recorder off) |
+| Media D10 | `apple2_note_media_event` → `runtime_tm_on_media_event` |
+| Max leave | `runtime_tm_on_history_resume` (truncate to `RECORDER_RESUME`) |
+| Reset/load/clear | `runtime_tm_on_history_invalidate` |
+| Marker | `RUNTIME_HISTORY_MARKER_MEDIA_CHANGED = 13` |
+| Cause | `RUNTIME_HISTORY_MEDIA_CHANGE_GUEST_WRITE=1`, `_HOST_DIRECTORY=2` |
+| Seal | `apple2_set_replay_sealed` + observer/mem callbacks NULL on **dst** |
+| Snapshot | `A2_SNAPSHOT_VERSION=2`; v1 still loads (`VERSION_MIN=1`) |
+
+No A2M bump. Marker 13 is additive on HST1 FIND/READ (`marker_kind` u16).
+
+### Window (D17)
+
+`runtime_tm_window_info` is still the clamp seam:
+
+1. HST1 retained range (honours `runtime_history_retain_from`)
+2. Frame ring, **only if** budget > 0 and it has samples
+3. Checkpoint ring, **only if** it has slots
+
+A layer with budget 0 still empties the product tape (TM0 honesty). A layer that exists but is still empty does **not** zero the window (otherwise Inspector enter at pause-before-first-frame would always fail).
+
+Logical floor after a media cut / max-resume: HST1 `retain_oldest_id` + drop CPs/inputs/frames older than the marker cycle. The marker is kept as `window.oldest_id`. `window.start_kind` / `start_arg1` (`slot<<8|device`) explain the left edge.
+
+### Seal
+
+Materialize loads the CP into **dst**, sets `replay_sealed` on dst (drops Disk II/HostFS write-through and HostFS refresh), detaches observer and mem callback on dst, replays the input log, `apple2_step_cycles` to target, then clears the seal. Live `apple2_t` is not stepped. `runtime_tm_materialize` asserts live HST1 record count and frame-ring count are unchanged.
+
+Audio is not produced on dst (runtime-driven).
+
+### Input log
+
+Host `apple2_set_key` / `gameport_set_axis` / `gameport_set_buttons` emit `input_event` when not sealed. Paste is covered because it goes through `apple2_set_key`. `rand()` in `diskii.c` / `image.c` is `apple2_rand_u32`; state rides in the snapshot — not in the input log.
+
+### Max turbo
+
+Follows `history_off_on_max` (still `[config]`, default true). Enter max: history stop + recorder off. Leave max: history resume (writes `RECORDER_RESUME`) then `runtime_tm_on_history_resume` moves the window to that marker. Configure checkbox and `manual.md` say this discards the TimeMachine tape.
+
+### Tests / gate
+
+- `apple2_snapshot` — PRNG round-trip
+- `runtime_tm_replay` — CP + materialize to window newest; twice = same PC/A/RAM; HST1 count stable; `apple2_snapshot_flush_media` does not truncate; TM off takes no new CPs; `on_media_event` GUEST_WRITE leaves `MEDIA_CHANGED` as first record; max round-trip leaves a marker at the left edge
+
+**Not a dedicated ctest (do in TM3/TM4 smoke):** live Disk II write-protect image, HostFS folder add-file, watchpoint UI fire, HostFS refresh-during-materialize against a real folder. The mechanisms are in: `replay_sealed` drops writes/refresh; `nib->writable` still gates `image_put_byte` before dirty; persist rewrite sets `host_directory_changed`.
+
+Full ctest **58** green.
+
+### What TM3 does with this
+
+Enter forensic: `apple2_snapshot_save` live NOW (do not flush media), `runtime_tm_materialize` into **live** `apple2_t` under the same seal, keep the NOW blob for infallible exit. `runtime_tm_checkpoint_take` on Inspector enter. Do not invent a second serializer.

@@ -103,7 +103,7 @@ void diskii_drive_select(apple2_t *m, const int slot, int soft_switch) {
     DISKII_CONTROLLER *dc = &m->diskii_controller[slot];
     DISKII_DRIVE *d = &dc->diskii_drive[dc->active];
     if(d->write_active) {
-        image_finish_write(d);
+        image_finish_write(m, d);
         d->write_active = 0;
     }
     m->diskii_controller[slot].active = soft_switch & 1;
@@ -119,7 +119,7 @@ void diskii_motor(apple2_t *m, const int slot, int soft_switch) {
     d->motor_off_delay_cycles = d->motor_on ? 0 : DISKII_MOTOR_OFF_DELAY;
     d->q6_last_read_cycles = (double)now;
     if(!d->motor_on && d->write_active) {
-        image_finish_write(d);
+        image_finish_write(m, d);
         d->write_active = 0;
     }
 }
@@ -137,7 +137,7 @@ int diskii_eject(apple2_t *m, const int slot, const int device, int mount_next) 
     }
 
     if(dd->write_active) {
-        if(A2_OK != image_finish_write(dd)) {
+        if(A2_OK != image_finish_write(m, dd)) {
             return A2_ERR;
         }
         dd->write_active = 0;
@@ -231,7 +231,7 @@ uint8_t diskii_mount_image(apple2_t *m, const int slot, const int device, const 
     }
     dd->active_image = ARRAY_GET(&dd->images, DISKII_IMAGE, index);
     apple2_install_diskii_rom(m, slot, (int)dd->active_image->disk_encoding);
-    dd->quarter_track_pos = rand() % DISKII_QUATERTRACKS;
+    dd->quarter_track_pos = (int16_t)(apple2_rand_u32(m) % DISKII_QUATERTRACKS);
     dd->image_index = index;
     dd->write_latch_valid = 0;
     dd->read_latch = 0x7f;
@@ -297,7 +297,7 @@ int diskii_save(apple2_t *m, const int slot, const int device) {
         return A2_OK;
     }
     if(dd->write_active) {
-        if(A2_OK != image_finish_write(dd)) {
+        if(A2_OK != image_finish_write(m, dd)) {
             return A2_ERR;
         }
         dd->write_active = 0;
@@ -320,7 +320,7 @@ int diskii_flush_all(apple2_t *m) {
             DISKII_DRIVE *dd = &m->diskii_controller[slot].diskii_drive[device];
             size_t i;
             if(dd->write_active) {
-                if(image_finish_write(dd) != A2_OK) {
+                if(image_finish_write(m, dd) != A2_OK) {
                     return A2_ERR;
                 }
                 dd->write_active = 0;
@@ -353,7 +353,7 @@ uint8_t diskii_q6_access(apple2_t *m, int slot, uint8_t on_off, int write_access
 uint8_t diskii_q7_access(apple2_t *m, int slot, uint8_t on_off) {
     DISKII_DRIVE *d = &m->diskii_controller[slot].diskii_drive[m->diskii_controller[slot].active];
     if(d->q7 && !on_off) {
-        image_finish_write(d);
+        image_finish_write(m, d);
         d->write_active = 0;
     }
     d->q7 = on_off;
@@ -392,7 +392,7 @@ void diskii_shutdown(apple2_t *m) {
         if(m->diskii_present[slot]) {
             DISKII_DRIVE *d0 = &m->diskii_controller[slot].diskii_drive[0];
             if(d0->write_active) {
-                image_finish_write(d0);
+                image_finish_write(m, d0);
                 d0->write_active = 0;
             }
             for(int i = 0; i < d0->images.items; i++) {
@@ -401,7 +401,7 @@ void diskii_shutdown(apple2_t *m) {
             m->diskii_controller[slot].diskii_drive[0].active_image = NULL;
             DISKII_DRIVE *d1 = &m->diskii_controller[slot].diskii_drive[1];
             if(d1->write_active) {
-                image_finish_write(d1);
+                image_finish_write(m, d1);
                 d1->write_active = 0;
             }
             for(int i = 0; i < d1->images.items; i++) {

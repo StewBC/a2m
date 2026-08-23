@@ -153,7 +153,47 @@ typedef struct apple2 {
     /* Last-writer PC pack per logical address (debugger annotation, not BP).
        Each write shifts prior PCs left 16 and ORs the current opcode_pc. */
     uint64_t *write_history; /* 65536 entries when allocated */
+
+    /* Machine-local PRNG (Disk II weak bits / mount jitter). Seeded at init;
+       saved/restored with the snapshot. */
+    uint32_t prng;
+
+    /* Sealed replay: drop host media write-through and HostFS refresh. */
+    bool replay_sealed;
+
+    /* TimeMachine: guest media write / host-directory change (D10). */
+    void (*media_event)(void *user, uint64_t cycle, int slot, int device, int kind);
+    void *media_event_user;
+
+    /* TimeMachine input log (host key / gameport). */
+    void (*input_event)(
+        void *user, uint64_t cycle, int kind, uint32_t a, uint32_t b, uint32_t c);
+    void *input_event_user;
 } apple2_t;
+
+enum {
+    APPLE2_MEDIA_EVENT_GUEST_WRITE = 1,
+    APPLE2_MEDIA_EVENT_HOST_DIRECTORY = 2
+};
+
+enum {
+    APPLE2_INPUT_KEY = 1,
+    APPLE2_INPUT_GAMEPORT_AXIS = 2,
+    APPLE2_INPUT_GAMEPORT_BUTTONS = 3
+};
+
+uint32_t apple2_rand_u32(apple2_t *machine);
+void apple2_set_replay_sealed(apple2_t *machine, bool sealed);
+void apple2_set_media_event_callback(
+    apple2_t *machine,
+    void (*callback)(void *user, uint64_t cycle, int slot, int device, int kind),
+    void *user);
+void apple2_set_input_event_callback(
+    apple2_t *machine,
+    void (*callback)(
+        void *user, uint64_t cycle, int kind, uint32_t a, uint32_t b, uint32_t c),
+    void *user);
+void apple2_note_media_event(apple2_t *machine, int slot, int device, int kind);
 
 bool apple2_init(apple2_t *machine);
 void apple2_shutdown(apple2_t *machine);

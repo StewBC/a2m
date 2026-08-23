@@ -200,6 +200,7 @@ struct runtime {
     bool timemachine_enabled;
     uint32_t timemachine_memory_mb;
     runtime_tm_focus tm_focus;
+    struct runtime_tm_recorder *tm_recorder;
 
     /* TRON/TROFF instruction log (C5b) — file open while trace_enabled. */
     bool trace_enabled;

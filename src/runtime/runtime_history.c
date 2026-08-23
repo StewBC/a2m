@@ -57,6 +57,7 @@ struct runtime_history {
     uint8_t recording;
     uint8_t has_current_block;
     uint8_t has_active_record;
+    uint64_t retain_oldest_id;
 };
 
 static void *history_default_alloc(size_t size, void *user) {
@@ -542,6 +543,12 @@ void runtime_history_get_status(
             }
         }
     }
+    if (history->retain_oldest_id != 0u &&
+        history->retain_oldest_id > out_status->oldest_id &&
+        (out_status->newest_id == 0u ||
+         history->retain_oldest_id <= out_status->newest_id)) {
+        out_status->oldest_id = history->retain_oldest_id;
+    }
 }
 
 bool runtime_history_has_active_record(const runtime_history *history) {
@@ -830,6 +837,7 @@ static bool history_clear_epoch(
         history->epoch = 1u;
     }
     history->next_id = 1u;
+    history->retain_oldest_id = 0u;
     history->timeline = timeline;
     history->wrap_count = 0u;
     history->truncated_accesses = 0u;
@@ -870,6 +878,36 @@ bool runtime_history_transition_timeline(runtime_history *history) {
     (void)runtime_history_seal_partial(history);
     history_seal_current_block(history);
     history->timeline++;
+    return true;
+}
+
+bool runtime_history_retain_from(
+    runtime_history *history,
+    uint64_t epoch,
+    uint64_t id)
+{
+    runtime_history_record rec;
+    size_t i;
+
+    if (history == NULL || !history->available || id == 0u) {
+        return false;
+    }
+    if (epoch != history->epoch) {
+        return false;
+    }
+    if (!runtime_history_lookup(history, epoch, id, &rec)) {
+        return false;
+    }
+    history->retain_oldest_id = id;
+    for (i = 0u; i < history->block_count; ++i) {
+        runtime_history_block *block = &history->blocks[i];
+        if (!block->occupied || block->epoch != history->epoch) {
+            continue;
+        }
+        if (block->last_id < id) {
+            memset(block, 0, sizeof(*block));
+        }
+    }
     return true;
 }
 

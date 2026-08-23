@@ -4,7 +4,7 @@
 
 **Rules:** [`rules.md`](rules.md)  
 **Closed:** paint; SP `$C800`; BP 0–4e + P4b TRON; remote-debug **C0–C5b**; control tools **T1–T5**; `get-softswitches`; **turbo-zip**; **max free-run S2**; **snapshots** ([`snapshots.md`](snapshots.md) — `.a2state` save/load, drop, `--sna`, Opt+Shift+./,); **sessions foundation** ([`sessions.md`](sessions.md) — multi-asker + `state-changed`; A2M/11).  
-**Active:** **TimeMachine** ([`timemachine.md`](timemachine.md) — TM0–TM6; V1 = TM0–TM4). **TM0–TM1 landed:** opt-in recording + HST1 query verbs (`runtime_tm_query`). Next: TM2 checkpoint ring + sealed replay. F7 Inspector is **retired and removed** — lessons in [`inspector.md`](inspector.md), code at tag `archive/f7-inspector`.  
+**Active:** **TimeMachine** ([`timemachine.md`](timemachine.md) — TM0–TM6; V1 = TM0–TM4). **TM0–TM2 landed:** opt-in recording, HST1 queries, checkpoint ring + sealed materialize-to-scratch. Next: TM3 replace-live forensic mode. F7 Inspector is **retired and removed** — lessons in [`inspector.md`](inspector.md), code at tag `archive/f7-inspector`.  
 **Look-later:** TM5 forensic BPs / TM6 Promote; debug ergonomics (mem workshop → live remount → frame gate / HW snaps).
 
 ---
@@ -52,7 +52,7 @@ Keyboard stick (when on): Option/KP0 and Space are fire keys (optional swap in C
 
 | Area | Evidence |
 |------|----------|
-| Build / ctest | **57 green** (`testing.md`; includes sessions + state-changed, file-codec, assembler MLI launch, TM0–TM1) |
+| Build / ctest | **58 green** (`testing.md`; includes sessions + state-changed, file-codec, assembler MLI launch, TM0–TM2) |
 | Assembler | Misc → Assembler: assemble to RAM / `file=` HostFS; optional Auto-run; **MLI launch** gates auto-run on CPU-visible `$BF00 == $4C` (mutually exclusive with Reset); sample shim in `samples/asm_mli_launch/` |
 | CLI / INI | model, mounts sNdN (multi-image queue), turbo MHz/`max`, lifecycle, headless; `[DEBUG] break.*` |
 | Turbo / step / reset | Opt+T (MHz/max); F10–F12 family; F8 / Opt+F8 |

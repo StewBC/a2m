@@ -2311,7 +2311,7 @@ static void frontend_draw_config_machine_tab(frontend *ui, frontend_config_dialo
     nk_layout_row_dynamic(ctx, 22.0f, 1);
     frontend_checkbox_bool(
         ctx,
-        "History off on max (faster free-run)",
+        "History off on max (faster free-run; discards TimeMachine tape)",
         &dialog->edited.history_off_on_max);
 
     nk_layout_row_dynamic(ctx, 22.0f, 1);

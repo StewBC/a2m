@@ -387,7 +387,72 @@ bool apple2_init(apple2_t *machine)
     apple2_attach_mockingboard(machine, 4);
 
     cpu65_reset(&machine->cpu);
+    machine->prng = 0xA2A2A2A2u;
     return true;
+}
+
+uint32_t apple2_rand_u32(apple2_t *machine)
+{
+    uint32_t x;
+
+    if (machine == NULL) {
+        return 0u;
+    }
+    x = machine->prng;
+    if (x == 0u) {
+        x = 0xA2A2A2A2u;
+    }
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    machine->prng = x;
+    return x;
+}
+
+void apple2_set_replay_sealed(apple2_t *machine, bool sealed)
+{
+    if (machine == NULL) {
+        return;
+    }
+    machine->replay_sealed = sealed;
+}
+
+void apple2_set_media_event_callback(
+    apple2_t *machine,
+    void (*callback)(void *user, uint64_t cycle, int slot, int device, int kind),
+    void *user)
+{
+    if (machine == NULL) {
+        return;
+    }
+    machine->media_event = callback;
+    machine->media_event_user = user;
+}
+
+void apple2_set_input_event_callback(
+    apple2_t *machine,
+    void (*callback)(
+        void *user, uint64_t cycle, int kind, uint32_t a, uint32_t b, uint32_t c),
+    void *user)
+{
+    if (machine == NULL) {
+        return;
+    }
+    machine->input_event = callback;
+    machine->input_event_user = user;
+}
+
+void apple2_note_media_event(apple2_t *machine, int slot, int device, int kind)
+{
+    if (machine == NULL || machine->replay_sealed || machine->media_event == NULL) {
+        return;
+    }
+    machine->media_event(
+        machine->media_event_user,
+        apple2_cycles(machine),
+        slot,
+        device,
+        kind);
 }
 
 void apple2_install_diskii_rom(apple2_t *m, int slot, int encoding)
@@ -908,6 +973,15 @@ void apple2_set_key(apple2_t *machine, uint8_t key_with_strobe)
     machine->ram_main[SS_KBD] = key_with_strobe;
     machine->key_held = key_with_strobe;
     machine->state_flags |= A2S_KEY_HELD;
+    if (!machine->replay_sealed && machine->input_event != NULL) {
+        machine->input_event(
+            machine->input_event_user,
+            apple2_cycles(machine),
+            APPLE2_INPUT_KEY,
+            key_with_strobe,
+            0u,
+            0u);
+    }
 }
 
 uint64_t apple2_cycles(const apple2_t *machine)
@@ -1133,17 +1207,27 @@ void apple2_gameport_set_axis(apple2_t *m, int axis, uint8_t value)
         return;
     }
     m->gameport_axis[axis] = apple2_gameport_clamp_axis(value);
+    if (!m->replay_sealed && m->input_event != NULL) {
+        m->input_event(
+            m->input_event_user,
+            apple2_cycles(m),
+            APPLE2_INPUT_GAMEPORT_AXIS,
+            (uint32_t)axis,
+            m->gameport_axis[axis],
+            0u);
+    }
 }
 
 void apple2_gameport_set_axes(apple2_t *m, const uint8_t axis[4])
 {
+    int i;
+
     if (m == NULL || axis == NULL) {
         return;
     }
-    m->gameport_axis[0] = apple2_gameport_clamp_axis(axis[0]);
-    m->gameport_axis[1] = apple2_gameport_clamp_axis(axis[1]);
-    m->gameport_axis[2] = apple2_gameport_clamp_axis(axis[2]);
-    m->gameport_axis[3] = apple2_gameport_clamp_axis(axis[3]);
+    for (i = 0; i < 4; ++i) {
+        apple2_gameport_set_axis(m, i, axis[i]);
+    }
 }
 
 void apple2_gameport_set_buttons(apple2_t *m, uint8_t mask)
@@ -1152,6 +1236,15 @@ void apple2_gameport_set_buttons(apple2_t *m, uint8_t mask)
         return;
     }
     m->gameport_buttons = (uint8_t)(mask & 0x07u);
+    if (!m->replay_sealed && m->input_event != NULL) {
+        m->input_event(
+            m->input_event_user,
+            apple2_cycles(m),
+            APPLE2_INPUT_GAMEPORT_BUTTONS,
+            m->gameport_buttons,
+            0u,
+            0u);
+    }
 }
 
 void apple2_gameport_ptrig(apple2_t *m)

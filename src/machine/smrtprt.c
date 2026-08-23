@@ -108,6 +108,7 @@ int sp_mount(apple2_t *m, int slot, int device, const char *file_name) {
         spd->backend[device] = SP_BACKEND_HOSTFS;
         spd->hostfs[device] = vol;
         spd->file_header_size[device] = 0;
+        hostfs_bind_apple(vol, m, slot, device);
 
         spd->sp_buffer[1] = (uint8_t)(device << 7);
         spd->sp_buffer[2] = spd->sp_buffer[3] = 0;

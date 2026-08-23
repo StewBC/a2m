@@ -8,7 +8,7 @@
 
 /* LE fourcc 'A2ST' */
 #define A2_SNAPSHOT_MAGIC 0x41325354u
-#define A2_SNAPSHOT_VERSION 1u
+#define A2_SNAPSHOT_VERSION 2u
 #define A2_SNAPSHOT_VERSION_MIN 1u
 
 typedef enum a2_snapshot_content_mode {
