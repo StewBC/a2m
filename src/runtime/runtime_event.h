@@ -85,9 +85,7 @@ typedef enum runtime_event_type {
     RUNTIME_EVENT_SESSION_RESPONSE,
     RUNTIME_EVENT_STATE_CHANGED,
     RUNTIME_EVENT_MEDIA_CHANGED,
-    RUNTIME_EVENT_TM_FOCUS,
-    RUNTIME_EVENT_TM_MODE,
-    RUNTIME_EVENT_TM_BREAKPOINTS_RESPONSE
+    RUNTIME_EVENT_TM_MODE
 } runtime_event_type;
 
 typedef enum runtime_state_changed_reason {
@@ -465,12 +463,6 @@ typedef struct runtime_event {
             uint64_t frame;
             uint64_t history_epoch;
         } state_changed;
-        struct {
-            runtime_tm_query_op op;
-            runtime_tm_query_status status;
-            runtime_tm_focus focus;
-            uint8_t clamped;
-        } tm_focus;
         struct {
             uint8_t op; /* 0 enter, 1 exit */
             uint8_t mode; /* runtime_tm_mode */

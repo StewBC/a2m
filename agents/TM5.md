@@ -1,7 +1,7 @@
 # TM5 — Forensic breakpoint / watch system
 
 **Status:** Landed. **V1.1** (not required for TimeMachine V1 bar).  
-**TMA overlay:** the second Time Machine BP bank is leftover. TMA1 already uses the **one** live list in time travel; [`TMA2.md`](TMA2.md) deletes this store. This file is the record of the tape-scan experiment.  
+**Second bank removed in TMA2; this file is history.** `tm_breakpoints[]` is gone. Live and time travel share the one breakpoint list ([`TMA0.md`](TMA0.md) A14 / [`TMA2.md`](TMA2.md)).  
 **Epic:** [`timemachine.md`](timemachine.md)  
 **Prev / Next:** [`TM4.md`](TM4.md) / [`TM6.md`](TM6.md)  
 **Depends on:** TM1–TM3 (queries + sealed materialize); best after TM4 chrome.

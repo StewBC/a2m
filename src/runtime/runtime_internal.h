@@ -26,21 +26,6 @@ typedef struct thread thread;
 
 bool runtime_quit_requested(const runtime *rt);
 
-bool runtime_tm_bp_add(
-    runtime *rt,
-    const runtime_breakpoint_definition *definition,
-    uint32_t *out_id);
-bool runtime_tm_bp_update(
-    runtime *rt,
-    uint32_t id,
-    const runtime_breakpoint_definition *definition);
-bool runtime_tm_bp_clear(runtime *rt, uint32_t id);
-void runtime_tm_bp_clear_all(runtime *rt);
-bool runtime_tm_bp_set_enabled(runtime *rt, uint32_t id, bool enabled);
-void runtime_tm_bp_toggle_execute(runtime *rt, uint16_t address);
-void runtime_tm_bp_fill_snapshot(const runtime *rt, runtime_breakpoint_snapshot *out);
-size_t runtime_tm_bp_count(const runtime *rt);
-
 enum {
     RUNTIME_COMMAND_QUEUE_CAPACITY = 256,
     RUNTIME_EVENT_QUEUE_CAPACITY = 256,
@@ -242,10 +227,6 @@ struct runtime {
     runtime_breakpoint breakpoints[RUNTIME_BREAKPOINT_CAPACITY];
     size_t breakpoint_count;
     uint32_t next_breakpoint_id;
-    /* TM5: forensic-only store. Never copied into breakpoints[]. */
-    runtime_breakpoint tm_breakpoints[RUNTIME_BREAKPOINT_CAPACITY];
-    size_t tm_breakpoint_count;
-    uint32_t tm_next_breakpoint_id;
     bool suppress_execute_bp;
     bool temp_bp_active;
     uint16_t temp_bp_address;

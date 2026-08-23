@@ -973,93 +973,6 @@ bool runtime_client_tm_set_enabled(
     return runtime_client_push(client, &command);
 }
 
-bool runtime_client_tm_query(
-    runtime_client *client,
-    runtime_tm_query_op op,
-    const runtime_tm_query_args *args,
-    uint64_t request_token) {
-    runtime_command command = {
-        .type = RUNTIME_COMMAND_TM_QUERY,
-        .request_token = request_token,
-    };
-    if (client == NULL) {
-        return false;
-    }
-    command.data.tm_query.op = (uint8_t)op;
-    if (args != NULL) {
-        command.data.tm_query.direction =
-            args->direction < 0 ? (int8_t)-1 : (int8_t)(args->direction > 0 ? 1 : 0);
-        command.data.tm_query.target_pc = args->target_pc;
-        command.data.tm_query.cycle_ceiling = args->cycle_ceiling;
-        command.data.tm_query.history_id = args->history_id;
-        command.data.tm_query.cycle = args->cycle;
-        command.data.tm_query.epoch = args->epoch;
-    }
-    return runtime_client_push(client, &command);
-}
-
-bool runtime_client_tm_step(
-    runtime_client *client,
-    int direction,
-    uint64_t request_token) {
-    runtime_tm_query_args args;
-    memset(&args, 0, sizeof(args));
-    args.direction = direction < 0 ? -1 : 1;
-    return runtime_client_tm_query(
-        client, RUNTIME_TM_QUERY_STEP, &args, request_token);
-}
-
-bool runtime_client_tm_step_over(
-    runtime_client *client,
-    uint64_t request_token) {
-    return runtime_client_tm_query(
-        client, RUNTIME_TM_QUERY_STEP_OVER, NULL, request_token);
-}
-
-bool runtime_client_tm_step_out(
-    runtime_client *client,
-    uint64_t request_token) {
-    return runtime_client_tm_query(
-        client, RUNTIME_TM_QUERY_STEP_OUT, NULL, request_token);
-}
-
-bool runtime_client_tm_run_to(
-    runtime_client *client,
-    uint16_t pc,
-    uint64_t cycle_ceiling,
-    uint64_t request_token) {
-    runtime_tm_query_args args;
-    memset(&args, 0, sizeof(args));
-    args.target_pc = pc;
-    args.cycle_ceiling = cycle_ceiling;
-    return runtime_client_tm_query(
-        client, RUNTIME_TM_QUERY_RUN_TO_PC, &args, request_token);
-}
-
-bool runtime_client_tm_seek_id(
-    runtime_client *client,
-    uint64_t epoch,
-    uint64_t history_id,
-    uint64_t request_token) {
-    runtime_tm_query_args args;
-    memset(&args, 0, sizeof(args));
-    args.epoch = epoch;
-    args.history_id = history_id;
-    return runtime_client_tm_query(
-        client, RUNTIME_TM_QUERY_SEEK_ID, &args, request_token);
-}
-
-bool runtime_client_tm_seek_cycle(
-    runtime_client *client,
-    uint64_t cycle,
-    uint64_t request_token) {
-    runtime_tm_query_args args;
-    memset(&args, 0, sizeof(args));
-    args.cycle = cycle;
-    return runtime_client_tm_query(
-        client, RUNTIME_TM_QUERY_SEEK_CYCLE, &args, request_token);
-}
-
 bool runtime_client_tm_enter_forensic(
     runtime_client *client,
     uint64_t request_token) {
@@ -1072,84 +985,6 @@ bool runtime_client_tm_exit_forensic(
     uint64_t request_token) {
     return runtime_client_send_command_token(
         client, RUNTIME_COMMAND_TM_EXIT_FORENSIC, request_token);
-}
-
-bool runtime_client_tm_bp_create(
-    runtime_client *client,
-    const runtime_breakpoint_definition *definition) {
-    runtime_command command = {
-        .type = RUNTIME_COMMAND_TM_BP_CREATE,
-    };
-
-    if (!client || !definition) {
-        return false;
-    }
-    command.data.create_breakpoint.definition = *definition;
-    return runtime_client_push(client, &command);
-}
-
-bool runtime_client_tm_bp_update(
-    runtime_client *client,
-    uint32_t id,
-    const runtime_breakpoint_definition *definition) {
-    runtime_command command = {
-        .type = RUNTIME_COMMAND_TM_BP_UPDATE,
-    };
-
-    if (!client || !definition) {
-        return false;
-    }
-    command.data.update_breakpoint.id = id;
-    command.data.update_breakpoint.definition = *definition;
-    return runtime_client_push(client, &command);
-}
-
-bool runtime_client_tm_bp_clear(runtime_client *client, uint32_t id) {
-    runtime_command command = {
-        .type = RUNTIME_COMMAND_TM_BP_CLEAR,
-    };
-
-    if (!client) {
-        return false;
-    }
-    command.data.clear_breakpoint.id = id;
-    return runtime_client_push(client, &command);
-}
-
-bool runtime_client_tm_bp_clear_all(runtime_client *client) {
-    return runtime_client_send_command(client, RUNTIME_COMMAND_TM_BP_CLEAR_ALL);
-}
-
-bool runtime_client_tm_bp_set_enabled(
-    runtime_client *client, uint32_t id, bool enabled) {
-    runtime_command command = {
-        .type = RUNTIME_COMMAND_TM_BP_SET_ENABLED,
-    };
-
-    if (!client) {
-        return false;
-    }
-    command.data.set_breakpoint_enabled.id = id;
-    command.data.set_breakpoint_enabled.enabled = enabled ? 1u : 0u;
-    return runtime_client_push(client, &command);
-}
-
-bool runtime_client_tm_bp_request(runtime_client *client) {
-    return runtime_client_send_command(client, RUNTIME_COMMAND_TM_BP_REQUEST);
-}
-
-bool runtime_client_tm_set_execute_breakpoint(
-    runtime_client *client, uint16_t address) {
-    runtime_command command = {
-        .type = RUNTIME_COMMAND_TM_SET_EXECUTE_BREAKPOINT,
-    };
-
-    if (!client) {
-        return false;
-    }
-    command.data.set_execute_breakpoint.address = address;
-    command.data.set_execute_breakpoint.enabled = 1u;
-    return runtime_client_push(client, &command);
 }
 
 bool runtime_client_tm_land(
@@ -1179,12 +1014,6 @@ bool runtime_client_tm_frame_step(
     command.data.tm_frame_step.direction =
         direction < 0 ? (int8_t)-1 : (int8_t)1;
     return runtime_client_push(client, &command);
-}
-
-bool runtime_client_tm_run_until_break(
-    runtime_client *client, uint64_t request_token) {
-    return runtime_client_send_command_token(
-        client, RUNTIME_COMMAND_TM_RUN_UNTIL_BREAK, request_token);
 }
 
 bool runtime_client_history_clear(

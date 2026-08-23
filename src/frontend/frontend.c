@@ -6896,7 +6896,7 @@ static void frontend_draw_misc_breakpoints(frontend *ui, const frontend_debug_st
         nk_layout_row_dynamic(ctx, 24.0f, 1);
         if (nk_button_label(ctx, "Run to breakpoint")) {
             frontend_push_debugger_intent(
-                ui, FRONTEND_DEBUGGER_INTENT_TM_RUN_UNTIL, 0);
+                ui, FRONTEND_DEBUGGER_INTENT_RUN, 0);
         }
     }
     nk_layout_row_dynamic(ctx, 24.0f, 1);
@@ -7324,10 +7324,10 @@ static void frontend_push_tm_intent(
     if (ui == NULL) {
         return;
     }
-    if (type == FRONTEND_DEBUGGER_INTENT_TM_SEEK_CYCLE) {
+    if (type == FRONTEND_DEBUGGER_INTENT_TM_LAND) {
         i = ui->intent_read;
         while (i != ui->intent_write) {
-            if (ui->intents[i].type == FRONTEND_DEBUGGER_INTENT_TM_SEEK_CYCLE) {
+            if (ui->intents[i].type == FRONTEND_DEBUGGER_INTENT_TM_LAND) {
                 ui->intents[i].tm_cycle = cycle;
                 return;
             }
@@ -7605,7 +7605,7 @@ static void frontend_draw_misc_inspector(
                     if (!down) {
                         frontend_push_tm_intent(
                             ui,
-                            FRONTEND_DEBUGGER_INTENT_TM_SEEK_CYCLE,
+                            FRONTEND_DEBUGGER_INTENT_TM_LAND,
                             false,
                             cycle);
                         ui->misc.inspector_thumb_down = false;

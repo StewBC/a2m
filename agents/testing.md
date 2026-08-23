@@ -8,7 +8,7 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-Expect **60** green. Run from repo root.
+Expect **59** green. Run from repo root.
 
 ## Registered tests (product gate)
 
@@ -52,10 +52,9 @@ Expect **60** green. Run from repo root.
 | `runtime_history_sessions` | Dual session FIND/NEXT isolation (S0/S1) |
 | `runtime_state_changed` | state-changed inform + cursor stale (S3) |
 | `runtime_timemachine` | TM0: master enable arms HST1 + frame ring; pin-3 no re-arm; zero-budget empty tape |
-| `runtime_tm_query` | TM1: HST1 step/over/out/run-to/seek; window clamp; epoch reject |
 | `runtime_tm_replay` | TM2: checkpoint + sealed materialize; media truncate; max kills window |
-| `runtime_tm_forensic` | TM3: enter/exit NOW; seek materialize; read-only; control mode/exit |
-| `runtime_tm_bp` | TM5: forensic BP store; tape run-until exec hit; live list unchanged |
+| `runtime_tm_forensic` | TM3/TMA1: enter/exit NOW; land; read-only; sealed step; control mode/exit |
+| `runtime_tm_bp` | TMA2: one BP list; time-travel run-until hits it or live; leave keeps it |
 | `control_protocol` | A2M parse + format (`src/control`) |
 | `assembler_*` | expressions/conditionals/loops/macros/scopes/targets/CPU profiles/multifile |
 | `runtime_assembler` | live RAM assembly + runtime event path |

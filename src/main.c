@@ -1630,7 +1630,7 @@ static void dispatch_intent(
         (void)runtime_client_tm_exit_forensic(client, token);
         break;
     }
-    case FRONTEND_DEBUGGER_INTENT_TM_SEEK_CYCLE: {
+    case FRONTEND_DEBUGGER_INTENT_TM_LAND: {
         uint64_t token = runtime_client_alloc_request_token(client);
         (void)runtime_client_tm_land(client, intent->tm_cycle, token);
         break;
@@ -1638,11 +1638,7 @@ static void dispatch_intent(
     case FRONTEND_DEBUGGER_INTENT_TM_PAUSE:
         (void)runtime_client_pause(client);
         break;
-    case FRONTEND_DEBUGGER_INTENT_TM_RUN_TO: {
-        (void)runtime_client_run_to_cursor(client, intent->address);
-        break;
-    }
-    case FRONTEND_DEBUGGER_INTENT_TM_RUN_UNTIL:
+    case FRONTEND_DEBUGGER_INTENT_RUN:
         (void)runtime_client_run(client);
         break;
     case FRONTEND_DEBUGGER_INTENT_TM_FRAME_STEP: {
@@ -2140,10 +2136,6 @@ static void apply_event_to_debug(
         break;
     case RUNTIME_EVENT_BREAKPOINTS_RESPONSE:
         debug->has_breakpoints = true;
-        break;
-    case RUNTIME_EVENT_TM_BREAKPOINTS_RESPONSE:
-        debug->tm_breakpoints = event->data.breakpoints;
-        debug->has_tm_breakpoints = true;
         break;
     case RUNTIME_EVENT_CALL_STACK_RESPONSE:
         debug->call_stack = event->data.call_stack;
@@ -2809,10 +2801,6 @@ int main(int argc, char **argv)
                     debug.debug_memory = snap;
                     debug.has_debug_memory = true;
                 }
-            }
-            if (revent.type == RUNTIME_EVENT_TM_BREAKPOINTS_RESPONSE) {
-                debug.tm_breakpoints = revent.data.breakpoints;
-                debug.has_tm_breakpoints = true;
             }
             if (revent.type == RUNTIME_EVENT_BREAKPOINTS_RESPONSE) {
                 runtime_breakpoint_snapshot bps;

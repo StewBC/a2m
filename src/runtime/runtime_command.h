@@ -68,17 +68,8 @@ typedef enum runtime_command_type {
     RUNTIME_COMMAND_BOOT_SLOT,
     RUNTIME_COMMAND_SET_DISPLAY_OVERRIDE,
     RUNTIME_COMMAND_TM_SET_ENABLED,
-    RUNTIME_COMMAND_TM_QUERY,
     RUNTIME_COMMAND_TM_ENTER_FORENSIC,
     RUNTIME_COMMAND_TM_EXIT_FORENSIC,
-    RUNTIME_COMMAND_TM_BP_CREATE,
-    RUNTIME_COMMAND_TM_BP_UPDATE,
-    RUNTIME_COMMAND_TM_BP_CLEAR,
-    RUNTIME_COMMAND_TM_BP_CLEAR_ALL,
-    RUNTIME_COMMAND_TM_BP_SET_ENABLED,
-    RUNTIME_COMMAND_TM_BP_REQUEST,
-    RUNTIME_COMMAND_TM_SET_EXECUTE_BREAKPOINT,
-    RUNTIME_COMMAND_TM_RUN_UNTIL_BREAK,
     RUNTIME_COMMAND_TM_LAND,
     RUNTIME_COMMAND_TM_FRAME_STEP
 } runtime_command_type;
@@ -331,16 +322,6 @@ typedef struct runtime_command {
         struct {
             uint8_t enabled;
         } tm_set_enabled;
-
-        struct {
-            uint8_t op; /* runtime_tm_query_op */
-            int8_t direction;
-            uint16_t target_pc;
-            uint64_t cycle_ceiling;
-            uint64_t history_id;
-            uint64_t cycle;
-            uint64_t epoch;
-        } tm_query;
 
         struct {
             uint64_t cycle;

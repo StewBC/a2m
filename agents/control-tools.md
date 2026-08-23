@@ -75,7 +75,7 @@ Unsolicited: `0 event state-changed reason=… session=… cycles=… frame=… 
 | Frame ring | `frame-ring-info` `frame-ring-record` `frame-ring-clear` `get-frame-at frame=\|cycle=` |
 | Breakpoints | `break-create` / `break-update` / `break-list` / `break-enable` / `break-clear` / `break-clear-all` / `rearm-oneshots` / `break-exec`; `when=`; access exec/read/write |
 | History | `history-info` `history-record` `history-clear` `history-find` `history-next` `history-read` `history-close` → `data history` **HST1** (per TCP session cursor). Marker 13 = `MEDIA_CHANGED`; `arg0` is `0 unknown / 1 guest-write / 2 host-directory`, `arg1` is `(slot<<8)\|device`. Additive; no A2M bump. |
-| TimeMachine | Master switch is still INI `[debug] timemachine=0\|1` / CLI `--timemachine` (default **off**). **A2M/12:** `get-state` reports `mode=live\|forensic focus_cycle=N start=… start_arg1=N`; `exit-forensic` (any session) leaves forensic and restores live NOW; mutating verbs fail with `error read-only-forensic`. Tape seek/step stay `runtime_client_tm_*` (not on the wire). `history-record` / `frame-ring-record` off after TM-on is respected — Inspector enter then fails because the window is empty. |
+| TimeMachine | Master switch is still INI `[debug] timemachine=0\|1` / CLI `--timemachine` (default **off**). **A2M/12:** `get-state` reports `mode=live\|forensic focus_cycle=N start=… start_arg1=N` (`focus_cycle` = landed `apple2_cycles`; wire `forensic` = time travel). `exit-forensic` (any session) leaves time travel and restores live NOW; mutating verbs fail with `error read-only-forensic`. Tape seek/step **do not exist**. FIND stays (`history-find` / `history-next` / `history-read`). Inspector enter needs checkpoints (film optional). |
 | Waits | `wait-paused` `wait-running` `wait-frame` `wait-event` (incl. `assemble-complete` / `assemble-error`) |
 | Assembler | `assemble [address=] [run-address=] [auto-run=] [mli-launch=] [reset=] [auto-adjust-segments=] <path>` (deferred) |
 | Symbols | `find-symbol <name>` → `ok address=$XXXX name=…` / `not-ready` / `not-found` |
@@ -129,8 +129,8 @@ Aliases for `kind=`: `disk` → diskii; `sp` / `hd` → smartport.
   `frame-ring-record` remain the per-recorder controls. While `mode=forensic`,
   `get-memory`/`get-cpu` return THEN; `run`/`set-memory`/`set-reg`/mount/reset
   fail with `read-only-forensic`. `exit-forensic` restores live NOW and does
-  **not** auto-resume. There is no enter/seek verb on the wire (UI uses
-  `runtime_client`).
+  **not** auto-resume. There is no enter/land/seek verb on the wire (UI uses
+  `runtime_client`). Tape seek/step do not exist. FIND stays.
 
 ctest gate: see [`testing.md`](testing.md) (expect full green after build).
 

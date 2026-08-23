@@ -4,8 +4,8 @@
 
 **Rules:** [`rules.md`](rules.md)  
 **Closed:** paint; SP `$C800`; BP 0–4e + P4b TRON; remote-debug **C0–C5b**; control tools **T1–T5**; `get-softswitches`; **turbo-zip**; **max free-run S2**; **snapshots** ([`snapshots.md`](snapshots.md) — `.a2state` save/load, drop, `--sna`, Opt+Shift+./,); **sessions foundation** ([`sessions.md`](sessions.md) — multi-asker + `state-changed`; A2M/11).  
-**Active:** **TMA1 Landed** — Inspector **time travel** ([`TMA0.md`](TMA0.md) / [`TMA1.md`](TMA1.md)): film / land / re-execute to **live**; one breakpoint list; Opt+Left unbound. Stopped for a look. TimeMachine V1 (TM0–TM4) accepted; TM4 Inspector UX superseded. F7 stays unbound. **Not going to TM6.** Lessons from retired F7: [`inspector.md`](inspector.md).  
-**Look-later:** **TMA2** [`TMA2.md`](TMA2.md) delete TM1 tape-nav + TM5 second BP bank (required; FIND stays); drop stored film? (TMA0 A11); debug ergonomics (mem workshop, live remount, frame gate / HW snaps). TM6 Promote/Branch is parked, not next.
+**Active:** **TMA2 Landed** — TM1 tape-nav and the TM5 second BP bank are gone. Inspector is **time travel** ([`TMA0.md`](TMA0.md)): film / land / re-execute to **live**; one breakpoint list; Opt+Left unbound; HST1 FIND stays. TimeMachine V1 (TM0–TM4) accepted; TM4 Inspector UX superseded. F7 stays unbound. **Not going to TM6.** Lessons from retired F7: [`inspector.md`](inspector.md).  
+**Look-later:** drop stored film? (TMA0 A11); debug ergonomics (mem workshop, live remount, frame gate / HW snaps). TM6 Promote/Branch is parked, not next.
 
 ---
 
@@ -53,7 +53,7 @@ Keyboard stick (when on): Option/KP0 and Space are fire keys (optional swap in C
 
 | Area | Evidence |
 |------|----------|
-| Build / ctest | **60 green** (`testing.md`; includes sessions + state-changed, file-codec, assembler MLI launch, TM0–TM5) |
+| Build / ctest | **59 green** (`testing.md`; includes sessions + state-changed, file-codec, assembler MLI launch, TM0/TM2–TM3 + TMA1/TMA2) |
 | Assembler | Misc → Assembler: assemble to RAM / `file=` HostFS; optional Auto-run; **MLI launch** gates auto-run on CPU-visible `$BF00 == $4C` (mutually exclusive with Reset); sample shim in `samples/asm_mli_launch/` |
 | CLI / INI | model, mounts sNdN (multi-image queue), turbo MHz/`max`, lifecycle, headless; `[DEBUG] break.*` |
 | Turbo / step / reset | Opt+T (MHz/max); F10–F12 family; F8 / Opt+F8 |

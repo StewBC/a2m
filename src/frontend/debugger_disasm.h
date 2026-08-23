@@ -35,8 +35,8 @@ typedef struct debugger_disasm_view {
 } debugger_disasm_view;
 
 /*
- * Mode-aware accessors. NULL callbacks are skipped (F9-only verbs stay NULL
- * on the forensic ops table: Opt+Left set-PC, Opt+B breakpoint).
+ * Mode-aware accessors. NULL callbacks are skipped (time travel: Opt+Left
+ * unbound; Opt+B uses the one live breakpoint list).
  */
 typedef struct debugger_disasm_ops {
     void *ctx;
@@ -61,13 +61,14 @@ typedef struct debugger_disasm_ops {
     void (*browse_home)(void *ctx, debugger_disasm_view *view, bool alt);
     void (*browse_end)(void *ctx, debugger_disasm_view *view, bool alt);
 
-    /* Live-only (NULL on forensic). */
+    /* Opt+B: one list in live and time travel. Opt+Left: live set-PC; NULL
+     * (unbound) in time travel. */
     void (*on_toggle_execute_bp)(void *ctx); /* Opt+B */
     void (*on_set_pc)(void *ctx, uint16_t address); /* Opt+Left */
     void (*on_cycle_memory_mode)(void *ctx); /* Opt+M */
     void (*on_symbol_lookup)(void *ctx); /* Opt+S */
 
-    /* Forensic PC-pass step ([-]/[+]); optional on live. */
+    /* Optional frame-step in time travel. */
     void (*on_step_prev)(void *ctx);
     void (*on_step_next)(void *ctx);
 } debugger_disasm_ops;

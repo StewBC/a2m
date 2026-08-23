@@ -1,6 +1,6 @@
 # TMA2 — Delete TM1 tape-nav and the second BP bank (required cleanup)
 
-**Status:** Roadmap (implementation brief).  
+**Status:** Landed.  
 **Epic:** [`timemachine.md`](timemachine.md)  
 **Prev / Next:** [`TMA1.md`](TMA1.md) / —  
 **Depends on:** **TMA1 Landed.** Do not rip TM1 while the Inspector still calls it.
@@ -134,17 +134,17 @@ Do not reimplement run-until as `runtime_history_find` + materialize. FIND stays
 
 ## Acceptance checklist
 
-- [ ] `rg 'runtime_tm_query|TM_QUERY|tm_seek_cycle|runtime_client_tm_step|tm_run_until_break|tm_breakpoints' src/` is empty (or comments citing TMA2 only)  
-- [ ] `test_runtime_tm_query` gone from CMake + `testing.md`  
-- [ ] HST1 FIND still works (existing `runtime_history_query` / control tests)  
-- [ ] Inspector land / ± / F10-family unchanged from TMA1  
-- [ ] One BP list; Opt+B in time travel edits it; second bank gone  
-- [ ] Opt+Left unbound in time travel  
-- [ ] F12 / run-until is sealed execute to a breakpoint or live; button copy does not say “tape”  
-- [ ] Socket: no new tape verbs; `history-find` still there; `focus_cycle` = machine cycle  
-- [ ] TM1.md and TM5.md marked history-only  
-- [ ] ctest green + short Inspector smoke  
-- [ ] **Landed** filled  
+- [x] `rg 'runtime_tm_query|TM_QUERY|tm_seek_cycle|runtime_client_tm_step|tm_run_until_break|tm_breakpoints' src/` is empty (or comments citing TMA2 only)  
+- [x] `test_runtime_tm_query` gone from CMake + `testing.md`  
+- [x] HST1 FIND still works (existing `runtime_history_query` / control tests)  
+- [x] Inspector land / ± / F10-family unchanged from TMA1  
+- [x] One BP list; Opt+B in time travel edits it; second bank gone  
+- [x] Opt+Left unbound in time travel  
+- [x] F12 / run-until is sealed execute to a breakpoint or live; button copy does not say “tape”  
+- [x] Socket: no new tape verbs; `history-find` still there; `focus_cycle` = machine cycle  
+- [x] TM1.md and TM5.md marked history-only  
+- [x] ctest green + short Inspector smoke  
+- [x] **Landed** filled  
 
 ---
 
@@ -162,4 +162,10 @@ Do not reimplement run-until as `runtime_history_find` + materialize. FIND stays
 
 ## Landed
 
-Not yet.
+2026-08-23. TM1 tape-nav and the TM5 second breakpoint bank are gone.
+
+- `runtime_tm_query` / `SEEK_CYCLE` / tape step/over/out/run-to deleted. Inspector land / frame-step / F10-family unchanged.
+- `tm_breakpoints[]` deleted. One list in live and time travel. Breakpoints tab “Run to breakpoint” is sealed execute (same as F12).
+- Opt+Left stays unbound in time travel. `focus_cycle` is landed `apple2_cycles`. Wire `mode=forensic` is time travel.
+- HST1 FIND kept (`history-find` / query tests). No tape verbs on the socket.
+- ctest 59 green. **Not going to TM6.**

@@ -128,7 +128,7 @@ Do not re-expand full scope here — edit the phase file.
 
 **Two streams:** Time Machine = **time travel** (checkpoints, land, re-execute). HST1 = **forensic** flight recorder (FIND). Inspector is time travel. Wire `mode=forensic` is that mode’s code name.
 
-TM4 Inspector **behaviour** is superseded by **[`TMA0.md`](TMA0.md)** (film / land / re-execute to **live**; one BP list; Opt+Left unbound). TM4 stays Landed as history. HST1 (TM1) stays in the product; it is not the Inspector slider. Implementer briefs: **[`TMA1.md`](TMA1.md)** (Inspector; stop after Landed), **[`TMA2.md`](TMA2.md)** (delete TM1 tape-nav **and** the TM5 second BP bank — required). **Not going to TM6.**
+TM4 Inspector **behaviour** is superseded by **[`TMA0.md`](TMA0.md)** (film / land / re-execute to **live**; one BP list; Opt+Left unbound). TM4 stays Landed as history. HST1 stays as forensic FIND; TM1 tape-nav and the TM5 second BP bank were **removed in TMA2**. Implementer briefs: **[`TMA1.md`](TMA1.md)** (Inspector), **[`TMA2.md`](TMA2.md)** (cleanup — Landed). **Not going to TM6.**
 
 ---
 
@@ -216,8 +216,8 @@ Epic V1 = **TM0–TM4** closed (accepted 2026-08-22 with a recording-speed cavea
 ```text
 1. Read agents/rules.md, agents/timemachine.md (this file), then agents/TMn.md
    or agents/TMAn.md for the phase named in the human brief (only one unless told
-   to continue). Live Inspector UX is TMA0, not TM4. TMA1 then stop; TMA2 when
-   told. Do not start TM6.
+   to continue). Live Inspector UX is TMA0, not TM4. TMA1 and TMA2 are Landed.
+   Do not start TM6.
 2. Also read deps listed in that phase doc (sessions/snapshots/remote-debug as cited).
 3. Implement that phase → Landed in TMn.md / TMAn.md + one-line status here if useful.
 4. F7 is already gone (D14) — there is nothing to retire or salvage. If a phase doc

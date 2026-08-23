@@ -423,7 +423,7 @@ of jump as entering the writer PC with `Opt+A`.
 | `Opt+B` | Toggle execute breakpoint at cursor (paused only) |
 | `Opt+M` | Cycle source mode: Map -> ROM -> Main -> Map |
 | `Opt+S` | Open the Symbol Lookup dialog |
-| `Opt+Left` | Set PC to cursor address (paused only) |
+| `Opt+Left` | Set PC to cursor address (paused, live only; unbound in time travel) |
 | `Up` / `Down` | Move cursor one instruction |
 | `PgUp` / `PgDn` | Scroll one page |
 | `Home` / `End` | Jump to first or last line of the current view |

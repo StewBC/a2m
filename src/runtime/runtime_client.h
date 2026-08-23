@@ -215,57 +215,12 @@ bool runtime_client_tm_set_enabled(
     runtime_client *client,
     bool enabled,
     uint64_t request_token);
-bool runtime_client_tm_query(
-    runtime_client *client,
-    runtime_tm_query_op op,
-    const runtime_tm_query_args *args,
-    uint64_t request_token);
-bool runtime_client_tm_step(
-    runtime_client *client,
-    int direction,
-    uint64_t request_token);
-bool runtime_client_tm_step_over(
-    runtime_client *client,
-    uint64_t request_token);
-bool runtime_client_tm_step_out(
-    runtime_client *client,
-    uint64_t request_token);
-bool runtime_client_tm_run_to(
-    runtime_client *client,
-    uint16_t pc,
-    uint64_t cycle_ceiling,
-    uint64_t request_token);
-bool runtime_client_tm_seek_id(
-    runtime_client *client,
-    uint64_t epoch,
-    uint64_t history_id,
-    uint64_t request_token);
-bool runtime_client_tm_seek_cycle(
-    runtime_client *client,
-    uint64_t cycle,
-    uint64_t request_token);
 bool runtime_client_tm_enter_forensic(
     runtime_client *client,
     uint64_t request_token);
 bool runtime_client_tm_exit_forensic(
     runtime_client *client,
     uint64_t request_token);
-bool runtime_client_tm_bp_create(
-    runtime_client *client,
-    const runtime_breakpoint_definition *definition);
-bool runtime_client_tm_bp_update(
-    runtime_client *client,
-    uint32_t id,
-    const runtime_breakpoint_definition *definition);
-bool runtime_client_tm_bp_clear(runtime_client *client, uint32_t id);
-bool runtime_client_tm_bp_clear_all(runtime_client *client);
-bool runtime_client_tm_bp_set_enabled(
-    runtime_client *client, uint32_t id, bool enabled);
-bool runtime_client_tm_bp_request(runtime_client *client);
-bool runtime_client_tm_set_execute_breakpoint(
-    runtime_client *client, uint16_t address);
-bool runtime_client_tm_run_until_break(
-    runtime_client *client, uint64_t request_token);
 bool runtime_client_tm_land(
     runtime_client *client, uint64_t cycle, uint64_t request_token);
 bool runtime_client_tm_frame_step(

@@ -1625,13 +1625,9 @@ static void runtime_publish_machine(runtime *rt)
     }
     event.data.machine_state.tm_recorder_recording =
         runtime_tm_recorder_is_recording(rt) ? 1u : 0u;
-    if (rt->tm_forensic) {
-        event.data.machine_state.tm_focus_cycle = apple2_cycles(&rt->machine);
-        event.data.machine_state.tm_focus_id = 0u;
-    } else if (rt->tm_focus.valid) {
-        event.data.machine_state.tm_focus_cycle = rt->tm_focus.cycle;
-        event.data.machine_state.tm_focus_id = rt->tm_focus.history_id;
-    }
+    event.data.machine_state.tm_focus_cycle =
+        rt->machine_ready ? apple2_cycles(&rt->machine) : 0u;
+    event.data.machine_state.tm_focus_id = 0u;
     {
         uint64_t oldest = 0u;
         uint64_t live = 0u;
@@ -1764,19 +1760,6 @@ static void runtime_publish_breakpoints(runtime *rt)
     event.type = RUNTIME_EVENT_BREAKPOINTS_RESPONSE;
     event.data.breakpoints = snap;
     event.data.breakpoints_ready.count = (uint16_t)n;
-    runtime_publish_event(rt, &event);
-}
-
-static void runtime_publish_tm_breakpoints(runtime *rt)
-{
-    runtime_event event;
-    runtime_breakpoint_snapshot snap;
-
-    runtime_tm_bp_fill_snapshot(rt, &snap);
-    memset(&event, 0, sizeof(event));
-    event.type = RUNTIME_EVENT_TM_BREAKPOINTS_RESPONSE;
-    event.data.breakpoints = snap;
-    event.data.breakpoints_ready.count = snap.count;
     runtime_publish_event(rt, &event);
 }
 
@@ -4247,83 +4230,6 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         break;
     }
 
-    case RUNTIME_COMMAND_TM_QUERY: {
-        runtime_tm_query_args args;
-        runtime_tm_query_result result;
-        runtime_event event;
-        runtime_tm_query_op op = (runtime_tm_query_op)cmd->data.tm_query.op;
-
-        memset(&args, 0, sizeof(args));
-        args.direction = cmd->data.tm_query.direction;
-        args.target_pc = cmd->data.tm_query.target_pc;
-        args.cycle_ceiling = cmd->data.tm_query.cycle_ceiling;
-        args.history_id = cmd->data.tm_query.history_id;
-        args.cycle = cmd->data.tm_query.cycle;
-        args.epoch = cmd->data.tm_query.epoch;
-
-        if (rt->tm_forensic &&
-            (op == RUNTIME_TM_QUERY_SEEK_CYCLE || op == RUNTIME_TM_QUERY_SEEK_ID)) {
-            runtime_tm_window window;
-            runtime_tm_window_info(rt, &window);
-            if (!window.valid ||
-                (op == RUNTIME_TM_QUERY_SEEK_CYCLE &&
-                 (args.cycle < window.oldest_cycle ||
-                  args.cycle > window.newest_cycle)) ||
-                (op == RUNTIME_TM_QUERY_SEEK_ID &&
-                 (args.history_id < window.oldest_id ||
-                  args.history_id > window.newest_id))) {
-                memset(&result, 0, sizeof(result));
-                result.status = RUNTIME_TM_QUERY_NOT_RETAINED;
-                result.focus = rt->tm_focus;
-                memset(&event, 0, sizeof(event));
-                event.type = RUNTIME_EVENT_TM_FOCUS;
-                event.request_token = cmd->request_token;
-                event.data.tm_focus.op = op;
-                event.data.tm_focus.status = result.status;
-                event.data.tm_focus.focus = result.focus;
-                runtime_publish_event(rt, &event);
-                break;
-            }
-        }
-
-        (void)runtime_tm_query(rt, op, &args, &result);
-        if (rt->tm_forensic &&
-            (result.status == RUNTIME_TM_QUERY_OK ||
-             result.status == RUNTIME_TM_QUERY_END_OF_TAPE) &&
-            result.focus.valid) {
-            uint8_t *then_blob = NULL;
-            size_t then_size = 0u;
-            if (runtime_tm_snapshot_machine(rt, &then_blob, &then_size)) {
-                if (!runtime_tm_materialize_live(rt, result.focus.cycle)) {
-                    (void)runtime_tm_restore_blob(rt, then_blob, then_size);
-                    apple2_set_replay_sealed(&rt->machine, true);
-                    apple2_set_cpu_observer(&rt->machine, NULL, NULL);
-                    apple2_set_memory_access_callback(&rt->machine, NULL, NULL);
-                    result.status = RUNTIME_TM_QUERY_MATERIALIZE_FAILED;
-                    result.focus = rt->tm_focus;
-                } else {
-                    runtime_tm_publish_head(rt);
-                    runtime_publish_state_changed(
-                        rt,
-                        RUNTIME_STATE_CHANGED_FORENSIC_SEEK,
-                        cmd->session_id);
-                }
-                free(then_blob);
-            } else {
-                result.status = RUNTIME_TM_QUERY_MATERIALIZE_FAILED;
-            }
-        }
-        memset(&event, 0, sizeof(event));
-        event.type = RUNTIME_EVENT_TM_FOCUS;
-        event.request_token = cmd->request_token;
-        event.data.tm_focus.op = op;
-        event.data.tm_focus.status = result.status;
-        event.data.tm_focus.focus = result.focus;
-        event.data.tm_focus.clamped = result.clamped ? 1u : 0u;
-        runtime_publish_event(rt, &event);
-        break;
-    }
-
     case RUNTIME_COMMAND_TM_ENTER_FORENSIC: {
         runtime_tm_enter_status st;
 
@@ -4464,63 +4370,6 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         break;
     }
 
-    case RUNTIME_COMMAND_TM_BP_CREATE:
-        (void)runtime_tm_bp_add(rt, &cmd->data.create_breakpoint.definition, NULL);
-        runtime_publish_tm_breakpoints(rt);
-        break;
-    case RUNTIME_COMMAND_TM_BP_UPDATE:
-        (void)runtime_tm_bp_update(
-            rt,
-            cmd->data.update_breakpoint.id,
-            &cmd->data.update_breakpoint.definition);
-        runtime_publish_tm_breakpoints(rt);
-        break;
-    case RUNTIME_COMMAND_TM_BP_CLEAR:
-        (void)runtime_tm_bp_clear(rt, cmd->data.clear_breakpoint.id);
-        runtime_publish_tm_breakpoints(rt);
-        break;
-    case RUNTIME_COMMAND_TM_BP_CLEAR_ALL:
-        runtime_tm_bp_clear_all(rt);
-        runtime_publish_tm_breakpoints(rt);
-        break;
-    case RUNTIME_COMMAND_TM_BP_SET_ENABLED:
-        (void)runtime_tm_bp_set_enabled(
-            rt,
-            cmd->data.set_breakpoint_enabled.id,
-            cmd->data.set_breakpoint_enabled.enabled != 0);
-        runtime_publish_tm_breakpoints(rt);
-        break;
-    case RUNTIME_COMMAND_TM_BP_REQUEST:
-        runtime_publish_tm_breakpoints(rt);
-        break;
-    case RUNTIME_COMMAND_TM_SET_EXECUTE_BREAKPOINT:
-        runtime_tm_bp_toggle_execute(
-            rt, cmd->data.set_execute_breakpoint.address);
-        runtime_publish_tm_breakpoints(rt);
-        break;
-    case RUNTIME_COMMAND_TM_RUN_UNTIL_BREAK: {
-        /* TMA1: one BP list, sealed run to a breakpoint or live. */
-        if (rt->tm_forensic) {
-            runtime_command run_cmd;
-
-            memset(&run_cmd, 0, sizeof(run_cmd));
-            run_cmd.type = RUNTIME_COMMAND_RUN;
-            run_cmd.request_token = cmd->request_token;
-            run_cmd.session_id = cmd->session_id;
-            runtime_process_command(rt, &run_cmd, alive);
-        } else {
-            runtime_command query_cmd;
-
-            memset(&query_cmd, 0, sizeof(query_cmd));
-            query_cmd.type = RUNTIME_COMMAND_TM_QUERY;
-            query_cmd.request_token = cmd->request_token;
-            query_cmd.session_id = cmd->session_id;
-            query_cmd.data.tm_query.op =
-                (uint8_t)RUNTIME_TM_QUERY_RUN_UNTIL_BREAK;
-            runtime_process_command(rt, &query_cmd, alive);
-        }
-        break;
-    }
     case RUNTIME_COMMAND_TM_LAND:
         if (rt->tm_forensic) {
             if (runtime_tm_land(rt, cmd->data.tm_land.cycle)) {
@@ -4642,33 +4491,20 @@ static void runtime_free_run_batch(runtime *rt)
     }
 }
 
-static bool runtime_command_is_tm_tape_seek(const runtime_command *cmd)
+static bool runtime_command_is_tm_land(const runtime_command *cmd)
 {
-    uint8_t op;
-
-    if (cmd == NULL) {
-        return false;
-    }
-    if (cmd->type == RUNTIME_COMMAND_TM_LAND) {
-        return true;
-    }
-    if (cmd->type != RUNTIME_COMMAND_TM_QUERY) {
-        return false;
-    }
-    op = cmd->data.tm_query.op;
-    return op == (uint8_t)RUNTIME_TM_QUERY_SEEK_CYCLE ||
-        op == (uint8_t)RUNTIME_TM_QUERY_SEEK_ID;
+    return cmd != NULL && cmd->type == RUNTIME_COMMAND_TM_LAND;
 }
 
-static bool runtime_command_preempts_tm_seek(const runtime_command *cmd)
+static bool runtime_command_preempts_tm_land(const runtime_command *cmd)
 {
     return cmd != NULL &&
         (cmd->type == RUNTIME_COMMAND_QUIT ||
          cmd->type == RUNTIME_COMMAND_TM_EXIT_FORENSIC);
 }
 
-/* Keep only the latest tape seek. Quit / exit-forensic drop the backlog. */
-static void runtime_coalesce_tm_tape_seeks(
+/* Keep only the latest land. Quit / exit-forensic drop the backlog. */
+static void runtime_coalesce_tm_lands(
     runtime *rt,
     runtime_command *cmd,
     runtime_command *deferred,
@@ -4679,18 +4515,18 @@ static void runtime_coalesce_tm_tape_seeks(
     if (rt == NULL || cmd == NULL || deferred == NULL || has_deferred == NULL) {
         return;
     }
-    if (!runtime_command_is_tm_tape_seek(cmd)) {
+    if (!runtime_command_is_tm_land(cmd)) {
         return;
     }
     while (message_queue_try_pop(rt->command_queue, &extra)) {
-        if (runtime_command_is_tm_tape_seek(&extra)) {
+        if (runtime_command_is_tm_land(&extra)) {
             *cmd = extra;
             continue;
         }
-        if (runtime_command_preempts_tm_seek(&extra)) {
+        if (runtime_command_preempts_tm_land(&extra)) {
             *cmd = extra;
             while (message_queue_try_pop(rt->command_queue, &extra)) {
-                if (runtime_command_is_tm_tape_seek(&extra)) {
+                if (runtime_command_is_tm_land(&extra)) {
                     continue;
                 }
                 *deferred = extra;
@@ -4870,7 +4706,7 @@ int runtime_thread_main(void *userdata)
                 } else if (!message_queue_try_pop(rt->command_queue, &command)) {
                     break;
                 }
-                runtime_coalesce_tm_tape_seeks(
+                runtime_coalesce_tm_lands(
                     rt, &command, &deferred, &has_deferred);
                 runtime_process_command(rt, &command, &alive);
                 if (!alive) {
@@ -4896,7 +4732,7 @@ int runtime_thread_main(void *userdata)
                     alive = false;
                     break;
                 }
-                runtime_coalesce_tm_tape_seeks(
+                runtime_coalesce_tm_lands(
                     rt, &command, &deferred, &has_deferred);
                 runtime_process_command(rt, &command, &alive);
             }

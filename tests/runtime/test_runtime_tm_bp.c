@@ -1,4 +1,4 @@
-/* TMA1: one breakpoint list; time-travel run stops on it (or at live). */
+/* TMA2: one breakpoint list; time-travel F12 / run-until hits it (or live). */
 #include "apple2.h"
 #include "runtime.h"
 #include "runtime_client.h"
@@ -130,30 +130,32 @@ int main(void)
     expect_true("landed before live", apple2_cycles(&rt->machine) <= old);
     expect_true("not at live after land", !runtime_tm_at_live(rt));
 
+    expect_true("run-until", runtime_client_run(client));
     {
-        int i;
-        for (i = 0; i < 8000; ++i) {
-            uint64_t c0;
-            int spin;
-            if (runtime_tm_at_live(rt) ||
-                rt->machine.cpu.cpu.pc == target_pc) {
-                break;
-            }
-            c0 = apple2_cycles(&rt->machine);
-            expect_true("step", runtime_client_step_instruction(client));
-            for (spin = 0; spin < 200000; ++spin) {
-                if (apple2_cycles(&rt->machine) != c0 ||
-                    runtime_tm_at_live(rt)) {
-                    break;
-                }
-            }
+        clock_t t0 = clock();
+        while (rt->exec_state == RUNTIME_EXEC_RUNNING &&
+               (double)(clock() - t0) / (double)CLOCKS_PER_SEC < 2.0) {
+            SDL_Delay(1);
         }
     }
+    drain(client);
     expect_true("stopped", rt->exec_state != RUNTIME_EXEC_RUNNING);
     expect_true("still time travel", runtime_tm_in_forensic(rt));
     expect_true("hit pc or live",
         rt->machine.cpu.cpu.pc == target_pc || runtime_tm_at_live(rt));
     expect_true("list unchanged", rt->breakpoint_count == live_count);
+
+    token = runtime_client_alloc_request_token(client);
+    expect_true("leave", runtime_client_tm_exit_forensic(client, token));
+    {
+        clock_t t0 = clock();
+        while (runtime_tm_in_forensic(rt) &&
+               (double)(clock() - t0) / (double)CLOCKS_PER_SEC < 2.0) {
+            SDL_Delay(1);
+        }
+    }
+    expect_true("left inspect", !runtime_tm_in_forensic(rt));
+    expect_true("list survives leave", rt->breakpoint_count == live_count);
 
     runtime_stop(rt);
     runtime_destroy(rt);
