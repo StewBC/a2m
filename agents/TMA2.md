@@ -72,7 +72,7 @@ HST1 remains a **flight recorder** (FIND: “who wrote `$22` to `$2011`”). Tha
 - Slider/coalesce/`dispatch_intent` cases for those
 - Time-travel F10/F11/Shift+F10/F12 still calling `runtime_client_tm_*`
 - Opt+Left in time travel → **unbound** (A13). Not tape run-to, not poke-PC, not sealed run-to-cursor.
-- Breakpoints tab **“Run tape to breakpoint”** → ordinary run-until (same as F12): sealed execute from the landed state until a breakpoint on the **one** list or **live**. No HST1 scan. Copy must not say “tape.”
+- Breakpoints tab **“Run tape to breakpoint”** → do **not** add a button (A14). Time-travel **F12** is sealed execute from the landed state until a breakpoint on the **one** list or **live**. No HST1 scan.
 
 ### Tests / build
 
@@ -165,7 +165,7 @@ Do not reimplement run-until as `runtime_history_find` + materialize. FIND stays
 2026-08-23. TM1 tape-nav and the TM5 second breakpoint bank are gone.
 
 - `runtime_tm_query` / `SEEK_CYCLE` / tape step/over/out/run-to deleted. Inspector land / frame-step / F10-family unchanged.
-- `tm_breakpoints[]` deleted. One list in live and time travel. Breakpoints tab “Run to breakpoint” is sealed execute (same as F12).
+- `tm_breakpoints[]` deleted. One list in live and time travel. Breakpoints tab is the live panel (no “Run to breakpoint” button); F12 in Inspect is sealed execute to a BP or live.
 - Opt+Left stays unbound in time travel. `focus_cycle` is landed `apple2_cycles`. Wire `mode=forensic` is time travel.
 - HST1 FIND kept (`history-find` / query tests). No tape verbs on the socket.
 - ctest 59 green. **Not going to TM6.**

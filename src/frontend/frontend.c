@@ -6874,31 +6874,17 @@ static void frontend_draw_misc_breakpoints(frontend *ui, const frontend_debug_st
     struct nk_context *ctx;
     uint16_t i;
     uint16_t count;
-    bool forensic;
 
     if (ui == NULL || ui->ctx == NULL) {
         return;
     }
 
     ctx = ui->ctx;
-    forensic = debug_state != NULL && debug_state->tm_forensic;
     count = debug_state != NULL && debug_state->has_breakpoints ?
         debug_state->breakpoints.count : 0;
 
     nk_layout_row_dynamic(ctx, 18.0f, 1);
     nk_label(ctx, "Breakpoints", NK_TEXT_LEFT);
-    if (forensic) {
-        nk_layout_row_dynamic(ctx, 36.0f, 1);
-        nk_label_wrap(
-            ctx,
-            "One breakpoint list in live and time travel. Opt+B toggles "
-            "execute at the disassembly cursor. Run until a breakpoint or live.");
-        nk_layout_row_dynamic(ctx, 24.0f, 1);
-        if (nk_button_label(ctx, "Run to breakpoint")) {
-            frontend_push_debugger_intent(
-                ui, FRONTEND_DEBUGGER_INTENT_RUN, 0);
-        }
-    }
     nk_layout_row_dynamic(ctx, 24.0f, 1);
     if (nk_button_label(ctx, "New")) {
         frontend_open_breakpoint_dialog_default(ui);

@@ -3,7 +3,7 @@
 **Status:** Roadmap (implementation brief).  
 **Epic:** [`timemachine.md`](timemachine.md)  
 **Prev / Next:** [`TMA0.md`](TMA0.md) / [`TMA2.md`](TMA2.md) (delete TM1 tape-nav + second BP bank — required)  
-**Depends on:** TMA0 A1–A17 (do not re-litigate); TM2 checkpoint + seal; TM3 enter/exit NOW; TM4 Misc tab chrome.
+**Depends on:** TMA0 A1–A18 (do not re-litigate); TM2 checkpoint + seal; TM3 enter/exit NOW; TM4 Misc tab chrome.
 
 Related: [`TM4.md`](TM4.md) · [`rules.md`](rules.md) · [`testing.md`](testing.md) · [`frontend.md`](frontend.md).
 
@@ -13,7 +13,7 @@ This is the how-to. Product contract is TMA0. Do not rewrite TM0–TM6. **Stop w
 
 ## Goal
 
-Rewire Misc → Inspector to A1–A17.
+Rewire Misc → Inspector to A1–A18.
 
 **Win:** slam the thumb left — UI stays live, CRT shows film or pink, Apple does not move. Release **lands** (snapshot load, ~ms). `[-]`/`[+]` frame-step that Apple. F10-family **re-executes** toward **live**. HST1 is not on this path.
 
@@ -88,7 +88,7 @@ Keep the seal (D16): observer off, no HST1 append, no `runtime_tm_after_step` ch
 
 **Breakpoints:** the live `rt->breakpoints[]` list. Do not arm or match `tm_breakpoints[]`. Time-travel F12 / run-until / Opt+B / Breakpoints tab all use that one list. Leave Inspect keeps whatever you added or cleared (debugger state, not inside the snapshot).
 
-The Breakpoints tab **“Run tape to breakpoint”** in time travel is the same run as F12 (to a breakpoint or live). Copy can wait for TMA2; behaviour must not HST1-scan.
+The Breakpoints tab is the **live** panel in both modes (A14). No Inspect-only copy and no “Run to breakpoint” button. Time-travel **F12** is the run-until (breakpoint or live).
 
 ### 4. Frame-step (A5)
 
@@ -99,22 +99,26 @@ New worker command, e.g. `runtime_client_tm_frame_step(client, dir, token)` with
 
 Do not HST1-walk. Disable the buttons at the ends; they cannot fire during a drag.
 
-### 5. Inspector chrome (A1–A3, A12, A17)
+### 5. Inspector chrome (A1–A3, A12, A17, A18)
 
-`frontend_draw_misc_inspector`:
+`frontend_draw_misc_inspector` (A18):
+
+- **Record off:** `[ ] Record` only.
+- **Record on, not inspecting:** **Inspect** (enter forensic; worker already pauses if running) plus History start cycle / Live cycle / Duration (`~(live−oldest)/(APPLE2_VIDEO_CYCLES_PER_FRAME×60)`). No Pause on this tab.
+- **Inspecting:** **Leave Inspector**. Then `[-]` slider `[+]`. Then Current cycle and the same three lines. No Record row, no help dump.
+
+Slider:
 
 - Stop sending `FRONTEND_DEBUGGER_INTENT_TM_SEEK_CYCLE` from the slider.
-- Slider domain = **cycle-linear oldest snapshot → live**. Thumb = current `apple2_cycles` when not dragging. After land / `±` / F10-family the thumb **follows cycles** (a notch ≈ 20 k-cycle snapshot spacing).
-- **Thumb down:** film cursor only. CRT = frame-ring still at that time, else **pink** fill of the display client area (hot magenta `255,0,255`; tune later). Apple frozen.
-- **Thumb up:** one `tm_land` at that cycle (right end = live). After land, CRT is the painted Apple (never leave the user on pink).
-- `[-]` / `[+]` beside the slider → `tm_frame_step`. Disabled at oldest / live / during drag.
-- Copy: bar is **retained snapshots → live**; stills where we have them; pink where we do not. Drop “Scale is cycles still retained.”
+- Domain = **cycle-linear oldest snapshot → live**. Thumb = current `apple2_cycles` when not dragging. After land / `±` / F10-family the thumb **follows cycles**.
+- **Thumb down:** film cursor only. CRT = frame-ring still at that time, else **pink**. Apple frozen.
+- **Thumb up:** one `tm_land` at that cycle (right end = live).
+- `[-]` / `[+]` → `tm_frame_step`. Disabled at oldest / live / during drag.
+- Grab hit-test: `nk_widget_bounds` **before** `nk_slider_int`. After the slider, peek is the `[+]` slot — using that makes `[+]` look like a rewind.
 
-Preview must not wait on materialize. Prefer a UI-thread blit if `runtime_client` can lock the frame ring (the ring is documented as main-readable). Else a coalesced `tm_preview` worker command that only copies pixels or publishes a magenta buffer — still O(one frame), never `SEEK_CYCLE`.
+Preview must not wait on materialize. Prefer a UI-thread blit if `runtime_client` can lock the frame ring. Else a coalesced `tm_preview` that only copies pixels or magenta — never `SEEK_CYCLE`.
 
-Frontend already coalesces `TM_SEEK_CYCLE` intents; reuse that pattern for preview/land so a slam-left is one land, not 100.
-
-**Time-travel window chrome (A17):** while `tm_forensic`, retint **headers only** — `nk_rgb(24, 62, 118)` / hover `32, 76, 136` / active `40, 88, 152`. Do **not** change `style.window.fixed_background`. TM4’s warm-brown panel fill is gone. Restore the saved window style after the debugger draw.
+**Time-travel window chrome (A17):** while `tm_forensic`, retint **headers only** — `nk_rgb(24, 62, 118)` / hover `32, 76, 136` / active `40, 88, 152`. Do **not** change `style.window.fixed_background`. Restore the saved window style after the debugger draw.
 
 ### 6. Display after land / stop (A16)
 
@@ -230,6 +234,7 @@ Do not add flaky UI automation. Manual smoke is the GUI gate.
 - [x] F10-family = sealed re-execute; F12 stops at a breakpoint or live; stay in time travel  
 - [x] Stop presents CRT (A16): Override / paint-off dumps RAM; else beam buffer (`runtime_display_stop`)  
 - [x] Inspect chrome (A17): cobalt headers, no background tint  
+- [x] Inspector tab (A18): Record / Inspect / Leave; history lines; BP tab unchanged  
 - [x] Opt+Left unbound; one BP list  
 - [x] Pokes still rejected; leave restores NOW paused  
 - [x] Slam-left does not stall the worker  
@@ -243,7 +248,7 @@ Do not add flaky UI automation. Manual smoke is the GUI gate.
 ## Agent script
 
 ```text
-1. Read agents/rules.md, agents/TMA0.md (A1–A17), this file, TM3 Landed (seal / NOW).
+1. Read agents/rules.md, agents/TMA0.md (A1–A18), this file, TM3 Landed (seal / NOW).
 2. Implement in the order above (gate → land → execute → frame-step → chrome).
 3. Do not route Inspector through SEEK_CYCLE. Do not drop the frame ring.
 4. Build + ctest. Manual smoke. Update manual/status. Landed. Stop.
@@ -262,5 +267,6 @@ Do not add flaky UI automation. Manual smoke is the GUI gate.
 - F12 runs to a breakpoint or live and stays in Inspect. Opt+Left unbound.
 - Stop presents the CRT (A16): Override or paint-off dumps RAM; otherwise the beam buffer (raster-accurate). `runtime_publish_presented_frame` / `runtime_display_stop`.
 - Inspect chrome (A17): dark cobalt headers; no window-background tint.
+- Inspector tab (A18): Record / Inspect / Leave; history lines; BP tab is live chrome.
 - One breakpoint list. TM1 query engine is unused by the Inspector (deleted in TMA2).
 - ctest 60 green. Stop for a look before TMA2.

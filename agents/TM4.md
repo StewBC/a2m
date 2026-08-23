@@ -236,7 +236,7 @@ Forensic F12 is tape run-to, not live run. **Leave Inspector** first, then F12.
 - Registers: `NK_EDIT_READ_ONLY` (same `editable` flag as running).
 - Memory footer: `read-only` while forensic (not `editable`). Hex type-in is a no-op.
 - Breakpoints tab in forensic is the TM5 Time Machine list (see [`TM5.md`](TM5.md)).
-  Opt+B arms that store. Live list is not edited.
+  Opt+B arms that store. Live list is not edited. **Superseded:** one list (A14); tab chrome is the live panel (no Inspect-only copy, no “Run to breakpoint” button). F12 in Inspect is the run-until.
 - Host keys not sent to the Apple while forensic. F8, Opt+Insert paste,
   quicksave/load, Opt+Shift+A, and kbd-stick also skipped (worker would
   `read-only-forensic`). Configure OK (`CONFIG_APPLY`) is dropped too.

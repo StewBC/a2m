@@ -72,16 +72,17 @@ These overlay TM4 Inspector UX. Backend pins D5 / D5a / D12 / D16 still hold.
 | **A11** | Stored film | **Keep the ring for now** as a preview cache. Whether 128 MB of ARGB is worth it — follow-up, not this brief. Source of truth is the checkpoint. |
 | **A12** | Thumb follows cycles | Bar is short (~128 distinct pixels). Thumb position is the **current machine cycle** on oldest→live. After land / `±` / F10-family, if cycles cross a notch (~20 k-cycle snapshot spacing), the thumb moves. Not a dual coarseness slider. |
 | **A13** | Opt+Left | **Unbound** in time travel. Not poke-PC, not HST1 run-to, not sealed run-to-cursor. |
-| **A14** | Breakpoints | **One list.** Live and time travel share it. Opt+B and the Breakpoints tab always edit that list. Time-travel run stops on those breakpoints. The TM5 second bank is deleted in [`TMA2.md`](TMA2.md). |
+| **A14** | Breakpoints | **One list.** Live and time travel share it. Opt+B and the Breakpoints tab always edit that list. Time-travel **F12** stops on those breakpoints (or live). The tab chrome is the **live** panel (New + list) — no Inspect-only copy, no “Run to breakpoint” button. The TM5 second bank is deleted in [`TMA2.md`](TMA2.md). |
 | **A15** | TM6 | **Not this campaign.** No Promote / Branch. |
 | **A16** | CRT on stop | Any F10-family / F12 / Pause that leaves the Apple **stopped** must **publish a CRT frame**. Same rule in live and time travel (one skin). **Override on** (Hardware tab) is a RAM view of a page — dump video RAM, then publish. **Override off** publishes the **beam buffer** so a mid-frame mode switch stays visible. Paint-off (max turbo, sealed F12 run) has no beam image: dump RAM. Do not leave the CRT on a vblank captured mid-routine. |
 | **A17** | Inspect chrome | While in time travel, window **headers** use dark cobalt (`nk_rgb(24, 62, 118)` / hover `32, 76, 136` / active `40, 88, 152`) so gray title text still reads. Do **not** tint the window background (TM4’s warm-brown fill is gone). |
+| **A18** | Inspector tab | Misc → Inspector is short. **Record off:** checkbox only. **Record on:** **Inspect** (pauses if running) plus History start cycle / Live cycle / Duration (`~(live−oldest)/(17030×60)` guest seconds). **In Inspect:** **Leave Inspector**, `[-]` slider `[+]`, Current cycle, same three lines. No Pause on this tab. No help dump. Slider grab uses the slider column, not the `[+]` slot (`nk_widget_bounds` after `nk_slider_int` peeks `[+]`). |
 
 ---
 
 ## Goal
 
-Rewire Misc → Inspector so it matches A1–A17.
+Rewire Misc → Inspector so it matches A1–A18.
 
 **Win:** slam the thumb to the far left and the UI stays live; release **lands** in ~a millisecond-scale snapshot load; `±` and F10-family move that Apple by re-execute, clamped to live.
 
@@ -190,6 +191,7 @@ TM4 Landed remains true as a historical phase. This addendum supersedes **that t
 - [x] One breakpoint list; Opt+Left unbound; F12 runs to live; enter starts at live  
 - [x] A16 CRT on stop: Override / paint-off dumps RAM; else beam buffer  
 - [x] A17 Inspect chrome: cobalt headers, no background tint  
+- [x] A18 Inspector tab: Record / Inspect / Leave; history lines; no BP-tab extras  
 
 Implementation acceptance lives in [`TMA1.md`](TMA1.md).
 
@@ -199,7 +201,7 @@ Implementation acceptance lives in [`TMA1.md`](TMA1.md).
 
 ```text
 TMA0: docs only (this file).
-TMA1: implement A1–A17 (Inspector is time travel; stops calling TM1). Stop for a look.
+TMA1: implement A1–A18 (Inspector is time travel; stops calling TM1). Stop for a look.
 TMA2: [`TMA2.md`](TMA2.md) delete the TM1 query engine and the TM5 second BP bank.
 Do not start TM6. Do not re-open A11 (drop film) without a new addendum.
 ```
@@ -208,4 +210,4 @@ Do not start TM6. Do not re-open A11 (drop film) without a new addendum.
 
 ## Landed
 
-Brief accepted as the Inspector contract 2026-08-23; vocabulary restated 2026-08-23 (time travel vs forensic; live end; one BP list). A16 CRT on stop and A17 Inspect chrome added 2026-08-23. Code is TMA1.
+Brief accepted as the Inspector contract 2026-08-23; vocabulary restated 2026-08-23 (time travel vs forensic; live end; one BP list). A16–A18 (CRT on stop, cobalt headers, Inspector tab) added 2026-08-23. Code is TMA1.
