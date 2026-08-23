@@ -47,6 +47,7 @@ static void runtime_publish_event(runtime *rt, const runtime_event *event);
 static void runtime_type_script_tick(runtime *rt, uint32_t cycles_elapsed);
 static void runtime_history_sync_observer(runtime *rt);
 static void runtime_reset_pacer(runtime *rt);
+static void runtime_tm_publish_head(runtime *rt);
 
 static void runtime_history_observer_begin(
     void *user,
@@ -1624,20 +1625,29 @@ static void runtime_publish_machine(runtime *rt)
     }
     event.data.machine_state.tm_recorder_recording =
         runtime_tm_recorder_is_recording(rt) ? 1u : 0u;
-    if (rt->tm_focus.valid) {
+    if (rt->tm_forensic) {
+        event.data.machine_state.tm_focus_cycle = apple2_cycles(&rt->machine);
+        event.data.machine_state.tm_focus_id = 0u;
+    } else if (rt->tm_focus.valid) {
         event.data.machine_state.tm_focus_cycle = rt->tm_focus.cycle;
         event.data.machine_state.tm_focus_id = rt->tm_focus.history_id;
     }
     {
-        runtime_tm_window window;
-        runtime_tm_window_info(rt, &window);
-        event.data.machine_state.tm_window_valid = window.valid ? 1u : 0u;
-        event.data.machine_state.tm_window_start_kind = (uint8_t)window.start_kind;
-        event.data.machine_state.tm_window_start_arg1 = window.start_arg1;
-        event.data.machine_state.tm_oldest_cycle = window.oldest_cycle;
-        event.data.machine_state.tm_newest_cycle = window.newest_cycle;
-        event.data.machine_state.tm_oldest_id = window.oldest_id;
-        event.data.machine_state.tm_newest_id = window.newest_id;
+        uint64_t oldest = 0u;
+        uint64_t live = 0u;
+        uint64_t count = 0u;
+        runtime_tm_window extras;
+
+        runtime_tm_timeline_bounds(rt, &oldest, &live, &count);
+        memset(&extras, 0, sizeof(extras));
+        runtime_tm_fill_window_extras(rt, &extras);
+        event.data.machine_state.tm_window_valid = count > 0u ? 1u : 0u;
+        event.data.machine_state.tm_window_start_kind = (uint8_t)extras.start_kind;
+        event.data.machine_state.tm_window_start_arg1 = extras.start_arg1;
+        event.data.machine_state.tm_oldest_cycle = oldest;
+        event.data.machine_state.tm_newest_cycle = live;
+        event.data.machine_state.tm_oldest_id = 0u;
+        event.data.machine_state.tm_newest_id = 0u;
     }
     for (slot = 1; slot <= 7; ++slot) {
         runtime_slot_snapshot *out = &event.data.machine_state.slots[slot];
@@ -2723,6 +2733,9 @@ static void runtime_produce_audio(runtime *rt, uint32_t cpu_cycles)
     if (rt == NULL || cpu_cycles == 0u) {
         return;
     }
+    if (rt->tm_forensic) {
+        return;
+    }
 
     mb = runtime_primary_mockingboard(rt);
 
@@ -2844,7 +2857,7 @@ static void runtime_pace_after_frame(runtime *rt)
     uint64_t now;
     uint64_t frequency;
 
-    if (runtime_turbo_is_free_run(rt)) {
+    if (runtime_turbo_is_free_run(rt) || (rt != NULL && rt->tm_forensic)) {
         return;
     }
     if (!rt->pace_initialized) {
@@ -3071,6 +3084,48 @@ static void runtime_fill_debug_memory(runtime *rt, bool include_write_history)
 
 enum { RUNTIME_STEP_NESTED_FAST_LIMIT = 100000 };
 
+static bool runtime_tm_pause_at_live(runtime *rt)
+{
+    if (rt == NULL || !rt->tm_forensic || !runtime_tm_at_live(rt)) {
+        return false;
+    }
+    (void)runtime_tm_restore_live(rt);
+    rt->temp_bp_active = false;
+    if (rt->exec_state == RUNTIME_EXEC_RUNNING) {
+        rt->exec_state = RUNTIME_EXEC_PAUSED;
+        rt->last_stop_reason = RUNTIME_STOP_REASON_RUN_COMPLETE;
+        runtime_publish_simple(rt, RUNTIME_EVENT_RUN_COMPLETE);
+        runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
+        runtime_tm_publish_head(rt);
+    }
+    return true;
+}
+
+static bool runtime_exec_step_instruction(runtime *rt)
+{
+    uint64_t c0;
+
+    if (rt == NULL) {
+        return false;
+    }
+    c0 = apple2_cycles(&rt->machine);
+    if (!apple2_step_instruction(&rt->machine)) {
+        return false;
+    }
+    if (rt->tm_forensic) {
+        runtime_tm_apply_logged_inputs(
+            rt, &rt->machine, c0 + 1u, apple2_cycles(&rt->machine));
+        if (runtime_tm_at_live(rt)) {
+            (void)runtime_tm_restore_live(rt);
+        } else {
+            runtime_tm_sync_focus(rt);
+        }
+    } else {
+        runtime_tm_after_step(rt);
+    }
+    return true;
+}
+
 static void runtime_step_over(runtime *rt, bool *alive)
 {
     uint8_t opcode;
@@ -3082,13 +3137,18 @@ static void runtime_step_over(runtime *rt, bool *alive)
     if (rt->exec_state == RUNTIME_EXEC_RUNNING) {
         return;
     }
+    if (rt->tm_forensic && runtime_tm_at_live(rt)) {
+        return;
+    }
     runtime_finish_to_instruction_boundary(rt);
     opcode = apple2_debug_read(&rt->machine, rt->machine.cpu.cpu.pc);
     if (opcode != 0x20u) {
-        (void)apple2_step_instruction(&rt->machine);
+        (void)runtime_exec_step_instruction(rt);
         runtime_maybe_frame(rt);
         rt->suppress_execute_bp = false;
-        runtime_pause_for_step(rt);
+        if (!runtime_tm_pause_at_live(rt)) {
+            runtime_pause_for_step(rt);
+        }
         return;
     }
     stop_pc = (uint16_t)(rt->machine.cpu.cpu.pc + 3u);
@@ -3101,8 +3161,11 @@ static void runtime_step_over(runtime *rt, bool *alive)
             return;
         }
         opcode = apple2_debug_read(&rt->machine, rt->machine.cpu.cpu.pc);
-        (void)apple2_step_instruction(&rt->machine);
+        (void)runtime_exec_step_instruction(rt);
         runtime_maybe_frame(rt);
+        if (runtime_tm_pause_at_live(rt)) {
+            return;
+        }
         if (runtime_pause_if_breakpoint_pending(rt)) {
             return;
         }
@@ -3132,6 +3195,9 @@ static void runtime_step_out(runtime *rt, bool *alive)
     if (rt->exec_state == RUNTIME_EXEC_RUNNING) {
         return;
     }
+    if (rt->tm_forensic && runtime_tm_at_live(rt)) {
+        return;
+    }
     runtime_finish_to_instruction_boundary(rt);
     rt->suppress_execute_bp = true;
     rt->exec_state = RUNTIME_EXEC_RUNNING;
@@ -3142,8 +3208,11 @@ static void runtime_step_out(runtime *rt, bool *alive)
             return;
         }
         opcode = apple2_debug_read(&rt->machine, rt->machine.cpu.cpu.pc);
-        (void)apple2_step_instruction(&rt->machine);
+        (void)runtime_exec_step_instruction(rt);
         runtime_maybe_frame(rt);
+        if (runtime_tm_pause_at_live(rt)) {
+            return;
+        }
         if (runtime_pause_if_breakpoint_pending(rt)) {
             return;
         }
@@ -3167,6 +3236,9 @@ static void runtime_run_to_cursor(runtime *rt, uint16_t address, bool *alive)
 {
     int fast_limit = 0;
     (void)alive;
+    if (rt->tm_forensic && runtime_tm_at_live(rt)) {
+        return;
+    }
     runtime_finish_to_instruction_boundary(rt);
     rt->temp_bp_active = true;
     rt->temp_bp_address = address;
@@ -3188,8 +3260,11 @@ static void runtime_run_to_cursor(runtime *rt, uint16_t address, bool *alive)
                 return;
             }
         }
-        (void)apple2_step_instruction(&rt->machine);
+        (void)runtime_exec_step_instruction(rt);
         runtime_maybe_frame(rt);
+        if (runtime_tm_pause_at_live(rt)) {
+            return;
+        }
         if (runtime_pause_if_breakpoint_pending(rt)) {
             return;
         }
@@ -3458,14 +3533,6 @@ static bool runtime_tm_command_mutates_machine(runtime_command_type type)
 {
     switch (type) {
     case RUNTIME_COMMAND_RESET:
-    case RUNTIME_COMMAND_RUN:
-    case RUNTIME_COMMAND_STEP_CYCLE:
-    case RUNTIME_COMMAND_STEP_INSTRUCTION:
-    case RUNTIME_COMMAND_STEP_OVER:
-    case RUNTIME_COMMAND_STEP_OUT:
-    case RUNTIME_COMMAND_RUN_CYCLES:
-    case RUNTIME_COMMAND_RUN_INSTRUCTIONS:
-    case RUNTIME_COMMAND_RUN_TO_CURSOR:
     case RUNTIME_COMMAND_WRITE_MEMORY_BYTE:
     case RUNTIME_COMMAND_WRITE_MEMORY:
     case RUNTIME_COMMAND_SET_CPU_REGISTER:
@@ -3727,6 +3794,9 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         break;
     }
     case RUNTIME_COMMAND_RUN:
+        if (rt->tm_forensic && runtime_tm_at_live(rt)) {
+            break;
+        }
         rt->exec_state = RUNTIME_EXEC_RUNNING;
         rt->last_stop_reason = RUNTIME_STOP_REASON_NONE;
         runtime_reset_pacer(rt);
@@ -3737,6 +3807,10 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
             runtime_finish_to_instruction_boundary(rt);
             rt->exec_state = RUNTIME_EXEC_PAUSED;
             rt->last_stop_reason = RUNTIME_STOP_REASON_PAUSE_COMMAND;
+            if (rt->tm_forensic) {
+                rt->machine.video.paint_enabled = true;
+                apple2_video_paint_full_frame(&rt->machine);
+            }
             runtime_publish_machine(rt);
             runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
             runtime_publish_cpu(rt, 0u);
@@ -3823,10 +3897,15 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
     }
     case RUNTIME_COMMAND_STEP_INSTRUCTION:
         if (rt->exec_state != RUNTIME_EXEC_RUNNING) {
-            (void)apple2_step_instruction(&rt->machine);
-            runtime_tm_after_step(rt);
+            if (rt->tm_forensic && runtime_tm_at_live(rt)) {
+                break;
+            }
+            (void)runtime_exec_step_instruction(rt);
             runtime_maybe_frame(rt);
             rt->suppress_execute_bp = false;
+            if (runtime_tm_pause_at_live(rt)) {
+                break;
+            }
             if (!runtime_pause_if_breakpoint_pending(rt)) {
                 runtime_pause_for_step(rt);
             }
@@ -4420,17 +4499,50 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         runtime_publish_tm_breakpoints(rt);
         break;
     case RUNTIME_COMMAND_TM_RUN_UNTIL_BREAK: {
-        runtime_command query_cmd;
+        /* TMA1: one BP list, sealed run to a breakpoint or live. */
+        if (rt->tm_forensic) {
+            runtime_command run_cmd;
 
-        memset(&query_cmd, 0, sizeof(query_cmd));
-        query_cmd.type = RUNTIME_COMMAND_TM_QUERY;
-        query_cmd.request_token = cmd->request_token;
-        query_cmd.session_id = cmd->session_id;
-        query_cmd.data.tm_query.op =
-            (uint8_t)RUNTIME_TM_QUERY_RUN_UNTIL_BREAK;
-        runtime_process_command(rt, &query_cmd, alive);
+            memset(&run_cmd, 0, sizeof(run_cmd));
+            run_cmd.type = RUNTIME_COMMAND_RUN;
+            run_cmd.request_token = cmd->request_token;
+            run_cmd.session_id = cmd->session_id;
+            runtime_process_command(rt, &run_cmd, alive);
+        } else {
+            runtime_command query_cmd;
+
+            memset(&query_cmd, 0, sizeof(query_cmd));
+            query_cmd.type = RUNTIME_COMMAND_TM_QUERY;
+            query_cmd.request_token = cmd->request_token;
+            query_cmd.session_id = cmd->session_id;
+            query_cmd.data.tm_query.op =
+                (uint8_t)RUNTIME_TM_QUERY_RUN_UNTIL_BREAK;
+            runtime_process_command(rt, &query_cmd, alive);
+        }
         break;
     }
+    case RUNTIME_COMMAND_TM_LAND:
+        if (rt->tm_forensic) {
+            if (runtime_tm_land(rt, cmd->data.tm_land.cycle)) {
+                runtime_tm_publish_head(rt);
+                runtime_publish_state_changed(
+                    rt,
+                    RUNTIME_STATE_CHANGED_FORENSIC_SEEK,
+                    cmd->session_id);
+            }
+        }
+        break;
+    case RUNTIME_COMMAND_TM_FRAME_STEP:
+        if (rt->tm_forensic) {
+            if (runtime_tm_frame_step(rt, (int)cmd->data.tm_frame_step.direction)) {
+                runtime_tm_publish_head(rt);
+                runtime_publish_state_changed(
+                    rt,
+                    RUNTIME_STATE_CHANGED_FORENSIC_SEEK,
+                    cmd->session_id);
+            }
+        }
+        break;
 
     case RUNTIME_COMMAND_SAVE_STATE:
         runtime_save_state(rt, cmd);
@@ -4458,13 +4570,26 @@ static void runtime_free_run_batch(runtime *rt)
 {
     uint32_t i;
 
-    /* Max: instruction quanta + 60 Hz paint (S2). Finite: Φ0 beam path. */
-    if (runtime_turbo_is_free_run(rt)) {
+    /* Max: instruction quanta + 60 Hz paint (S2). Finite: Φ0 beam path.
+       Time travel always uses the cycle path so the input log applies. */
+    if (runtime_turbo_is_free_run(rt) && !rt->tm_forensic) {
         runtime_free_run_max_quantum(rt);
         return;
     }
 
+    if (rt->tm_forensic) {
+        rt->machine.video.paint_enabled = false;
+    }
+
     for (i = 0; i < RUNTIME_RUN_BATCH_CYCLES; i++) {
+        uint64_t c0;
+
+        if (rt->tm_forensic && runtime_tm_pause_at_live(rt)) {
+            rt->machine.video.paint_enabled = true;
+            apple2_video_paint_full_frame(&rt->machine);
+            runtime_tm_publish_head(rt);
+            return;
+        }
         if (!rt->suppress_execute_bp &&
             runtime_at_instruction_boundary(rt) &&
             (rt->breakpoint_count > 0 || rt->temp_bp_active) &&
@@ -4474,10 +4599,15 @@ static void runtime_free_run_batch(runtime *rt)
                 rt->machine.cpu.cpu.pc == rt->temp_bp_address) {
                 rt->temp_bp_skip_current = false;
             } else {
+                if (rt->tm_forensic) {
+                    rt->machine.video.paint_enabled = true;
+                    apple2_video_paint_full_frame(&rt->machine);
+                }
                 runtime_pause_for_breakpoint(rt);
                 return;
             }
         }
+        c0 = apple2_cycles(&rt->machine);
         if (!apple2_step_cycle(&rt->machine)) {
             rt->exec_state = RUNTIME_EXEC_PAUSED;
             rt->last_stop_reason = RUNTIME_STOP_REASON_ERROR;
@@ -4485,17 +4615,28 @@ static void runtime_free_run_batch(runtime *rt)
             runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
             return;
         }
-        /* One cycle at a time so $C030 toggles land on the right samples. */
-        runtime_produce_audio(rt, 1u);
+        if (rt->tm_forensic) {
+            runtime_tm_apply_logged_inputs(
+                rt, &rt->machine, c0 + 1u, apple2_cycles(&rt->machine));
+            if (runtime_tm_at_live(rt)) {
+                (void)runtime_tm_restore_live(rt);
+                (void)runtime_tm_pause_at_live(rt);
+                return;
+            }
+            runtime_tm_sync_focus(rt);
+        } else {
+            /* One cycle at a time so $C030 toggles land on the right samples. */
+            runtime_produce_audio(rt, 1u);
+            runtime_type_script_tick(rt, 1u);
+        }
         runtime_maybe_frame(rt);
-        runtime_type_script_tick(rt, 1u);
         if (runtime_pause_if_breakpoint_pending(rt)) {
             return;
         }
         if (rt->suppress_execute_bp && runtime_at_instruction_boundary(rt)) {
             rt->suppress_execute_bp = false;
         }
-        if (rt->machine.instruction_complete) {
+        if (!rt->tm_forensic && rt->machine.instruction_complete) {
             runtime_tm_after_step(rt);
         }
     }
@@ -4505,7 +4646,13 @@ static bool runtime_command_is_tm_tape_seek(const runtime_command *cmd)
 {
     uint8_t op;
 
-    if (cmd == NULL || cmd->type != RUNTIME_COMMAND_TM_QUERY) {
+    if (cmd == NULL) {
+        return false;
+    }
+    if (cmd->type == RUNTIME_COMMAND_TM_LAND) {
+        return true;
+    }
+    if (cmd->type != RUNTIME_COMMAND_TM_QUERY) {
         return false;
     }
     op = cmd->data.tm_query.op;
@@ -4733,10 +4880,12 @@ int runtime_thread_main(void *userdata)
             if (!alive) {
                 break;
             }
-            if (rt->exec_state == RUNTIME_EXEC_RUNNING && !rt->tm_forensic) {
-                runtime_free_run_batch(rt);
-            } else if (rt->tm_forensic && rt->exec_state == RUNTIME_EXEC_RUNNING) {
-                rt->exec_state = RUNTIME_EXEC_PAUSED;
+            if (rt->exec_state == RUNTIME_EXEC_RUNNING) {
+                if (rt->tm_forensic && runtime_tm_pause_at_live(rt)) {
+                    /* already at live */
+                } else {
+                    runtime_free_run_batch(rt);
+                }
             } else if (!has_deferred) {
                 if (!message_queue_wait_pop_timeout(
                         rt->command_queue, &command, 10u)) {

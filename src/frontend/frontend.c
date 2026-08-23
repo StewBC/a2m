@@ -272,7 +272,9 @@ typedef struct frontend_misc_view_state {
     bool active;
     bool display_override_enabled;
     uint32_t display_override_flags;
-    int inspector_slider; /* 0..1000 over tm_window */
+    int inspector_slider; /* 0..1000 over oldest snapshot -> live */
+    bool inspector_thumb_down;
+    uint64_t inspector_preview_cycle;
 } frontend_misc_view_state;
 
 typedef enum frontend_active_view {
@@ -1330,28 +1332,6 @@ static void frontend_toggle_execute_breakpoint_at_cursor(
     }
 
     address = ui->disassembly.cursor_address;
-    if (debug_state != NULL && debug_state->tm_forensic) {
-        if (debug_state->has_tm_breakpoints) {
-            uint16_t i;
-            for (i = 0; i < debug_state->tm_breakpoints.count; ++i) {
-                const runtime_breakpoint_snapshot_entry *tm_entry =
-                    &debug_state->tm_breakpoints.entries[i];
-                if (tm_entry->start_address == address &&
-                    tm_entry->has_end_address == 0 &&
-                    (tm_entry->access & RUNTIME_BREAKPOINT_ACCESS_EXECUTE) != 0) {
-                    frontend_push_breakpoint_id_intent(
-                        ui,
-                        FRONTEND_DEBUGGER_INTENT_BREAKPOINT_CLEAR,
-                        tm_entry->id,
-                        false);
-                    return;
-                }
-            }
-        }
-        frontend_push_debugger_intent(
-            ui, FRONTEND_DEBUGGER_INTENT_BREAKPOINT_SET_EXECUTE, address);
-        return;
-    }
     entry = frontend_find_execute_breakpoint(debug_state, address);
     if (entry != NULL) {
         frontend_push_breakpoint_id_intent(
@@ -4279,10 +4259,7 @@ static void frontend_disassembly_handle_key(
         if (alt && debug_state != NULL &&
             debug_state->runtime_state == FRONTEND_RUNTIME_STATE_PAUSED) {
             if (debug_state->tm_forensic) {
-                frontend_push_debugger_intent(
-                    ui,
-                    FRONTEND_DEBUGGER_INTENT_TM_RUN_TO,
-                    view->cursor_address);
+                /* Time travel: Opt+Left is unbound. */
             } else {
                 frontend_push_debugger_intent(
                     ui,
@@ -6905,35 +6882,22 @@ static void frontend_draw_misc_breakpoints(frontend *ui, const frontend_debug_st
 
     ctx = ui->ctx;
     forensic = debug_state != NULL && debug_state->tm_forensic;
-    if (forensic) {
-        count = debug_state != NULL && debug_state->has_tm_breakpoints ?
-            debug_state->tm_breakpoints.count : 0;
-    } else {
-        count = debug_state != NULL && debug_state->has_breakpoints ?
-            debug_state->breakpoints.count : 0;
-    }
+    count = debug_state != NULL && debug_state->has_breakpoints ?
+        debug_state->breakpoints.count : 0;
 
     nk_layout_row_dynamic(ctx, 18.0f, 1);
-    nk_label(
-        ctx,
-        forensic ? "Time Machine breakpoints" : "Breakpoints",
-        NK_TEXT_LEFT);
+    nk_label(ctx, "Breakpoints", NK_TEXT_LEFT);
     if (forensic) {
         nk_layout_row_dynamic(ctx, 36.0f, 1);
         nk_label_wrap(
             ctx,
-            "Tape breakpoints (execute / write). They do not change the live "
-            "list. Opt+B toggles execute at the disassembly cursor.");
+            "One breakpoint list in live and time travel. Opt+B toggles "
+            "execute at the disassembly cursor. Run until a breakpoint or live.");
         nk_layout_row_dynamic(ctx, 24.0f, 1);
-        if (nk_button_label(ctx, "Run tape to breakpoint")) {
+        if (nk_button_label(ctx, "Run to breakpoint")) {
             frontend_push_debugger_intent(
                 ui, FRONTEND_DEBUGGER_INTENT_TM_RUN_UNTIL, 0);
         }
-    } else {
-        nk_layout_row_dynamic(ctx, 32.0f, 1);
-        nk_label_wrap(
-            ctx,
-            "Inspector mode has a separate Time Machine breakpoint list.");
     }
     nk_layout_row_dynamic(ctx, 24.0f, 1);
     if (nk_button_label(ctx, "New")) {
@@ -6946,8 +6910,7 @@ static void frontend_draw_misc_breakpoints(frontend *ui, const frontend_debug_st
     }
 
     for (i = 0; i < count; ++i) {
-        const runtime_breakpoint_snapshot_entry *entry = forensic ?
-            &debug_state->tm_breakpoints.entries[i] :
+        const runtime_breakpoint_snapshot_entry *entry =
             &debug_state->breakpoints.entries[i];
         struct nk_style_button saved_button = ctx->style.button;
         char label[96];
@@ -7493,8 +7456,7 @@ static void frontend_draw_misc_inspector(
         debug->runtime_state == FRONTEND_RUNTIME_STATE_PAUSED;
     forensic = debug != NULL && debug->tm_forensic;
     can_enter = paused && debug != NULL && debug->tm_enabled &&
-        debug->tm_window_valid && debug->tm_history_recording &&
-        debug->tm_frame_recording && debug->tm_recorder_recording;
+        debug->tm_window_valid;
 
     nk_layout_row_dynamic(ctx, 18.0f, 1);
     nk_label(ctx, "Inspector (TimeMachine)", NK_TEXT_LEFT);
@@ -7552,18 +7514,17 @@ static void frontend_draw_misc_inspector(
     if (!forensic) {
         if (!can_enter) {
             nk_layout_row_dynamic(ctx, 48.0f, 1);
-            if (!debug->tm_window_valid || !debug->tm_history_recording ||
-                !debug->tm_frame_recording || !debug->tm_recorder_recording) {
+            if (!debug->tm_window_valid) {
                 nk_label_wrap(
                     ctx,
-                    "No TimeMachine window. A recorder is off, a budget is 0, "
-                    "or nothing has been recorded yet.");
+                    "No TimeMachine snapshots yet. Enable recording, run a "
+                    "moment, then Pause.");
             } else {
-                nk_label_wrap(ctx, "Pause the machine to inspect the tape.");
+                nk_label_wrap(ctx, "Pause the machine to inspect.");
             }
         } else {
             nk_layout_row_dynamic(ctx, 24.0f, 1);
-            if (nk_button_label(ctx, "Inspect (enter forensic)")) {
+            if (nk_button_label(ctx, "Inspect (time travel)")) {
                 frontend_push_tm_intent(
                     ui, FRONTEND_DEBUGGER_INTENT_TM_ENTER_FORENSIC, false, 0u);
             }
@@ -7581,9 +7542,9 @@ static void frontend_draw_misc_inspector(
     snprintf(
         line,
         sizeof(line),
-        "Focus cycle %llu  id %llu",
+        "Cycle %llu  (live %llu)",
         (unsigned long long)(debug != NULL ? debug->tm_focus_cycle : 0u),
-        (unsigned long long)(debug != NULL ? debug->tm_focus_id : 0u));
+        (unsigned long long)(debug != NULL ? debug->tm_newest_cycle : 0u));
     nk_layout_row_dynamic(ctx, 18.0f, 1);
     nk_label(ctx, line, NK_TEXT_LEFT);
 
@@ -7591,7 +7552,7 @@ static void frontend_draw_misc_inspector(
         snprintf(
             line,
             sizeof(line),
-            "Window %llu .. %llu",
+            "Snapshots %llu .. live %llu",
             (unsigned long long)debug->tm_oldest_cycle,
             (unsigned long long)debug->tm_newest_cycle);
         nk_layout_row_dynamic(ctx, 18.0f, 1);
@@ -7605,35 +7566,75 @@ static void frontend_draw_misc_inspector(
 
         slider = ui->misc.inspector_slider;
         if (forensic) {
-            bool dragging = nk_input_is_mouse_down(&ctx->input, NK_BUTTON_LEFT);
+            bool down = nk_input_is_mouse_down(&ctx->input, NK_BUTTON_LEFT);
+            bool at_oldest = debug->tm_focus_cycle <= debug->tm_oldest_cycle;
+            bool at_live = debug->tm_focus_cycle >= debug->tm_newest_cycle;
+            bool thumb = ui->misc.inspector_thumb_down;
 
-            if (!dragging) {
+            if (!thumb) {
                 slider = frontend_tm_cycle_to_slider(debug, debug->tm_focus_cycle);
             }
-            nk_layout_row_dynamic(ctx, 32.0f, 1);
+
+            nk_layout_row_dynamic(ctx, 36.0f, 1);
             nk_label_wrap(
                 ctx,
-                "Scrub window: oldest left, newest right. Scale is cycles "
-                "still retained, not frames and not since boot.");
-            nk_layout_row_dynamic(ctx, 22.0f, 1);
-            if (nk_slider_int(ctx, 0, &slider, 1000, 1) && dragging) {
-                uint64_t cycle = frontend_tm_slider_to_cycle(debug, slider);
-                if (cycle != debug->tm_focus_cycle) {
-                    frontend_push_tm_intent(
-                        ui, FRONTEND_DEBUGGER_INTENT_TM_SEEK_CYCLE, false, cycle);
-                }
+                "Retained snapshots (left) to live (right). Drag previews film "
+                "or pink; release lands. Pink means no stored still.");
+
+            nk_layout_row_begin(ctx, NK_DYNAMIC, 22.0f, 3);
+            nk_layout_row_push(ctx, 0.08f);
+            if (frontend_nk_action_button(
+                    ctx, "-", !thumb && !at_oldest)) {
+                frontend_push_tm_intent(
+                    ui, FRONTEND_DEBUGGER_INTENT_TM_FRAME_STEP, false, 0u);
             }
+            nk_layout_row_push(ctx, 0.84f);
+            {
+                int prev_slider = slider;
+                nk_bool moved = nk_slider_int(ctx, 0, &slider, 1000, 1);
+                struct nk_rect bounds = nk_widget_bounds(ctx);
+                bool hovered =
+                    nk_input_is_mouse_hovering_rect(&ctx->input, bounds);
+
+                if (moved && down) {
+                    ui->misc.inspector_thumb_down = true;
+                }
+                if (ui->misc.inspector_thumb_down) {
+                    uint64_t cycle = frontend_tm_slider_to_cycle(debug, slider);
+                    ui->misc.inspector_preview_cycle = cycle;
+                    if (!down) {
+                        frontend_push_tm_intent(
+                            ui,
+                            FRONTEND_DEBUGGER_INTENT_TM_SEEK_CYCLE,
+                            false,
+                            cycle);
+                        ui->misc.inspector_thumb_down = false;
+                    }
+                } else if ((hovered || moved) && down) {
+                    ui->misc.inspector_thumb_down = true;
+                    ui->misc.inspector_preview_cycle =
+                        frontend_tm_slider_to_cycle(debug, slider);
+                }
+                (void)prev_slider;
+            }
+            nk_layout_row_push(ctx, 0.08f);
+            if (frontend_nk_action_button(ctx, "+", !thumb && !at_live)) {
+                frontend_push_tm_intent(
+                    ui, FRONTEND_DEBUGGER_INTENT_TM_FRAME_STEP, true, 0u);
+            }
+            nk_layout_row_end(ctx);
             ui->misc.inspector_slider = slider;
         }
     }
 
     nk_layout_row_dynamic(ctx, 8.0f, 1);
     nk_spacing(ctx, 1);
-    nk_layout_row_dynamic(ctx, 32.0f, 1);
+    nk_layout_row_dynamic(ctx, 40.0f, 1);
     nk_label_wrap(
         ctx,
-        "Forensic keys: F10 step, F11 over, Shift+F10 out, F12 run-to cursor. "
-        "Memory and registers are read-only. A disk write drops earlier history.");
+        "Time travel: F10 step, F11 over, Shift+F10 out, F12 run to a "
+        "breakpoint or live (stay in Inspect). Opt+Left unbound. "
+        "Pokes rejected. A disk write drops earlier snapshots.");
 }
 
 static void frontend_draw_misc_tab_button(
@@ -8464,6 +8465,17 @@ void frontend_end_input(frontend *ui)
     }
 
     nk_input_end(ui->ctx);
+}
+
+bool frontend_inspector_preview(const frontend *ui, uint64_t *out_cycle)
+{
+    if (ui == NULL || !ui->misc.inspector_thumb_down) {
+        return false;
+    }
+    if (out_cycle != NULL) {
+        *out_cycle = ui->misc.inspector_preview_cycle;
+    }
+    return true;
 }
 
 bool frontend_submit_argb_frame(

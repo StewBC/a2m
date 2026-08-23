@@ -135,7 +135,8 @@ typedef enum frontend_debugger_intent_type {
     FRONTEND_DEBUGGER_INTENT_TM_SEEK_CYCLE,
     FRONTEND_DEBUGGER_INTENT_TM_PAUSE,
     FRONTEND_DEBUGGER_INTENT_TM_RUN_TO,
-    FRONTEND_DEBUGGER_INTENT_TM_RUN_UNTIL
+    FRONTEND_DEBUGGER_INTENT_TM_RUN_UNTIL,
+    FRONTEND_DEBUGGER_INTENT_TM_FRAME_STEP
 } frontend_debugger_intent_type;
 
 /* File-browser "default folder" slots. Each remembers the last directory used by
@@ -273,6 +274,8 @@ bool frontend_submit_argb_frame(
     uint32_t width,
     uint32_t height,
     uint64_t frame_number);
+/* True while the Inspector thumb is down (film/pink preview). */
+bool frontend_inspector_preview(const frontend *ui, uint64_t *out_cycle);
 void frontend_render(frontend *ui, bool ui_visible, const frontend_debug_state *debug_state);
 /* Force disk activity LEDs off (e.g. machine reset). */
 void frontend_clear_disk_activity_leds(frontend *ui);

@@ -131,6 +131,18 @@ void runtime_tm_recorder_destroy(runtime *rt);
 void runtime_tm_checkpoint_bounds(
     const runtime *rt, uint64_t *oldest, uint64_t *newest, uint64_t *count);
 void runtime_tm_fill_window_extras(const runtime *rt, runtime_tm_window *out);
+void runtime_tm_timeline_bounds(
+    const runtime *rt, uint64_t *oldest, uint64_t *live, uint64_t *count);
+uint64_t runtime_tm_live_cycle(const runtime *rt);
+bool runtime_tm_at_live(const runtime *rt);
+void runtime_tm_sync_focus(runtime *rt);
+void runtime_tm_apply_logged_inputs(
+    runtime *rt, apple2_t *dst, uint64_t from_inclusive, uint64_t to_inclusive);
+bool runtime_tm_load_nearest_checkpoint(runtime *rt, uint64_t cycle);
+bool runtime_tm_restore_live(runtime *rt);
+bool runtime_tm_land(runtime *rt, uint64_t cycle);
+bool runtime_tm_reexecute_to(runtime *rt, uint64_t target_cycle);
+bool runtime_tm_frame_step(runtime *rt, int direction);
 
 runtime_tm_mode runtime_tm_current_mode(const runtime *rt);
 bool runtime_tm_in_forensic(const runtime *rt);

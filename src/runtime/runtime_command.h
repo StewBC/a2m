@@ -78,7 +78,9 @@ typedef enum runtime_command_type {
     RUNTIME_COMMAND_TM_BP_SET_ENABLED,
     RUNTIME_COMMAND_TM_BP_REQUEST,
     RUNTIME_COMMAND_TM_SET_EXECUTE_BREAKPOINT,
-    RUNTIME_COMMAND_TM_RUN_UNTIL_BREAK
+    RUNTIME_COMMAND_TM_RUN_UNTIL_BREAK,
+    RUNTIME_COMMAND_TM_LAND,
+    RUNTIME_COMMAND_TM_FRAME_STEP
 } runtime_command_type;
 
 enum {
@@ -339,5 +341,13 @@ typedef struct runtime_command {
             uint64_t cycle;
             uint64_t epoch;
         } tm_query;
+
+        struct {
+            uint64_t cycle;
+        } tm_land;
+
+        struct {
+            int8_t direction; /* +1 forward frame, -1 previous frame */
+        } tm_frame_step;
     } data;
 } runtime_command;

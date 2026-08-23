@@ -620,7 +620,7 @@ static void sdl_apple_controllers_close(
 }
 
 /* F10 pause/step and F11 step-over. allow_pause=false for key-repeat (step only).
-   Forensic: F10/F11 are TimeMachine tape verbs, never live step. */
+   Time travel: same live step APIs, sealed and clamped to live. */
 static bool handle_step_key_event(
     runtime_client *client,
     frontend_debug_state *debug,
@@ -632,10 +632,7 @@ static bool handle_step_key_event(
     }
 
     if (key->keysym.sym == SDLK_F10 && !frontend_input_has_shift_modifier(key)) {
-        if (debug->tm_forensic) {
-            uint64_t token = runtime_client_alloc_request_token(client);
-            (void)runtime_client_tm_step(client, 1, token);
-        } else if (debug->runtime_state == FRONTEND_RUNTIME_STATE_RUNNING) {
+        if (debug->runtime_state == FRONTEND_RUNTIME_STATE_RUNNING) {
             if (allow_pause) {
                 (void)runtime_client_pause(client);
             }
@@ -645,12 +642,7 @@ static bool handle_step_key_event(
         return true;
     }
     if (key->keysym.sym == SDLK_F11) {
-        if (debug->tm_forensic) {
-            uint64_t token = runtime_client_alloc_request_token(client);
-            (void)runtime_client_tm_step_over(client, token);
-        } else {
-            (void)runtime_client_step_over(client);
-        }
+        (void)runtime_client_step_over(client);
         return true;
     }
     return false;
@@ -1588,67 +1580,31 @@ static void dispatch_intent(
             client, intent->address, (uint8_t)intent->value, intent->memory_mode);
         break;
     case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_SET_EXECUTE:
-        if (forensic) {
-            (void)runtime_client_tm_set_execute_breakpoint(client, intent->address);
-            (void)runtime_client_tm_bp_request(client);
-        } else {
-            (void)runtime_client_set_execute_breakpoint(client, intent->address);
-            (void)runtime_client_request_breakpoints(client);
-        }
+        (void)runtime_client_set_execute_breakpoint(client, intent->address);
+        (void)runtime_client_request_breakpoints(client);
         break;
     case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_CLEAR:
-        if (forensic) {
-            (void)runtime_client_tm_bp_clear(client, intent->id);
-            (void)runtime_client_tm_bp_request(client);
-        } else {
-            (void)runtime_client_clear_breakpoint(client, intent->id);
-            (void)runtime_client_request_breakpoints(client);
-        }
+        (void)runtime_client_clear_breakpoint(client, intent->id);
+        (void)runtime_client_request_breakpoints(client);
         break;
     case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_CLEAR_ALL:
-        if (forensic) {
-            (void)runtime_client_tm_bp_clear_all(client);
-            (void)runtime_client_tm_bp_request(client);
-        } else {
-            (void)runtime_client_clear_all_breakpoints(client);
-            (void)runtime_client_request_breakpoints(client);
-        }
+        (void)runtime_client_clear_all_breakpoints(client);
+        (void)runtime_client_request_breakpoints(client);
         break;
     case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_SET_ENABLED:
-        if (forensic) {
-            (void)runtime_client_tm_bp_set_enabled(
-                client, intent->id, intent->enabled);
-            (void)runtime_client_tm_bp_request(client);
-        } else {
-            (void)runtime_client_set_breakpoint_enabled(client, intent->id, intent->enabled);
-            (void)runtime_client_request_breakpoints(client);
-        }
+        (void)runtime_client_set_breakpoint_enabled(client, intent->id, intent->enabled);
+        (void)runtime_client_request_breakpoints(client);
         break;
     case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_CREATE:
-        if (forensic) {
-            (void)runtime_client_tm_bp_create(client, &intent->breakpoint);
-            (void)runtime_client_tm_bp_request(client);
-        } else {
-            (void)runtime_client_create_breakpoint(client, &intent->breakpoint);
-            (void)runtime_client_request_breakpoints(client);
-        }
+        (void)runtime_client_create_breakpoint(client, &intent->breakpoint);
+        (void)runtime_client_request_breakpoints(client);
         break;
     case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_UPDATE:
-        if (forensic) {
-            (void)runtime_client_tm_bp_update(
-                client, intent->id, &intent->breakpoint);
-            (void)runtime_client_tm_bp_request(client);
-        } else {
-            (void)runtime_client_update_breakpoint(client, intent->id, &intent->breakpoint);
-            (void)runtime_client_request_breakpoints(client);
-        }
+        (void)runtime_client_update_breakpoint(client, intent->id, &intent->breakpoint);
+        (void)runtime_client_request_breakpoints(client);
         break;
     case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_REQUEST_SNAPSHOT:
-        if (forensic) {
-            (void)runtime_client_tm_bp_request(client);
-        } else {
-            (void)runtime_client_request_breakpoints(client);
-        }
+        (void)runtime_client_request_breakpoints(client);
         break;
     case FRONTEND_DEBUGGER_INTENT_MACHINE_RESET:
         (void)runtime_client_reset_ex_with_resume(
@@ -1666,7 +1622,7 @@ static void dispatch_intent(
     case FRONTEND_DEBUGGER_INTENT_TM_ENTER_FORENSIC: {
         uint64_t token = runtime_client_alloc_request_token(client);
         (void)runtime_client_tm_enter_forensic(client, token);
-        (void)runtime_client_tm_bp_request(client);
+        (void)runtime_client_request_breakpoints(client);
         break;
     }
     case FRONTEND_DEBUGGER_INTENT_TM_EXIT_FORENSIC: {
@@ -1676,21 +1632,23 @@ static void dispatch_intent(
     }
     case FRONTEND_DEBUGGER_INTENT_TM_SEEK_CYCLE: {
         uint64_t token = runtime_client_alloc_request_token(client);
-        (void)runtime_client_tm_seek_cycle(client, intent->tm_cycle, token);
+        (void)runtime_client_tm_land(client, intent->tm_cycle, token);
         break;
     }
     case FRONTEND_DEBUGGER_INTENT_TM_PAUSE:
         (void)runtime_client_pause(client);
         break;
     case FRONTEND_DEBUGGER_INTENT_TM_RUN_TO: {
-        uint64_t token = runtime_client_alloc_request_token(client);
-        (void)runtime_client_tm_run_to(
-            client, intent->address, 0u, token);
+        (void)runtime_client_run_to_cursor(client, intent->address);
         break;
     }
-    case FRONTEND_DEBUGGER_INTENT_TM_RUN_UNTIL: {
+    case FRONTEND_DEBUGGER_INTENT_TM_RUN_UNTIL:
+        (void)runtime_client_run(client);
+        break;
+    case FRONTEND_DEBUGGER_INTENT_TM_FRAME_STEP: {
         uint64_t token = runtime_client_alloc_request_token(client);
-        (void)runtime_client_tm_run_until_break(client, token);
+        (void)runtime_client_tm_frame_step(
+            client, intent->enabled ? 1 : -1, token);
         break;
     }
     case FRONTEND_DEBUGGER_INTENT_SET_DISPLAY_OVERRIDE:
@@ -2793,35 +2751,15 @@ int main(int argc, char **argv)
                 } else if (handle_step_key_event(client, &debug, &event.key, true)) {
                     send_event_to_frontend = false;
                 } else if (sym == SDLK_F10 && frontend_input_has_shift_modifier(&event.key)) {
-                    if (debug.tm_forensic) {
-                        uint64_t token = runtime_client_alloc_request_token(client);
-                        (void)runtime_client_tm_step_out(client, token);
-                    } else {
-                        (void)runtime_client_step_out(client);
-                    }
+                    (void)runtime_client_step_out(client);
                     send_event_to_frontend = false;
                 } else if (sym == SDLK_F12 && !frontend_input_has_shift_modifier(&event.key)) {
-                    if (debug.tm_forensic) {
-                        uint16_t addr = 0;
-                        uint64_t token = runtime_client_alloc_request_token(client);
-                        if (frontend_get_disassembly_cursor(ui, &addr)) {
-                            (void)runtime_client_tm_run_to(client, addr, 0u, token);
-                        }
-                    } else {
-                        (void)runtime_client_run(client);
-                    }
+                    (void)runtime_client_run(client);
                     send_event_to_frontend = false;
                 } else if (sym == SDLK_F12 && frontend_input_has_shift_modifier(&event.key)) {
                     uint16_t addr = 0;
                     if (frontend_get_disassembly_cursor(ui, &addr)) {
-                        if (debug.tm_forensic) {
-                            uint64_t token =
-                                runtime_client_alloc_request_token(client);
-                            (void)runtime_client_tm_run_to(
-                                client, addr, 0u, token);
-                        } else {
-                            (void)runtime_client_run_to_cursor(client, addr);
-                        }
+                        (void)runtime_client_run_to_cursor(client, addr);
                     }
                     send_event_to_frontend = false;
                 } else if (sym == SDLK_t &&
@@ -3045,6 +2983,44 @@ int main(int argc, char **argv)
             (void)frontend_submit_argb_frame(ui, pixels, w, h, fn);
             debug.has_frame = true;
             debug.frame_number = fn;
+        }
+        {
+            uint64_t preview_cycle = 0u;
+            if (frontend_inspector_preview(ui, &preview_cycle)) {
+                static runtime_ring_frame film;
+                if (runtime_client_copy_frame_at(
+                        client, preview_cycle, true, &film)) {
+                    (void)frontend_submit_argb_frame(
+                        ui,
+                        film.pixels,
+                        film.width,
+                        film.height,
+                        film.frame_number);
+                    debug.has_frame = true;
+                    debug.frame_number = film.frame_number;
+                } else {
+                    static uint32_t pink[
+                        APPLE2_VIDEO_WIDTH * APPLE2_VIDEO_HEIGHT];
+                    static int pink_init = 0;
+                    if (!pink_init) {
+                        size_t i;
+                        for (i = 0;
+                             i < (size_t)APPLE2_VIDEO_WIDTH *
+                                 (size_t)APPLE2_VIDEO_HEIGHT;
+                             ++i) {
+                            pink[i] = 0xffff00ffu;
+                        }
+                        pink_init = 1;
+                    }
+                    (void)frontend_submit_argb_frame(
+                        ui,
+                        pink,
+                        APPLE2_VIDEO_WIDTH,
+                        APPLE2_VIDEO_HEIGHT,
+                        0u);
+                    debug.has_frame = true;
+                }
+            }
         }
 
         {

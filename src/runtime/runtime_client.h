@@ -266,6 +266,10 @@ bool runtime_client_tm_set_execute_breakpoint(
     runtime_client *client, uint16_t address);
 bool runtime_client_tm_run_until_break(
     runtime_client *client, uint64_t request_token);
+bool runtime_client_tm_land(
+    runtime_client *client, uint64_t cycle, uint64_t request_token);
+bool runtime_client_tm_frame_step(
+    runtime_client *client, int direction, uint64_t request_token);
 bool runtime_client_history_clear(
     runtime_client *client,
     uint64_t request_token);

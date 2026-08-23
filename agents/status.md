@@ -4,7 +4,7 @@
 
 **Rules:** [`rules.md`](rules.md)  
 **Closed:** paint; SP `$C800`; BP 0–4e + P4b TRON; remote-debug **C0–C5b**; control tools **T1–T5**; `get-softswitches`; **turbo-zip**; **max free-run S2**; **snapshots** ([`snapshots.md`](snapshots.md) — `.a2state` save/load, drop, `--sna`, Opt+Shift+./,); **sessions foundation** ([`sessions.md`](sessions.md) — multi-asker + `state-changed`; A2M/11).  
-**Active:** **TMA1** — Inspector **time travel** ([`TMA0.md`](TMA0.md) / [`TMA1.md`](TMA1.md)): film / land / re-execute to **live**; one breakpoint list; Opt+Left unbound. TimeMachine V1 (TM0–TM4) accepted; TM4 Inspector UX superseded. TM5 second BP bank is leftover — TMA1 stops using it. F7 stays unbound. **Not going to TM6.** Lessons from retired F7: [`inspector.md`](inspector.md).  
+**Active:** **TMA1 Landed** — Inspector **time travel** ([`TMA0.md`](TMA0.md) / [`TMA1.md`](TMA1.md)): film / land / re-execute to **live**; one breakpoint list; Opt+Left unbound. Stopped for a look. TimeMachine V1 (TM0–TM4) accepted; TM4 Inspector UX superseded. F7 stays unbound. **Not going to TM6.** Lessons from retired F7: [`inspector.md`](inspector.md).  
 **Look-later:** **TMA2** [`TMA2.md`](TMA2.md) delete TM1 tape-nav + TM5 second BP bank (required; FIND stays); drop stored film? (TMA0 A11); debug ergonomics (mem workshop, live remount, frame gate / HW snaps). TM6 Promote/Branch is parked, not next.
 
 ---

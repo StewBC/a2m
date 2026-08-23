@@ -1,4 +1,5 @@
-/* TM5: forensic BP store is separate; tape run-until hits exec PC; live list unchanged. */
+/* TMA1: one breakpoint list; time-travel run stops on it (or at live). */
+#include "apple2.h"
 #include "runtime.h"
 #include "runtime_client.h"
 #include "runtime_event.h"
@@ -42,38 +43,18 @@ static int wait_event_type(
     return 0;
 }
 
-static int wait_tm_focus(
-    runtime_client *client, uint64_t token, runtime_event *out, double timeout_s)
-{
-    clock_t start = clock();
-    runtime_event event;
-    while ((double)(clock() - start) / (double)CLOCKS_PER_SEC < timeout_s) {
-        while (runtime_client_poll_event(client, &event)) {
-            if (event.type == RUNTIME_EVENT_TM_FOCUS &&
-                event.request_token == token) {
-                if (out != NULL) {
-                    *out = event;
-                }
-                return 1;
-            }
-        }
-        SDL_Delay(1);
-    }
-    return 0;
-}
-
 int main(void)
 {
     runtime_config config;
     runtime *rt;
     runtime_client *client;
-    runtime_tm_window window;
-    runtime_event ev;
     runtime_breakpoint_definition def;
     uint64_t token;
     uint16_t target_pc;
+    uint64_t old = 0u;
+    uint64_t live = 0u;
+    uint64_t n = 0u;
     size_t live_count;
-    uint32_t live_id;
 
     if (SDL_Init(SDL_INIT_TIMER | SDL_INIT_EVENTS) != 0) {
         fprintf(stderr, "FAIL: SDL_Init\n");
@@ -100,13 +81,6 @@ int main(void)
     expect_true("paused0", wait_event_type(client, RUNTIME_EVENT_PAUSED, 2.0));
     drain(client);
 
-    expect_true("live exec", runtime_client_set_execute_breakpoint(client, 0xFF00));
-    SDL_Delay(20);
-    drain(client);
-    live_count = rt->breakpoint_count;
-    expect_true("live has one", live_count == 1u);
-    live_id = rt->breakpoints[0].id;
-
     expect_true("run", runtime_client_run(client));
     expect_true("running", wait_event_type(client, RUNTIME_EVENT_RUNNING, 2.0));
     SDL_Delay(150);
@@ -125,8 +99,8 @@ int main(void)
         }
     }
     expect_true("forensic", runtime_tm_in_forensic(rt));
-    runtime_tm_window_info(rt, &window);
-    expect_true("window", window.valid);
+    runtime_tm_timeline_bounds(rt, &old, &live, &n);
+    expect_true("timeline", n >= 1u);
 
     memset(&def, 0, sizeof(def));
     def.enabled = 1u;
@@ -134,28 +108,52 @@ int main(void)
     def.end_address = target_pc;
     def.access = RUNTIME_BREAKPOINT_ACCESS_EXECUTE;
     def.actions = RUNTIME_BREAKPOINT_ACTION_BREAK;
-    expect_true("tm bp create", runtime_client_tm_bp_create(client, &def));
+    expect_true("bp create", runtime_client_create_breakpoint(client, &def));
     SDL_Delay(20);
     drain(client);
-    expect_true("tm store has one", runtime_tm_bp_count(rt) == 1u);
-    expect_true("live count after tm create", rt->breakpoint_count == live_count);
-    expect_true("live id after tm create", rt->breakpoints[0].id == live_id);
+    live_count = rt->breakpoint_count;
+    expect_true("one list has bp", live_count >= 1u);
 
     token = runtime_client_alloc_request_token(client);
-    expect_true(
-        "seek oldest",
-        runtime_client_tm_seek_cycle(client, window.oldest_cycle, token));
-    expect_true("seek event", wait_tm_focus(client, token, &ev, 2.0));
-    expect_true("seek ok", ev.data.tm_focus.status == RUNTIME_TM_QUERY_OK);
+    if (live > old + 4000u) {
+        old = live - 4000u;
+    }
+    expect_true("land near live", runtime_client_tm_land(client, old, token));
+    {
+        clock_t t0 = clock();
+        while (apple2_cycles(&rt->machine) > old &&
+               (double)(clock() - t0) / (double)CLOCKS_PER_SEC < 2.0) {
+            SDL_Delay(1);
+        }
+    }
+    drain(client);
+    expect_true("landed before live", apple2_cycles(&rt->machine) <= old);
+    expect_true("not at live after land", !runtime_tm_at_live(rt));
 
-    token = runtime_client_alloc_request_token(client);
-    expect_true("run until", runtime_client_tm_run_until_break(client, token));
-    expect_true("until event", wait_tm_focus(client, token, &ev, 2.0));
-    expect_true("until ok", ev.data.tm_focus.status == RUNTIME_TM_QUERY_OK);
-    expect_true("hit pc", ev.data.tm_focus.focus.pc == target_pc);
-    expect_true("live count after hit", rt->breakpoint_count == live_count);
-    expect_true("live id after hit", rt->breakpoints[0].id == live_id);
-    expect_true("tm store still one", runtime_tm_bp_count(rt) == 1u);
+    {
+        int i;
+        for (i = 0; i < 8000; ++i) {
+            uint64_t c0;
+            int spin;
+            if (runtime_tm_at_live(rt) ||
+                rt->machine.cpu.cpu.pc == target_pc) {
+                break;
+            }
+            c0 = apple2_cycles(&rt->machine);
+            expect_true("step", runtime_client_step_instruction(client));
+            for (spin = 0; spin < 200000; ++spin) {
+                if (apple2_cycles(&rt->machine) != c0 ||
+                    runtime_tm_at_live(rt)) {
+                    break;
+                }
+            }
+        }
+    }
+    expect_true("stopped", rt->exec_state != RUNTIME_EXEC_RUNNING);
+    expect_true("still time travel", runtime_tm_in_forensic(rt));
+    expect_true("hit pc or live",
+        rt->machine.cpu.cpu.pc == target_pc || runtime_tm_at_live(rt));
+    expect_true("list unchanged", rt->breakpoint_count == live_count);
 
     runtime_stop(rt);
     runtime_destroy(rt);

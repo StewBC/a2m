@@ -9,6 +9,7 @@
 #include "runtime.h"
 #include "runtime_client.h"
 #include "runtime_event.h"
+#include "runtime_frame_ring.h"
 #include "runtime_history.h"
 #include "runtime_internal.h"
 #include "runtime_timemachine.h"
@@ -89,29 +90,6 @@ static int wait_tm_mode(
         }
         if (got_mode) {
             return 1;
-        }
-        SDL_Delay(1);
-    }
-    return 0;
-}
-
-static int wait_tm_focus(
-    runtime_client *client,
-    uint64_t token,
-    runtime_event *out,
-    double timeout_s)
-{
-    clock_t start = clock();
-    runtime_event event;
-    while ((double)(clock() - start) / (double)CLOCKS_PER_SEC < timeout_s) {
-        while (runtime_client_poll_event(client, &event)) {
-            if (event.type == RUNTIME_EVENT_TM_FOCUS &&
-                event.request_token == token) {
-                if (out != NULL) {
-                    *out = event;
-                }
-                return 1;
-            }
         }
         SDL_Delay(1);
     }
@@ -260,10 +238,6 @@ int main(void)
     uint8_t motor_now;
     uint16_t via_t1_now;
     runtime_tm_window window;
-    apple2_t scratch;
-    uint16_t seek_pc;
-    uint8_t seek_a;
-    uint8_t seek_ram;
 
     if (SDL_Init(SDL_INIT_TIMER | SDL_INIT_EVENTS) != 0) {
         fprintf(stderr, "FAIL: SDL_Init\n");
@@ -331,25 +305,56 @@ int main(void)
         (void)runtime_tm_checkpoint_take(rt);
     }
 
-    /* Recorder off (pin 3) → enter empty. */
+    /* HST1 off is not an Inspect gate (TMA0 A7). */
     {
         uint64_t tok = runtime_client_alloc_request_token(client);
         expect_true("hist off", runtime_client_history_record(client, false, tok));
         SDL_Delay(30);
         drain_ignore_error(client);
+        (void)runtime_tm_checkpoint_take(rt);
         tok = runtime_client_alloc_request_token(client);
-        expect_true("enter empty", runtime_client_tm_enter_forensic(client, tok));
+        expect_true("enter hst1 off", runtime_client_tm_enter_forensic(client, tok));
         expect_true(
-            "enter empty event",
+            "enter hst1 off event",
             wait_tm_mode(
-                client, tok, &ev, NULL, RUNTIME_STATE_CHANGED_OTHER, 2.0));
+                client, tok, &ev, NULL, RUNTIME_STATE_CHANGED_FORENSIC_ENTER, 2.0));
         expect_true(
-            "enter empty status",
-            ev.data.tm_mode.status == RUNTIME_TM_ENTER_EMPTY);
+            "enter hst1 off ok",
+            ev.data.tm_mode.status == RUNTIME_TM_ENTER_OK);
+        expect_true("hst1 off forensic", runtime_tm_in_forensic(rt));
+        tok = runtime_client_alloc_request_token(client);
+        expect_true("leave hst1 off", runtime_client_tm_exit_forensic(client, tok));
+        expect_true(
+            "leave hst1 off event",
+            wait_tm_mode(
+                client, tok, &ev, NULL, RUNTIME_STATE_CHANGED_FORENSIC_EXIT, 2.0));
         tok = runtime_client_alloc_request_token(client);
         expect_true("hist on", runtime_client_history_record(client, true, tok));
         SDL_Delay(30);
         drain_ignore_error(client);
+        (void)runtime_tm_checkpoint_take(rt);
+    }
+
+    /* Frame ring off is not an Inspect gate. */
+    {
+        uint64_t tok;
+        runtime_frame_ring_set_recording(&rt->frame_ring, false);
+        tok = runtime_client_alloc_request_token(client);
+        expect_true("enter film off", runtime_client_tm_enter_forensic(client, tok));
+        expect_true(
+            "enter film off event",
+            wait_tm_mode(
+                client, tok, &ev, NULL, RUNTIME_STATE_CHANGED_FORENSIC_ENTER, 2.0));
+        expect_true(
+            "enter film off ok",
+            ev.data.tm_mode.status == RUNTIME_TM_ENTER_OK);
+        tok = runtime_client_alloc_request_token(client);
+        expect_true("leave film off", runtime_client_tm_exit_forensic(client, tok));
+        expect_true(
+            "leave film off event",
+            wait_tm_mode(
+                client, tok, &ev, NULL, RUNTIME_STATE_CHANGED_FORENSIC_EXIT, 2.0));
+        runtime_frame_ring_set_recording(&rt->frame_ring, true);
         (void)runtime_tm_checkpoint_take(rt);
     }
 
@@ -372,8 +377,14 @@ int main(void)
     expect_true("cpu after enter", wait_cpu(client, &cpu_then, 2.0));
     expect_true("sealed", rt->machine.replay_sealed);
     expect_true("paused forensic", rt->exec_state != RUNTIME_EXEC_RUNNING);
+    pc_now = rt->machine.cpu.cpu.pc;
+    cycles_now = apple2_cycles(&rt->machine);
+    ram_now = apple2_debug_read(&rt->machine, 0x0000);
+    motor_now = rt->machine.diskii_controller[6].diskii_drive[0].motor_on;
+    via_t1_now = rt->machine.mockingboard[4].via[0].t1_counter;
+    expect_true("enter at live", cycles_now > 0u);
 
-    /* Read-only: poke / live step. */
+    /* Read-only pokes; execute is allowed and clamped to live. */
     expect_true(
         "poke",
         runtime_client_write_memory_byte(
@@ -381,103 +392,107 @@ int main(void)
     expect_true(
         "poke error",
         wait_error_code(client, RUNTIME_ERROR_READ_ONLY_FORENSIC, 2.0));
-    expect_true("step live", runtime_client_step_instruction(client));
-    expect_true(
-        "step error",
-        wait_error_code(client, RUNTIME_ERROR_READ_ONLY_FORENSIC, 2.0));
-    expect_true("run live", runtime_client_run(client));
-    expect_true(
-        "run error",
-        wait_error_code(client, RUNTIME_ERROR_READ_ONLY_FORENSIC, 2.0));
     expect_true("still forensic after poke", runtime_tm_in_forensic(rt));
 
-    /* Seek to mid-window; live matches scratch materialize. */
-    runtime_tm_window_info(rt, &window);
-    expect_true("window after enter", window.valid);
+    /* Land oldest snapshot. */
     {
-        uint64_t mid = window.oldest_cycle +
-            (window.newest_cycle - window.oldest_cycle) / 2u;
-        uint64_t focus_cycle;
-        if (mid < window.oldest_cycle) {
-            mid = window.oldest_cycle;
+        uint64_t old = 0u;
+        uint64_t live = 0u;
+        uint64_t n = 0u;
+        uint64_t hst1_before = 0u;
+        runtime_history_status st;
+
+        runtime_tm_timeline_bounds(rt, &old, &live, &n);
+        expect_true("timeline", n >= 1u);
+        if (rt->history != NULL) {
+            runtime_history_get_status(rt->history, &st);
+            hst1_before = st.record_count;
         }
         token = runtime_client_alloc_request_token(client);
-        expect_true("seek mid", runtime_client_tm_seek_cycle(client, mid, token));
-        expect_true("seek event", wait_tm_focus(client, token, &ev, 2.0));
-        expect_true(
-            "seek ok",
-            ev.data.tm_focus.status == RUNTIME_TM_QUERY_OK);
-        expect_true("seek focus", ev.data.tm_focus.focus.valid);
-        focus_cycle = ev.data.tm_focus.focus.cycle;
-        expect_true("init scratch", apple2_init(&scratch));
-        expect_true(
-            "scratch mat", runtime_tm_materialize(rt, focus_cycle, &scratch));
-        seek_pc = scratch.cpu.cpu.pc;
-        seek_a = scratch.cpu.cpu.A;
-        seek_ram = apple2_debug_read(&scratch, 0x0000);
-        apple2_shutdown(&scratch);
+        expect_true("land old", runtime_client_tm_land(client, old, token));
+        {
+            clock_t t0 = clock();
+            while (apple2_cycles(&rt->machine) != old &&
+                   (double)(clock() - t0) / (double)CLOCKS_PER_SEC < 2.0) {
+                SDL_Delay(1);
+            }
+        }
+        expect_true("cpu after land", wait_cpu(client, &cpu_back, 2.0));
+        expect_true("landed old cycle", apple2_cycles(&rt->machine) == old);
+        expect_true("still sealed after land", rt->machine.replay_sealed);
+        if (rt->history != NULL) {
+            runtime_history_get_status(rt->history, &st);
+            expect_true("hst1 unchanged", st.record_count == hst1_before);
+        }
 
-        expect_true("cpu after seek", wait_cpu(client, &cpu_back, 2.0));
-        if (rt->machine.cpu.cpu.pc != seek_pc) {
+        /* Step insn from the landed snapshot. */
+        {
+            uint64_t c0 = apple2_cycles(&rt->machine);
+            clock_t t0;
+            expect_true("step tt", runtime_client_step_instruction(client));
+            t0 = clock();
+            while (apple2_cycles(&rt->machine) == c0 &&
+                   !runtime_tm_at_live(rt) &&
+                   (double)(clock() - t0) / (double)CLOCKS_PER_SEC < 2.0) {
+                SDL_Delay(1);
+            }
+            expect_true("cpu after step", wait_cpu(client, &cpu_back, 2.0));
+            if (!(apple2_cycles(&rt->machine) > c0 || runtime_tm_at_live(rt))) {
+                fprintf(
+                    stderr,
+                    "step stuck c0=%llu now=%llu live=%d exec=%d\n",
+                    (unsigned long long)c0,
+                    (unsigned long long)apple2_cycles(&rt->machine),
+                    runtime_tm_at_live(rt) ? 1 : 0,
+                    (int)rt->exec_state);
+            }
+            expect_true(
+                "step advanced or live",
+                apple2_cycles(&rt->machine) > c0 || runtime_tm_at_live(rt));
+            expect_true("still forensic after step", runtime_tm_in_forensic(rt));
+        }
+
+        /* Land live restores NOW. */
+        token = runtime_client_alloc_request_token(client);
+        expect_true("land live", runtime_client_tm_land(client, live, token));
+        {
+            clock_t t0 = clock();
+            while (apple2_cycles(&rt->machine) != cycles_now &&
+                   (double)(clock() - t0) / (double)CLOCKS_PER_SEC < 2.0) {
+                SDL_Delay(1);
+            }
+        }
+        expect_true("cpu after land live", wait_cpu(client, &cpu_then, 2.0));
+        if (apple2_cycles(&rt->machine) != cycles_now) {
             fprintf(
                 stderr,
-                "seek pc live=%04X scratch=%04X focus_cycle=%llu live_cyc=%llu\n",
-                rt->machine.cpu.cpu.pc,
-                seek_pc,
-                (unsigned long long)focus_cycle,
-                (unsigned long long)apple2_cycles(&rt->machine));
+                "land live got=%llu want=%llu arg=%llu at_live=%d\n",
+                (unsigned long long)apple2_cycles(&rt->machine),
+                (unsigned long long)cycles_now,
+                (unsigned long long)live,
+                runtime_tm_at_live(rt) ? 1 : 0);
         }
-        expect_true("seek pc", rt->machine.cpu.cpu.pc == seek_pc);
-        expect_true("seek a", rt->machine.cpu.cpu.A == seek_a);
-        expect_true(
-            "seek ram", apple2_debug_read(&rt->machine, 0x0000) == seek_ram);
-        expect_true("still sealed", rt->machine.replay_sealed);
+        expect_true("live cycle", apple2_cycles(&rt->machine) == cycles_now);
+        expect_true("live pc", rt->machine.cpu.cpu.pc == pc_now);
+
+        /* F12 at live is a no-op (stay in time travel, paused). */
+        expect_true("run at live", runtime_client_run(client));
+        SDL_Delay(40);
+        drain_ignore_error(client);
+        expect_true("still forensic at live run", runtime_tm_in_forensic(rt));
+        expect_true("still paused at live", rt->exec_state != RUNTIME_EXEC_RUNNING);
+        expect_true("live cycle after run", apple2_cycles(&rt->machine) == cycles_now);
     }
 
-    /* Backward seek to oldest. */
-    {
-        uint64_t old = window.oldest_cycle;
-        token = runtime_client_alloc_request_token(client);
-        expect_true("seek old", runtime_client_tm_seek_cycle(client, old, token));
-        expect_true("seek old event", wait_tm_focus(client, token, &ev, 2.0));
-        expect_true(
-            "seek old ok",
-            ev.data.tm_focus.status == RUNTIME_TM_QUERY_OK);
-        expect_true(
-            "cycles moved or equal",
-            apple2_cycles(&rt->machine) <= cycles_now);
-    }
-
-    /* Window-edge: seek outside does not move state. */
-    {
-        uint16_t pc_before = rt->machine.cpu.cpu.pc;
-        uint64_t cyc_before = apple2_cycles(&rt->machine);
-        token = runtime_client_alloc_request_token(client);
-        expect_true(
-            "seek outside",
-            runtime_client_tm_seek_cycle(
-                client, window.newest_cycle + 100000u, token));
-        expect_true("outside event", wait_tm_focus(client, token, &ev, 2.0));
-        expect_true(
-            "outside not retained",
-            ev.data.tm_focus.status == RUNTIME_TM_QUERY_NOT_RETAINED);
-        expect_true("pc unchanged", rt->machine.cpu.cpu.pc == pc_before);
-        expect_true("cyc unchanged", apple2_cycles(&rt->machine) == cyc_before);
-    }
-
-    /* Force materialize failure, then exit still restores NOW. */
+    /* Force land failure, then exit still restores NOW. */
     runtime_tm_on_history_invalidate(rt);
     expect_true("cps cleared", runtime_tm_checkpoint_count(rt) == 0u);
     token = runtime_client_alloc_request_token(client);
     expect_true(
-        "seek after wipe",
-        runtime_client_tm_seek_cycle(client, window.oldest_cycle, token));
-    expect_true("wipe event", wait_tm_focus(client, token, &ev, 2.0));
-    expect_true(
-        "wipe failed or not retained",
-        ev.data.tm_focus.status == RUNTIME_TM_QUERY_MATERIALIZE_FAILED ||
-            ev.data.tm_focus.status == RUNTIME_TM_QUERY_NOT_RETAINED ||
-            ev.data.tm_focus.status == RUNTIME_TM_QUERY_EMPTY);
+        "land after wipe",
+        runtime_client_tm_land(client, 0u, token));
+    SDL_Delay(30);
+    drain_ignore_error(client);
     expect_true("still forensic after fail", runtime_tm_in_forensic(rt));
 
     token = runtime_client_alloc_request_token(client);
@@ -615,10 +630,11 @@ int main(void)
     }
 #endif
 
-    /* Flood tape seeks then stop. Quit used to sit behind the backlog (or fail
-       to enqueue) and beachball. */
+    /* Flood lands then stop. Slam-left must not stall the worker. */
     {
-        runtime_tm_window w;
+        uint64_t old = 0u;
+        uint64_t live = 0u;
+        uint64_t n = 0u;
         int i;
 
         expect_true("run-flood", runtime_client_run(client));
@@ -643,13 +659,13 @@ int main(void)
             }
         }
         expect_true("forensic-flood", runtime_tm_in_forensic(rt));
-        runtime_tm_window_info(rt, &w);
-        expect_true("window-flood", w.valid && w.newest_cycle >= w.oldest_cycle);
+        runtime_tm_timeline_bounds(rt, &old, &live, &n);
+        expect_true("timeline-flood", n >= 1u && live >= old);
         for (i = 0; i < 64; ++i) {
-            uint64_t span = w.newest_cycle - w.oldest_cycle;
-            uint64_t cyc = w.oldest_cycle + (span * (uint64_t)i) / 63u;
+            uint64_t span = live - old;
+            uint64_t cyc = old + (span * (uint64_t)i) / 63u;
             token = runtime_client_alloc_request_token(client);
-            (void)runtime_client_tm_seek_cycle(client, cyc, token);
+            (void)runtime_client_tm_land(client, cyc, token);
         }
     }
 

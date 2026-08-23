@@ -220,10 +220,11 @@ struct runtime {
     uint32_t timemachine_memory_mb;
     runtime_tm_focus tm_focus;
     struct runtime_tm_recorder *tm_recorder;
-    /* TM3: forensic mode replaces live apple2_t with THEN; NOW blob for exit. */
+    /* TM3/TMA1: time-travel mode replaces live apple2_t; NOW blob is live. */
     bool tm_forensic;
     uint8_t *tm_now_blob;
     size_t tm_now_size;
+    uint64_t tm_now_cycle;
 
     /* TRON/TROFF instruction log (C5b) — file open while trace_enabled. */
     bool trace_enabled;

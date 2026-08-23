@@ -1551,13 +1551,14 @@ defaults, TimeMachine on is 256 + 128 + 128 = 512 MB. A budget of `0` disables
 that recorder and leaves an empty tape; it is not overridden back to the default.
 
 Open F9 debugger, Misc -> Inspector. Enable recording, Pause, then Inspect.
-The debugger tints and becomes read-only while you scrub the tape. Leave
-Inspector restores live NOW and stays paused (F12 runs again). F7 is unbound.
+Inspect is **time travel**: you start at live (the paused NOW). Drag the
+slider to preview stored film or pink (no still); release lands a snapshot.
+[-]/[+] step one video frame. F12 re-executes toward live and stops at a
+breakpoint or at live; you stay in Inspect. Leave Inspector restores live NOW
+and stays paused. F7 is unbound. Opt+Left is unbound in time travel.
 
-While Inspect is active, Misc -> Breakpoints shows **Time Machine
-breakpoints** (execute / write on the tape). Opt+B toggles execute at the
-disassembly cursor into that list, not the live list. Run tape to breakpoint
-scans HST1 then materializes the hit. Live breakpoints are unchanged.
+Breakpoints are **one list** in live and time travel. Opt+B toggles execute at
+the disassembly cursor. Pokes are rejected while Inspect is on.
 
 A guest disk write that succeeds drops earlier history: the scrubber's left
 edge is that write, not data loss. Saving to a writable disk mid-session will
@@ -1626,12 +1627,12 @@ macOS, **Opt** = Option/Alt.
 | **Opt+H** | Toggle in-emulator help on/off |
 | **Shift+Opt+A** | Assemble the configured source file using the Assembler settings |
 | **Shift+Opt+M** | Toggle keyboard joystick mapping between Numpad and WASD |
-| **F10** | Live: step instruction (paused) or Pause (running). Forensic: tape step |
-| **Shift+F10** | Live: step out. Forensic: tape step-out |
-| **F11** | Live: step over JSR. Forensic: tape step-over |
-| **F12** | Live: run. Forensic: tape run-to disassembly cursor |
-| **Shift+F12** | Live: run to cursor. Forensic: tape run-to cursor |
-| **Opt+B** | Live: toggle execute breakpoint at disassembly cursor. Forensic: same, on the Time Machine list |
+| **F10** | Live: step instruction (paused) or Pause (running). Time travel: sealed step (no-op at live) |
+| **Shift+F10** | Live: step out. Time travel: sealed step-out (no-op at live) |
+| **F11** | Live: step over JSR. Time travel: sealed step-over (no-op at live) |
+| **F12** | Live: run. Time travel: re-execute to a breakpoint or live; stay in Inspect |
+| **Shift+F12** | Live: run to cursor. Time travel: run-to-cursor; stop at a breakpoint or live |
+| **Opt+B** | Toggle execute breakpoint at disassembly cursor (same list in live and time travel) |
 | **F8** | Warm reset (CTRL+RESET) |
 | **Opt+F8** | Cold reset (CTRL+Open-Apple+RESET) |
 | **Opt+T** | Cycle turbo mode |
@@ -1985,7 +1986,7 @@ flight recorder for the same moment.
 | `save-state <path>` | Write a `.a2state` snapshot |
 
 `get-state` is answered from the main loop's cached frontend debug state.
-While `mode=forensic`, `get-cpu` / `get-memory` / `get-frame` show the tape head
+While `mode=forensic` (time travel), `get-cpu` / `get-memory` / `get-frame` show the landed Apple
 (THEN). Mutating verbs (`run`, `set-memory`, `set-reg`, mount, reset, ...) fail
 with `error read-only-forensic`. `exit-forensic` restores live NOW and does not
 resume execution.

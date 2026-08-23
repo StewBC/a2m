@@ -1152,6 +1152,35 @@ bool runtime_client_tm_set_execute_breakpoint(
     return runtime_client_push(client, &command);
 }
 
+bool runtime_client_tm_land(
+    runtime_client *client, uint64_t cycle, uint64_t request_token)
+{
+    runtime_command command = {
+        .type = RUNTIME_COMMAND_TM_LAND,
+        .request_token = request_token,
+    };
+    if (client == NULL) {
+        return false;
+    }
+    command.data.tm_land.cycle = cycle;
+    return runtime_client_push(client, &command);
+}
+
+bool runtime_client_tm_frame_step(
+    runtime_client *client, int direction, uint64_t request_token)
+{
+    runtime_command command = {
+        .type = RUNTIME_COMMAND_TM_FRAME_STEP,
+        .request_token = request_token,
+    };
+    if (client == NULL) {
+        return false;
+    }
+    command.data.tm_frame_step.direction =
+        direction < 0 ? (int8_t)-1 : (int8_t)1;
+    return runtime_client_push(client, &command);
+}
+
 bool runtime_client_tm_run_until_break(
     runtime_client *client, uint64_t request_token) {
     return runtime_client_send_command_token(

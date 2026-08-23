@@ -46,6 +46,7 @@ struct runtime_tm_recorder {
     uint32_t input_cap;
     uint32_t input_count;
     uint32_t input_head;
+    uint32_t replay_i; /* offset from tail; time-travel input cursor */
 };
 
 static uint32_t tm_cp_index(const struct runtime_tm_recorder *rec, uint32_t logical)
@@ -630,4 +631,61 @@ void runtime_tm_fill_window_extras(const runtime *rt, runtime_tm_window *out)
     out->media_truncations = rt->tm_recorder->truncations;
     out->start_kind = rt->tm_recorder->start_kind;
     out->start_arg1 = rt->tm_recorder->start_arg1;
+}
+
+void runtime_tm_apply_logged_inputs(
+    runtime *rt, apple2_t *dst, uint64_t from_inclusive, uint64_t to_inclusive)
+{
+    struct runtime_tm_recorder *rec;
+    uint32_t tail;
+
+    if (rt == NULL || dst == NULL || rt->tm_recorder == NULL) {
+        return;
+    }
+    rec = rt->tm_recorder;
+    if (to_inclusive < from_inclusive || rec->input_count == 0u) {
+        return;
+    }
+    tail = (rec->input_head + rec->input_cap - rec->input_count) % rec->input_cap;
+    if (rec->replay_i > rec->input_count) {
+        rec->replay_i = 0u;
+    }
+    while (rec->replay_i < rec->input_count) {
+        const runtime_tm_input *ev =
+            &rec->inputs[(tail + rec->replay_i) % rec->input_cap];
+        if (ev->cycle < from_inclusive) {
+            rec->replay_i++;
+            continue;
+        }
+        if (ev->cycle > to_inclusive) {
+            break;
+        }
+        tm_apply_input(dst, ev);
+        rec->replay_i++;
+    }
+}
+
+bool runtime_tm_load_nearest_checkpoint(runtime *rt, uint64_t cycle)
+{
+    struct runtime_tm_recorder *rec;
+    const runtime_tm_checkpoint *cp;
+
+    if (rt == NULL || !rt->machine_ready || rt->tm_recorder == NULL) {
+        return false;
+    }
+    rec = rt->tm_recorder;
+    cp = tm_nearest_cp(rec, cycle);
+    if (cp == NULL || cp->blob == NULL) {
+        return false;
+    }
+    if (!apple2_snapshot_load(&rt->machine, cp->blob, cp->size)) {
+        return false;
+    }
+    apple2_video_reseed_from_cycles(&rt->machine);
+    rt->machine.video.paint_enabled = true;
+    apple2_set_replay_sealed(&rt->machine, true);
+    apple2_set_cpu_observer(&rt->machine, NULL, NULL);
+    apple2_set_memory_access_callback(&rt->machine, NULL, NULL);
+    rec->replay_i = 0u;
+    return true;
 }

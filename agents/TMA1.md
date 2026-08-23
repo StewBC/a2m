@@ -210,19 +210,19 @@ Do not add flaky UI automation. Manual smoke is the GUI gate.
 
 ## Acceptance checklist
 
-- [ ] Enter Inspect = checkpoints only; **starts at live**  
-- [ ] Slider = oldest snapshot → live; drag does not mutate the Apple; thumb follows cycles  
-- [ ] Drag CRT = film or pink (`255,0,255`)  
-- [ ] Release lands (`load(cp ≤ time)` or live); CRT painted; HST1 unused  
-- [ ] `[-]`/`[+]` = one guest frame; disabled at oldest / live  
-- [ ] F10-family = sealed re-execute; F12 stops at a breakpoint or live; stay in time travel  
-- [ ] Opt+Left unbound; one BP list  
-- [ ] Pokes still rejected; leave restores NOW paused  
-- [ ] Slam-left does not stall the worker  
-- [ ] ctest green; enter tests updated for A7 + start-at-live  
-- [ ] Manual smoke + manual.md  
-- [ ] **Landed** filled below  
-- [ ] **Stop.** Do not start TMA2.
+- [x] Enter Inspect = checkpoints only; **starts at live**  
+- [x] Slider = oldest snapshot → live; drag does not mutate the Apple; thumb follows cycles  
+- [x] Drag CRT = film or pink (`255,0,255`)  
+- [x] Release lands (`load(cp ≤ time)` or live); CRT painted; HST1 unused  
+- [x] `[-]`/`[+]` = one guest frame; disabled at oldest / live  
+- [x] F10-family = sealed re-execute; F12 stops at a breakpoint or live; stay in time travel  
+- [x] Opt+Left unbound; one BP list  
+- [x] Pokes still rejected; leave restores NOW paused  
+- [x] Slam-left does not stall the worker  
+- [x] ctest green; enter tests updated for A7 + start-at-live  
+- [x] Manual smoke + manual.md  
+- [x] **Landed** filled below  
+- [x] **Stop.** Do not start TMA2.
 
 ---
 
@@ -240,4 +240,11 @@ Do not add flaky UI automation. Manual smoke is the GUI gate.
 
 ## Landed
 
-Not yet.
+2026-08-23. Inspector is time travel: film / land / re-execute to live.
+
+- Enter Inspect needs checkpoints only (A7); starts at live (no HST1 SEEK).
+- Slider is oldest snapshot → live; drag previews film or pink; release lands.
+- Thumb follows machine cycles. `[-]`/`[+]` frame-step; F10-family sealed execute.
+- F12 runs to a breakpoint or live and stays in Inspect. Opt+Left unbound.
+- One breakpoint list. TM1 query engine is unused by the Inspector (deleted in TMA2).
+- ctest 60 green. Stop for a look before TMA2.
