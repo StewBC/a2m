@@ -223,7 +223,7 @@ Left-edge text uses `tm_window_start_kind` / `start_arg1`:
 | Shift+F10 | `tm_step_out` |
 | F12 / Shift+F12 | `tm_run_to` at disasm cursor |
 | Opt+Left | `tm_run_to` at disasm cursor (not poke PC) |
-| Opt+B | unbound |
+| Opt+B | TM5: toggle execute on the Time Machine list |
 | Memory / register type-in | no-op in UI; worker would `read-only-forensic` |
 
 Live F10-while-running is still Pause (does **not** auto-enter forensic).
@@ -235,10 +235,8 @@ Forensic F12 is tape run-to, not live run. **Leave Inspector** first, then F12.
 - Title: `TIME MACHINE oldest-newest @ focus` via `frontend_format_window_title_ex`.
 - Registers: `NK_EDIT_READ_ONLY` (same `editable` flag as running).
 - Memory footer: `read-only` while forensic (not `editable`). Hex type-in is a no-op.
-- Breakpoints tab: New / Edit / Duplicate / Enable / Disable / Clear / Clear All
-  disabled + "forensic breakpoints are TM5". **View PC** stays (navigation).
-  Opt+B unbound. BP create/update/clear/enable intents are dropped in
-  `dispatch_intent` while forensic (worker still allows control-port BP edits).
+- Breakpoints tab in forensic is the TM5 Time Machine list (see [`TM5.md`](TM5.md)).
+  Opt+B arms that store. Live list is not edited.
 - Host keys not sent to the Apple while forensic. F8, Opt+Insert paste,
   quicksave/load, Opt+Shift+A, and kbd-stick also skipped (worker would
   `read-only-forensic`). Configure OK (`CONFIG_APPLY`) is dropped too.

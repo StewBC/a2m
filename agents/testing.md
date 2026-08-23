@@ -8,7 +8,7 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-Expect **59** green. Run from repo root. TM4 is UI; gate stays 59 (no new ctest).
+Expect **60** green. Run from repo root.
 
 ## Registered tests (product gate)
 
@@ -55,6 +55,7 @@ Expect **59** green. Run from repo root. TM4 is UI; gate stays 59 (no new ctest)
 | `runtime_tm_query` | TM1: HST1 step/over/out/run-to/seek; window clamp; epoch reject |
 | `runtime_tm_replay` | TM2: checkpoint + sealed materialize; media truncate; max kills window |
 | `runtime_tm_forensic` | TM3: enter/exit NOW; seek materialize; read-only; control mode/exit |
+| `runtime_tm_bp` | TM5: forensic BP store; tape run-until exec hit; live list unchanged |
 | `control_protocol` | A2M parse + format (`src/control`) |
 | `assembler_*` | expressions/conditionals/loops/macros/scopes/targets/CPU profiles/multifile |
 | `runtime_assembler` | live RAM assembly + runtime event path |

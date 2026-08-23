@@ -4,8 +4,8 @@
 
 **Rules:** [`rules.md`](rules.md)  
 **Closed:** paint; SP `$C800`; BP 0–4e + P4b TRON; remote-debug **C0–C5b**; control tools **T1–T5**; `get-softswitches`; **turbo-zip**; **max free-run S2**; **snapshots** ([`snapshots.md`](snapshots.md) — `.a2state` save/load, drop, `--sna`, Opt+Shift+./,); **sessions foundation** ([`sessions.md`](sessions.md) — multi-asker + `state-changed`; A2M/11).  
-**Active:** **TimeMachine V1 accepted** (TM0–TM4) with the caveat that **TM-on recording must hold 1 MHz**. Misc -> Inspector is the forensic entry; F7 stays unbound. **TM5 / TM6** are V1.1 (forensic BPs / Promote) — do not start until the TM-on play path is real-time. Lessons from retired F7: [`inspector.md`](inspector.md).  
-**Look-later:** TM-on 1 MHz record path; then TM5 forensic BPs / TM6 Promote; debug ergonomics (mem workshop, live remount, frame gate / HW snaps).
+**Active:** **TimeMachine V1 accepted** (TM0–TM4). **TM5 forensic BPs landed.** Misc -> Inspector is the forensic entry; Opt+B in forensic arms the TM store only. F7 stays unbound. **TM6** Promote is V1.1 remaining. Lessons from retired F7: [`inspector.md`](inspector.md).  
+**Look-later:** TM6 Promote/Branch; TM BP conditions / sealed re-run; debug ergonomics (mem workshop, live remount, frame gate / HW snaps).
 
 ---
 
@@ -32,6 +32,7 @@
 | **F10** / Shift+F10 | Pause/step · step out (forensic: tape step / step-out) |
 | **F11** | Step over (forensic: tape step-over) |
 | **F12** / Shift+F12 | Run · run to cursor (forensic: tape run-to cursor) |
+| **Opt+B** | Toggle execute BP at disasm cursor (forensic: Time Machine list only) |
 | **Opt+T** | Cycle turbo ladder (MHz / max — [`turbo-zip.md`](turbo-zip.md)) |
 | **Opt+Shift+.** / **,** | Quicksave / quickload `.a2state` |
 | **Opt+Shift+A** | Assemble configured source; honor reset / auto-run / MLI launch / one-shot options |
@@ -52,7 +53,7 @@ Keyboard stick (when on): Option/KP0 and Space are fire keys (optional swap in C
 
 | Area | Evidence |
 |------|----------|
-| Build / ctest | **59 green** (`testing.md`; includes sessions + state-changed, file-codec, assembler MLI launch, TM0–TM3) |
+| Build / ctest | **60 green** (`testing.md`; includes sessions + state-changed, file-codec, assembler MLI launch, TM0–TM5) |
 | Assembler | Misc → Assembler: assemble to RAM / `file=` HostFS; optional Auto-run; **MLI launch** gates auto-run on CPU-visible `$BF00 == $4C` (mutually exclusive with Reset); sample shim in `samples/asm_mli_launch/` |
 | CLI / INI | model, mounts sNdN (multi-image queue), turbo MHz/`max`, lifecycle, headless; `[DEBUG] break.*` |
 | Turbo / step / reset | Opt+T (MHz/max); F10–F12 family; F8 / Opt+F8 |

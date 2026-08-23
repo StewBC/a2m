@@ -58,7 +58,8 @@ typedef enum runtime_tm_query_op {
     RUNTIME_TM_QUERY_STEP,
     RUNTIME_TM_QUERY_STEP_OVER,
     RUNTIME_TM_QUERY_STEP_OUT,
-    RUNTIME_TM_QUERY_RUN_TO_PC
+    RUNTIME_TM_QUERY_RUN_TO_PC,
+    RUNTIME_TM_QUERY_RUN_UNTIL_BREAK
 } runtime_tm_query_op;
 
 typedef enum runtime_tm_query_status {

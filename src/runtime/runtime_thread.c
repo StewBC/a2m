@@ -1757,6 +1757,19 @@ static void runtime_publish_breakpoints(runtime *rt)
     runtime_publish_event(rt, &event);
 }
 
+static void runtime_publish_tm_breakpoints(runtime *rt)
+{
+    runtime_event event;
+    runtime_breakpoint_snapshot snap;
+
+    runtime_tm_bp_fill_snapshot(rt, &snap);
+    memset(&event, 0, sizeof(event));
+    event.type = RUNTIME_EVENT_TM_BREAKPOINTS_RESPONSE;
+    event.data.breakpoints = snap;
+    event.data.breakpoints_ready.count = snap.count;
+    runtime_publish_event(rt, &event);
+}
+
 static int runtime_find_breakpoint_by_id(const runtime *rt, uint32_t id)
 {
     size_t i;
@@ -4369,6 +4382,53 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
                 session_id,
                 kind);
         }
+        break;
+    }
+
+    case RUNTIME_COMMAND_TM_BP_CREATE:
+        (void)runtime_tm_bp_add(rt, &cmd->data.create_breakpoint.definition, NULL);
+        runtime_publish_tm_breakpoints(rt);
+        break;
+    case RUNTIME_COMMAND_TM_BP_UPDATE:
+        (void)runtime_tm_bp_update(
+            rt,
+            cmd->data.update_breakpoint.id,
+            &cmd->data.update_breakpoint.definition);
+        runtime_publish_tm_breakpoints(rt);
+        break;
+    case RUNTIME_COMMAND_TM_BP_CLEAR:
+        (void)runtime_tm_bp_clear(rt, cmd->data.clear_breakpoint.id);
+        runtime_publish_tm_breakpoints(rt);
+        break;
+    case RUNTIME_COMMAND_TM_BP_CLEAR_ALL:
+        runtime_tm_bp_clear_all(rt);
+        runtime_publish_tm_breakpoints(rt);
+        break;
+    case RUNTIME_COMMAND_TM_BP_SET_ENABLED:
+        (void)runtime_tm_bp_set_enabled(
+            rt,
+            cmd->data.set_breakpoint_enabled.id,
+            cmd->data.set_breakpoint_enabled.enabled != 0);
+        runtime_publish_tm_breakpoints(rt);
+        break;
+    case RUNTIME_COMMAND_TM_BP_REQUEST:
+        runtime_publish_tm_breakpoints(rt);
+        break;
+    case RUNTIME_COMMAND_TM_SET_EXECUTE_BREAKPOINT:
+        runtime_tm_bp_toggle_execute(
+            rt, cmd->data.set_execute_breakpoint.address);
+        runtime_publish_tm_breakpoints(rt);
+        break;
+    case RUNTIME_COMMAND_TM_RUN_UNTIL_BREAK: {
+        runtime_command query_cmd;
+
+        memset(&query_cmd, 0, sizeof(query_cmd));
+        query_cmd.type = RUNTIME_COMMAND_TM_QUERY;
+        query_cmd.request_token = cmd->request_token;
+        query_cmd.session_id = cmd->session_id;
+        query_cmd.data.tm_query.op =
+            (uint8_t)RUNTIME_TM_QUERY_RUN_UNTIL_BREAK;
+        runtime_process_command(rt, &query_cmd, alive);
         break;
     }
 

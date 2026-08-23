@@ -22,6 +22,7 @@ typedef struct frontend_debug_state {
     int memory_view_snapshot_count;
     runtime_debug_memory_snapshot debug_memory;
     runtime_breakpoint_snapshot breakpoints;
+    runtime_breakpoint_snapshot tm_breakpoints;
     runtime_disk_status_snapshot disk_status[2];
     runtime_call_stack_snapshot call_stack;
     uint64_t frame_number;
@@ -38,6 +39,7 @@ typedef struct frontend_debug_state {
     bool has_memory;
     bool has_debug_memory;
     bool has_breakpoints;
+    bool has_tm_breakpoints;
     bool has_disk_status[2];
     bool has_call_stack;
     /* Apple soft switches / model. */
@@ -132,7 +134,8 @@ typedef enum frontend_debugger_intent_type {
     FRONTEND_DEBUGGER_INTENT_TM_EXIT_FORENSIC,
     FRONTEND_DEBUGGER_INTENT_TM_SEEK_CYCLE,
     FRONTEND_DEBUGGER_INTENT_TM_PAUSE,
-    FRONTEND_DEBUGGER_INTENT_TM_RUN_TO
+    FRONTEND_DEBUGGER_INTENT_TM_RUN_TO,
+    FRONTEND_DEBUGGER_INTENT_TM_RUN_UNTIL
 } frontend_debugger_intent_type;
 
 /* File-browser "default folder" slots. Each remembers the last directory used by

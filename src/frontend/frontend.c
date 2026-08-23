@@ -1325,12 +1325,33 @@ static void frontend_toggle_execute_breakpoint_at_cursor(
     const runtime_breakpoint_snapshot_entry *entry;
     uint16_t address;
 
-    if (ui == NULL || !ui->disassembly.has_user_cursor ||
-        (debug_state != NULL && debug_state->tm_forensic)) {
+    if (ui == NULL || !ui->disassembly.has_user_cursor) {
         return;
     }
 
     address = ui->disassembly.cursor_address;
+    if (debug_state != NULL && debug_state->tm_forensic) {
+        if (debug_state->has_tm_breakpoints) {
+            uint16_t i;
+            for (i = 0; i < debug_state->tm_breakpoints.count; ++i) {
+                const runtime_breakpoint_snapshot_entry *tm_entry =
+                    &debug_state->tm_breakpoints.entries[i];
+                if (tm_entry->start_address == address &&
+                    tm_entry->has_end_address == 0 &&
+                    (tm_entry->access & RUNTIME_BREAKPOINT_ACCESS_EXECUTE) != 0) {
+                    frontend_push_breakpoint_id_intent(
+                        ui,
+                        FRONTEND_DEBUGGER_INTENT_BREAKPOINT_CLEAR,
+                        tm_entry->id,
+                        false);
+                    return;
+                }
+            }
+        }
+        frontend_push_debugger_intent(
+            ui, FRONTEND_DEBUGGER_INTENT_BREAKPOINT_SET_EXECUTE, address);
+        return;
+    }
     entry = frontend_find_execute_breakpoint(debug_state, address);
     if (entry != NULL) {
         frontend_push_breakpoint_id_intent(
@@ -4080,9 +4101,6 @@ static void frontend_disassembly_handle_key(
     shift = (mod & KMOD_SHIFT) != 0;
 
     if (alt && sym == SDLK_b) {
-        if (debug_state != NULL && debug_state->tm_forensic) {
-            return;
-        }
         frontend_disassembly_ensure_user_cursor(ui, debug_state);
         frontend_toggle_execute_breakpoint_at_cursor(ui, debug_state);
         return;
@@ -6887,23 +6905,38 @@ static void frontend_draw_misc_breakpoints(frontend *ui, const frontend_debug_st
 
     ctx = ui->ctx;
     forensic = debug_state != NULL && debug_state->tm_forensic;
-    count = debug_state != NULL && debug_state->has_breakpoints ?
-        debug_state->breakpoints.count :
-        0;
+    if (forensic) {
+        count = debug_state != NULL && debug_state->has_tm_breakpoints ?
+            debug_state->tm_breakpoints.count : 0;
+    } else {
+        count = debug_state != NULL && debug_state->has_breakpoints ?
+            debug_state->breakpoints.count : 0;
+    }
 
     nk_layout_row_dynamic(ctx, 18.0f, 1);
-    nk_label(ctx, "Breakpoints", NK_TEXT_LEFT);
+    nk_label(
+        ctx,
+        forensic ? "Time Machine breakpoints" : "Breakpoints",
+        NK_TEXT_LEFT);
     if (forensic) {
         nk_layout_row_dynamic(ctx, 36.0f, 1);
         nk_label_wrap(
             ctx,
-            "Breakpoints are live-only while TIME MACHINE is active. "
-            "Forensic breakpoints are TM5.");
+            "Tape breakpoints (execute / write). They do not change the live "
+            "list. Opt+B toggles execute at the disassembly cursor.");
+        nk_layout_row_dynamic(ctx, 24.0f, 1);
+        if (nk_button_label(ctx, "Run tape to breakpoint")) {
+            frontend_push_debugger_intent(
+                ui, FRONTEND_DEBUGGER_INTENT_TM_RUN_UNTIL, 0);
+        }
+    } else {
+        nk_layout_row_dynamic(ctx, 32.0f, 1);
+        nk_label_wrap(
+            ctx,
+            "Inspector mode has a separate Time Machine breakpoint list.");
     }
     nk_layout_row_dynamic(ctx, 24.0f, 1);
-    if (forensic) {
-        nk_label(ctx, "New (disabled)", NK_TEXT_LEFT);
-    } else if (nk_button_label(ctx, "New")) {
+    if (nk_button_label(ctx, "New")) {
         frontend_open_breakpoint_dialog_default(ui);
     }
 
@@ -6913,7 +6946,9 @@ static void frontend_draw_misc_breakpoints(frontend *ui, const frontend_debug_st
     }
 
     for (i = 0; i < count; ++i) {
-        const runtime_breakpoint_snapshot_entry *entry = &debug_state->breakpoints.entries[i];
+        const runtime_breakpoint_snapshot_entry *entry = forensic ?
+            &debug_state->tm_breakpoints.entries[i] :
+            &debug_state->breakpoints.entries[i];
         struct nk_style_button saved_button = ctx->style.button;
         char label[96];
         char access[4];
@@ -6969,18 +7004,18 @@ static void frontend_draw_misc_breakpoints(frontend *ui, const frontend_debug_st
             NK_TEXT_LEFT,
             entry->enabled != 0 ? nk_rgb(232, 235, 238) : nk_rgb(180, 142, 210));
         nk_layout_row_push(ctx, 0.13f);
-        if (frontend_nk_action_button(ctx, "Edit", !forensic)) {
+        if (frontend_nk_action_button(ctx, "Edit", true)) {
             frontend_open_breakpoint_dialog_from_entry(ui, entry, false);
         }
         nk_layout_row_push(ctx, 0.16f);
-        if (frontend_nk_action_button(ctx, "Duplicate", !forensic)) {
+        if (frontend_nk_action_button(ctx, "Duplicate", true)) {
             frontend_open_breakpoint_dialog_from_entry(ui, entry, true);
         }
         nk_layout_row_push(ctx, 0.14f);
         if (frontend_nk_action_button(
                 ctx,
                 entry->enabled != 0 ? "Disable" : "Enable",
-                !forensic)) {
+                true)) {
             frontend_push_breakpoint_id_intent(
                 ui,
                 FRONTEND_DEBUGGER_INTENT_BREAKPOINT_SET_ENABLED,
@@ -6993,7 +7028,7 @@ static void frontend_draw_misc_breakpoints(frontend *ui, const frontend_debug_st
             frontend_disassembly_set_user_cursor(&ui->disassembly, entry->start_address, ui->disassembly.rows / 2, 1);
         }
         nk_layout_row_push(ctx, 0.14f);
-        if (frontend_nk_action_button(ctx, "Clear", !forensic)) {
+        if (frontend_nk_action_button(ctx, "Clear", true)) {
             frontend_push_breakpoint_id_intent(
                 ui,
                 FRONTEND_DEBUGGER_INTENT_BREAKPOINT_CLEAR,
@@ -7006,7 +7041,7 @@ static void frontend_draw_misc_breakpoints(frontend *ui, const frontend_debug_st
 
     if (count >= 2) {
         nk_layout_row_dynamic(ctx, 24.0f, 1);
-        if (frontend_nk_action_button(ctx, "Clear All", !forensic)) {
+        if (frontend_nk_action_button(ctx, "Clear All", true)) {
             frontend_push_debugger_intent(
                 ui,
                 FRONTEND_DEBUGGER_INTENT_BREAKPOINT_CLEAR_ALL,

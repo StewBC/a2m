@@ -86,7 +86,8 @@ typedef enum runtime_event_type {
     RUNTIME_EVENT_STATE_CHANGED,
     RUNTIME_EVENT_MEDIA_CHANGED,
     RUNTIME_EVENT_TM_FOCUS,
-    RUNTIME_EVENT_TM_MODE
+    RUNTIME_EVENT_TM_MODE,
+    RUNTIME_EVENT_TM_BREAKPOINTS_RESPONSE
 } runtime_event_type;
 
 typedef enum runtime_state_changed_reason {

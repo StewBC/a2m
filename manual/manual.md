@@ -1554,6 +1554,11 @@ Open F9 debugger, Misc -> Inspector. Enable recording, Pause, then Inspect.
 The debugger tints and becomes read-only while you scrub the tape. Leave
 Inspector restores live NOW and stays paused (F12 runs again). F7 is unbound.
 
+While Inspect is active, Misc -> Breakpoints shows **Time Machine
+breakpoints** (execute / write on the tape). Opt+B toggles execute at the
+disassembly cursor into that list, not the live list. Run tape to breakpoint
+scans HST1 then materializes the hit. Live breakpoints are unchanged.
+
 A guest disk write that succeeds drops earlier history: the scrubber's left
 edge is that write, not data loss. Saving to a writable disk mid-session will
 cut the window. Opt+T into max also discards the tape (`history_off_on_max`).
@@ -1626,6 +1631,7 @@ macOS, **Opt** = Option/Alt.
 | **F11** | Live: step over JSR. Forensic: tape step-over |
 | **F12** | Live: run. Forensic: tape run-to disassembly cursor |
 | **Shift+F12** | Live: run to cursor. Forensic: tape run-to cursor |
+| **Opt+B** | Live: toggle execute breakpoint at disassembly cursor. Forensic: same, on the Time Machine list |
 | **F8** | Warm reset (CTRL+RESET) |
 | **Opt+F8** | Cold reset (CTRL+Open-Apple+RESET) |
 | **Opt+T** | Cycle turbo mode |

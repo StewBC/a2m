@@ -1074,6 +1074,90 @@ bool runtime_client_tm_exit_forensic(
         client, RUNTIME_COMMAND_TM_EXIT_FORENSIC, request_token);
 }
 
+bool runtime_client_tm_bp_create(
+    runtime_client *client,
+    const runtime_breakpoint_definition *definition) {
+    runtime_command command = {
+        .type = RUNTIME_COMMAND_TM_BP_CREATE,
+    };
+
+    if (!client || !definition) {
+        return false;
+    }
+    command.data.create_breakpoint.definition = *definition;
+    return runtime_client_push(client, &command);
+}
+
+bool runtime_client_tm_bp_update(
+    runtime_client *client,
+    uint32_t id,
+    const runtime_breakpoint_definition *definition) {
+    runtime_command command = {
+        .type = RUNTIME_COMMAND_TM_BP_UPDATE,
+    };
+
+    if (!client || !definition) {
+        return false;
+    }
+    command.data.update_breakpoint.id = id;
+    command.data.update_breakpoint.definition = *definition;
+    return runtime_client_push(client, &command);
+}
+
+bool runtime_client_tm_bp_clear(runtime_client *client, uint32_t id) {
+    runtime_command command = {
+        .type = RUNTIME_COMMAND_TM_BP_CLEAR,
+    };
+
+    if (!client) {
+        return false;
+    }
+    command.data.clear_breakpoint.id = id;
+    return runtime_client_push(client, &command);
+}
+
+bool runtime_client_tm_bp_clear_all(runtime_client *client) {
+    return runtime_client_send_command(client, RUNTIME_COMMAND_TM_BP_CLEAR_ALL);
+}
+
+bool runtime_client_tm_bp_set_enabled(
+    runtime_client *client, uint32_t id, bool enabled) {
+    runtime_command command = {
+        .type = RUNTIME_COMMAND_TM_BP_SET_ENABLED,
+    };
+
+    if (!client) {
+        return false;
+    }
+    command.data.set_breakpoint_enabled.id = id;
+    command.data.set_breakpoint_enabled.enabled = enabled ? 1u : 0u;
+    return runtime_client_push(client, &command);
+}
+
+bool runtime_client_tm_bp_request(runtime_client *client) {
+    return runtime_client_send_command(client, RUNTIME_COMMAND_TM_BP_REQUEST);
+}
+
+bool runtime_client_tm_set_execute_breakpoint(
+    runtime_client *client, uint16_t address) {
+    runtime_command command = {
+        .type = RUNTIME_COMMAND_TM_SET_EXECUTE_BREAKPOINT,
+    };
+
+    if (!client) {
+        return false;
+    }
+    command.data.set_execute_breakpoint.address = address;
+    command.data.set_execute_breakpoint.enabled = 1u;
+    return runtime_client_push(client, &command);
+}
+
+bool runtime_client_tm_run_until_break(
+    runtime_client *client, uint64_t request_token) {
+    return runtime_client_send_command_token(
+        client, RUNTIME_COMMAND_TM_RUN_UNTIL_BREAK, request_token);
+}
+
 bool runtime_client_history_clear(
     runtime_client *client,
     uint64_t request_token) {

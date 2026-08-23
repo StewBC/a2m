@@ -1525,12 +1525,6 @@ static bool intent_mutates_in_forensic(frontend_debugger_intent_type type)
     case FRONTEND_DEBUGGER_INTENT_DISK_MOUNT_DIALOG:
     case FRONTEND_DEBUGGER_INTENT_DISK_ADD_DIALOG:
     case FRONTEND_DEBUGGER_INTENT_DISK_UNMOUNT:
-    case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_SET_EXECUTE:
-    case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_CLEAR:
-    case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_CLEAR_ALL:
-    case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_SET_ENABLED:
-    case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_CREATE:
-    case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_UPDATE:
     case FRONTEND_DEBUGGER_INTENT_CONFIG_APPLY:
     case FRONTEND_DEBUGGER_INTENT_TM_SET_ENABLED:
         return true;
@@ -1594,31 +1588,67 @@ static void dispatch_intent(
             client, intent->address, (uint8_t)intent->value, intent->memory_mode);
         break;
     case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_SET_EXECUTE:
-        (void)runtime_client_set_execute_breakpoint(client, intent->address);
-        (void)runtime_client_request_breakpoints(client);
+        if (forensic) {
+            (void)runtime_client_tm_set_execute_breakpoint(client, intent->address);
+            (void)runtime_client_tm_bp_request(client);
+        } else {
+            (void)runtime_client_set_execute_breakpoint(client, intent->address);
+            (void)runtime_client_request_breakpoints(client);
+        }
         break;
     case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_CLEAR:
-        (void)runtime_client_clear_breakpoint(client, intent->id);
-        (void)runtime_client_request_breakpoints(client);
+        if (forensic) {
+            (void)runtime_client_tm_bp_clear(client, intent->id);
+            (void)runtime_client_tm_bp_request(client);
+        } else {
+            (void)runtime_client_clear_breakpoint(client, intent->id);
+            (void)runtime_client_request_breakpoints(client);
+        }
         break;
     case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_CLEAR_ALL:
-        (void)runtime_client_clear_all_breakpoints(client);
-        (void)runtime_client_request_breakpoints(client);
+        if (forensic) {
+            (void)runtime_client_tm_bp_clear_all(client);
+            (void)runtime_client_tm_bp_request(client);
+        } else {
+            (void)runtime_client_clear_all_breakpoints(client);
+            (void)runtime_client_request_breakpoints(client);
+        }
         break;
     case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_SET_ENABLED:
-        (void)runtime_client_set_breakpoint_enabled(client, intent->id, intent->enabled);
-        (void)runtime_client_request_breakpoints(client);
+        if (forensic) {
+            (void)runtime_client_tm_bp_set_enabled(
+                client, intent->id, intent->enabled);
+            (void)runtime_client_tm_bp_request(client);
+        } else {
+            (void)runtime_client_set_breakpoint_enabled(client, intent->id, intent->enabled);
+            (void)runtime_client_request_breakpoints(client);
+        }
         break;
     case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_CREATE:
-        (void)runtime_client_create_breakpoint(client, &intent->breakpoint);
-        (void)runtime_client_request_breakpoints(client);
+        if (forensic) {
+            (void)runtime_client_tm_bp_create(client, &intent->breakpoint);
+            (void)runtime_client_tm_bp_request(client);
+        } else {
+            (void)runtime_client_create_breakpoint(client, &intent->breakpoint);
+            (void)runtime_client_request_breakpoints(client);
+        }
         break;
     case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_UPDATE:
-        (void)runtime_client_update_breakpoint(client, intent->id, &intent->breakpoint);
-        (void)runtime_client_request_breakpoints(client);
+        if (forensic) {
+            (void)runtime_client_tm_bp_update(
+                client, intent->id, &intent->breakpoint);
+            (void)runtime_client_tm_bp_request(client);
+        } else {
+            (void)runtime_client_update_breakpoint(client, intent->id, &intent->breakpoint);
+            (void)runtime_client_request_breakpoints(client);
+        }
         break;
     case FRONTEND_DEBUGGER_INTENT_BREAKPOINT_REQUEST_SNAPSHOT:
-        (void)runtime_client_request_breakpoints(client);
+        if (forensic) {
+            (void)runtime_client_tm_bp_request(client);
+        } else {
+            (void)runtime_client_request_breakpoints(client);
+        }
         break;
     case FRONTEND_DEBUGGER_INTENT_MACHINE_RESET:
         (void)runtime_client_reset_ex_with_resume(
@@ -1636,6 +1666,7 @@ static void dispatch_intent(
     case FRONTEND_DEBUGGER_INTENT_TM_ENTER_FORENSIC: {
         uint64_t token = runtime_client_alloc_request_token(client);
         (void)runtime_client_tm_enter_forensic(client, token);
+        (void)runtime_client_tm_bp_request(client);
         break;
     }
     case FRONTEND_DEBUGGER_INTENT_TM_EXIT_FORENSIC: {
@@ -1655,6 +1686,11 @@ static void dispatch_intent(
         uint64_t token = runtime_client_alloc_request_token(client);
         (void)runtime_client_tm_run_to(
             client, intent->address, 0u, token);
+        break;
+    }
+    case FRONTEND_DEBUGGER_INTENT_TM_RUN_UNTIL: {
+        uint64_t token = runtime_client_alloc_request_token(client);
+        (void)runtime_client_tm_run_until_break(client, token);
         break;
     }
     case FRONTEND_DEBUGGER_INTENT_SET_DISPLAY_OVERRIDE:
@@ -2146,6 +2182,10 @@ static void apply_event_to_debug(
         break;
     case RUNTIME_EVENT_BREAKPOINTS_RESPONSE:
         debug->has_breakpoints = true;
+        break;
+    case RUNTIME_EVENT_TM_BREAKPOINTS_RESPONSE:
+        debug->tm_breakpoints = event->data.breakpoints;
+        debug->has_tm_breakpoints = true;
         break;
     case RUNTIME_EVENT_CALL_STACK_RESPONSE:
         debug->call_stack = event->data.call_stack;
@@ -2831,6 +2871,10 @@ int main(int argc, char **argv)
                     debug.debug_memory = snap;
                     debug.has_debug_memory = true;
                 }
+            }
+            if (revent.type == RUNTIME_EVENT_TM_BREAKPOINTS_RESPONSE) {
+                debug.tm_breakpoints = revent.data.breakpoints;
+                debug.has_tm_breakpoints = true;
             }
             if (revent.type == RUNTIME_EVENT_BREAKPOINTS_RESPONSE) {
                 runtime_breakpoint_snapshot bps;

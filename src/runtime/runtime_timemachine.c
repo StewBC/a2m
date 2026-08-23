@@ -623,6 +623,136 @@ static runtime_tm_query_status tm_run_to_pc(
     }
 }
 
+static void tm_bp_range(
+    const runtime_breakpoint *bp, uint16_t *lo, uint16_t *hi)
+{
+    uint16_t a = bp->start_address;
+    uint16_t b = bp->has_end_address ? bp->end_address : bp->start_address;
+
+    if (a <= b) {
+        *lo = a;
+        *hi = b;
+    } else {
+        *lo = b;
+        *hi = a;
+    }
+}
+
+static bool tm_bp_find_next(
+    runtime *rt,
+    const runtime_tm_window *window,
+    const runtime_breakpoint *bp,
+    uint64_t from_id,
+    runtime_history_record *out)
+{
+    runtime_history_query query;
+    runtime_history_record recs[1];
+    runtime_history_page page;
+    uint16_t lo;
+    uint16_t hi;
+
+    if (rt == NULL || rt->history == NULL || bp == NULL || out == NULL ||
+        window == NULL || !bp->enabled || bp->condition.term_count > 0u) {
+        return false;
+    }
+    tm_bp_range(bp, &lo, &hi);
+    memset(&query, 0, sizeof(query));
+    query.direction = RUNTIME_HISTORY_QUERY_FORWARD;
+    query.has_epoch = true;
+    query.epoch = window->epoch;
+
+    if ((bp->access_mask & RUNTIME_BREAKPOINT_ACCESS_EXECUTE) != 0u) {
+        query.has_pc = true;
+        query.pc_first = lo;
+        query.pc_last = hi;
+    } else if ((bp->access_mask & RUNTIME_BREAKPOINT_ACCESS_WRITE) != 0u) {
+        query.has_address = true;
+        query.address_first = lo;
+        query.address_last = hi;
+        query.has_access = true;
+        query.access_mask = RUNTIME_HISTORY_ACCESS_DATA_WRITE;
+    } else {
+        return false;
+    }
+
+    memset(&page, 0, sizeof(page));
+    if (runtime_history_find(
+            rt->history, &query, from_id, 1u, recs, &page, NULL) !=
+            RUNTIME_HISTORY_QUERY_OK ||
+        page.count == 0u) {
+        return false;
+    }
+    *out = recs[0];
+    return true;
+}
+
+static runtime_tm_query_status tm_run_until_break(
+    runtime *rt,
+    const runtime_tm_window *window,
+    runtime_tm_query_result *result)
+{
+    runtime_history_record best;
+    int have = 0;
+    size_t i;
+    uint64_t from_id;
+
+    if (!rt->tm_forensic) {
+        return RUNTIME_TM_QUERY_UNAVAILABLE;
+    }
+    from_id = rt->tm_focus.valid ?
+        rt->tm_focus.history_id + 1u : window->oldest_id;
+    if (from_id == 0u || from_id > window->newest_id) {
+        result->focus = rt->tm_focus;
+        result->status = RUNTIME_TM_QUERY_END_OF_TAPE;
+        result->clamped = false;
+        return RUNTIME_TM_QUERY_END_OF_TAPE;
+    }
+
+    memset(&best, 0, sizeof(best));
+    for (i = 0; i < rt->tm_breakpoint_count; ++i) {
+        runtime_history_record rec;
+        const runtime_breakpoint *bp = &rt->tm_breakpoints[i];
+
+        if ((bp->access_mask &
+             (RUNTIME_BREAKPOINT_ACCESS_EXECUTE |
+              RUNTIME_BREAKPOINT_ACCESS_WRITE)) ==
+            (RUNTIME_BREAKPOINT_ACCESS_EXECUTE |
+             RUNTIME_BREAKPOINT_ACCESS_WRITE)) {
+            runtime_breakpoint exec_bp = *bp;
+            runtime_breakpoint write_bp = *bp;
+            exec_bp.access_mask = RUNTIME_BREAKPOINT_ACCESS_EXECUTE;
+            write_bp.access_mask = RUNTIME_BREAKPOINT_ACCESS_WRITE;
+            if (tm_bp_find_next(rt, window, &exec_bp, from_id, &rec)) {
+                if (!have || rec.id < best.id) {
+                    best = rec;
+                    have = 1;
+                }
+            }
+            if (tm_bp_find_next(rt, window, &write_bp, from_id, &rec)) {
+                if (!have || rec.id < best.id) {
+                    best = rec;
+                    have = 1;
+                }
+            }
+            continue;
+        }
+        if (tm_bp_find_next(rt, window, bp, from_id, &rec)) {
+            if (!have || rec.id < best.id) {
+                best = rec;
+                have = 1;
+            }
+        }
+    }
+    if (!have) {
+        result->focus = rt->tm_focus;
+        result->status = RUNTIME_TM_QUERY_END_OF_TAPE;
+        result->clamped = false;
+        return RUNTIME_TM_QUERY_END_OF_TAPE;
+    }
+    tm_commit_focus(rt, &best, result, RUNTIME_TM_QUERY_OK, false);
+    return RUNTIME_TM_QUERY_OK;
+}
+
 runtime_tm_query_status runtime_tm_query(
     runtime *rt,
     runtime_tm_query_op op,
@@ -669,6 +799,9 @@ runtime_tm_query_status runtime_tm_query(
         break;
     case RUNTIME_TM_QUERY_RUN_TO_PC:
         st = tm_run_to_pc(rt, &window, args, result);
+        break;
+    case RUNTIME_TM_QUERY_RUN_UNTIL_BREAK:
+        st = tm_run_until_break(rt, &window, result);
         break;
     default:
         st = RUNTIME_TM_QUERY_INVALID;
@@ -897,4 +1030,225 @@ void runtime_tm_exit_forensic(runtime *rt)
     if (rt->timemachine_enabled) {
         runtime_tm_recorder_set_enabled(rt, true);
     }
+}
+
+static int tm_bp_find_id(const runtime *rt, uint32_t id)
+{
+    size_t i;
+
+    if (rt == NULL) {
+        return -1;
+    }
+    for (i = 0; i < rt->tm_breakpoint_count; ++i) {
+        if (rt->tm_breakpoints[i].id == id) {
+            return (int)i;
+        }
+    }
+    return -1;
+}
+
+static bool tm_bp_definition_ok(const runtime_breakpoint_definition *definition)
+{
+    uint32_t access;
+
+    if (definition == NULL) {
+        return false;
+    }
+    access = definition->access &
+        (RUNTIME_BREAKPOINT_ACCESS_EXECUTE |
+         RUNTIME_BREAKPOINT_ACCESS_READ |
+         RUNTIME_BREAKPOINT_ACCESS_WRITE);
+    if (access == 0u) {
+        return false;
+    }
+    /* Index-scan kinds: execute and write. Read is stored but not evaluated. */
+    return true;
+}
+
+static void tm_bp_apply(
+    runtime_breakpoint *bp,
+    const runtime_breakpoint_definition *definition)
+{
+    bp->enabled = definition->enabled != 0;
+    bp->start_address = definition->start_address;
+    bp->end_address = definition->has_end_address ?
+        definition->end_address : definition->start_address;
+    bp->has_end_address = definition->has_end_address != 0;
+    bp->access_mask = definition->access;
+    bp->mapping = definition->mapping;
+    bp->action_mask = definition->actions != 0u ?
+        definition->actions : (uint32_t)RUNTIME_BREAKPOINT_ACTION_BREAK;
+    bp->use_counter = definition->use_counter != 0;
+    bp->initial_count = definition->initial_count;
+    bp->reset_count = definition->reset_count;
+    bp->counter = definition->initial_count;
+    bp->current_hits = 0;
+    bp->condition = definition->condition;
+}
+
+bool runtime_tm_bp_add(
+    runtime *rt,
+    const runtime_breakpoint_definition *definition,
+    uint32_t *out_id)
+{
+    runtime_breakpoint *bp;
+
+    if (rt == NULL || !tm_bp_definition_ok(definition)) {
+        return false;
+    }
+    if (rt->tm_breakpoint_count >= RUNTIME_BREAKPOINT_CAPACITY) {
+        return false;
+    }
+    if (rt->tm_next_breakpoint_id == 0u) {
+        rt->tm_next_breakpoint_id = 1u;
+    }
+    bp = &rt->tm_breakpoints[rt->tm_breakpoint_count];
+    memset(bp, 0, sizeof(*bp));
+    bp->id = rt->tm_next_breakpoint_id++;
+    tm_bp_apply(bp, definition);
+    rt->tm_breakpoint_count++;
+    if (out_id != NULL) {
+        *out_id = bp->id;
+    }
+    return true;
+}
+
+bool runtime_tm_bp_update(
+    runtime *rt,
+    uint32_t id,
+    const runtime_breakpoint_definition *definition)
+{
+    int index;
+
+    if (rt == NULL || !tm_bp_definition_ok(definition)) {
+        return false;
+    }
+    index = tm_bp_find_id(rt, id);
+    if (index < 0) {
+        return false;
+    }
+    tm_bp_apply(&rt->tm_breakpoints[index], definition);
+    return true;
+}
+
+bool runtime_tm_bp_clear(runtime *rt, uint32_t id)
+{
+    int index;
+
+    if (rt == NULL) {
+        return false;
+    }
+    index = tm_bp_find_id(rt, id);
+    if (index < 0) {
+        return false;
+    }
+    if ((size_t)index + 1u < rt->tm_breakpoint_count) {
+        memmove(
+            &rt->tm_breakpoints[index],
+            &rt->tm_breakpoints[index + 1],
+            (rt->tm_breakpoint_count - (size_t)index - 1u) *
+                sizeof(rt->tm_breakpoints[0]));
+    }
+    rt->tm_breakpoint_count--;
+    memset(
+        &rt->tm_breakpoints[rt->tm_breakpoint_count],
+        0,
+        sizeof(rt->tm_breakpoints[0]));
+    return true;
+}
+
+void runtime_tm_bp_clear_all(runtime *rt)
+{
+    if (rt == NULL) {
+        return;
+    }
+    memset(rt->tm_breakpoints, 0, sizeof(rt->tm_breakpoints));
+    rt->tm_breakpoint_count = 0u;
+}
+
+bool runtime_tm_bp_set_enabled(runtime *rt, uint32_t id, bool enabled)
+{
+    int index;
+
+    if (rt == NULL) {
+        return false;
+    }
+    index = tm_bp_find_id(rt, id);
+    if (index < 0) {
+        return false;
+    }
+    rt->tm_breakpoints[index].enabled = enabled;
+    return true;
+}
+
+void runtime_tm_bp_toggle_execute(runtime *rt, uint16_t address)
+{
+    size_t i;
+    runtime_breakpoint_definition def;
+
+    if (rt == NULL) {
+        return;
+    }
+    for (i = 0; i < rt->tm_breakpoint_count; ++i) {
+        runtime_breakpoint *bp = &rt->tm_breakpoints[i];
+        if (bp->start_address == address &&
+            !bp->has_end_address &&
+            (bp->access_mask & RUNTIME_BREAKPOINT_ACCESS_EXECUTE) != 0u) {
+            (void)runtime_tm_bp_clear(rt, bp->id);
+            return;
+        }
+    }
+    memset(&def, 0, sizeof(def));
+    def.enabled = 1u;
+    def.start_address = address;
+    def.end_address = address;
+    def.access = RUNTIME_BREAKPOINT_ACCESS_EXECUTE;
+    def.actions = RUNTIME_BREAKPOINT_ACTION_BREAK;
+    (void)runtime_tm_bp_add(rt, &def, NULL);
+}
+
+void runtime_tm_bp_fill_snapshot(
+    const runtime *rt, runtime_breakpoint_snapshot *out)
+{
+    size_t i;
+    size_t n;
+
+    if (out == NULL) {
+        return;
+    }
+    memset(out, 0, sizeof(*out));
+    if (rt == NULL) {
+        return;
+    }
+    n = rt->tm_breakpoint_count;
+    if (n > RUNTIME_BREAKPOINT_SNAPSHOT_MAX) {
+        n = RUNTIME_BREAKPOINT_SNAPSHOT_MAX;
+    }
+    out->count = (uint16_t)n;
+    for (i = 0; i < n; ++i) {
+        runtime_breakpoint_snapshot_entry *e = &out->entries[i];
+        const runtime_breakpoint *bp = &rt->tm_breakpoints[i];
+
+        e->id = bp->id;
+        e->start_address = bp->start_address;
+        e->end_address = bp->end_address;
+        e->has_end_address = bp->has_end_address ? 1u : 0u;
+        e->access = (runtime_breakpoint_access)bp->access_mask;
+        e->mapping = bp->mapping;
+        e->actions = bp->action_mask;
+        e->enabled = bp->enabled ? 1u : 0u;
+        e->use_counter = bp->use_counter ? 1u : 0u;
+        e->current_hits = bp->current_hits;
+        e->initial_count = bp->initial_count;
+        e->reset_count = bp->reset_count;
+        e->counter = bp->counter;
+        e->condition = bp->condition;
+        e->address = bp->start_address;
+        e->target_hits = bp->initial_count;
+    }
+}
+
+size_t runtime_tm_bp_count(const runtime *rt)
+{
+    return rt != NULL ? rt->tm_breakpoint_count : 0u;
 }

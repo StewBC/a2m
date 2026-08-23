@@ -1,6 +1,6 @@
 # TM5 — Forensic breakpoint / watch system
 
-**Status:** Not started. **V1.1** (not required for TimeMachine V1 bar).  
+**Status:** Landed. **V1.1** (not required for TimeMachine V1 bar).  
 **Epic:** [`timemachine.md`](timemachine.md)  
 **Prev / Next:** [`TM4.md`](TM4.md) / [`TM6.md`](TM6.md)  
 **Depends on:** TM1–TM3 (queries + sealed materialize); best after TM4 chrome.
@@ -88,11 +88,11 @@ Stop focus on hit; materialize; publish. End-of-tape → honest miss.
 
 ## Acceptance checklist
 
-- [ ] Separate TM BP store; live list untouched by forensic arming  
-- [ ] Exec (and write if in scope) hit on tape run  
-- [ ] UI labeled; Opt+B forensic → TM store  
-- [ ] ctest + build green  
-- [ ] Landed filled  
+- [x] Separate TM BP store; live list untouched by forensic arming  
+- [x] Exec (and write if in scope) hit on tape run  
+- [x] UI labeled; Opt+B forensic → TM store  
+- [x] ctest + build green  
+- [x] Landed filled  
 
 ---
 
@@ -108,4 +108,57 @@ Stop focus on hit; materialize; publish. End-of-tape → honest miss.
 
 ## Landed
 
-_(empty until implemented)_
+Handoff. Separate forensic BP store. Live `rt->breakpoints[]` is never written
+by TM arming, Opt+B, or tape run-until. F7 stays unbound. No A2M verbs (brief
+said optional). Conditions on TM BPs are stored but **not** evaluated; sealed
+re-run with the live BP engine is **not** implemented (index scan only).
+
+### Store
+
+| Piece | Name |
+|-------|------|
+| Table | `rt->tm_breakpoints[RUNTIME_BREAKPOINT_CAPACITY]` (64) |
+| Count / ids | `tm_breakpoint_count` / `tm_next_breakpoint_id` (starts at 1) |
+| Add | `runtime_tm_bp_add` |
+| Toggle exec | `runtime_tm_bp_toggle_execute` (Opt+B) |
+| Snapshot | `runtime_tm_bp_fill_snapshot` → `RUNTIME_EVENT_TM_BREAKPOINTS_RESPONSE` |
+| Not INI | session-only; `[DEBUG] break.*` remains live |
+
+### Run-until (default route)
+
+`RUNTIME_TM_QUERY_RUN_UNTIL_BREAK` / `runtime_client_tm_run_until_break`.
+Must be forensic. Scans from `focus.history_id + 1` (or window oldest).
+
+| TM BP access | HST1 query |
+|--------------|------------|
+| execute | `has_pc` range |
+| write | `has_address` + `RUNTIME_HISTORY_ACCESS_DATA_WRITE` |
+| both | two finds; earliest id wins |
+| condition.term_count > 0 | skipped (no sealed re-run) |
+
+Hit: `runtime_tm_query` SEEK_ID + live materialize (same TM3 path). Miss:
+`END_OF_TAPE`, focus unchanged. Live list unchanged (`runtime_tm_bp` ctest).
+
+### Commands (not on the wire)
+
+`TM_BP_CREATE` / `UPDATE` / `CLEAR` / `CLEAR_ALL` / `SET_ENABLED` / `REQUEST` /
+`TM_SET_EXECUTE_BREAKPOINT` / `TM_RUN_UNTIL_BREAK`. Reuse live command union
+fields (`create_breakpoint.definition`, etc.).
+
+### UI
+
+Forensic Breakpoints tab: **Time Machine breakpoints**, New/Edit/Enable/Clear
+work, **Run tape to breakpoint** button, Opt+B toggles execute at disasm
+cursor into the TM store. Live tab shows live list plus a one-line note that
+Inspector has a separate list. Intent dispatch: forensic BP intents go to
+`runtime_client_tm_bp_*`, not live.
+
+### Tests / docs
+
+`runtime_tm_bp`: live exec BP stays; TM exec BP + seek oldest + run-until lands
+on that PC. Gate **60**. `manual/manual.md` + `status.md`.
+
+### What TM6 must not break
+
+Leave Inspector still restores NOW and stays paused. TM BPs do not appear in
+the live list after exit. F7 stays unbound.

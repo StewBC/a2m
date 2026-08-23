@@ -118,7 +118,7 @@ one-line pointer update here if useful.
 | **TM2** | [`TM2.md`](TM2.md) | Yes | Checkpoint ring + input log + sealed replay; test materialize (**Landed**) |
 | **TM3** | [`TM3.md`](TM3.md) | Yes | Materialize into one true `apple2_t`; enter/exit NOW; control honesty (**Landed**, A2M/12) |
 | **TM4** | [`TM4.md`](TM4.md) | Yes | Misc Inspector tab; one skin (F7 already gone — D14) (**Landed**) |
-| **TM5** | [`TM5.md`](TM5.md) | V1.1 | Forensic BP/watch store |
+| **TM5** | [`TM5.md`](TM5.md) | V1.1 | Forensic BP/watch store (**Landed**) |
 | **TM6** | [`TM6.md`](TM6.md) | V1.1 | Promote / Branch |
 
 Phase docs are the implementer briefs (goal, non-goals, anchors, acceptance, script).
