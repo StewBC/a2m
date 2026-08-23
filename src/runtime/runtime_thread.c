@@ -4012,6 +4012,31 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         break;
     }
 
+    case RUNTIME_COMMAND_TM_QUERY: {
+        runtime_tm_query_args args;
+        runtime_tm_query_result result;
+        runtime_event event;
+
+        memset(&args, 0, sizeof(args));
+        args.direction = cmd->data.tm_query.direction;
+        args.target_pc = cmd->data.tm_query.target_pc;
+        args.cycle_ceiling = cmd->data.tm_query.cycle_ceiling;
+        args.history_id = cmd->data.tm_query.history_id;
+        args.cycle = cmd->data.tm_query.cycle;
+        args.epoch = cmd->data.tm_query.epoch;
+        (void)runtime_tm_query(
+            rt, (runtime_tm_query_op)cmd->data.tm_query.op, &args, &result);
+        memset(&event, 0, sizeof(event));
+        event.type = RUNTIME_EVENT_TM_FOCUS;
+        event.request_token = cmd->request_token;
+        event.data.tm_focus.op = (runtime_tm_query_op)cmd->data.tm_query.op;
+        event.data.tm_focus.status = result.status;
+        event.data.tm_focus.focus = result.focus;
+        event.data.tm_focus.clamped = result.clamped ? 1u : 0u;
+        runtime_publish_event(rt, &event);
+        break;
+    }
+
     case RUNTIME_COMMAND_SET_HISTORY_OFF_ON_MAX: {
         bool enable = cmd->data.set_history_off_on_max.enabled != 0u;
         rt->history_off_on_max = enable;

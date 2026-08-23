@@ -8,7 +8,7 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-Expect **56** green. Run from repo root.
+Expect **57** green. Run from repo root.
 
 ## Registered tests (product gate)
 
@@ -52,6 +52,7 @@ Expect **56** green. Run from repo root.
 | `runtime_history_sessions` | Dual session FIND/NEXT isolation (S0/S1) |
 | `runtime_state_changed` | state-changed inform + cursor stale (S3) |
 | `runtime_timemachine` | TM0: master enable arms HST1 + frame ring; pin-3 no re-arm; zero-budget empty tape |
+| `runtime_tm_query` | TM1: HST1 step/over/out/run-to/seek; window clamp; epoch reject |
 | `control_protocol` | A2M parse + format (`src/control`) |
 | `assembler_*` | expressions/conditionals/loops/macros/scopes/targets/CPU profiles/multifile |
 | `runtime_assembler` | live RAM assembly + runtime event path |

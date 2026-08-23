@@ -3,6 +3,7 @@
 #include "memview.h"
 #include "runtime_breakpoint_condition.h"
 #include "runtime_history.h"
+#include "runtime_timemachine.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -83,7 +84,8 @@ typedef enum runtime_event_type {
     RUNTIME_EVENT_HISTORY_RESULT_RESPONSE,
     RUNTIME_EVENT_SESSION_RESPONSE,
     RUNTIME_EVENT_STATE_CHANGED,
-    RUNTIME_EVENT_MEDIA_CHANGED
+    RUNTIME_EVENT_MEDIA_CHANGED,
+    RUNTIME_EVENT_TM_FOCUS
 } runtime_event_type;
 
 typedef enum runtime_state_changed_reason {
@@ -439,5 +441,11 @@ typedef struct runtime_event {
             uint64_t frame;
             uint64_t history_epoch;
         } state_changed;
+        struct {
+            runtime_tm_query_op op;
+            runtime_tm_query_status status;
+            runtime_tm_focus focus;
+            uint8_t clamped;
+        } tm_focus;
     } data;
 } runtime_event;

@@ -12,6 +12,7 @@
 #include "runtime_event.h"
 #include "runtime_frame_ring.h"
 #include "runtime_history.h"
+#include "runtime_timemachine.h"
 #include "symbol_table.h"
 #include "apple_type_script.h"
 
@@ -198,6 +199,7 @@ struct runtime {
     /* TimeMachine master enable. Off→on arms HST1 + frame ring once. */
     bool timemachine_enabled;
     uint32_t timemachine_memory_mb;
+    runtime_tm_focus tm_focus;
 
     /* TRON/TROFF instruction log (C5b) — file open while trace_enabled. */
     bool trace_enabled;

@@ -215,6 +215,35 @@ bool runtime_client_tm_set_enabled(
     runtime_client *client,
     bool enabled,
     uint64_t request_token);
+bool runtime_client_tm_query(
+    runtime_client *client,
+    runtime_tm_query_op op,
+    const runtime_tm_query_args *args,
+    uint64_t request_token);
+bool runtime_client_tm_step(
+    runtime_client *client,
+    int direction,
+    uint64_t request_token);
+bool runtime_client_tm_step_over(
+    runtime_client *client,
+    uint64_t request_token);
+bool runtime_client_tm_step_out(
+    runtime_client *client,
+    uint64_t request_token);
+bool runtime_client_tm_run_to(
+    runtime_client *client,
+    uint16_t pc,
+    uint64_t cycle_ceiling,
+    uint64_t request_token);
+bool runtime_client_tm_seek_id(
+    runtime_client *client,
+    uint64_t epoch,
+    uint64_t history_id,
+    uint64_t request_token);
+bool runtime_client_tm_seek_cycle(
+    runtime_client *client,
+    uint64_t cycle,
+    uint64_t request_token);
 bool runtime_client_history_clear(
     runtime_client *client,
     uint64_t request_token);

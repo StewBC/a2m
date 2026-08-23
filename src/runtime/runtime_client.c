@@ -973,6 +973,93 @@ bool runtime_client_tm_set_enabled(
     return runtime_client_push(client, &command);
 }
 
+bool runtime_client_tm_query(
+    runtime_client *client,
+    runtime_tm_query_op op,
+    const runtime_tm_query_args *args,
+    uint64_t request_token) {
+    runtime_command command = {
+        .type = RUNTIME_COMMAND_TM_QUERY,
+        .request_token = request_token,
+    };
+    if (client == NULL) {
+        return false;
+    }
+    command.data.tm_query.op = (uint8_t)op;
+    if (args != NULL) {
+        command.data.tm_query.direction =
+            args->direction < 0 ? (int8_t)-1 : (int8_t)(args->direction > 0 ? 1 : 0);
+        command.data.tm_query.target_pc = args->target_pc;
+        command.data.tm_query.cycle_ceiling = args->cycle_ceiling;
+        command.data.tm_query.history_id = args->history_id;
+        command.data.tm_query.cycle = args->cycle;
+        command.data.tm_query.epoch = args->epoch;
+    }
+    return runtime_client_push(client, &command);
+}
+
+bool runtime_client_tm_step(
+    runtime_client *client,
+    int direction,
+    uint64_t request_token) {
+    runtime_tm_query_args args;
+    memset(&args, 0, sizeof(args));
+    args.direction = direction < 0 ? -1 : 1;
+    return runtime_client_tm_query(
+        client, RUNTIME_TM_QUERY_STEP, &args, request_token);
+}
+
+bool runtime_client_tm_step_over(
+    runtime_client *client,
+    uint64_t request_token) {
+    return runtime_client_tm_query(
+        client, RUNTIME_TM_QUERY_STEP_OVER, NULL, request_token);
+}
+
+bool runtime_client_tm_step_out(
+    runtime_client *client,
+    uint64_t request_token) {
+    return runtime_client_tm_query(
+        client, RUNTIME_TM_QUERY_STEP_OUT, NULL, request_token);
+}
+
+bool runtime_client_tm_run_to(
+    runtime_client *client,
+    uint16_t pc,
+    uint64_t cycle_ceiling,
+    uint64_t request_token) {
+    runtime_tm_query_args args;
+    memset(&args, 0, sizeof(args));
+    args.target_pc = pc;
+    args.cycle_ceiling = cycle_ceiling;
+    return runtime_client_tm_query(
+        client, RUNTIME_TM_QUERY_RUN_TO_PC, &args, request_token);
+}
+
+bool runtime_client_tm_seek_id(
+    runtime_client *client,
+    uint64_t epoch,
+    uint64_t history_id,
+    uint64_t request_token) {
+    runtime_tm_query_args args;
+    memset(&args, 0, sizeof(args));
+    args.epoch = epoch;
+    args.history_id = history_id;
+    return runtime_client_tm_query(
+        client, RUNTIME_TM_QUERY_SEEK_ID, &args, request_token);
+}
+
+bool runtime_client_tm_seek_cycle(
+    runtime_client *client,
+    uint64_t cycle,
+    uint64_t request_token) {
+    runtime_tm_query_args args;
+    memset(&args, 0, sizeof(args));
+    args.cycle = cycle;
+    return runtime_client_tm_query(
+        client, RUNTIME_TM_QUERY_SEEK_CYCLE, &args, request_token);
+}
+
 bool runtime_client_history_clear(
     runtime_client *client,
     uint64_t request_token) {

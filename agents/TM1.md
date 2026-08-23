@@ -1,6 +1,6 @@
 # TM1 — Query engine on existing HST1 (fast tape verbs)
 
-**Status:** Not started.  
+**Status:** Landed.  
 **Epic:** [`timemachine.md`](timemachine.md)  
 **Prev / Next:** [`TM0.md`](TM0.md) / [`TM2.md`](TM2.md)  
 **V1 bar:** Required.  
@@ -134,14 +134,14 @@ depth is a direct comparison rather than an inference:
 
 ## Acceptance checklist
 
-- [ ] Worker TimeMachine query module exists; UI never FIND-loops for over/out/run-to  
-- [ ] step / step-over / step-out / run-to-PC / seek implemented on HST1, **depth via recorded `sp`**  
-- [ ] All ops clamp to `tm_window`; epoch-crossing seek rejected  
-- [ ] `runtime_client` wrappers + events with clear focus payload  
-- [ ] ctest covers sp-depth step-out/over, missing-target honesty, window clamp, epoch reject  
-- [ ] Does **not** mutate `apple2_t`  
-- [ ] Build + full ctest green  
-- [ ] Landed filled; note any A2M bump (expect none)
+- [x] Worker TimeMachine query module exists; UI never FIND-loops for over/out/run-to  
+- [x] step / step-over / step-out / run-to-PC / seek implemented on HST1, **depth via recorded `sp`**  
+- [x] All ops clamp to `tm_window`; epoch-crossing seek rejected  
+- [x] `runtime_client` wrappers + events with clear focus payload  
+- [x] ctest covers sp-depth step-out/over, missing-target honesty, window clamp, epoch reject  
+- [x] Does **not** mutate `apple2_t`  
+- [x] Build + full ctest green  
+- [x] Landed filled; note any A2M bump (expect none)
 
 ---
 
@@ -158,4 +158,51 @@ depth is a direct comparison rather than an inference:
 
 ## Landed
 
-_(empty until implemented)_
+Handoff for TM2. Queries scan HST1 only; they never touch `apple2_t`.
+
+### Names
+
+| Piece | Name |
+|-------|------|
+| Window accessor | `runtime_tm_window_info(rt, &window)` — **the** clamp source. TM1 = HST1 coverage (oldest/newest id+cycle, current history epoch). TM2 intersects checkpoints + frame ring **here**, not at call sites. |
+| Focus | `runtime_tm_focus` on `rt->tm_focus`; `runtime_tm_get_focus` |
+| Query | `runtime_tm_query(rt, op, args, &result)` |
+| Ops | `RUNTIME_TM_QUERY_SEEK_ID` / `_SEEK_CYCLE` / `_STEP` / `_STEP_OVER` / `_STEP_OUT` / `_RUN_TO_PC` |
+| Status | `OK` `UNAVAILABLE` `EMPTY` `END_OF_TAPE` `EPOCH_MISMATCH` `NOT_RETAINED` `SP_WRAP` `INVALID` |
+| Command | `RUNTIME_COMMAND_TM_QUERY` |
+| Event | `RUNTIME_EVENT_TM_FOCUS` (`op`, `status`, `focus`, `clamped`) |
+| Client | `runtime_client_tm_query` plus `tm_step` / `tm_step_over` / `tm_step_out` / `tm_run_to` / `tm_seek_id` / `tm_seek_cycle` |
+
+No A2M verbs. No `state-changed` on query (TM3, when the machine is replaced).
+
+### Semantics that shipped
+
+- **Focus** is a history record (id, epoch, cycle, pc, sp, opcode, kind). First query with no focus seeks the newest **instruction** in the window.
+- **Step** ±1 walks to the next/prev **instruction**. IRQ, NMI, and non-barrier markers are skipped. End of tape: status `END_OF_TAPE`, focus stays on the last instruction in that direction.
+- **Step over:** if focus opcode is not `JSR` ($20), ≡ step forward. From a JSR: first later instruction with `sp >= entry_sp` (SP is at instruction *begin*, so the JSR row itself is not a match). IRQ rows are skipped and do not participate in the SP test.
+- **Step out:** first later instruction with `sp > entry_sp`.
+- **Run-to-PC:** first instruction at/after focus with `pc == target`. Optional `cycle_ceiling` (0 = none). Miss → `END_OF_TAPE` on last instruction visited.
+- **Seek id:** clamp onto `[oldest_id, newest_id]`, set `clamped`. Wrong `epoch` (or 0 meaning current, vs a stale value) → `EPOCH_MISMATCH`, focus unchanged.
+- **Seek cycle:** nearest instruction with `cycle <= target`, clamped to window cycles.
+- **Window clamp** is on every seek. Walks cannot leave the window.
+- **Epoch reject, two shapes:**
+  1. Seek with `args.epoch != tm_window.epoch` (history clear / state-load generation).
+  2. A **walk** that would pass `RESET_COMPLETE` or `STATE_LOAD` between the start record and the candidate → `EPOCH_MISMATCH`, focus unchanged. Starting *on* a barrier and stepping off it is allowed.
+- **Stack wrap:** step-over from a JSR with `sp < 2` returns `SP_WRAP` (unsigned `sp >= entry_sp` would fire on the first callee row). During over/out walks, adjacent instruction SP distance `> 3` is also `SP_WRAP`. Focus is not moved.
+- Queries do **not** require `runtime_tm_enabled`. They run on whatever HST1 exists (standalone `history-record` included). Empty/disabled history → `EMPTY` / `UNAVAILABLE`.
+
+### What TM2 must not break
+
+`runtime_tm_window_info` is the intersection seam. Today it is HST1-only; adding checkpoint/frame bounds there automatically clamps TM1 verbs. Do not read `runtime_history_get_status` at the step/seek call sites.
+
+Materialize (TM3) should treat `EMPTY` / a recorder that is off (TM0 pin 3) as “cannot enter”, not as a clamp.
+
+### Tests / gate
+
+`runtime_tm_query`: programmatic `runtime_history_begin_record` fill on an **unstarted** runtime (no worker, no apple2). Covers over/out SP-depth with an IRQ in the middle, run-to miss + ceiling, cycle/id clamp, stale-epoch seek, RESET walk barrier, SP wrap, plus one client `TM_FOCUS` round-trip.
+
+Full ctest **57** green. No A2M bump.
+
+### Not in this phase
+
+Checkpoint ring, seal, materialize, Inspector tab, control-port TM verbs.

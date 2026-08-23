@@ -74,7 +74,7 @@ Unsolicited: `0 event state-changed reason=… session=… cycles=… frame=… 
 | Frame ring | `frame-ring-info` `frame-ring-record` `frame-ring-clear` `get-frame-at frame=\|cycle=` |
 | Breakpoints | `break-create` / `break-update` / `break-list` / `break-enable` / `break-clear` / `break-clear-all` / `rearm-oneshots` / `break-exec`; `when=`; access exec/read/write |
 | History | `history-info` `history-record` `history-clear` `history-find` `history-next` `history-read` `history-close` → `data history` **HST1** (per TCP session cursor) |
-| TimeMachine | **No A2M verb in TM0.** Master switch is INI `[debug] timemachine=0\|1` / CLI `--timemachine` / `--no-timemachine` (default **off**). `timemachine=1` arms HST1 + frame ring once (off→on). `history-record` and `frame-ring-record` stay as standalone agent verbs — turning either off after TM-on is respected (no hidden re-arm). `timemachine=0` does not disable those verbs. |
+| TimeMachine | **No A2M verb in TM0/TM1.** Master switch is INI `[debug] timemachine=0\|1` / CLI `--timemachine` / `--no-timemachine` (default **off**). Tape verbs (`step` / over / out / run-to / seek) are `runtime_client_tm_*` only until TM3. `history-record` and `frame-ring-record` stay as standalone agent verbs — turning either off after TM-on is respected (no hidden re-arm). |
 | Waits | `wait-paused` `wait-running` `wait-frame` `wait-event` (incl. `assemble-complete` / `assemble-error`) |
 | Assembler | `assemble [address=] [run-address=] [auto-run=] [mli-launch=] [reset=] [auto-adjust-segments=] <path>` (deferred) |
 | Symbols | `find-symbol <name>` → `ok address=$XXXX name=…` / `not-ready` / `not-found` |
