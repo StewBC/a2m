@@ -59,7 +59,8 @@ language):
 | INI | `[debug] timemachine=0\|1` |
 | CLI | `--timemachine` / `--no-timemachine` |
 | Default | **off** (Total Replay / play path stays cheap) |
-| Budgets | Keep existing `history_memory_mb` / `frame_ring_memory_mb`; **add `timemachine_memory_mb`** for the TM2 checkpoint ring (default ~128MB ≈ 800 checkpoints at ~160K each) |
+| Budgets | Keep existing `history_memory_mb` / `frame_ring_memory_mb` (both read from `[debug]`, [`app_options.c:1892,1908`](../src/app_options.c)); **add `timemachine_memory_mb`** there too, default **128** (≈ 800 checkpoints at ~160K each) |
+| Footprint | State the aggregate plainly: 256 + 128 + 128 = **512 MB** when TimeMachine is on. Opt-in, but it should be a documented number, not a discovered one |
 
 **Semantics — pinned, not "preferred". Do not re-litigate:**
 
@@ -117,7 +118,8 @@ Document the dual wording honestly in `control-tools.md` while both surfaces exi
 - [ ] Master TimeMachine enable in INI + CLI; **default off**  
 - [ ] `timemachine_memory_mb` budget option plumbed (consumed in TM2)  
 - [ ] Flag reaches runtime config; readable where TM1 will gate  
-- [ ] `a2m.ini.example` + short agent/doc note: off = play, on = debug recording path  
+- [ ] `a2m.ini.example` gains a **`[debug]` section** — it has none today (sections are window/machine/Slots/config/DiskII/SmartPort/input), so `history_memory_mb` and `frame_ring_memory_mb` are undocumented there. Add them alongside `timemachine`  
+- [ ] Doc note: off = play, on = debug recording path; state the 512 MB aggregate  
 - [ ] `control-tools.md` notes the TM master switch vs standalone `history-record` / `frame-ring-record`  
 - [ ] Epic + phase files linked; Inspector supersession consistent  
 - [ ] Build + full ctest green  

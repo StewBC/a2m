@@ -75,10 +75,17 @@ Reuse shared disasm ops table pattern (`debugger_disasm` mode ops).
 
 ### Key surface
 
-- F7 is **free** — it was unbound when the old Inspector was removed. Either leave it
-  unbound or bind it to “open debugger + Inspector tab (+ enter forensic if available)”
-  as a convenience. Product-neutral; pick one and document it.  
-- Update `status.md`, `manual/manual.md`, key tables to match whatever ships.
+- **Pinned: F7 stays unbound.** It was freed when the old Inspector was removed; do not
+  rebind it. Rationale: `../c64m` binds no F7 either (`rules.md` rule 2 — match c64m for
+  shared debugger interaction), and a dedicated top-level “go to Inspector” key re-creates
+  the *F7 is the other thing* model that D14 removed. The Misc tab is the entry (D15).  
+- Consequence: **no key-table or manual change for F7.** `manual/` is already clean of F7
+  references; leave it that way.  
+- If this is ever revisited, bind it to **navigation only** (open debugger + focus the
+  Inspector tab) — never to auto-entering forensic. A key that sometimes switches tabs and
+  sometimes flips the machine into read-only past is unpredictable; forensic entry has its
+  own explicit control in the UX table above.  
+- Update `status.md`, `manual/manual.md`, key tables for everything else that ships.
 
 ---
 

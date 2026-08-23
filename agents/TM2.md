@@ -82,7 +82,7 @@ Everything re-execution cannot derive from the checkpoint, timestamped by `machi
 | Paste | `paste_text` / `paste_index` | In snapshot; log `apple2_paste_on_kbdstrb` consumption if needed |
 | Gameport | `apple2_gameport_set_axis/axes/buttons`, `ptrig` | Log value + cycle |
 | Disk weak bits / track | `rand()` in [`diskii.c:234`](../src/machine/diskii.c), [`image.c:120,453`](../src/machine/image.c) | **Replace bare `rand()` with a seeded machine-local PRNG**; seed rides in the checkpoint |
-| HostFS clock | `clock_gettime` in [`hostfs.c:133`](../src/machine/hostfs.c) | Log returned value per call, or freeze during replay |
+| ~~HostFS clock~~ | `hostfs_now_ms` feeds **only** `vol->last_refresh_ms` ([`hostfs.c:2036,3015,3049`](../src/machine/hostfs.c)) | **Not a nondeterminism source** — never reaches guest state, sets no ProDOS dates. Nothing to log. The refresh it gates is handled as a seal gate instead |
 
 The bare `rand()` calls are the one machine-side change this phase needs. Keep it minimal:
 a small PRNG in `apple2_t`, seeded at reset, saved/restored with the snapshot. Bump
@@ -99,11 +99,18 @@ rule). Do not leave that to a later phase.
   1 MHz) so worst-case replay stays under ~1 ms at beam free-run speed (~22–25 MHz,
   [`turbo-zip.md`](turbo-zip.md)).  
 - Forced checkpoint on recorder start and on Inspector enter (TM3).  
-- **Max free-run:** frame boundaries are ~750k cycles apart at ~45 MHz
-  ([`max-free-run.md`](max-free-run.md)) — a frame-capped cadence collapses there. The
-  cycle cap handles it, but recording cost per emulated second rises ~45×. Measure, then
-  pin one of: cycle-capped as normal, degraded cadence under max, or recording refused
-  in max with an honest message. **Document the choice in Landed.**
+- **Max free-run — pinned:** follow the existing `history_off_on_max`
+  ([`app_options.c:2292`](../src/app_options.c), default **true**, read from `[config]` not
+  `[debug]` — do not "tidy" that). TimeMachine recording stops on entering max.
+
+  **A pause is a window kill, not a hold.** HST1 tolerates a gap (it has
+  `RECORDER_STOP`/`RECORDER_RESUME` markers); re-execution cannot replay across one, and
+  `tm_window` is a single oldest/newest pair (D17). So on resume, **`tm_window.oldest` moves
+  to the `RECORDER_RESUME` marker** — same truncate-to-the-marker pattern as a media change.
+  Do not attempt multi-island windows.
+
+  Consequence to surface: one Opt+T into max discards the tape. Say so on the turbo cycle,
+  not only in the Inspector tab. Pin measured cost numbers in Landed.
 - Drop oldest checkpoint (and its input-log span) when over budget; keep honesty counters
   (dropped, oldest cycle retained).
 
@@ -119,6 +126,7 @@ Re-execution runs real code, so every side-effect path must be muted for the dur
 | CPU observer | `apple2_set_cpu_observer(m, NULL, NULL)` — else replay appends duplicate HST1 records ([`runtime_thread.c:133`](../src/runtime/runtime_thread.c)) |
 | Memory-access callback | Detach `runtime_on_memory_access` — it is installed permanently ([`runtime_thread.c:4200`](../src/runtime/runtime_thread.c)) and would fire watchpoints/BPs spuriously |
 | Frame ring / publish | No `runtime_frame_ring_push`, no live-slot publish until the head lands |
+| **HostFS refresh** | Suppress `hostfs_maybe_refresh` outright. A refresh during replay can detect a catalog change and truncate **the window being stood on** (D10) — a direct seal violation. Do not rely on a frozen clock to prevent it |
 | Audio | Simply do not call `runtime_produce_audio` — it is runtime-driven, not machine-driven |
 | Media write-through | **Safety net, not correctness.** The window never spans a guest media write (see below), so replay cannot re-execute one. Keep a machine-level replay flag that drops Disk II image writes and HostFS write-through anyway, so a bug in the truncation rule can never reach a user's files |
 
@@ -284,6 +292,8 @@ runtime_tm_window_info(rt, ...)                    // tm_window: oldest/newest c
 | **Housekeeping does not truncate** | eject flush / snapshot flush / unchanged-catalog refresh leave the window intact |
 | **Host dir change truncates** | add a file to a mounted HostFS folder from the host → window cuts with cause `HOST_DIRECTORY` |
 | **Refused write does not truncate** | write-protected image: guest write attempt → window unchanged, no marker, image bytes unchanged |
+| **Max turbo kills the window** | enter max → recording stops; leave max → window oldest is the `RECORDER_RESUME` marker, not the pre-max cycle |
+| **Seal: HostFS refresh** | change the host folder mid-materialize → no refresh, no truncation, window intact |
 | Budget drop | fill past budget → oldest advances; `tm_window` honest |
 | Off path | enable off → insn path does not grow TM buffers |
 

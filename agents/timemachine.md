@@ -57,7 +57,7 @@ TimeMachine answers **queries** (step-out, run-to-PC, materialize-at-cycle), not
 | D14 | Migration | **Done — F7 is already retired and removed** (`b738cef`; code at tag `archive/f7-inspector`). No `frontend_inspector_*` remains in `src/`. Salvaged: shared disasm chrome, join-key and frame-ring accessor lessons. No phase owns F7 removal. |
 | D15 | Entry UX | Misc → **Inspector** tab: while running, primarily **Pause/Stop**; when paused + recording available, scrubber + forensic mode. This tab is **net-new UI** (nothing to retire — D14). |
 | D16 | Sealed replay | Re-execution must run **sealed**: CPU observer off, memory-access callback off, no frame push / publish, no `runtime_produce_audio`. Media write suppression stays as a **safety net** — D10 means the window never spans a write, so replay cannot re-execute one. A leaky seal corrupts the tape being stood on. One ctest per gate. |
-| D17 | TM window | HST1, frame ring and checkpoints age out independently. TimeMachine exposes **one `tm_window`** = their intersection (oldest/newest cycle). TM1 clamps seeks to it; the TM4 scrubber renders it; materialize outside it is an honest error, never a partial apply. |
+| D17 | TM window | HST1, frame ring and checkpoints age out independently. TimeMachine exposes **one `tm_window`** = their intersection (oldest/newest cycle). **Single interval, never a set of islands** — anything that breaks replay continuity (media change D10, recorder stop/resume under max) moves `oldest` to the marker rather than leaving a gap. TM1 clamps seeks to it; the TM4 scrubber renders it; materialize outside it is an honest error, never a partial apply. |
 | D18 | Control honesty | Forensic mode is a **global** read-only state, so socket peers must be able to see it and leave it. Existing status verb reports `mode` + focus cycle; an exit verb exists; `state-changed` gains forensic reasons. This **is** wire-visible — expect an **A2M bump** in TM3, not "client-only". |
 
 ---
@@ -165,7 +165,7 @@ Keep [`testing.md`](testing.md) gate green every phase.
 | **Leaky seal corrupts the tape** | D16 is the top correctness risk: replay re-entering the observer, watchpoints, frame push, audio or **host media writes**. One ctest per gate; assert recorder counters unchanged across a materialize |
 | **Replay divergence** | Enumerate nondeterminism up front: `rand()` in `diskii.c` / `image.c`, `clock_gettime` in `hostfs.c`, host key/paddle/paste input. Seed + checkpoint the PRNG; log inputs with cycles. Test: materialize twice → identical |
 | Window chopped by media writes | Expected consequence of D10, not a bug. Copy-protection write-checks and mid-play saves will cut the window during exactly the sessions users want to scrub. Surface the `MEDIA_CHANGED` marker so it reads as a stated rule, never as data loss |
-| Max free-run blows the cadence | At ~45 MHz a frame boundary is ~750k cycles apart. Cadence must be **cycle-capped, not frame-capped**; decide and document TM-on behaviour under max (TM2) |
+| Max free-run discards the tape | **Pinned:** follow existing `history_off_on_max` (default true) — recording stops in max. Because re-execution cannot replay across a gap, resume moves `tm_window.oldest` to the `RECORDER_RESUME` marker: one Opt+T throws the tape away. Surface it on the turbo cycle, not only in the Inspector tab |
 | Recording cost when on | Opt-in (D6); profile insn path; V1 assumes full TM when on |
 | One-state coop confusion | `state-changed` + status “forensic @ cycle” + control-visible mode and exit verb (D18); document turn-taking (D9) |
 
@@ -199,7 +199,7 @@ Epic V1 = **TM0–TM4** closed:
 | Live NOW anchor representation | **Full `apple2_snapshot`** at Inspector enter — identical to a checkpoint (D5), so exit restores Disk II and MB too |
 | A2M verbs for TimeMachine | **Required in TM3**, not optional (D18): mode + focus on status, exit verb, forensic `state-changed` reasons. Expect a protocol bump |
 | Whether recording-on implies frame ring + HST1 always | **Yes** for V1 when TM enabled |
-| TM behaviour under max free-run | Open — pin in TM2 Landed: cycle-capped checkpoints, or refuse/degrade recording in max |
+| TM behaviour under max free-run | **Closed:** recording stops in max (`history_off_on_max`); resume truncates the window to the `RECORDER_RESUME` marker. Measured cost numbers still go in TM2 Landed |
 
 ---
 
