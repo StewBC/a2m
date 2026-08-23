@@ -36,7 +36,8 @@ Open the component note only when the task touches that area:
 [`disk.md`](disk.md) · [`breakpoints.md`](breakpoints.md) ·
 [`snapshots.md`](snapshots.md) ·
 [`remote-debug.md`](remote-debug.md) · [`control-tools.md`](control-tools.md) ·
-[`turbo-zip.md`](turbo-zip.md) · [`sessions.md`](sessions.md) ·
+[`turbo-zip.md`](turbo-zip.md) · [`max-free-run.md`](max-free-run.md) ·
+[`sessions.md`](sessions.md) ·
 [`inspector.md`](inspector.md) · [`timemachine.md`](timemachine.md).
 
 ## Document set
@@ -47,11 +48,12 @@ Open the component note only when the task touches that area:
 | `rules.md` | Must-not-break architecture / host rules |
 | `snapshots.md` | Closed: machine save/load — c64m reuse + Apple payload |
 | `turbo-zip.md` | Closed: Zip MHz ladder + max presentation (block) paint |
+| `max-free-run.md` | Closed: instruction-quanta free-run (S2) + 60 Hz block paint |
 | `control-tools.md` | Agent ops: control-port scripting via `Ctl` + coop_watch (A2M/11) |
 | `remote-debug.md` | Closed epic record: control/history/frame-ring wire |
 | `sessions.md` | Closed foundation: runtime sessions + state-changed |
 | `inspector.md` | Retired F7 Inspector: lessons kept, code archived at `archive/f7-inspector` |
-| `timemachine.md` | **Active:** TimeMachine epic roadmap (north star + D1–D15) |
+| `timemachine.md` | **Active:** TimeMachine epic roadmap (north star + D1–D18) |
 | `TM0.md` … `TM6.md` | Implementer briefs per phase (V1 = TM0–TM4; V1.1 = TM5–TM6) |
 | `breakpoints.md` | Debugger BP product path (done through P5 + TRON) |
 | `video-paint.md` | Closed epic record: a2m-class paint into the beam |

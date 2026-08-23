@@ -6,18 +6,23 @@
 **V1 bar:** Required (closes TimeMachine V1 with TM0–TM3).  
 **Depends on:** TM3 materialize + forensic mode; TM1 verbs; TM0 recording enable.
 
-Related: [`frontend.md`](frontend.md) · [`inspector.md`](inspector.md) (I5a salvage) ·
-[`rules.md`](rules.md) · D1, D3, D4, D14, D15.
+Related: [`frontend.md`](frontend.md) · [`inspector.md`](inspector.md) (I5a verb-mapping
+lessons only — no live code) · [`rules.md`](rules.md) · [`max-free-run.md`](max-free-run.md) ·
+D1, D3, D4, D14, D15.
 
 ---
 
 ## Goal
 
 One debugger interface: **live** and **forensic** share F9 chrome. Inspector is a
-**Misc tab + mode**, not a second application. F7-as-separate-shell is retired (removed
-or thin alias into Inspector mode).
+**Misc tab + mode**, not a second application.
 
 Forensics uses the same keys as debugging; mode-aware verbs hit TimeMachine.
+
+**Scope note:** the F7 second shell was already removed in `b738cef` (D14) — there is no
+`frontend_inspector_*` in `src/` and no F7 binding in `main.c`. This phase is **net-new
+UI only**; nothing to retire, nothing to alias. Earlier drafts of this doc budgeted for
+that removal — they were stale.
 
 ---
 
@@ -27,7 +32,7 @@ Forensics uses the same keys as debugging; mode-aware verbs hit TimeMachine.
 - Promote/Branch button (TM6)  
 - Full forensic BP product (TM5) — in TM4 either disable BP edits in forensic with a
   clear message **or** stub “opens TM5 later”  
-- Preserving F7 layout for nostalgia (D14)  
+- Reviving any part of the F7 layout (D14)  
 - Flaky automated UI tests  
 
 ---
@@ -50,7 +55,9 @@ seek; leaving Inspector mode calls TM3 exit (restore NOW). **No auto-resume.**
 - Visual cue: distinct background/canvas tint (unmistakable).  
 - All value setters read-only (reject); rely on TM3 runtime reject too.  
 - Display / mem / softswitches / regs: normal views on one true state.  
-- Status line: `TIME MACHINE` / cycle / media caveat once.
+- Status line: `TIME MACHINE` / cycle / window extent.
+- When the window was cut by a media write, say why at the scrubber's left edge —
+  `disk write @ cycle N` (D10). A user whose 5 seconds became 0.2 must see the reason.
 
 ### Verb mapping (extend I5a to the shell)
 
@@ -66,13 +73,12 @@ seek; leaving Inspector mode calls TM3 exit (restore NOW). **No auto-resume.**
 
 Reuse shared disasm ops table pattern (`debugger_disasm` mode ops).
 
-### F7 retirement
+### Key surface
 
-- Remove exclusive F7 Inspector view **or** make F7 = “open debugger + Inspector tab +
-  enter forensic if possible.”  
-- Update `status.md`, `manual/manual.md`, key tables.  
-- Delete or gut `frontend_inspector_*` second shell once Misc tab works — salvage only
-  useful helpers.
+- F7 is **free** — it was unbound when the old Inspector was removed. Either leave it
+  unbound or bind it to “open debugger + Inspector tab (+ enter forensic if available)”
+  as a convenience. Product-neutral; pick one and document it.  
+- Update `status.md`, `manual/manual.md`, key tables to match whatever ships.
 
 ---
 
@@ -81,6 +87,8 @@ Reuse shared disasm ops table pattern (`debugger_disasm` mode ops).
 - Prefer driving everything through `runtime_client_tm_*` from TM1/TM3.  
 - Frame scrubber: use frame ring info + TM3 seek(`frame.machine_cycle`).  
 - Recording toggle: TM0 flag + history/frame/TM recorder enable (unified story).  
+- Window extent and its start reason come from `runtime_tm_window_info` — do not infer
+  either from frame-ring bounds.  
 - Sessions: UI may keep a `kind=ui` session; not required to FIND-page for nav anymore.
 
 ---
@@ -92,8 +100,8 @@ Reuse shared disasm ops table pattern (`debugger_disasm` mode ops).
 | Misc / debugger layout | `src/frontend/debugger_*.c`, layout misc pane |
 | Host keys | `src/main.c` |
 | Disasm mode ops | `src/frontend/debugger_disasm.*` |
-| Legacy F7 | `frontend_inspector_*` in `frontend.c` / `frontend.h` |
 | Client TM APIs | from TM1/TM3 Landed |
+| Turbo ladder | `agents/turbo-zip.md`, `agents/max-free-run.md` |
 | Docs | `agents/status.md`, `manual/manual.md` |
 
 ---
@@ -103,9 +111,15 @@ Reuse shared disasm ops table pattern (`debugger_disasm` mode ops).
 1. TM off → play; confirm no obvious new cost; Inspector explains how to enable.  
 2. TM on → run → Pause from tab → scrub frames → mem/regs/display match past.  
 3. F10/F11/F12 forensic nav without FIND lag.  
-4. Try poke mem → rejected.  
+4. Try poke mem → rejected with the read-only message.  
 5. Exit Inspector mode → NOW restored; still paused; F12 runs live again.  
-6. F7 gone or aliased; docs match keys.  
+6. **Boot a disk, scrub back through the load, exit** → drive still works; host image
+   file unchanged.  
+7. **Save to disk while recording** → window visibly cuts at the write, scrubber shows
+   the reason, forward recording continues, and the host image is correct (D10).  
+8. **TM on + Opt+T max** → whatever TM2 pinned for max actually happens (recording
+   degraded or refused) and the tab says so honestly — no silent window collapse.  
+9. Docs match keys.  
 
 Desktop + reasonable window size; tint visible.
 
@@ -113,10 +127,14 @@ Desktop + reasonable window size; tint visible.
 
 ## Acceptance checklist
 
-- [ ] Misc Inspector tab is the entry; dual F7 app gone from product  
+- [ ] Misc Inspector tab is the only forensic entry  
 - [ ] Forensic tint + read-only views  
 - [ ] Scrubber + TM verbs wired; same-skin keys  
+- [ ] Scrubber extent reflects `tm_window`, not frame-ring extent alone (D17)  
 - [ ] Live BP list not silently mutated in forensic  
+- [ ] Max-turbo behaviour surfaced honestly in the tab  
+- [ ] Window-cut reason shown at the scrubber edge when a media write truncated it  
+- [ ] `manual/manual.md` states plainly: **a disk write drops earlier history**  
 - [ ] Docs/keys/manual updated  
 - [ ] Build + ctest green; manual smoke above  
 - [ ] Landed filled — **TimeMachine V1 bar (TM0–TM4) claimable**  
@@ -126,10 +144,11 @@ Desktop + reasonable window size; tint visible.
 ## Agent script
 
 ```text
-1. Read agents/rules.md, agents/timemachine.md D1/D14/D15, TM3 Landed, TM4.md,
-   agents/frontend.md.
-2. Implement Misc Inspector tab + mode chrome; wire TM client; retire F7 shell.
-3. Manual smoke; update status/manual. Build + ctest.
+1. Read agents/rules.md, agents/timemachine.md D1/D14/D15/D17, TM3 Landed, TM4.md,
+   agents/frontend.md, agents/max-free-run.md.
+2. Implement Misc Inspector tab + mode chrome; wire TM client. Net-new UI — F7 is
+   already gone; do not go looking for a shell to retire.
+3. Manual smoke (incl. disk scrub + max turbo); update status/manual. Build + ctest.
 4. Landed. Stop — do not start TM5/TM6 unless human accepts V1 and asks.
 ```
 

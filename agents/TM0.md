@@ -15,15 +15,15 @@ Related: [`rules.md`](rules.md) · [`status.md`](status.md) · [`inspector.md`](
 Lock vocabulary, opt-in recording switches, and agent docs so every later TM phase
 shares one language. **No TimeMachine engine work in this phase.**
 
-After TM0, an implementer can open TM1 without re-arguing D1–D15.
+After TM0, an implementer can open TM1 without re-arguing D1–D18.
 
 ---
 
 ## Non-goals
 
-- Checkpoint / delta format  
+- Checkpoint ring / input log / sealed replay (TM2)  
 - Materialize / replace `apple2_t`  
-- Misc Inspector tab / F7 retirement  
+- Misc Inspector tab (TM4)  
 - A2M protocol bump (unless a config wire verb is unavoidable — prefer not)  
 - Changing default play performance (recording stays **off** by default)
 
@@ -32,8 +32,8 @@ After TM0, an implementer can open TM1 without re-arguing D1–D15.
 ## Pinned decisions this phase must honor
 
 From [`timemachine.md`](timemachine.md): **D6** (opt-in), **D8** (runtime-owned name),
-**D14** (F7 disposable), **D15** (Misc tab later). Full table is in the epic — do not
-re-litigate.
+**D14** (F7 already retired — nothing to remove), **D15** (Misc tab later, net-new UI).
+Full table is in the epic — do not re-litigate.
 
 ---
 
@@ -56,24 +56,25 @@ language):
 
 | Surface | Behavior |
 |---------|----------|
-| INI | e.g. `[debug] timemachine=0\|1` or `timemachine_record=…` (pick one; document) |
-| CLI | matching flag / `--timemachine` / `--no-timemachine` |
+| INI | `[debug] timemachine=0\|1` |
+| CLI | `--timemachine` / `--no-timemachine` |
 | Default | **off** (Total Replay / play path stays cheap) |
-| Budgets | Keep existing `history_memory_mb` / `frame_ring_memory_mb`; document that when TM is on, V1 implies HST1 + frame ring + (from TM2) checkpoints/deltas under those budgets |
+| Budgets | Keep existing `history_memory_mb` / `frame_ring_memory_mb`; **add `timemachine_memory_mb`** for the TM2 checkpoint ring (default ~128MB ≈ 800 checkpoints at ~160K each) |
 
-**Semantics for TM0 (even before TM2 exists):**
+**Semantics — pinned, not "preferred". Do not re-litigate:**
 
-- `timemachine=0`: no new TM work; existing history/frame-ring may still be toggled by
-  their own record APIs — **or** TM0 may define that master-off forces both recorders
-  off. **Prefer:** master-off means “TimeMachine product path off”; do not break
-  existing `history-record` / `frame-ring-record` for agents unless documented.  
-- **Recommended pin for TM0:** add master enable that later phases gate checkpoint/delta
-  **and** that UI Inspector mode requires on. Existing HST1/frame record commands remain
-  independently usable until TM4 unifies the story — document the temporary dual wording
-  honestly.
+1. `timemachine=1` **implies** HST1 recording + frame ring + (from TM2) the checkpoint
+   ring. One product path, one switch. This is the epic's own open-item default
+   ("recording-on implies frame ring + HST1 always: **Yes** for V1").
+2. `timemachine=0` forces the TimeMachine product path off. It does **not** remove the
+   existing `history-record` / `frame-ring-record` control verbs — those keep working
+   standalone for agents, and are the pre-TimeMachine behaviour.
+3. Turning TM on from off is what arms the recorders; an agent that then calls
+   `history-record off` gets what it asked for, and Inspector enter (TM3) fails honestly
+   because `tm_window` is empty. No hidden re-arming.
+4. UI Inspector mode (TM4) **requires** `timemachine=1`.
 
-If unifying “TM on ⇒ history+frames on” in TM0 is cleaner and low-risk, do that and
-document it; do not leave ambiguity for TM1.
+Document the dual wording honestly in `control-tools.md` while both surfaces exist.
 
 ### 3. Runtime plumbing (minimal)
 
@@ -91,7 +92,10 @@ document it; do not leave ambiguity for TM1.
 | TimeMachine | Runtime forensic engine (queries + later materialize) |
 | Inspector mode | Debugger forensic mode (UI); drives TimeMachine |
 | Tape / head | Retained timeline + current forensic focus |
-| Checkpoint / delta | TM2 storage (mention only in docs here) |
+| Checkpoint | Full `apple2_snapshot` blob in the TM2 ring (mention only in docs here) |
+| Input log | Timestamped host input + nondeterminism record (TM2) |
+| Sealed replay | Re-execution with observers/audio/media side effects muted (D16) |
+| `tm_window` | Intersection of HST1 / frame ring / checkpoint coverage (D17) |
 | Live NOW | Unscrubbed machine head |
 | Forensic THEN | Materialized / focused past (TM3+) |
 
@@ -111,8 +115,10 @@ document it; do not leave ambiguity for TM1.
 ## Acceptance checklist
 
 - [ ] Master TimeMachine enable in INI + CLI; **default off**  
+- [ ] `timemachine_memory_mb` budget option plumbed (consumed in TM2)  
 - [ ] Flag reaches runtime config; readable where TM1 will gate  
 - [ ] `a2m.ini.example` + short agent/doc note: off = play, on = debug recording path  
+- [ ] `control-tools.md` notes the TM master switch vs standalone `history-record` / `frame-ring-record`  
 - [ ] Epic + phase files linked; Inspector supersession consistent  
 - [ ] Build + full ctest green  
 - [ ] **Landed** section filled below  
@@ -122,7 +128,7 @@ document it; do not leave ambiguity for TM1.
 ## Agent script
 
 ```text
-1. Read agents/rules.md, agents/timemachine.md (D1–D15), agents/TM0.md (this file).
+1. Read agents/rules.md, agents/timemachine.md (D1–D18), agents/TM0.md (this file).
 2. Add config flag + plumb to runtime; update ini example.
 3. Align status/README/timemachine Landed pointers; do not implement TM1 APIs.
 4. Build + ctest. Write Landed. Stop.

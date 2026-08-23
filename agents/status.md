@@ -4,7 +4,7 @@
 
 **Rules:** [`rules.md`](rules.md)  
 **Closed:** paint; SP `$C800`; BP 0–4e + P4b TRON; remote-debug **C0–C5b**; control tools **T1–T5**; `get-softswitches`; **turbo-zip**; **max free-run S2**; **snapshots** ([`snapshots.md`](snapshots.md) — `.a2state` save/load, drop, `--sna`, Opt+Shift+./,); **sessions foundation** ([`sessions.md`](sessions.md) — multi-asker + `state-changed`; A2M/11).  
-**Active:** **TimeMachine** roadmap ([`timemachine.md`](timemachine.md) — TM0–TM6; V1 = TM0–TM4). The F7 Inspector spine it supersedes is **retired and removed** — lessons in [`inspector.md`](inspector.md), code at tag `archive/f7-inspector`.  
+**Active:** **TimeMachine** roadmap ([`timemachine.md`](timemachine.md) — TM0–TM6; V1 = TM0–TM4; storage = checkpoint ring + sealed re-execution, D5a). The F7 Inspector spine it supersedes is **retired and removed** — lessons in [`inspector.md`](inspector.md), code at tag `archive/f7-inspector`.  
 **Look-later:** TM5 forensic BPs / TM6 Promote; debug ergonomics (mem workshop → live remount → frame gate / HW snaps).
 
 ---

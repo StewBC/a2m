@@ -3,7 +3,7 @@
 **Status:** Not started. **V1.1** (not required for TimeMachine V1 bar).  
 **Epic:** [`timemachine.md`](timemachine.md)  
 **Prev / Next:** [`TM4.md`](TM4.md) / [`TM6.md`](TM6.md)  
-**Depends on:** TM1–TM3 (queries + materialize); best after TM4 chrome.
+**Depends on:** TM1–TM3 (queries + sealed materialize); best after TM4 chrome.
 
 Related: [`breakpoints.md`](breakpoints.md) · [`rules.md`](rules.md).
 
@@ -42,16 +42,26 @@ without mutating or confusing the **live** BP engine used on free-run resume.
 ### Match kinds (V1.1)
 
 1. **Execute** PC (range optional if cheap)  
-2. **Mem write** to address (from delta stream or HST1 access) — if TM2 deltas support it  
+2. **Mem write** to address — HST1 already records `DATA_WRITE` accesses with address and
+   value per instruction, and `runtime_history_find` already filters on
+   `has_address` + `access_mask`. No new storage needed.  
 
 Conditions (regs/mem-at-THEN): evaluate against **materialized** state at candidate
 records — start minimal (PC only) if needed; extend in same phase if low cost.
 
-### Run-tape-to-BP
+### Run-tape-to-BP — two routes
 
-From focus, scan forward (TM1 index + materialize as needed, or HST1-only match then
-single materialize on hit). Stop focus on hit; materialize; publish. End-of-tape →
-honest miss.
+| Route | How | When |
+|-------|-----|------|
+| **Index scan** | `runtime_history_find` matches PC / address / value on HST1, then a single materialize on the hit | **Default.** No state rebuild per candidate; fastest for simple match kinds |
+| **Sealed re-run** | Load nearest checkpoint, then re-execute under the seal (D16) **with the live BP engine armed** | For conditions HST1 cannot express (register state, memory-at-THEN, complex predicates) |
+
+The second route is the payoff from choosing re-execution over deltas (D5a): forensic
+"run until condition" can reuse the existing breakpoint/condition evaluator instead of
+reimplementing it against a reconstructed state. Keep the seal engaged throughout — a BP
+hit during replay must not publish frames or append HST1 records.
+
+Stop focus on hit; materialize; publish. End-of-tape → honest miss.
 
 ---
 

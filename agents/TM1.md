@@ -22,11 +22,11 @@ loop. Prove the TimeMachine “SQL” API before checkpoints exist.
 
 ## Non-goals
 
-- Checkpoints / deltas / materialize into `apple2_t` (TM2–TM3)  
-- Misc Inspector tab / kill F7 (TM4)  
+- Checkpoints / sealed replay / materialize into `apple2_t` (TM2–TM3)  
+- Misc Inspector tab (TM4)  
 - Replacing live `runtime_client_step_out` machine execution  
 - Dual NOW+THEN panels  
-- Perfect call-stack via SP reconstruction beyond JSR/RTS opcode nest on the tape  
+- A full reconstructed call-stack *display* (depth tracking is for nav only)  
 
 ---
 
@@ -36,14 +36,15 @@ loop. Prove the TimeMachine “SQL” API before checkpoints exist.
 |------|-----------------|
 | **Focus** | Current HST1 record id + `machine_cycle` (tape head index) |
 | **Step** | Next (or prev) instruction record from focus |
-| **Step over** | From focus on JSR (or nest point): advance to record after matching RTS at same nest depth |
-| **Step out** | From focus: advance until nest depth returns below entry depth (exit current routine) |
+| **Step over** | From focus on JSR: advance to the first record whose `sp` has returned to entry level |
+| **Step out** | From focus: advance until `sp` rises above entry `sp` (frame popped) |
 | **Run to PC** | Next record with `pc == target` at/after focus (optional cycle/span ceiling) |
 | **Seek** | Set focus to history id or nearest insn ≤ cycle |
 
-Nesting rules should match live step-over/out semantics where practical (same mental
-model as `runtime_step_over` / `runtime_step_out` in `runtime_thread.c`), but operate
-**only** on recorded HST1 instruction rows — never call live step APIs.
+Depth semantics should match live step-over/out where practical (same mental model as
+`runtime_step_over` / `runtime_step_out` in `runtime_thread.c`), but operate **only** on
+recorded HST1 rows — never call live step APIs. See **Nest / depth notes** below for why
+the recorded `sp` is the signal, not JSR/RTS opcode counting.
 
 ---
 
@@ -81,22 +82,39 @@ runtime_timemachine_query(rt, op, focus, args) → result focus
    (minimal fields). Initialize from “newest” or caller-provided seek.  
 2. **Query ops** implemented against `runtime_history` (random access / iterate by id).  
 3. **Client API** + command/event types for request/response (mirror existing token style).  
-4. **ctest** with recorded fixture or programmatic HST1 fill: step, over, out, run-to.  
-5. **Optional UI hookup:** point F7 forensic tape keys / I5a forensic ops at TM1 client
-   APIs if F7 still exists — **do not** invest in F7 chrome. If hookup is messy, ship
-   API + tests only and leave UI to TM4. Prefer at least one path exercised from UI or
-   control for smoke if low cost.
+4. **Window clamp (D17):** every op clamps to `tm_window`. In TM1 that is HST1 coverage
+   alone; once TM2 lands it becomes the intersection, so route the clamp through one
+   accessor rather than reading history status inline at each call site.  
+5. **Epoch / timeline:** a seek that would cross an epoch boundary (reset, state load —
+   history markers 4/5) is **rejected**, not silently satisfied. Focus carries `epoch`;
+   compare it.  
+6. **ctest** with recorded fixture or programmatic HST1 fill: step, over, out, run-to,
+   window clamp, epoch reject.
+
+There is **no UI to hook up** — F7 is gone (D14) and the Misc tab is TM4. Ship API +
+tests. If a control-port smoke path is cheap, take it; otherwise leave all UI to TM4.
 
 ---
 
-## Nest / opcode notes
+## Nest / depth notes
 
-- Treat `JSR` / `RTS` (and 65C02 equivalents the live stepper already cares about) as
-  nest ±1 when scanning forward from focus.  
-- Interrupt records: define behavior (skip for nest depth, or treat as non-nest). Pin
-  in Landed: **recommend skip markers/IRQ/NMI for depth**, only instruction rows.  
+**Pin: use the recorded `sp`, not opcode nesting.** Every history record carries `sp`
+([`runtime_history.h`](../src/runtime/runtime_history.h) `runtime_history_record`), so
+depth is a direct comparison rather than an inference:
+
+- **Step out** = first forward record with `sp > entry_sp` (stack unwound past the frame).  
+- **Step over** from a `JSR` = first forward record with `sp >= entry_sp` after the push.  
+- This is robust where opcode nesting is not: `RTI`, routines that end by manipulating the
+  stack, `PLA`/`PLA` returns, tail-jumps, and IRQ/NMI frames pushed mid-routine. Opcode
+  nesting mis-counts all of those.  
+- Keep `JSR`/`RTS` opcodes as a corroborating hint (and for the "focus is on a JSR" test),
+  not as the primary signal.  
+- Stack **wrap** ($01FF→$0100) is the one case SP comparison gets wrong; guard it or
+  bail honestly rather than returning a wrong focus.  
+- Interrupt records (`RUNTIME_HISTORY_RECORD_IRQ` / `_NMI`) and markers are not
+  instruction rows — skip them when evaluating depth, but do not lose them from the walk.  
 - If focus is not on a JSR, step-over ≡ step.  
-- If cannot find end (tape truncated): return honest error / end-of-tape focus + flag.
+- If the end cannot be found (tape truncated): return honest error / end-of-tape focus + flag.
 
 ---
 
@@ -109,7 +127,7 @@ runtime_timemachine_query(rt, op, focus, args) → result focus
 | Live step-over/out (reference) | `runtime_thread.c` `runtime_step_over` / `runtime_step_out` |
 | Client | `runtime_client.c` / `.h` |
 | Commands / events | `runtime_command.h`, `runtime_event.h` |
-| Forensic UI (optional consumer) | `src/frontend/debugger_disasm.*`, `frontend_inspector_*` |
+| Shared disasm chrome (TM4 consumer) | `src/frontend/debugger_disasm.*` |
 | Tests | `tests/runtime/test_runtime_history_*.c`, `test_runtime_step_nested.c` (live — reference only) |
 
 ---
@@ -117,9 +135,10 @@ runtime_timemachine_query(rt, op, focus, args) → result focus
 ## Acceptance checklist
 
 - [ ] Worker TimeMachine query module exists; UI never FIND-loops for over/out/run-to  
-- [ ] step / step-over / step-out / run-to-PC / seek implemented on HST1  
+- [ ] step / step-over / step-out / run-to-PC / seek implemented on HST1, **depth via recorded `sp`**  
+- [ ] All ops clamp to `tm_window`; epoch-crossing seek rejected  
 - [ ] `runtime_client` wrappers + events with clear focus payload  
-- [ ] ctest covers nest step-out/over and missing-target honesty  
+- [ ] ctest covers sp-depth step-out/over, missing-target honesty, window clamp, epoch reject  
 - [ ] Does **not** mutate `apple2_t`  
 - [ ] Build + full ctest green  
 - [ ] Landed filled; note any A2M bump (expect none)
@@ -131,7 +150,7 @@ runtime_timemachine_query(rt, op, focus, args) → result focus
 ```text
 1. Read agents/rules.md, agents/timemachine.md, agents/TM0.md (Landed), agents/TM1.md.
 2. Implement runtime_timemachine query + client; ctest first.
-3. Optionally retarget forensic step keys to TM1; do not build Misc tab.
+3. No UI work — F7 is gone and the Misc tab is TM4.
 4. Build + ctest. Landed. Stop — do not start TM2 unless brief says so.
 ```
 
