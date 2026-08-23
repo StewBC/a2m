@@ -6,6 +6,7 @@
 #include "runtime_breakpoint_ini.h"
 #include "runtime_command.h"
 #include "runtime_internal.h"
+#include "runtime_timemachine.h"
 #include "thread.h"
 
 #include <ctype.h>
@@ -336,6 +337,8 @@ runtime *runtime_create(const runtime_config *config)
         rt->history_memory_mb = config->history_memory_mb;
         rt->history_off_on_max = config->history_off_on_max;
         rt->history_paused_for_max = false;
+        rt->timemachine_enabled = false;
+        rt->timemachine_memory_mb = config->timemachine_memory_mb;
         if (rt->history_memory_mb > 0u) {
             uint64_t hbudget =
                 (uint64_t)rt->history_memory_mb * 1024ull * 1024ull;

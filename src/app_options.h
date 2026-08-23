@@ -114,6 +114,10 @@ typedef struct app_options {
      */
     bool history_off_on_max;
     int frame_ring_memory_mb;
+    /* TimeMachine master enable (default off). Off→on arms HST1 + frame ring. */
+    bool timemachine;
+    /* Checkpoint-ring budget in MiB (consumed in TM2). 0 or 16..4096; default 128. */
+    int timemachine_memory_mb;
     /* Host-keyboard joystick: layout name ("numpad" or "wasd") and the Apple
        gameport stick it drives (0 = disabled, 1 or 2 = active).
        swap_buttons: when stick is on, Space↔Option (FIRE2↔FIRE) for ergonomics. */

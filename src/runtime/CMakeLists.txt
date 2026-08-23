@@ -13,6 +13,7 @@ add_library(runtime STATIC
     runtime_slot_resolve.c
     runtime.c
     runtime_thread.c
+    runtime_timemachine.c
 )
 
 target_include_directories(runtime PUBLIC

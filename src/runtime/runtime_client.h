@@ -211,6 +211,10 @@ bool runtime_client_history_record(
     uint64_t request_token);
 /* Pause flight-recorder automatically while turbo is max (live policy). */
 bool runtime_client_set_history_off_on_max(runtime_client *client, bool enabled);
+bool runtime_client_tm_set_enabled(
+    runtime_client *client,
+    bool enabled,
+    uint64_t request_token);
 bool runtime_client_history_clear(
     runtime_client *client,
     uint64_t request_token);

@@ -423,6 +423,115 @@ int main(void)
         }
     }
 
+    /* TimeMachine config: default off, INI/CLI, 0 honoured, garbage → default. */
+    {
+        char *argv_tm[] = {
+            (char *)"a2m",
+            (char *)"--noini",
+            (char *)"--timemachine",
+            (char *)"--timemachine-memory",
+            (char *)"64",
+        };
+        char *argv_no[] = {
+            (char *)"a2m",
+            (char *)"--noini",
+            (char *)"--no-timemachine",
+        };
+        char *argv_zero[] = {
+            (char *)"a2m",
+            (char *)"--noini",
+            (char *)"--timemachine-memory",
+            (char *)"0",
+        };
+        char *argv_bad[] = {
+            (char *)"a2m",
+            (char *)"--noini",
+            (char *)"--timemachine-memory",
+            (char *)"5",
+        };
+        const char *path = "/tmp/a2m-test-timemachine.ini";
+        FILE *file;
+        config *saved;
+
+        app_options_init(&options);
+        expect_true("TM default off", !options.timemachine);
+        expect_true("TM budget default 128", options.timemachine_memory_mb == 128);
+        app_options_destroy(&options);
+
+        expect_true(
+            "CLI --timemachine",
+            app_options_load_startup(
+                &options, (int)(sizeof(argv_tm) / sizeof(argv_tm[0])), argv_tm));
+        expect_true("CLI TM on", options.timemachine);
+        expect_true("CLI TM budget 64", options.timemachine_memory_mb == 64);
+        app_options_destroy(&options);
+
+        expect_true(
+            "CLI --no-timemachine",
+            app_options_load_startup(
+                &options, (int)(sizeof(argv_no) / sizeof(argv_no[0])), argv_no));
+        expect_true("CLI TM off", !options.timemachine);
+        app_options_destroy(&options);
+
+        expect_true(
+            "CLI TM budget 0",
+            app_options_load_startup(
+                &options,
+                (int)(sizeof(argv_zero) / sizeof(argv_zero[0])),
+                argv_zero));
+        expect_true("CLI 0 honoured", options.timemachine_memory_mb == 0);
+        app_options_destroy(&options);
+
+        expect_true(
+            "CLI TM budget 5 rejected",
+            !app_options_load_startup(
+                &options, (int)(sizeof(argv_bad) / sizeof(argv_bad[0])), argv_bad));
+        app_options_destroy(&options);
+
+        file = fopen(path, "w");
+        expect_true("create TM INI", file != NULL);
+        fputs(
+            "[debug]\n"
+            "timemachine = 1\n"
+            "timemachine_memory_mb = 0\n"
+            "history_memory_mb = 0\n"
+            "frame_ring_memory_mb = 32\n",
+            file);
+        expect_true("close TM INI", fclose(file) == 0);
+        app_options_init(&options);
+        expect_true("load TM INI", app_options_apply_ini_file(&options, path));
+        expect_true("INI TM on", options.timemachine);
+        expect_true("INI TM budget 0", options.timemachine_memory_mb == 0);
+        expect_true("INI history 0", options.history_memory_mb == 0);
+        expect_true("INI frame 32", options.frame_ring_memory_mb == 32);
+        set_ini_path(&options, path);
+        expect_true("save TM INI", app_options_save_shutdown(&options));
+        app_options_destroy(&options);
+
+        saved = config_load(path);
+        expect_true("reload TM INI", saved != NULL);
+        expect_true(
+            "saved timemachine",
+            config_get(saved, "debug", "timemachine") != NULL &&
+                strcmp(config_get(saved, "debug", "timemachine"), "true") == 0);
+        expect_true(
+            "saved TM budget 0",
+            config_get(saved, "debug", "timemachine_memory_mb") != NULL &&
+                strcmp(config_get(saved, "debug", "timemachine_memory_mb"), "0") ==
+                    0);
+        config_destroy(saved);
+
+        file = fopen(path, "w");
+        expect_true("create garbage TM INI", file != NULL);
+        fputs("[debug]\ntimemachine_memory_mb = no-thanks\n", file);
+        expect_true("close garbage TM INI", fclose(file) == 0);
+        app_options_init(&options);
+        expect_true("load garbage TM INI", app_options_apply_ini_file(&options, path));
+        expect_true("garbage TM budget → default", options.timemachine_memory_mb == 128);
+        app_options_destroy(&options);
+        expect_true("remove TM INI", remove(path) == 0);
+    }
+
     printf("OK app_options_mounts\n");
     return 0;
 }

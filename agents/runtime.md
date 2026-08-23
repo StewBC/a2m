@@ -75,7 +75,7 @@ Full epic: [`remote-debug.md`](remote-debug.md).
 | Product `src/control` | Parked c64-shaped library (not linked) |
 | Frame ring | **Done** — ARGB ring, live push, control wire |
 | CPU history | **Done through C4c** — arena, observer, worker RPC, control wire |
-| Options | `history_memory_mb`, `frame_ring_memory_mb` wired into runtime |
+| Options | `history_memory_mb`, `frame_ring_memory_mb`, `timemachine`, `timemachine_memory_mb` wired into runtime |
 | Sessions | Fixed table N=4; per-session history cursors; `runtime_client_session_open/close`; control TCP binds `kind=control`; `RUNTIME_EVENT_STATE_CHANGED` |
 
 ## Deferred tests

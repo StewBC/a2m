@@ -1,6 +1,6 @@
 # TM0 — Epic contract + config surface
 
-**Status:** Not started.  
+**Status:** Landed.  
 **Epic:** [`timemachine.md`](timemachine.md)  
 **Prev / Next:** — / [`TM1.md`](TM1.md)  
 **V1 bar:** Required (first phase).
@@ -127,17 +127,17 @@ Document the dual wording honestly in `control-tools.md` while both surfaces exi
 
 ## Acceptance checklist
 
-- [ ] Master TimeMachine enable in INI + CLI; **default off**  
-- [ ] `timemachine_memory_mb` budget option plumbed (consumed in TM2)  
-- [ ] Flag reaches runtime config; readable where TM1 will gate  
-- [ ] TM off→on arms HST1 + frame ring once; no hidden re-arm after standalone off  
-- [ ] `timemachine=1` + budget `0` → honest empty tape (`DISABLED_BY_CONFIG`); one startup warning  
-- [ ] `a2m.ini.example` gains a **`[debug]` section** — it has none today (sections are window/machine/Slots/config/DiskII/SmartPort/input), so `history_memory_mb` and `frame_ring_memory_mb` are undocumented there. Add them alongside `timemachine`  
-- [ ] Doc note: off = play, on = debug recording path; state the 512 MB aggregate  
-- [ ] `control-tools.md` notes the TM master switch vs standalone `history-record` / `frame-ring-record`  
-- [ ] Epic + phase files linked; Inspector supersession consistent  
-- [ ] Build + full ctest green  
-- [ ] **Landed** section filled below  
+- [x] Master TimeMachine enable in INI + CLI; **default off**  
+- [x] `timemachine_memory_mb` budget option plumbed (consumed in TM2)  
+- [x] Flag reaches runtime config; readable where TM1 will gate  
+- [x] TM off→on arms HST1 + frame ring once; no hidden re-arm after standalone off  
+- [x] `timemachine=1` + budget `0` → honest empty tape (`DISABLED_BY_CONFIG`); one startup warning  
+- [x] `a2m.ini.example` gains a **`[debug]` section** — it has none today (sections are window/machine/Slots/config/DiskII/SmartPort/input), so `history_memory_mb` and `frame_ring_memory_mb` are undocumented there. Add them alongside `timemachine`  
+- [x] Doc note: off = play, on = debug recording path; state the 512 MB aggregate  
+- [x] `control-tools.md` notes the TM master switch vs standalone `history-record` / `frame-ring-record`  
+- [x] Epic + phase files linked; Inspector supersession consistent  
+- [x] Build + full ctest green  
+- [x] **Landed** section filled below  
 
 ---
 
@@ -155,4 +155,81 @@ Document the dual wording honestly in `control-tools.md` while both surfaces exi
 
 ## Landed
 
-_(empty until implemented)_
+Handoff for TM1. Source is the contract; this records what actually shipped.
+
+### Names
+
+| Surface | Name | Default |
+|---------|------|---------|
+| INI | `[debug] timemachine=0\|1` | **0** (off) |
+| CLI | `--timemachine` / `--no-timemachine` | off |
+| INI budget | `[debug] timemachine_memory_mb` | **128** |
+| CLI budget | `--timemachine-memory=<MiB>` | 128 (extra CLI; the brief listed INI only) |
+| Worker | `runtime_tm_set_enabled` / `runtime_tm_enabled` / `runtime_tm_memory_mb` | — |
+| Client | `runtime_client_tm_set_enabled(client, enabled, token)` | replies with `HISTORY_STATUS_RESPONSE` |
+| Command | `RUNTIME_COMMAND_TM_SET_ENABLED` | **not** on the A2M wire |
+
+Module: `src/runtime/runtime_timemachine.c` / `.h`. No query/materialize APIs.
+
+Budget range matches history: **0 or 16..4096**. INI garbage/out-of-range warns and uses 128; CLI rejects. Typed **0 is honoured**.
+
+No A2M bump. Control-port `history-record` / `frame-ring-record` unchanged.
+
+### Arming (the function TM2 extends)
+
+`runtime_tm_set_enabled(rt, bool)` is the single off→on edge:
+
+1. Sets `rt->timemachine_enabled`.
+2. If transitioning **off→on**: `runtime_history_resume` + `runtime_frame_ring_set_recording(true)` (frame only if `frame_ring_memory_mb > 0`).
+3. If already on, or turning off: **do not** touch recorders.
+4. Turning TM off does **not** stop standalone recording.
+
+Call sites: worker startup (`rt->config.timemachine`) **before** `history_off_on_max` is applied; `RUNTIME_COMMAND_TM_SET_ENABLED` for tests and later TM4 UI.
+
+Max turbo: if TM enable happens while already on max and `history_off_on_max` is set, HST1 is **not** resumed (`history_paused_for_max = true` so leave-max restores). Frame ring is still armed; TM2 owns max-stop for the rest.
+
+### What TM1 gates on
+
+```c
+runtime_tm_enabled(rt)          /* worker bool */
+runtime_tm_memory_mb(rt)        /* checkpoint budget, unused until TM2 */
+rt->history                     /* NULL when history_memory_mb==0 */
+rt->frame_ring                  /* capacity 0 when frame_ring_memory_mb==0 */
+```
+
+There is no `tm_window` yet. Intersection (D17) is TM1/TM2. A recorder that is available but **not recording** (pin 3) currently still has whatever records it already kept — TM3 Inspector enter must treat “TM on but a required recorder is off / budget 0” as empty window.
+
+Zero history budget: `runtime_history_status.available == false`, `unavailable_reason == RUNTIME_HISTORY_UNAVAILABLE_DISABLED_BY_CONFIG` (existing mapping; not a new enum).
+
+### Discovery that contradicts a naive reading of the brief
+
+HST1 and the frame ring **already record at startup** when their budgets are non-zero (`runtime_history_create` sets `recording=1`; `runtime_frame_ring_init` sets `recording=true`). Default play therefore already allocates 256+128 MB and records, TM or not. TM0 does **not** change that: `timemachine=0` skips the TM arm, it does not stop the existing recorders.
+
+So `timemachine=1` at a default-budget boot is a no-op on the recorders themselves (already on). The TM0 behaviour that is new:
+
+- the enable flag exists and is readable
+- off→on after a standalone `history-record off` / `frame-ring-record off` **re-arms**
+- while TM stays on, those standalone offs are **not** undone
+- `timemachine=1` + typed 0 budget is empty tape + one stderr warning:
+  `a2m: timemachine=1 but history_memory_mb=0; TimeMachine window will be empty`
+  (and/or `frame_ring_memory_mb=0`)
+
+There is no `--frame-ring-memory` CLI (pre-existing). Frame-ring 0 is INI-only.
+
+### Footprint
+
+Documented on-path aggregate when TM is on: **256 + 128 + 128 = 512 MB**. TM0 does not allocate the checkpoint 128 MB; `timemachine_memory_mb` is stored on the runtime for TM2. Play-cheap for TM is “no checkpoint work + default TM off”, not “HST1/frame rings absent”.
+
+### Tests / gate
+
+- `app_options_mounts` covers default off, CLI on/off, CLI budget 0 vs 5 (reject), INI 0 round-trip, INI garbage → 128.
+- `runtime_timemachine` covers arm-at-start, pin-3 both recorders, off→on re-arm, standalone history-record while TM off, history 0 → `DISABLED_BY_CONFIG`, frame 0 → capacity 0.
+- Full ctest **56** green (was 55).
+
+### Docs touched
+
+`a2m.ini.example` `[debug]` section; `manual/manual.md` flag + `[debug]` keys + 512 MB; `agents/control-tools.md` dual wording; `agents/status.md` / `testing.md` / `runtime.md`; this file.
+
+### Not in this phase
+
+Checkpoint ring, input log, seal, `tm_window`, query verbs, A2M TM commands, Misc Inspector tab. TM1 starts with `runtime_tm_enabled` + HST1 scans.

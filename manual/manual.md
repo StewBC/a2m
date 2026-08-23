@@ -36,6 +36,7 @@ Useful flags:
 | `--symbols <file>` | Load a simple symbol file (`NAME` hex per line) |
 | `--headless` | No window; short smoke exit unless `--control-port` is set |
 | `--control-port N` | Listen on localhost TCP for A2M/11 remote control (`0`=off) |
+| `--timemachine` / `--no-timemachine` | Enable TimeMachine recording (default off) |
 | `--audio-smoke` | Emit a 440 Hz test tone to verify audio output |
 
 By default, a2m loads `a2m.ini` from the current directory. The INI file stores
@@ -1538,8 +1539,17 @@ Persists the Assembler tab state. See **Assembler INI persistence**.
 
 | Key | Value |
 |-----|-------|
+| `timemachine` | TimeMachine recording master switch; `0` or `1` (default `0`) |
+| `timemachine_memory_mb` | Checkpoint-ring budget; `0` or `16..4096` (default `128`) |
 | `history_memory_mb` | CPU flight-recorder budget; `0` or `16..4096` (default `256`) |
 | `frame_ring_memory_mb` | Frame-ring budget; `0` or `8..4096` (default `128`) |
+
+TimeMachine is opt-in debug recording. Off is the play path. On arms the CPU
+history recorder and the frame ring; the checkpoint ring budget is reserved
+(`timemachine_memory_mb` or `--timemachine-memory`, default 128 MiB) and used by
+a later phase. With defaults, TimeMachine on is 256 + 128 + 128 = 512 MB. A
+budget of `0` disables that recorder and leaves an empty tape; it is not
+overridden back to the default.
 
 ### [DEBUG]
 

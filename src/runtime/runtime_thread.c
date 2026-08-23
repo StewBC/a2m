@@ -10,6 +10,7 @@
 #include "runtime_breakpoint_ini.h"
 #include "runtime_assembler.h"
 #include "runtime_history_wire.h"
+#include "runtime_timemachine.h"
 #include "softswitch.h"
 #include "video.h"
 
@@ -851,6 +852,7 @@ static bool runtime_history_command_invalidates_cursor(runtime_command_type type
     case RUNTIME_COMMAND_WRITE_MEMORY:
     case RUNTIME_COMMAND_SET_CPU_REGISTER:
     case RUNTIME_COMMAND_HISTORY_RECORD:
+    case RUNTIME_COMMAND_TM_SET_ENABLED:
     case RUNTIME_COMMAND_HISTORY_CLEAR:
     case RUNTIME_COMMAND_SAVE_STATE:
     case RUNTIME_COMMAND_LOAD_STATE:
@@ -4003,6 +4005,13 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         break;
     }
 
+    case RUNTIME_COMMAND_TM_SET_ENABLED: {
+        runtime_tm_set_enabled(rt, cmd->data.tm_set_enabled.enabled != 0u);
+        runtime_history_sync_observer(rt);
+        runtime_publish_history_status(rt, cmd->request_token);
+        break;
+    }
+
     case RUNTIME_COMMAND_SET_HISTORY_OFF_ON_MAX: {
         bool enable = cmd->data.set_history_off_on_max.enabled != 0u;
         rt->history_off_on_max = enable;
@@ -4280,6 +4289,9 @@ int runtime_thread_main(void *userdata)
     }
     rt->machine_ready = true;
     runtime_apply_turbo_video_policy(rt, false);
+    if (rt->config.timemachine) {
+        runtime_tm_set_enabled(rt, true);
+    }
     if (runtime_turbo_is_free_run(rt)) {
         runtime_history_apply_max_policy(rt, true, false);
     }

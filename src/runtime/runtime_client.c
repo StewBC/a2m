@@ -958,6 +958,21 @@ bool runtime_client_set_history_off_on_max(runtime_client *client, bool enabled)
     return runtime_client_push(client, &command);
 }
 
+bool runtime_client_tm_set_enabled(
+    runtime_client *client,
+    bool enabled,
+    uint64_t request_token) {
+    runtime_command command = {
+        .type = RUNTIME_COMMAND_TM_SET_ENABLED,
+        .request_token = request_token,
+    };
+    if (client == NULL) {
+        return false;
+    }
+    command.data.tm_set_enabled.enabled = enabled ? 1u : 0u;
+    return runtime_client_push(client, &command);
+}
+
 bool runtime_client_history_clear(
     runtime_client *client,
     uint64_t request_token) {

@@ -58,6 +58,14 @@ s6d0 = tests/fixtures/Apple DOS 3.3 January 1983.nib
 ; Force startup through a mounted SmartPort unit 0 (useful for Apple ][+ or non-slot-7 boot).
 ; boot_slot = 5
 
+[debug]
+; TimeMachine forensic recording (default off). On arms HST1 + frame ring.
+; When on, default budgets sum to 512 MB: history 256 + frames 128 + checkpoints 128.
+; timemachine = 0
+; timemachine_memory_mb = 128
+; history_memory_mb = 256
+; frame_ring_memory_mb = 128
+
 [input]
 ; Keyboard stick: 0=off, 1 or 2 = gameport stick; layout numpad|wasd
 ; keyboard_joystick_port = 1

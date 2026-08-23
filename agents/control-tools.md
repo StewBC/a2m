@@ -74,6 +74,7 @@ Unsolicited: `0 event state-changed reason=… session=… cycles=… frame=… 
 | Frame ring | `frame-ring-info` `frame-ring-record` `frame-ring-clear` `get-frame-at frame=\|cycle=` |
 | Breakpoints | `break-create` / `break-update` / `break-list` / `break-enable` / `break-clear` / `break-clear-all` / `rearm-oneshots` / `break-exec`; `when=`; access exec/read/write |
 | History | `history-info` `history-record` `history-clear` `history-find` `history-next` `history-read` `history-close` → `data history` **HST1** (per TCP session cursor) |
+| TimeMachine | **No A2M verb in TM0.** Master switch is INI `[debug] timemachine=0\|1` / CLI `--timemachine` / `--no-timemachine` (default **off**). `timemachine=1` arms HST1 + frame ring once (off→on). `history-record` and `frame-ring-record` stay as standalone agent verbs — turning either off after TM-on is respected (no hidden re-arm). `timemachine=0` does not disable those verbs. |
 | Waits | `wait-paused` `wait-running` `wait-frame` `wait-event` (incl. `assemble-complete` / `assemble-error`) |
 | Assembler | `assemble [address=] [run-address=] [auto-run=] [mli-launch=] [reset=] [auto-adjust-segments=] <path>` (deferred) |
 | Symbols | `find-symbol <name>` → `ok address=$XXXX name=…` / `not-ready` / `not-found` |
@@ -122,6 +123,10 @@ Aliases for `kind=`: `disk` → diskii; `sp` / `hd` → smartport.
   the next reply for id N. Prefer `Ctl` (`drain_events` / `events` list).
 - History FIND/NEXT cursors are **per session**; a step/poke/reset from any
   asker invalidates all cursors (`CURSOR_STALE` → re-FIND).
+- **TimeMachine vs record verbs:** `--timemachine` / `[debug] timemachine=1` is the
+  product master switch (arms history + frame ring). `history-record` /
+  `frame-ring-record` remain the per-recorder controls. There is no `timemachine`
+  control-port command yet (TM3 adds mode/exit).
 
 ctest gate: see [`testing.md`](testing.md) (expect full green after build).
 

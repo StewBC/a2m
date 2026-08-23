@@ -113,7 +113,7 @@ one-line pointer update here if useful.
 
 | Phase | Doc | V1? | Summary |
 |-------|-----|-----|---------|
-| **TM0** | [`TM0.md`](TM0.md) | Yes | Epic contract + opt-in config |
+| **TM0** | [`TM0.md`](TM0.md) | Yes | Epic contract + opt-in config (**Landed**) |
 | **TM1** | [`TM1.md`](TM1.md) | Yes | Fast HST1 tape queries (step/over/out/run-to) |
 | **TM2** | [`TM2.md`](TM2.md) | Yes | Checkpoint ring + input log + sealed replay; test materialize |
 | **TM3** | [`TM3.md`](TM3.md) | Yes | Materialize into one true `apple2_t`; enter/exit NOW; control honesty (A2M bump) |

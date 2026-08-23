@@ -195,6 +195,10 @@ struct runtime {
     /* True if we stopped history solely for max (so we may resume on leave). */
     bool history_paused_for_max;
 
+    /* TimeMachine master enable. Off→on arms HST1 + frame ring once. */
+    bool timemachine_enabled;
+    uint32_t timemachine_memory_mb;
+
     /* TRON/TROFF instruction log (C5b) — file open while trace_enabled. */
     bool trace_enabled;
     FILE *trace_file;

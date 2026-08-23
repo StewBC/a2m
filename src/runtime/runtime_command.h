@@ -66,7 +66,8 @@ typedef enum runtime_command_type {
     RUNTIME_COMMAND_MEDIA_EJECT,
     RUNTIME_COMMAND_MEDIA_SWAP,
     RUNTIME_COMMAND_BOOT_SLOT,
-    RUNTIME_COMMAND_SET_DISPLAY_OVERRIDE
+    RUNTIME_COMMAND_SET_DISPLAY_OVERRIDE,
+    RUNTIME_COMMAND_TM_SET_ENABLED
 } runtime_command_type;
 
 enum {
@@ -313,5 +314,9 @@ typedef struct runtime_command {
         struct {
             uint8_t enabled;
         } set_history_off_on_max;
+
+        struct {
+            uint8_t enabled;
+        } tm_set_enabled;
     } data;
 } runtime_command;

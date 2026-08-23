@@ -383,6 +383,13 @@ target_compile_features(test_runtime_state_changed PRIVATE c_std_99)
 target_link_libraries(test_runtime_state_changed PRIVATE runtime SDL2::SDL2)
 add_test(NAME runtime_state_changed COMMAND test_runtime_state_changed)
 
+add_executable(test_runtime_timemachine
+    tests/runtime/test_runtime_timemachine.c
+)
+target_compile_features(test_runtime_timemachine PRIVATE c_std_99)
+target_link_libraries(test_runtime_timemachine PRIVATE runtime SDL2::SDL2)
+add_test(NAME runtime_timemachine COMMAND test_runtime_timemachine)
+
 # Control protocol (A2M product wire — src/control).
 add_executable(test_control_protocol
     tests/control/test_control_protocol.c

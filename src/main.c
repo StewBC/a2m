@@ -2109,6 +2109,14 @@ static bool apply_options_to_runtime_config(const app_options *options, runtime_
         rt_config->history_memory_mb_configured = true;
     }
     rt_config->history_off_on_max = options->history_off_on_max;
+    rt_config->timemachine = options->timemachine;
+    if (options->timemachine_memory_mb > 0) {
+        rt_config->timemachine_memory_mb = (uint32_t)options->timemachine_memory_mb;
+        rt_config->timemachine_memory_mb_configured = true;
+    } else {
+        rt_config->timemachine_memory_mb = 0u;
+        rt_config->timemachine_memory_mb_configured = true;
+    }
 
     n = options->diskii_count;
     if (n > 16) {
