@@ -7432,16 +7432,58 @@ static uint64_t frontend_tm_slider_to_cycle(
     return debug->tm_oldest_cycle + (span * (uint64_t)slider) / 1000ull;
 }
 
+static void frontend_draw_tm_window_summary(
+    struct nk_context *ctx,
+    const frontend_debug_state *debug)
+{
+    char line[64];
+    uint64_t oldest;
+    uint64_t live;
+    uint64_t span;
+    uint64_t cps;
+    uint64_t secs;
+
+    if (ctx == NULL || debug == NULL || !debug->tm_window_valid) {
+        return;
+    }
+    oldest = debug->tm_oldest_cycle;
+    live = debug->tm_newest_cycle;
+    span = live >= oldest ? live - oldest : 0u;
+    cps = (uint64_t)APPLE2_VIDEO_CYCLES_PER_FRAME * 60u;
+    secs = (span + cps / 2u) / cps;
+
+    nk_layout_row_begin(ctx, NK_DYNAMIC, 18.0f, 2);
+    nk_layout_row_push(ctx, 0.48f);
+    nk_label(ctx, "History start cycle", NK_TEXT_LEFT);
+    nk_layout_row_push(ctx, 0.52f);
+    snprintf(line, sizeof(line), "%llu", (unsigned long long)oldest);
+    nk_label(ctx, line, NK_TEXT_LEFT);
+    nk_layout_row_end(ctx);
+
+    nk_layout_row_begin(ctx, NK_DYNAMIC, 18.0f, 2);
+    nk_layout_row_push(ctx, 0.48f);
+    nk_label(ctx, "Live cycle", NK_TEXT_LEFT);
+    nk_layout_row_push(ctx, 0.52f);
+    snprintf(line, sizeof(line), "%llu", (unsigned long long)live);
+    nk_label(ctx, line, NK_TEXT_LEFT);
+    nk_layout_row_end(ctx);
+
+    nk_layout_row_begin(ctx, NK_DYNAMIC, 18.0f, 2);
+    nk_layout_row_push(ctx, 0.48f);
+    nk_label(ctx, "Duration", NK_TEXT_LEFT);
+    nk_layout_row_push(ctx, 0.52f);
+    snprintf(line, sizeof(line), "~%llu seconds", (unsigned long long)secs);
+    nk_label(ctx, line, NK_TEXT_LEFT);
+    nk_layout_row_end(ctx);
+}
+
 static void frontend_draw_misc_inspector(
     frontend *ui,
     const frontend_debug_state *debug)
 {
     struct nk_context *ctx;
     char line[192];
-    char reason[160];
     nk_bool rec;
-    bool running;
-    bool paused;
     bool forensic;
     bool can_enter;
     int slider;
@@ -7450,23 +7492,13 @@ static void frontend_draw_misc_inspector(
         return;
     }
     ctx = ui->ctx;
-    running = debug != NULL &&
-        debug->runtime_state == FRONTEND_RUNTIME_STATE_RUNNING;
-    paused = debug != NULL &&
-        debug->runtime_state == FRONTEND_RUNTIME_STATE_PAUSED;
     forensic = debug != NULL && debug->tm_forensic;
-    can_enter = paused && debug != NULL && debug->tm_enabled &&
-        debug->tm_window_valid;
+    can_enter = debug != NULL && debug->tm_enabled && debug->tm_window_valid;
 
-    nk_layout_row_dynamic(ctx, 18.0f, 1);
-    nk_label(ctx, "Inspector (TimeMachine)", NK_TEXT_LEFT);
-
-    rec = (debug != NULL && debug->tm_enabled) ? nk_true : nk_false;
-    nk_layout_row_dynamic(ctx, 22.0f, 1);
-    if (forensic) {
-        nk_label(ctx, "Recording: on (locked while forensic)", NK_TEXT_LEFT);
-    } else {
-        if (nk_checkbox_label(ctx, "TimeMachine recording", &rec)) {
+    if (!forensic) {
+        rec = (debug != NULL && debug->tm_enabled) ? nk_true : nk_false;
+        nk_layout_row_dynamic(ctx, 22.0f, 1);
+        if (nk_checkbox_label(ctx, "Record", &rec)) {
             bool want = rec != nk_false;
             bool have = debug != NULL && debug->tm_enabled;
             if (want != have) {
@@ -7476,7 +7508,11 @@ static void frontend_draw_misc_inspector(
         }
     }
 
-    if (debug != NULL && debug->tm_stopped_for_max) {
+    if (debug == NULL || !debug->tm_enabled) {
+        return;
+    }
+
+    if (debug->tm_stopped_for_max) {
         nk_layout_row_dynamic(ctx, 36.0f, 1);
         nk_label_wrap(
             ctx,
@@ -7484,157 +7520,95 @@ static void frontend_draw_misc_inspector(
             "the TimeMachine tape (window restarts when you leave max).");
     }
 
-    if (debug == NULL || !debug->tm_enabled) {
-        nk_layout_row_dynamic(ctx, 48.0f, 1);
-        nk_label_wrap(
-            ctx,
-            "TimeMachine is off. Enable recording above (or --timemachine) "
-            "then Pause to scrub. Off keeps play cheap.");
-        if (running) {
-            nk_layout_row_dynamic(ctx, 24.0f, 1);
-            if (nk_button_label(ctx, "Pause")) {
-                frontend_push_tm_intent(
-                    ui, FRONTEND_DEBUGGER_INTENT_TM_PAUSE, false, 0u);
-            }
-        }
-        return;
-    }
-
-    if (running) {
-        nk_layout_row_dynamic(ctx, 24.0f, 1);
-        if (nk_button_label(ctx, "Pause")) {
-            frontend_push_tm_intent(
-                ui, FRONTEND_DEBUGGER_INTENT_TM_PAUSE, false, 0u);
-        }
-        nk_layout_row_dynamic(ctx, 32.0f, 1);
-        nk_label_wrap(ctx, "Pause, then Inspect to replace the machine with the past.");
-        return;
-    }
-
     if (!forensic) {
-        if (!can_enter) {
-            nk_layout_row_dynamic(ctx, 48.0f, 1);
-            if (!debug->tm_window_valid) {
-                nk_label_wrap(
-                    ctx,
-                    "No TimeMachine snapshots yet. Enable recording, run a "
-                    "moment, then Pause.");
-            } else {
-                nk_label_wrap(ctx, "Pause the machine to inspect.");
-            }
-        } else {
+        if (can_enter) {
             nk_layout_row_dynamic(ctx, 24.0f, 1);
-            if (nk_button_label(ctx, "Inspect (time travel)")) {
+            if (nk_button_label(ctx, "Inspect")) {
                 frontend_push_tm_intent(
                     ui, FRONTEND_DEBUGGER_INTENT_TM_ENTER_FORENSIC, false, 0u);
             }
+            frontend_draw_tm_window_summary(ctx, debug);
+        } else if (!debug->tm_window_valid) {
+            nk_layout_row_dynamic(ctx, 36.0f, 1);
+            nk_label_wrap(ctx, "No TimeMachine snapshots yet.");
         }
-    } else {
-        nk_layout_row_dynamic(ctx, 24.0f, 1);
-        if (nk_button_label(ctx, "Leave Inspector (restore NOW)")) {
-            frontend_push_tm_intent(
-                ui, FRONTEND_DEBUGGER_INTENT_TM_EXIT_FORENSIC, false, 0u);
-        }
-        nk_layout_row_dynamic(ctx, 18.0f, 1);
-        nk_label(ctx, "Still paused after leave. F12 runs live again.", NK_TEXT_LEFT);
+        return;
     }
 
+    nk_layout_row_dynamic(ctx, 24.0f, 1);
+    if (nk_button_label(ctx, "Leave Inspector")) {
+        frontend_push_tm_intent(
+            ui, FRONTEND_DEBUGGER_INTENT_TM_EXIT_FORENSIC, false, 0u);
+    }
+
+    slider = ui->misc.inspector_slider;
+    {
+        bool down = nk_input_is_mouse_down(&ctx->input, NK_BUTTON_LEFT);
+        bool at_oldest = debug->tm_focus_cycle <= debug->tm_oldest_cycle;
+        bool at_live = debug->tm_focus_cycle >= debug->tm_newest_cycle;
+        bool thumb = ui->misc.inspector_thumb_down;
+
+        if (!thumb) {
+            slider = frontend_tm_cycle_to_slider(debug, debug->tm_focus_cycle);
+        }
+
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 22.0f, 3);
+        nk_layout_row_push(ctx, 0.08f);
+        if (frontend_nk_action_button(
+                ctx, "-", !thumb && !at_oldest)) {
+            frontend_push_tm_intent(
+                ui, FRONTEND_DEBUGGER_INTENT_TM_FRAME_STEP, false, 0u);
+        }
+        nk_layout_row_push(ctx, 0.84f);
+        {
+            /* Peek this column before the slider consumes it. After
+               nk_slider_int, nk_widget_bounds is the [+] slot. */
+            struct nk_rect bounds = nk_widget_bounds(ctx);
+            nk_bool moved = nk_slider_int(ctx, 0, &slider, 1000, 1);
+            bool hovered =
+                nk_input_is_mouse_hovering_rect(&ctx->input, bounds);
+
+            if (moved && down) {
+                ui->misc.inspector_thumb_down = true;
+            }
+            if (ui->misc.inspector_thumb_down) {
+                uint64_t cycle = frontend_tm_slider_to_cycle(debug, slider);
+                ui->misc.inspector_preview_cycle = cycle;
+                if (!down) {
+                    frontend_push_tm_intent(
+                        ui,
+                        FRONTEND_DEBUGGER_INTENT_TM_LAND,
+                        false,
+                        cycle);
+                    ui->misc.inspector_thumb_down = false;
+                }
+            } else if ((hovered || moved) && down) {
+                ui->misc.inspector_thumb_down = true;
+                ui->misc.inspector_preview_cycle =
+                    frontend_tm_slider_to_cycle(debug, slider);
+            }
+        }
+        nk_layout_row_push(ctx, 0.08f);
+        if (frontend_nk_action_button(ctx, "+", !thumb && !at_live)) {
+            frontend_push_tm_intent(
+                ui, FRONTEND_DEBUGGER_INTENT_TM_FRAME_STEP, true, 0u);
+        }
+        nk_layout_row_end(ctx);
+        ui->misc.inspector_slider = slider;
+    }
+
+    nk_layout_row_begin(ctx, NK_DYNAMIC, 18.0f, 2);
+    nk_layout_row_push(ctx, 0.48f);
+    nk_label(ctx, "Current cycle:", NK_TEXT_LEFT);
+    nk_layout_row_push(ctx, 0.52f);
     snprintf(
         line,
         sizeof(line),
-        "Cycle %llu  (live %llu)",
-        (unsigned long long)(debug != NULL ? debug->tm_focus_cycle : 0u),
-        (unsigned long long)(debug != NULL ? debug->tm_newest_cycle : 0u));
-    nk_layout_row_dynamic(ctx, 18.0f, 1);
+        "%llu",
+        (unsigned long long)debug->tm_focus_cycle);
     nk_label(ctx, line, NK_TEXT_LEFT);
-
-    if (debug != NULL && debug->tm_window_valid) {
-        snprintf(
-            line,
-            sizeof(line),
-            "Snapshots %llu .. live %llu",
-            (unsigned long long)debug->tm_oldest_cycle,
-            (unsigned long long)debug->tm_newest_cycle);
-        nk_layout_row_dynamic(ctx, 18.0f, 1);
-        nk_label(ctx, line, NK_TEXT_LEFT);
-
-        frontend_format_tm_window_reason(debug, reason, sizeof(reason));
-        if (reason[0] != '\0') {
-            nk_layout_row_dynamic(ctx, 36.0f, 1);
-            nk_label_wrap(ctx, reason);
-        }
-
-        slider = ui->misc.inspector_slider;
-        if (forensic) {
-            bool down = nk_input_is_mouse_down(&ctx->input, NK_BUTTON_LEFT);
-            bool at_oldest = debug->tm_focus_cycle <= debug->tm_oldest_cycle;
-            bool at_live = debug->tm_focus_cycle >= debug->tm_newest_cycle;
-            bool thumb = ui->misc.inspector_thumb_down;
-
-            if (!thumb) {
-                slider = frontend_tm_cycle_to_slider(debug, debug->tm_focus_cycle);
-            }
-
-            nk_layout_row_dynamic(ctx, 36.0f, 1);
-            nk_label_wrap(
-                ctx,
-                "Retained snapshots (left) to live (right). Drag previews film "
-                "or pink; release lands. Pink means no stored still.");
-
-            nk_layout_row_begin(ctx, NK_DYNAMIC, 22.0f, 3);
-            nk_layout_row_push(ctx, 0.08f);
-            if (frontend_nk_action_button(
-                    ctx, "-", !thumb && !at_oldest)) {
-                frontend_push_tm_intent(
-                    ui, FRONTEND_DEBUGGER_INTENT_TM_FRAME_STEP, false, 0u);
-            }
-            nk_layout_row_push(ctx, 0.84f);
-            {
-                int prev_slider = slider;
-                nk_bool moved = nk_slider_int(ctx, 0, &slider, 1000, 1);
-                struct nk_rect bounds = nk_widget_bounds(ctx);
-                bool hovered =
-                    nk_input_is_mouse_hovering_rect(&ctx->input, bounds);
-
-                if (moved && down) {
-                    ui->misc.inspector_thumb_down = true;
-                }
-                if (ui->misc.inspector_thumb_down) {
-                    uint64_t cycle = frontend_tm_slider_to_cycle(debug, slider);
-                    ui->misc.inspector_preview_cycle = cycle;
-                    if (!down) {
-                        frontend_push_tm_intent(
-                            ui,
-                            FRONTEND_DEBUGGER_INTENT_TM_LAND,
-                            false,
-                            cycle);
-                        ui->misc.inspector_thumb_down = false;
-                    }
-                } else if ((hovered || moved) && down) {
-                    ui->misc.inspector_thumb_down = true;
-                    ui->misc.inspector_preview_cycle =
-                        frontend_tm_slider_to_cycle(debug, slider);
-                }
-                (void)prev_slider;
-            }
-            nk_layout_row_push(ctx, 0.08f);
-            if (frontend_nk_action_button(ctx, "+", !thumb && !at_live)) {
-                frontend_push_tm_intent(
-                    ui, FRONTEND_DEBUGGER_INTENT_TM_FRAME_STEP, true, 0u);
-            }
-            nk_layout_row_end(ctx);
-            ui->misc.inspector_slider = slider;
-        }
-    }
-
-    nk_layout_row_dynamic(ctx, 8.0f, 1);
-    nk_spacing(ctx, 1);
-    nk_layout_row_dynamic(ctx, 40.0f, 1);
-    nk_label_wrap(
-        ctx,
-        "Time travel: F10 step, F11 over, Shift+F10 out, F12 run to a "
-        "breakpoint or live (stay in Inspect). Opt+Left unbound. "
-        "Pokes rejected. A disk write drops earlier snapshots.");
+    nk_layout_row_end(ctx);
+    frontend_draw_tm_window_summary(ctx, debug);
 }
 
 static void frontend_draw_misc_tab_button(
