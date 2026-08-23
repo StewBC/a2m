@@ -150,6 +150,18 @@ bool message_queue_wait_pop_timeout(
     return true;
 }
 
+void message_queue_clear(message_queue *queue)
+{
+    if (!queue) {
+        return;
+    }
+    mutex_lock(queue->lock);
+    queue->head = 0;
+    queue->tail = 0;
+    queue->count = 0;
+    mutex_unlock(queue->lock);
+}
+
 void message_queue_wake_all(message_queue *queue) {
     if (!queue) {
         return;

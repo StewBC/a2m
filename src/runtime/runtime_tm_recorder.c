@@ -389,6 +389,10 @@ bool runtime_tm_materialize(runtime *rt, uint64_t cycle, apple2_t *dst)
         uint64_t remain = cycle - apple2_cycles(dst);
         uint32_t ran = 0u;
         uint32_t step = remain > 4096u ? 4096u : (uint32_t)remain;
+        if (runtime_quit_requested(rt)) {
+            apple2_set_replay_sealed(dst, false);
+            return false;
+        }
         if (!apple2_step_cycles(dst, step, &ran) || ran == 0u) {
             break;
         }

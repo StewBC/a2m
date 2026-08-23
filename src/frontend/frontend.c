@@ -7321,9 +7321,20 @@ static void frontend_push_tm_intent(
     uint64_t cycle)
 {
     size_t next;
+    size_t i;
 
     if (ui == NULL) {
         return;
+    }
+    if (type == FRONTEND_DEBUGGER_INTENT_TM_SEEK_CYCLE) {
+        i = ui->intent_read;
+        while (i != ui->intent_write) {
+            if (ui->intents[i].type == FRONTEND_DEBUGGER_INTENT_TM_SEEK_CYCLE) {
+                ui->intents[i].tm_cycle = cycle;
+                return;
+            }
+            i = (i + 1u) % FRONTEND_DEBUGGER_INTENT_CAPACITY;
+        }
     }
     next = (ui->intent_write + 1u) % FRONTEND_DEBUGGER_INTENT_CAPACITY;
     if (next == ui->intent_read) {
@@ -7559,13 +7570,18 @@ static void frontend_draw_misc_inspector(
 
         slider = ui->misc.inspector_slider;
         if (forensic) {
-            if (!nk_input_is_mouse_down(&ctx->input, NK_BUTTON_LEFT)) {
+            bool dragging = nk_input_is_mouse_down(&ctx->input, NK_BUTTON_LEFT);
+
+            if (!dragging) {
                 slider = frontend_tm_cycle_to_slider(debug, debug->tm_focus_cycle);
             }
+            nk_layout_row_dynamic(ctx, 32.0f, 1);
+            nk_label_wrap(
+                ctx,
+                "Scrub window: oldest left, newest right. Scale is cycles "
+                "still retained, not frames and not since boot.");
             nk_layout_row_dynamic(ctx, 22.0f, 1);
-            nk_label(ctx, "Scrub tape", NK_TEXT_LEFT);
-            nk_layout_row_dynamic(ctx, 22.0f, 1);
-            if (nk_slider_int(ctx, 0, &slider, 1000, 1)) {
+            if (nk_slider_int(ctx, 0, &slider, 1000, 1) && dragging) {
                 uint64_t cycle = frontend_tm_slider_to_cycle(debug, slider);
                 if (cycle != debug->tm_focus_cycle) {
                     frontend_push_tm_intent(

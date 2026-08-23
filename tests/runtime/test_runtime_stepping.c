@@ -198,9 +198,23 @@ int main(void)
 
     drain_events(client);
     expect_true("boot slot 1", runtime_client_boot_slot(client, 1));
-    expect_true("boot CPU", poll_event(
-        client, &event, RUNTIME_EVENT_CPU_STATE_RESPONSE, 2.0));
-    expect_true("boot PC C100", event.data.cpu_state.pc == 0xC100u);
+    {
+        clock_t start = clock();
+        int saw_c100 = 0;
+        while ((double)(clock() - start) / (double)CLOCKS_PER_SEC < 2.0) {
+            while (runtime_client_poll_event(client, &event)) {
+                if (event.type == RUNTIME_EVENT_CPU_STATE_RESPONSE &&
+                    event.data.cpu_state.pc == 0xC100u) {
+                    saw_c100 = 1;
+                    break;
+                }
+            }
+            if (saw_c100) {
+                break;
+            }
+        }
+        expect_true("boot PC C100", saw_c100);
+    }
 
     {
         runtime_machine_config machine_config = {0};

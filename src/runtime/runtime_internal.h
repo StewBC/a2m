@@ -16,12 +16,15 @@
 #include "symbol_table.h"
 #include "apple_type_script.h"
 
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 
 typedef struct message_queue message_queue;
 typedef struct thread thread;
+
+bool runtime_quit_requested(const runtime *rt);
 
 enum {
     RUNTIME_COMMAND_QUEUE_CAPACITY = 256,
@@ -157,6 +160,7 @@ typedef struct runtime_breakpoint {
 
 struct runtime {
     thread *thread;
+    atomic_bool quit_requested;
     message_queue *command_queue;
     message_queue *event_queue;
     runtime_client client;

@@ -615,6 +615,44 @@ int main(void)
     }
 #endif
 
+    /* Flood tape seeks then stop. Quit used to sit behind the backlog (or fail
+       to enqueue) and beachball. */
+    {
+        runtime_tm_window w;
+        int i;
+
+        expect_true("run-flood", runtime_client_run(client));
+        SDL_Delay(80);
+        expect_true("pause-flood", runtime_client_pause(client));
+        {
+            clock_t t0 = clock();
+            while (rt->exec_state == RUNTIME_EXEC_RUNNING &&
+                (double)(clock() - t0) / (double)CLOCKS_PER_SEC < 2.0) {
+                SDL_Delay(1);
+            }
+        }
+        expect_true("paused-flood", rt->exec_state != RUNTIME_EXEC_RUNNING);
+        token = runtime_client_alloc_request_token(client);
+        expect_true(
+            "enter-flood", runtime_client_tm_enter_forensic(client, token));
+        {
+            clock_t t0 = clock();
+            while (!runtime_tm_in_forensic(rt) &&
+                (double)(clock() - t0) / (double)CLOCKS_PER_SEC < 2.0) {
+                SDL_Delay(1);
+            }
+        }
+        expect_true("forensic-flood", runtime_tm_in_forensic(rt));
+        runtime_tm_window_info(rt, &w);
+        expect_true("window-flood", w.valid && w.newest_cycle >= w.oldest_cycle);
+        for (i = 0; i < 64; ++i) {
+            uint64_t span = w.newest_cycle - w.oldest_cycle;
+            uint64_t cyc = w.oldest_cycle + (span * (uint64_t)i) / 63u;
+            token = runtime_client_alloc_request_token(client);
+            (void)runtime_client_tm_seek_cycle(client, cyc, token);
+        }
+    }
+
     runtime_stop(rt);
     runtime_destroy(rt);
     SDL_Quit();

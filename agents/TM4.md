@@ -191,7 +191,19 @@ while forensic (TM3 rejects `TM_SET_ENABLED`).
 ### Scrubber (D17)
 
 Slider **0..1000 maps `tm_window.oldest_cycle` .. `newest_cycle`**, from
-`machine_state` (not frame-ring extent). Seek is `runtime_client_tm_seek_cycle`.
+`machine_state` (not frame-ring extent, not “since boot”). Left is the oldest
+cycle still in the intersection of HST1 + frame ring + checkpoints. A media
+write or Opt+T max moves that left edge forward. Scale is **cycles**, not
+frame count or checkpoint count.
+
+Each slider seek is a full checkpoint load + sealed re-exec (TM3, no hot
+forward). The UI only posts a seek while the mouse is down on the slider, and
+replaces a pending `TM_SEEK_CYCLE` instead of queuing every tick. The worker
+keeps only the **latest** tape seek; `QUIT` / `exit-forensic` drop the
+backlog. `runtime_stop` sets `quit_requested`, clears the command queue, and
+force-pushes `QUIT` so Cmd+Q cannot beachball behind 256 materializes.
+
+Seek is `runtime_client_tm_seek_cycle`.
 Left-edge text uses `tm_window_start_kind` / `start_arg1`:
 
 - guest-write: `history starts here: disk write, sNdN @ cycle C` (drive is 1-based)
@@ -211,6 +223,7 @@ Left-edge text uses `tm_window_start_kind` / `start_arg1`:
 | Memory / register type-in | no-op in UI; worker would `read-only-forensic` |
 
 Live F10-while-running is still Pause (does **not** auto-enter forensic).
+Forensic F12 is tape run-to, not live run. **Leave Inspector** first, then F12.
 
 ### Chrome
 

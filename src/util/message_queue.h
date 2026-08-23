@@ -30,3 +30,6 @@ bool message_queue_wait_pop_timeout(
     uint32_t timeout_ms);
 
 void message_queue_wake_all(message_queue *queue);
+
+/* Drop every pending item. Does not wake waiters; pair with wake_all if needed. */
+void message_queue_clear(message_queue *queue);

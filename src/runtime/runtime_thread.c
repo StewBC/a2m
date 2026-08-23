@@ -4441,6 +4441,63 @@ static void runtime_free_run_batch(runtime *rt)
     }
 }
 
+static bool runtime_command_is_tm_tape_seek(const runtime_command *cmd)
+{
+    uint8_t op;
+
+    if (cmd == NULL || cmd->type != RUNTIME_COMMAND_TM_QUERY) {
+        return false;
+    }
+    op = cmd->data.tm_query.op;
+    return op == (uint8_t)RUNTIME_TM_QUERY_SEEK_CYCLE ||
+        op == (uint8_t)RUNTIME_TM_QUERY_SEEK_ID;
+}
+
+static bool runtime_command_preempts_tm_seek(const runtime_command *cmd)
+{
+    return cmd != NULL &&
+        (cmd->type == RUNTIME_COMMAND_QUIT ||
+         cmd->type == RUNTIME_COMMAND_TM_EXIT_FORENSIC);
+}
+
+/* Keep only the latest tape seek. Quit / exit-forensic drop the backlog. */
+static void runtime_coalesce_tm_tape_seeks(
+    runtime *rt,
+    runtime_command *cmd,
+    runtime_command *deferred,
+    bool *has_deferred)
+{
+    runtime_command extra;
+
+    if (rt == NULL || cmd == NULL || deferred == NULL || has_deferred == NULL) {
+        return;
+    }
+    if (!runtime_command_is_tm_tape_seek(cmd)) {
+        return;
+    }
+    while (message_queue_try_pop(rt->command_queue, &extra)) {
+        if (runtime_command_is_tm_tape_seek(&extra)) {
+            *cmd = extra;
+            continue;
+        }
+        if (runtime_command_preempts_tm_seek(&extra)) {
+            *cmd = extra;
+            while (message_queue_try_pop(rt->command_queue, &extra)) {
+                if (runtime_command_is_tm_tape_seek(&extra)) {
+                    continue;
+                }
+                *deferred = extra;
+                *has_deferred = true;
+                break;
+            }
+            return;
+        }
+        *deferred = extra;
+        *has_deferred = true;
+        return;
+    }
+}
+
 int runtime_thread_main(void *userdata)
 {
     runtime *rt = (runtime *)userdata;
@@ -4590,25 +4647,50 @@ int runtime_thread_main(void *userdata)
         runtime_publish_simple(rt, RUNTIME_EVENT_RUNNING);
     }
 
-    while (alive) {
-        while (message_queue_try_pop(rt->command_queue, &command)) {
-            runtime_process_command(rt, &command, &alive);
+    {
+        runtime_command deferred;
+        bool has_deferred = false;
+
+        while (alive && !runtime_quit_requested(rt)) {
+            for (;;) {
+                if (runtime_quit_requested(rt)) {
+                    alive = false;
+                    break;
+                }
+                if (has_deferred) {
+                    command = deferred;
+                    has_deferred = false;
+                } else if (!message_queue_try_pop(rt->command_queue, &command)) {
+                    break;
+                }
+                runtime_coalesce_tm_tape_seeks(
+                    rt, &command, &deferred, &has_deferred);
+                runtime_process_command(rt, &command, &alive);
+                if (!alive) {
+                    break;
+                }
+            }
             if (!alive) {
                 break;
             }
-        }
-        if (!alive) {
-            break;
-        }
-        if (rt->exec_state == RUNTIME_EXEC_RUNNING && !rt->tm_forensic) {
-            runtime_free_run_batch(rt);
-        } else if (rt->tm_forensic && rt->exec_state == RUNTIME_EXEC_RUNNING) {
-            rt->exec_state = RUNTIME_EXEC_PAUSED;
-        } else {
-            if (!message_queue_wait_pop_timeout(rt->command_queue, &command, 10u)) {
-                continue;
+            if (rt->exec_state == RUNTIME_EXEC_RUNNING && !rt->tm_forensic) {
+                runtime_free_run_batch(rt);
+            } else if (rt->tm_forensic && rt->exec_state == RUNTIME_EXEC_RUNNING) {
+                rt->exec_state = RUNTIME_EXEC_PAUSED;
+            } else if (!has_deferred) {
+                if (!message_queue_wait_pop_timeout(
+                        rt->command_queue, &command, 10u)) {
+                    continue;
+                }
+                if (runtime_quit_requested(rt) &&
+                    command.type != RUNTIME_COMMAND_QUIT) {
+                    alive = false;
+                    break;
+                }
+                runtime_coalesce_tm_tape_seeks(
+                    rt, &command, &deferred, &has_deferred);
+                runtime_process_command(rt, &command, &alive);
             }
-            runtime_process_command(rt, &command, &alive);
         }
     }
 

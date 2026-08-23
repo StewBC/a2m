@@ -11,6 +11,7 @@
 
 #include <ctype.h>
 #include <math.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -274,6 +275,7 @@ runtime *runtime_create(const runtime_config *config)
         return NULL;
     }
 
+    atomic_init(&rt->quit_requested, false);
     rt->command_queue =
         message_queue_create(sizeof(runtime_command), RUNTIME_COMMAND_QUEUE_CAPACITY);
     rt->event_queue =
@@ -482,15 +484,25 @@ bool runtime_start(runtime *rt)
     return true;
 }
 
+bool runtime_quit_requested(const runtime *rt)
+{
+    return rt != NULL && atomic_load(&rt->quit_requested);
+}
+
 void runtime_stop(runtime *rt)
 {
     runtime_command command;
     if (rt == NULL || !rt->started) {
         return;
     }
+    /* Tape seeks can fill the 256-deep command queue. A failing QUIT push
+       then thread_join beachballs. Drop the backlog, force QUIT in. */
+    atomic_store(&rt->quit_requested, true);
+    message_queue_clear(rt->command_queue);
     memset(&command, 0, sizeof(command));
     command.type = RUNTIME_COMMAND_QUIT;
     (void)message_queue_push(rt->command_queue, &command);
+    message_queue_wake_all(rt->command_queue);
     thread_join(rt->thread);
     thread_destroy(rt->thread);
     rt->thread = NULL;
