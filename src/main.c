@@ -648,6 +648,43 @@ static bool handle_step_key_event(
     return false;
 }
 
+/*
+ * Leave Forensics.
+ * force_debugger (F9): always debugger, never resume.
+ * Otherwise (Opt+R / Close): return to entry surface; resume only if that
+ * surface was full-screen CRT and it was running when Forensics opened.
+ */
+static void leave_forensics_mode(
+    platform_window *window,
+    runtime_client *client,
+    frontend *ui,
+    bool *ui_visible,
+    bool force_debugger)
+{
+    bool show_debugger = true;
+    bool resume = false;
+    int min_w = 0;
+    int min_h = 0;
+
+    if (ui == NULL || ui_visible == NULL || !frontend_forensics_is_open(ui)) {
+        return;
+    }
+    if (!force_debugger && frontend_forensics_entered_from_crt(ui)) {
+        show_debugger = false;
+        resume = frontend_forensics_crt_was_running(ui);
+    }
+    frontend_close_forensics(ui);
+    *ui_visible = show_debugger;
+    if (show_debugger) {
+        frontend_debug_min_window_size(ui, &min_w, &min_h);
+        request_debug_state(client);
+    }
+    platform_window_set_minimum_size(window, min_w, min_h);
+    if (resume) {
+        (void)runtime_client_run(client);
+    }
+}
+
 static bool path_has_extension(const char *path, const char *ext);
 
 static bool path_is_absolute_local(const char *path)
@@ -2726,20 +2763,22 @@ int main(int argc, char **argv)
                     send_event_to_frontend = false;
                 } else if (sym == SDLK_F9) {
                     if (frontend_forensics_is_open(ui)) {
-                        /* F9 from Forensics → debugger (stay paused). */
-                        (void)frontend_close_forensics(ui);
-                        ui_visible = true;
+                        /* F9 from Forensics → debugger, always paused. */
+                        leave_forensics_mode(
+                            window, client, ui, &ui_visible, true);
                     } else {
                         ui_visible = !ui_visible;
-                    }
-                    {
-                        int min_w = 0;
-                        int min_h = 0;
-                        if (ui_visible) {
-                            frontend_debug_min_window_size(ui, &min_w, &min_h);
-                            request_debug_state(client);
+                        {
+                            int min_w = 0;
+                            int min_h = 0;
+                            if (ui_visible) {
+                                frontend_debug_min_window_size(
+                                    ui, &min_w, &min_h);
+                                request_debug_state(client);
+                            }
+                            platform_window_set_minimum_size(
+                                window, min_w, min_h);
                         }
-                        platform_window_set_minimum_size(window, min_w, min_h);
                     }
                     send_event_to_frontend = false;
                 } else if (sym == SDLK_F8) {
@@ -2777,39 +2816,16 @@ int main(int argc, char **argv)
                     sym == SDLK_r &&
                     frontend_input_has_option_modifier(&event.key) &&
                     !frontend_input_has_shift_modifier(&event.key)) {
-                    /* Opt+R: toggle Forensics↔debugger. Pause on enter; stay
-                       paused on leave. Available from display-only too. */
+                    /* Opt+R: toggle Forensics; leave returns to entry surface. */
                     if (frontend_forensics_is_open(ui)) {
-                        (void)frontend_close_forensics(ui);
-                        ui_visible = true;
-                        {
-                            int min_w = 0;
-                            int min_h = 0;
-                            frontend_debug_min_window_size(ui, &min_w, &min_h);
-                            request_debug_state(client);
-                            platform_window_set_minimum_size(window, min_w, min_h);
-                        }
+                        leave_forensics_mode(
+                            window, client, ui, &ui_visible, false);
                     } else {
-                        frontend_open_forensics(ui);
-                        ui_visible = true;
-                        {
-                            int min_w = 0;
-                            int min_h = 0;
-                            frontend_debug_min_window_size(ui, &min_w, &min_h);
-                            request_debug_state(client);
-                            platform_window_set_minimum_size(window, min_w, min_h);
-                        }
-                    }
-                    send_event_to_frontend = false;
-                } else if (sym == SDLK_ESCAPE && frontend_forensics_is_open(ui)) {
-                    (void)frontend_close_forensics(ui);
-                    ui_visible = true;
-                    {
-                        int min_w = 0;
-                        int min_h = 0;
-                        frontend_debug_min_window_size(ui, &min_w, &min_h);
-                        request_debug_state(client);
-                        platform_window_set_minimum_size(window, min_w, min_h);
+                        bool from_debugger = ui_visible;
+                        bool was_running =
+                            debug.runtime_state == FRONTEND_RUNTIME_STATE_RUNNING;
+                        frontend_open_forensics(
+                            ui, from_debugger, was_running);
                     }
                     send_event_to_frontend = false;
                 } else if (sym == SDLK_ESCAPE && frontend_help_is_open(ui)) {
@@ -3173,15 +3189,8 @@ int main(int argc, char **argv)
             }
         }
         if (frontend_forensics_consume_close_request(ui)) {
-            (void)frontend_close_forensics(ui);
-            ui_visible = true;
-            {
-                int min_w = 0;
-                int min_h = 0;
-                frontend_debug_min_window_size(ui, &min_w, &min_h);
-                request_debug_state(client);
-                platform_window_set_minimum_size(window, min_w, min_h);
-            }
+            /* Close button == Opt+R (return to entry surface). */
+            leave_forensics_mode(window, client, ui, &ui_visible, false);
         }
         {
             /* After render, edit-focus is current — sync macOS text input

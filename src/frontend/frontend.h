@@ -282,10 +282,17 @@ bool frontend_close_help(frontend *ui);
 bool frontend_help_is_open(const frontend *ui);
 bool frontend_help_paused_by_help(const frontend *ui);
 bool frontend_handle_help_key(frontend *ui, const SDL_KeyboardEvent *key, int scroll_wheel_lines);
-/* Forensics full-window mode (mutually exclusive with Help; no auto-pause). */
-void frontend_open_forensics(frontend *ui);
-bool frontend_close_forensics(frontend *ui); /* returns resume_on_forensics_exit */
+/* Forensics full-window mode (mutually exclusive with Help).
+   from_debugger: opened with F9 debugger up; else full-screen CRT.
+   crt_was_running: recorded only for CRT entry (restore on Opt+R/Close). */
+void frontend_open_forensics(
+    frontend *ui,
+    bool from_debugger,
+    bool crt_was_running);
+void frontend_close_forensics(frontend *ui); /* Misc→Inspector; no run/pause */
 bool frontend_forensics_is_open(const frontend *ui);
+bool frontend_forensics_entered_from_crt(const frontend *ui);
+bool frontend_forensics_crt_was_running(const frontend *ui);
 bool frontend_forensics_consume_close_request(frontend *ui);
 bool frontend_forensics_consume_pause_request(frontend *ui);
 bool frontend_handle_forensics_key(frontend *ui, const SDL_KeyboardEvent *key);

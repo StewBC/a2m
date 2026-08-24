@@ -7373,7 +7373,8 @@ static void frontend_draw_misc_inspector(
 
     nk_layout_row_dynamic(ctx, 24.0f, 1);
     if (nk_button_label(ctx, "Forensics...")) {
-        frontend_open_forensics(ui);
+        /* Inspector lives in the debugger; entry surface is debugger. */
+        frontend_open_forensics(ui, true, false);
     }
 
     if (debug == NULL || !debug->inspector_enabled) {
@@ -10414,34 +10415,50 @@ bool frontend_close_help(frontend *ui)
     return paused_by_help;
 }
 
-void frontend_open_forensics(frontend *ui)
+void frontend_open_forensics(
+    frontend *ui,
+    bool from_debugger,
+    bool crt_was_running)
 {
+    frontend_forensics_entry entry;
+
     if (ui == NULL) {
         return;
     }
-    /* Mutual exclusion with Help: close without resuming (caller paused us). */
+    /* Mutual exclusion with Help: close without resuming. */
     if (help_view_is_open(&ui->help)) {
         help_view_close(&ui->help);
     }
-    /* Exit never auto-resumes; Forensics is a paused full-window mode. */
-    forensics_view_open(&ui->forensics, false);
+    entry = from_debugger ? FRONTEND_FORENSICS_ENTRY_DEBUGGER :
+                            FRONTEND_FORENSICS_ENTRY_CRT;
+    forensics_view_open(&ui->forensics, entry, crt_was_running);
     frontend_set_active_view(ui, FRONTEND_ACTIVE_VIEW_NONE);
 }
 
-bool frontend_close_forensics(frontend *ui)
+void frontend_close_forensics(frontend *ui)
 {
     if (ui == NULL || !forensics_view_is_open(&ui->forensics)) {
-        return false;
+        return;
     }
-    (void)forensics_view_close(&ui->forensics);
+    forensics_view_close(&ui->forensics);
     ui->misc.active_tab = FRONTEND_MISC_TAB_INSPECTOR;
     ui->misc.initialized = true;
-    return false; /* stay paused — caller must not auto-run */
 }
 
 bool frontend_forensics_is_open(const frontend *ui)
 {
     return ui != NULL && forensics_view_is_open(&ui->forensics);
+}
+
+bool frontend_forensics_entered_from_crt(const frontend *ui)
+{
+    return ui != NULL &&
+        forensics_view_entry(&ui->forensics) == FRONTEND_FORENSICS_ENTRY_CRT;
+}
+
+bool frontend_forensics_crt_was_running(const frontend *ui)
+{
+    return ui != NULL && forensics_view_crt_was_running(&ui->forensics);
 }
 
 bool frontend_forensics_consume_close_request(frontend *ui)

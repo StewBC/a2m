@@ -78,43 +78,39 @@ Film frames, Inspector focus, and HST1 records share **`machine_cycle`**. They a
 
 ### Mode model
 
-Full-window mode swap with the debugger — **not** a Help-style CRT overlay:
+Full-window mode swap — **not** a Help-style CRT overlay:
 
 ```text
-Display-only  ←F9→  Debugger layout  ←Opt+R→  Forensics UI (full client area)
-                           ↑                      ↓
-                           └──── Esc / Close / F9 / Opt+R ────┘
+Display-only (CRT) ──Opt+R──► Forensics ──Opt+R/Close──► CRT (restore run state)
+Debugger (F9 up)   ──Opt+R──► Forensics ──Opt+R/Close──► Debugger (paused)
+Forensics          ──F9─────► Debugger (always paused)
+Esc does not leave Forensics
 ```
 
-**Shortcut (audited):** **Opt+R** from anywhere (display-only or debugger). Opt+H is Help. Other taken host Opt+ letters include T, M/A/B/S/F/G/V/J/X, Tab, 1/2/Insert, Shift variants.
+**Shortcut (audited):** **Opt+R** from anywhere. Opt+H is Help. Esc does **not** leave Forensics (Help still uses Esc).
 
-**Mutual exclusion with Help:** Forensics and Help cannot both be open. Esc closes **only the active** mode (Forensics or Help).
+**Mutual exclusion with Help:** Forensics and Help cannot both be open.
 
 **Pause policy (normative):**
 
 | Transition | Behavior |
 |------------|----------|
-| Open Forensics (Opt+R / Inspector button) | **Pause** if running. No CRT behind — whole window is Forensics. |
-| Leave Forensics (Esc / Close / Opt+R / F9) | Show **debugger** (`ui_visible`); Misc → Inspector. **Stay paused** (no auto-resume). |
-| Forensics → Help (Opt+H) | Close Forensics (stay paused); open Help with `paused_by_help=false` so Help close does not resume. |
-| Help → Forensics | Close Help without resume; open Forensics (already paused or pause if somehow running). |
+| Open Forensics | **Pause** if running. Record entry surface. If entry was CRT, also record whether it was running. |
+| Opt+R / Close | Return to **entry surface**. CRT entry → CRT and **resume** only if it was running at open. Debugger entry → debugger, **paused**. |
+| F9 | Always **debugger**, **paused** (abandons CRT resume latch). |
+| Esc | No-op for Forensics. |
+| Forensics → Help (Opt+H) | Close Forensics (stay paused); Help with `paused_by_help=false`. |
 
-FIND still requires pause (`RUNTIME_HISTORY_RPC_MACHINE_RUNNING`). Host F10/F11/F12 remain available while Forensics is open.
-
-- Entry: Inspector **“Forensics…”** or **Opt+R** (including from display-only).
-- While open: full client area Forensics only (no `frontend_render_display_only`). Keyboard routing to the machine is off.
-- Exit does **not** leave Inspect mode if that was active in the debugger.
+FIND still requires pause. Host F10/F11/F12 remain available while Forensics is open.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> DisplayOrDebugger
-    DisplayOrDebugger --> Forensics: Opt+R / Forensics button\n(pause)
-    Forensics --> Debugger: Esc / Close / Opt+R / F9\n(stay paused)
-    note right of Forensics
-      Full window, no CRT overlay
-      Transcript + status + query
-      Mutually exclusive with Help
-    end note
+    [*] --> CRT
+    [*] --> Debugger
+    CRT --> Forensics: Opt+R (pause; remember was_running)
+    Debugger --> Forensics: Opt+R / Forensics… (pause)
+    Forensics --> CRT: Opt+R/Close if entry=CRT\n(restore was_running)
+    Forensics --> Debugger: Opt+R/Close if entry=dbg\nOR F9 (paused)
 ```
 
 ### Layout
@@ -411,7 +407,8 @@ typedef struct frontend_fr_logical_entry {
 
 typedef struct frontend_forensics_state {
     bool open;
-    bool resume_on_forensics_exit; /* transferred Help pause latch */
+    frontend_forensics_entry entry; /* debugger vs CRT return target */
+    bool crt_was_running; /* CRT entry only */
     char query[256];
     char query_history[64][256];
     unsigned query_history_count;
@@ -549,7 +546,7 @@ Fuzz find-option strings in shared parse tests.
 ## Key Decisions
 
 1. **UI chrome name is Forensics; data name stays flight recorder / HST1** — Same split as Inspector vs TimeMachine. Button label **Forensics…**; manual § CPU Flight Recorder remains the recorder feature name.
-2. **Full-window mode flip, not a Misc tab / not a Help CRT overlay** — whole client area; **pause on enter**; leave → debugger and **stay paused**.
+2. **Full-window mode flip, not a Misc tab / not a Help CRT overlay** — whole client area; **pause on enter**; Opt+R/Close return to entry surface (CRT may resume); F9 → debugger paused; Esc does not leave.
 3. **Transcript canvas over grid/peephole** — Dense pages; `history-read` appends another block. Full formatter text stored per logical entry; **wrap-at-format** (~160 cols) for display; Copy uses unwrapped text (no silent 256-byte truncation).
 4. **In-process `runtime_client_history_*`, not self-TCP** — Claim via `runtime_client_claim_history_rpc` in `main.c`.
 5. **Expand find parser early into `src/runtime/runtime_history_query_parse.*`** — Normative grammar above; public key table drives autocomplete; control and UI share one implementation. Docs-only stopgap only if expansion slips.
@@ -572,7 +569,7 @@ Fuzz find-option strings in shared parse tests.
 | Shortcut | **Opt+R** (not Opt+H) |
 | Shared parse location | `src/runtime/runtime_history_query_parse.*` |
 | Drag-select in v1 | **No** — click + Copy button |
-| Help↔Forensics pause | **Pause on Forensics enter; never auto-resume on leave** |
+| Forensics leave | **Opt+R/Close → entry surface** (CRT restores run state); **F9 → debugger paused**; Esc ignored |
 | Long lines | **Wrap-at-format** (~160 cols); store full text; no silent truncate |
 | Land while live | **Inspect & Land** confirm when `can_enter`; soft-fail only if no window |
 | Token-aware copy | **In PR 7** — double-click / token hit on `id=` / `cyc=` / `pc=$…` |

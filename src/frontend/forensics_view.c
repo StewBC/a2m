@@ -66,14 +66,18 @@ void forensics_view_set_status(frontend_forensics_state *state, const char *text
     snprintf(state->status, sizeof(state->status), "%s", text);
 }
 
-void forensics_view_open(frontend_forensics_state *state, bool resume_on_exit)
+void forensics_view_open(
+    frontend_forensics_state *state,
+    frontend_forensics_entry entry,
+    bool crt_was_running)
 {
     if (state == NULL) {
         return;
     }
-    (void)resume_on_exit; /* Exit never auto-resumes (debugger mode swap). */
     state->open = true;
-    state->resume_on_forensics_exit = false;
+    state->entry = entry;
+    state->crt_was_running =
+        (entry == FRONTEND_FORENSICS_ENTRY_CRT) && crt_was_running;
     state->query_focus_pending = true;
     state->request_close = false;
     state->request_host_pause = true;
@@ -82,16 +86,17 @@ void forensics_view_open(frontend_forensics_state *state, bool resume_on_exit)
         state, "paused — FIND/NEXT/READ land in PR4");
 }
 
-bool forensics_view_close(frontend_forensics_state *state)
+void forensics_view_close(frontend_forensics_state *state)
 {
     if (state == NULL || !state->open) {
-        return false;
+        return;
     }
     state->open = false;
-    state->resume_on_forensics_exit = false;
     state->query_focus_pending = false;
     state->request_close = false;
-    return false; /* never request auto-resume */
+    state->request_host_pause = false;
+    state->entry = FRONTEND_FORENSICS_ENTRY_DEBUGGER;
+    state->crt_was_running = false;
 }
 
 bool forensics_view_is_open(const frontend_forensics_state *state)
@@ -99,9 +104,46 @@ bool forensics_view_is_open(const frontend_forensics_state *state)
     return state != NULL && state->open;
 }
 
-bool forensics_view_resume_on_exit(const frontend_forensics_state *state)
+frontend_forensics_entry forensics_view_entry(const frontend_forensics_state *state)
 {
-    return state != NULL && state->resume_on_forensics_exit;
+    if (state == NULL) {
+        return FRONTEND_FORENSICS_ENTRY_DEBUGGER;
+    }
+    return state->entry;
+}
+
+bool forensics_view_crt_was_running(const frontend_forensics_state *state)
+{
+    return state != NULL && state->crt_was_running;
+}
+
+frontend_forensics_leave_result forensics_view_leave_to_entry(
+    frontend_forensics_state *state)
+{
+    frontend_forensics_leave_result result;
+    result.show_debugger = true;
+    result.resume_machine = false;
+    if (state == NULL || !state->open) {
+        return result;
+    }
+    if (state->entry == FRONTEND_FORENSICS_ENTRY_CRT) {
+        result.show_debugger = false;
+        result.resume_machine = state->crt_was_running;
+    }
+    forensics_view_close(state);
+    return result;
+}
+
+frontend_forensics_leave_result forensics_view_leave_to_debugger(
+    frontend_forensics_state *state)
+{
+    frontend_forensics_leave_result result;
+    result.show_debugger = true;
+    result.resume_machine = false;
+    if (state != NULL && state->open) {
+        forensics_view_close(state);
+    }
+    return result;
 }
 
 bool forensics_view_query_history_prev(frontend_forensics_state *state)
@@ -241,7 +283,7 @@ void forensics_view_render(
         nk_layout_row_dynamic(ctx, hint_h, 1);
         nk_label(
             ctx,
-            "Opt+R toggles debugger. Esc/Close return to debugger (stay paused).",
+            "Opt+R/Close return to where you opened Forensics. F9 opens debugger (paused).",
             NK_TEXT_LEFT);
 
         /* Transcript fills the middle; status + query stay below. */

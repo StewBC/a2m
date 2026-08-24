@@ -18,6 +18,11 @@ enum {
     FRONTEND_FR_STATUS_MAX = 192
 };
 
+typedef enum frontend_forensics_entry {
+    FRONTEND_FORENSICS_ENTRY_DEBUGGER = 0,
+    FRONTEND_FORENSICS_ENTRY_CRT = 1
+} frontend_forensics_entry;
+
 typedef struct frontend_fr_logical_entry {
     char *text; /* full formatter output; heap; never 256-capped */
     uint64_t cycle;
@@ -30,7 +35,8 @@ typedef struct frontend_fr_logical_entry {
 
 typedef struct frontend_forensics_state {
     bool open;
-    bool resume_on_forensics_exit; /* transferred Help pause latch */
+    frontend_forensics_entry entry; /* where Opt+R/Close returns */
+    bool crt_was_running; /* valid when entry == CRT: restore on Opt+R/Close */
     bool query_focus_pending;
     char query[FRONTEND_FR_QUERY_MAX];
     char query_history[FRONTEND_FR_QUERY_HISTORY][FRONTEND_FR_QUERY_MAX];
@@ -50,16 +56,32 @@ typedef struct frontend_forensics_state {
     uint64_t last_cursor;
     bool last_more;
     char status[FRONTEND_FR_STATUS_MAX];
-    bool request_close;
+    bool request_close; /* Close button → leave to entry surface */
     bool request_host_pause; /* set on open; main pauses if still running */
 } frontend_forensics_state;
 
+/* Result of leaving Forensics (main applies ui_visible + run/pause). */
+typedef struct frontend_forensics_leave_result {
+    bool show_debugger; /* true → debugger; false → full-screen CRT */
+    bool resume_machine; /* true only when returning to CRT that was running */
+} frontend_forensics_leave_result;
+
 void forensics_view_init(frontend_forensics_state *state);
-void forensics_view_open(frontend_forensics_state *state, bool resume_on_exit);
-/* Returns the resume latch that was held (caller may honor it). */
-bool forensics_view_close(frontend_forensics_state *state);
+void forensics_view_open(
+    frontend_forensics_state *state,
+    frontend_forensics_entry entry,
+    bool crt_was_running);
+void forensics_view_close(frontend_forensics_state *state);
 bool forensics_view_is_open(const frontend_forensics_state *state);
-bool forensics_view_resume_on_exit(const frontend_forensics_state *state);
+frontend_forensics_entry forensics_view_entry(const frontend_forensics_state *state);
+bool forensics_view_crt_was_running(const frontend_forensics_state *state);
+
+/* Opt+R / Close: return to entry surface (may resume CRT). */
+frontend_forensics_leave_result forensics_view_leave_to_entry(
+    frontend_forensics_state *state);
+/* F9: always debugger, always paused. */
+frontend_forensics_leave_result forensics_view_leave_to_debugger(
+    frontend_forensics_state *state);
 
 void forensics_view_clear_transcript(frontend_forensics_state *state);
 void forensics_view_set_status(frontend_forensics_state *state, const char *text);
