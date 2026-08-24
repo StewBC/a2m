@@ -51,6 +51,7 @@ typedef struct frontend_forensics_state {
     bool last_more;
     char status[FRONTEND_FR_STATUS_MAX];
     bool request_close;
+    bool request_host_pause; /* set on open; main pauses if still running */
 } frontend_forensics_state;
 
 void forensics_view_init(frontend_forensics_state *state);

@@ -21,7 +21,7 @@ void forensics_view_init(frontend_forensics_state *state)
     snprintf(
         state->status,
         sizeof(state->status),
-        "Forensics ready — FIND requires pause (PR4 wires history RPCs)");
+        "paused — FIND/NEXT/READ land in PR4");
 }
 
 static void forensics_free_logical(frontend_forensics_state *state)
@@ -71,30 +71,27 @@ void forensics_view_open(frontend_forensics_state *state, bool resume_on_exit)
     if (state == NULL) {
         return;
     }
+    (void)resume_on_exit; /* Exit never auto-resumes (debugger mode swap). */
     state->open = true;
-    state->resume_on_forensics_exit = resume_on_exit;
+    state->resume_on_forensics_exit = false;
     state->query_focus_pending = true;
     state->request_close = false;
+    state->request_host_pause = true;
     state->query_history_index = 0u;
-    if (state->status[0] == '\0') {
-        forensics_view_set_status(
-            state,
-            "Forensics ready — FIND requires pause (PR4 wires history RPCs)");
-    }
+    forensics_view_set_status(
+        state, "paused — FIND/NEXT/READ land in PR4");
 }
 
 bool forensics_view_close(frontend_forensics_state *state)
 {
-    bool resume = false;
     if (state == NULL || !state->open) {
         return false;
     }
-    resume = state->resume_on_forensics_exit;
     state->open = false;
     state->resume_on_forensics_exit = false;
     state->query_focus_pending = false;
     state->request_close = false;
-    return resume;
+    return false; /* never request auto-resume */
 }
 
 bool forensics_view_is_open(const frontend_forensics_state *state)
@@ -174,10 +171,12 @@ void forensics_view_render(
     int height)
 {
     struct nk_rect bounds;
-    float margin;
-    float toolbar_h = 56.0f;
-    float status_h = 22.0f;
-    float query_h = 28.0f;
+    struct nk_style_window saved_window;
+    float toolbar_h = 28.0f;
+    float hint_h = 18.0f;
+    float status_h = 20.0f;
+    float query_h = 26.0f;
+    float title_and_pad = 44.0f; /* NK title bar + window padding/spacing */
     float content_h;
     unsigned i;
 
@@ -185,27 +184,27 @@ void forensics_view_render(
         return;
     }
 
-    margin = width < 760 ? 10.0f : 24.0f;
-    bounds = nk_rect(
-        margin,
-        margin,
-        (float)width - margin * 2.0f,
-        (float)height - margin * 2.0f);
-    if (bounds.w < 120.0f || bounds.h < 140.0f) {
-        return;
+    /* Full client area — not a Help-style inset overlay on the CRT. */
+    bounds = nk_rect(0.0f, 0.0f, (float)width, (float)height);
+    content_h = bounds.h - title_and_pad - toolbar_h - hint_h - status_h -
+        query_h - 16.0f;
+    if (content_h < 48.0f) {
+        content_h = 48.0f;
     }
-    content_h = bounds.h - toolbar_h - status_h - query_h - 18.0f;
-    if (content_h < 60.0f) {
-        content_h = 60.0f;
-    }
+
+    saved_window = ctx->style.window;
+    ctx->style.window.fixed_background =
+        nk_style_item_color(nk_rgb(28, 28, 34));
+    ctx->style.window.padding = nk_vec2(10.0f, 8.0f);
+    ctx->style.window.spacing = nk_vec2(6.0f, 4.0f);
 
     if (nk_begin(
             ctx,
             "Forensics",
             bounds,
             NK_WINDOW_BORDER | NK_WINDOW_TITLE | NK_WINDOW_NO_SCROLLBAR)) {
-        /* Toolbar row 1 */
-        nk_layout_row_begin(ctx, NK_STATIC, 24.0f, 5);
+        /* Toolbar */
+        nk_layout_row_begin(ctx, NK_STATIC, toolbar_h, 4);
         nk_layout_row_push(ctx, 70.0f);
         if (nk_button_label(ctx, "Close")) {
             state->request_close = true;
@@ -216,7 +215,6 @@ void forensics_view_render(
         }
         nk_layout_row_push(ctx, 70.0f);
         if (nk_button_label(ctx, "Copy")) {
-            /* PR4 fills transcript; stub copies a note when empty. */
             if (state->sel_logical_first != FORENSICS_SEL_NONE &&
                 state->sel_logical_first < state->logical_count &&
                 state->logical[state->sel_logical_first].text != NULL) {
@@ -240,13 +238,13 @@ void forensics_view_render(
         }
         nk_layout_row_end(ctx);
 
-        nk_layout_row_dynamic(ctx, 18.0f, 1);
+        nk_layout_row_dynamic(ctx, hint_h, 1);
         nk_label(
             ctx,
-            "Query FIND/NEXT/READ here — results append below (PR4).",
+            "Opt+R toggles debugger. Esc/Close return to debugger (stay paused).",
             NK_TEXT_LEFT);
 
-        /* Transcript */
+        /* Transcript fills the middle; status + query stay below. */
         nk_layout_row_dynamic(ctx, content_h, 1);
         if (nk_group_begin(ctx, "ForensicsTranscript", NK_WINDOW_BORDER)) {
             if (state->display_count == 0u && state->logical_count == 0u) {
@@ -312,14 +310,13 @@ void forensics_view_render(
             nk_group_end(ctx);
         }
 
-        /* Status + query */
         nk_layout_row_dynamic(ctx, status_h, 1);
         nk_label(ctx, state->status, NK_TEXT_LEFT);
 
         nk_layout_row_begin(ctx, NK_DYNAMIC, query_h, 2);
-        nk_layout_row_push(ctx, 0.12f);
+        nk_layout_row_push(ctx, 0.10f);
         nk_label(ctx, "Query", NK_TEXT_LEFT);
-        nk_layout_row_push(ctx, 0.88f);
+        nk_layout_row_push(ctx, 0.90f);
         {
             nk_flags edit_flags =
                 NK_EDIT_FIELD | NK_EDIT_SIG_ENTER | NK_EDIT_GOTO_END_ON_ACTIVATE;
@@ -346,4 +343,5 @@ void forensics_view_render(
         nk_layout_row_end(ctx);
     }
     nk_end(ctx);
+    ctx->style.window = saved_window;
 }

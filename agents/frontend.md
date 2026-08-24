@@ -84,10 +84,11 @@ Record / Inspect / Leave. See [`timemachine.md`](timemachine.md). Window
 tint the window background. Breakpoints tab chrome is the live panel in both
 modes (one list).
 
-**Forensics…** opens the full-window Forensics mode (also **Opt+R** while F9
-debugger is up). Mutually exclusive with Help; Forensics never auto-pauses.
-Esc / Close / Opt+R leave Forensics and select the Inspector tab. A Help pause
-latch transfers across Help↔Forensics. See [`design/forensics-ui.md`](../design/forensics-ui.md).
+**Forensics…** / **Opt+R** open full-window Forensics (no CRT behind — same
+class as the debugger layout, not a Help overlay). Opens from display-only
+too. **Pauses** on enter; Esc / Close / Opt+R / F9 leave to the debugger and
+**stay paused**. Mutually exclusive with Help. See
+[`design/forensics-ui.md`](../design/forensics-ui.md).
 
 Entering **max** remembers Record, wipes the tape, turns Record off (checkbox
 locked). Leaving max restores Record into an empty window.

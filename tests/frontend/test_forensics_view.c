@@ -23,10 +23,11 @@ int main(void)
 
     forensics_view_open(&state, true);
     expect_true("open", forensics_view_is_open(&state));
-    expect_true("latch", forensics_view_resume_on_exit(&state));
+    expect_true("no resume latch", !forensics_view_resume_on_exit(&state));
     expect_true("focus pending", state.query_focus_pending);
+    expect_true("pause requested", state.request_host_pause);
 
-    expect_true("close returns latch", forensics_view_close(&state));
+    expect_true("close never resumes", !forensics_view_close(&state));
     expect_true("closed", !forensics_view_is_open(&state));
     expect_true("latch cleared", !forensics_view_resume_on_exit(&state));
 

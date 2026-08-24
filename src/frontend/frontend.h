@@ -287,6 +287,7 @@ void frontend_open_forensics(frontend *ui);
 bool frontend_close_forensics(frontend *ui); /* returns resume_on_forensics_exit */
 bool frontend_forensics_is_open(const frontend *ui);
 bool frontend_forensics_consume_close_request(frontend *ui);
+bool frontend_forensics_consume_pause_request(frontend *ui);
 bool frontend_handle_forensics_key(frontend *ui, const SDL_KeyboardEvent *key);
 bool frontend_poll_debugger_intent(frontend *ui, frontend_debugger_intent *out_intent);
 void frontend_set_layout_state(frontend *ui, const frontend_layout_state *state);

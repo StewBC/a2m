@@ -10300,10 +10300,9 @@ void frontend_render(frontend *ui, bool ui_visible, const frontend_debug_state *
     }
 
     if (forensics_view_is_open(&ui->forensics)) {
-        frontend_render_display_only(ui);
+        /* Full-window mode: no CRT behind (unlike Help overlay). */
         forensics_view_render(ui->ctx, &ui->forensics, width, height);
         nk_sdl_render(NK_ANTI_ALIASING_ON);
-        frontend_draw_disk_activity_leds(ui, width, height, debug_state);
         return;
     }
 
@@ -10392,13 +10391,11 @@ void frontend_open_help(frontend *ui, bool paused_by_help)
     if (ui == NULL) {
         return;
     }
-    /* Mutual exclusion: close Forensics without honoring its resume latch here;
-       transfer the latch into Help's paused_by_help instead. */
+    /* Mutual exclusion: leave Forensics without resuming (machine already paused). */
     if (forensics_view_is_open(&ui->forensics)) {
-        bool fr_latch = forensics_view_close(&ui->forensics);
-        if (fr_latch) {
-            paused_by_help = true;
-        }
+        (void)forensics_view_close(&ui->forensics);
+        /* Forensics already paused the machine; do not make Help auto-resume. */
+        paused_by_help = false;
     }
     help_view_open(&ui->help, paused_by_help);
     frontend_set_active_view(ui, FRONTEND_ACTIVE_VIEW_NONE);
@@ -10419,31 +10416,27 @@ bool frontend_close_help(frontend *ui)
 
 void frontend_open_forensics(frontend *ui)
 {
-    bool resume_on_exit = false;
-
     if (ui == NULL) {
         return;
     }
-    /* Close Help without resuming; transfer paused_by_help latch if held. */
+    /* Mutual exclusion with Help: close without resuming (caller paused us). */
     if (help_view_is_open(&ui->help)) {
-        resume_on_exit = help_view_paused_by_help(&ui->help);
         help_view_close(&ui->help);
     }
-    forensics_view_open(&ui->forensics, resume_on_exit);
+    /* Exit never auto-resumes; Forensics is a paused full-window mode. */
+    forensics_view_open(&ui->forensics, false);
     frontend_set_active_view(ui, FRONTEND_ACTIVE_VIEW_NONE);
 }
 
 bool frontend_close_forensics(frontend *ui)
 {
-    bool resume;
-
     if (ui == NULL || !forensics_view_is_open(&ui->forensics)) {
         return false;
     }
-    resume = forensics_view_close(&ui->forensics);
+    (void)forensics_view_close(&ui->forensics);
     ui->misc.active_tab = FRONTEND_MISC_TAB_INSPECTOR;
     ui->misc.initialized = true;
-    return resume;
+    return false; /* stay paused — caller must not auto-run */
 }
 
 bool frontend_forensics_is_open(const frontend *ui)
@@ -10457,6 +10450,15 @@ bool frontend_forensics_consume_close_request(frontend *ui)
         return false;
     }
     ui->forensics.request_close = false;
+    return true;
+}
+
+bool frontend_forensics_consume_pause_request(frontend *ui)
+{
+    if (ui == NULL || !ui->forensics.request_host_pause) {
+        return false;
+    }
+    ui->forensics.request_host_pause = false;
     return true;
 }
 

@@ -2725,7 +2725,13 @@ int main(int argc, char **argv)
                         &kbd_joystick, &controllers, client, &event.key);
                     send_event_to_frontend = false;
                 } else if (sym == SDLK_F9) {
-                    ui_visible = !ui_visible;
+                    if (frontend_forensics_is_open(ui)) {
+                        /* F9 from Forensics → debugger (stay paused). */
+                        (void)frontend_close_forensics(ui);
+                        ui_visible = true;
+                    } else {
+                        ui_visible = !ui_visible;
+                    }
                     {
                         int min_w = 0;
                         int min_h = 0;
@@ -2770,22 +2776,40 @@ int main(int argc, char **argv)
                 } else if (
                     sym == SDLK_r &&
                     frontend_input_has_option_modifier(&event.key) &&
-                    !frontend_input_has_shift_modifier(&event.key) &&
-                    ui_visible) {
-                    /* Opt+R: toggle Forensics (debugger visible). No auto-pause. */
+                    !frontend_input_has_shift_modifier(&event.key)) {
+                    /* Opt+R: toggle Forensics↔debugger. Pause on enter; stay
+                       paused on leave. Available from display-only too. */
                     if (frontend_forensics_is_open(ui)) {
-                        bool resume = frontend_close_forensics(ui);
-                        if (resume) {
-                            (void)runtime_client_run(client);
+                        (void)frontend_close_forensics(ui);
+                        ui_visible = true;
+                        {
+                            int min_w = 0;
+                            int min_h = 0;
+                            frontend_debug_min_window_size(ui, &min_w, &min_h);
+                            request_debug_state(client);
+                            platform_window_set_minimum_size(window, min_w, min_h);
                         }
                     } else {
                         frontend_open_forensics(ui);
+                        ui_visible = true;
+                        {
+                            int min_w = 0;
+                            int min_h = 0;
+                            frontend_debug_min_window_size(ui, &min_w, &min_h);
+                            request_debug_state(client);
+                            platform_window_set_minimum_size(window, min_w, min_h);
+                        }
                     }
                     send_event_to_frontend = false;
                 } else if (sym == SDLK_ESCAPE && frontend_forensics_is_open(ui)) {
-                    bool resume = frontend_close_forensics(ui);
-                    if (resume) {
-                        (void)runtime_client_run(client);
+                    (void)frontend_close_forensics(ui);
+                    ui_visible = true;
+                    {
+                        int min_w = 0;
+                        int min_h = 0;
+                        frontend_debug_min_window_size(ui, &min_w, &min_h);
+                        request_debug_state(client);
+                        platform_window_set_minimum_size(window, min_w, min_h);
                     }
                     send_event_to_frontend = false;
                 } else if (sym == SDLK_ESCAPE && frontend_help_is_open(ui)) {
@@ -2799,20 +2823,8 @@ int main(int argc, char **argv)
                 } else if (frontend_handle_help_key(
                                ui, &event.key, options.scroll_wheel_lines)) {
                     send_event_to_frontend = false;
-                } else if (
-                    frontend_help_is_open(ui) || frontend_forensics_is_open(ui)) {
-                    send_event_to_frontend = true;
-                } else if (key_is_quicksave_shortcut(&event.key)) {
-                    if (!debug.inspecting) {
-                        (void)send_quicksave(client, &options, ui);
-                    }
-                    send_event_to_frontend = false;
-                } else if (key_is_quickload_shortcut(&event.key)) {
-                    if (!debug.inspecting) {
-                        (void)send_quickload(client, &options, ui);
-                    }
-                    send_event_to_frontend = false;
                 } else if (handle_step_key_event(client, &debug, &event.key, true)) {
+                    /* F10/F11 work while Forensics is open (before catch-all). */
                     send_event_to_frontend = false;
                 } else if (sym == SDLK_F10 && frontend_input_has_shift_modifier(&event.key)) {
                     (void)runtime_client_step_out(client);
@@ -2824,6 +2836,19 @@ int main(int argc, char **argv)
                     uint16_t addr = 0;
                     if (frontend_get_disassembly_cursor(ui, &addr)) {
                         (void)runtime_client_run_to_cursor(client, addr);
+                    }
+                    send_event_to_frontend = false;
+                } else if (
+                    frontend_help_is_open(ui) || frontend_forensics_is_open(ui)) {
+                    send_event_to_frontend = true;
+                } else if (key_is_quicksave_shortcut(&event.key)) {
+                    if (!debug.inspecting) {
+                        (void)send_quicksave(client, &options, ui);
+                    }
+                    send_event_to_frontend = false;
+                } else if (key_is_quickload_shortcut(&event.key)) {
+                    if (!debug.inspecting) {
+                        (void)send_quickload(client, &options, ui);
                     }
                     send_event_to_frontend = false;
                 } else if (key_is_video_display_shortcut(&event.key)) {
@@ -3142,10 +3167,20 @@ int main(int argc, char **argv)
             break;
         }
         frontend_render(ui, ui_visible, &debug);
+        if (frontend_forensics_consume_pause_request(ui)) {
+            if (debug.runtime_state == FRONTEND_RUNTIME_STATE_RUNNING) {
+                (void)runtime_client_pause(client);
+            }
+        }
         if (frontend_forensics_consume_close_request(ui)) {
-            bool resume = frontend_close_forensics(ui);
-            if (resume) {
-                (void)runtime_client_run(client);
+            (void)frontend_close_forensics(ui);
+            ui_visible = true;
+            {
+                int min_w = 0;
+                int min_h = 0;
+                frontend_debug_min_window_size(ui, &min_w, &min_h);
+                request_debug_state(client);
+                platform_window_set_minimum_size(window, min_w, min_h);
             }
         }
         {
