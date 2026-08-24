@@ -205,6 +205,13 @@ target_compile_features(test_video_block_paint PRIVATE c_std_99)
 target_link_libraries(test_video_block_paint PRIVATE machine)
 add_test(NAME video_block_paint COMMAND test_video_block_paint)
 
+add_executable(test_video_pixel_address
+    tests/machine/test_video_pixel_address.c
+)
+target_compile_features(test_video_pixel_address PRIVATE c_std_99)
+target_link_libraries(test_video_pixel_address PRIVATE machine)
+add_test(NAME video_pixel_address COMMAND test_video_pixel_address)
+
 add_executable(test_diskii
     tests/machine/test_diskii.c
 )

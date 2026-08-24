@@ -441,6 +441,207 @@ static void dlores_page_bases(
     *aux_base = 0x10000u + page;
 }
 
+/* Flag-only mode predicates for soft-switch-locked pixel address decode. */
+static bool flags_line_is_text(uint32_t flags, uint16_t line)
+{
+    if (line >= APPLE2_VIDEO_VISIBLE_LINES) {
+        return false;
+    }
+    if (flags & A2S_TEXT) {
+        return true;
+    }
+    if ((flags & A2S_MIXED) && line >= 160u) {
+        return true;
+    }
+    return false;
+}
+
+static bool flags_line_is_hgr(uint32_t flags, uint16_t line)
+{
+    if (line >= APPLE2_VIDEO_VISIBLE_LINES) {
+        return false;
+    }
+    if (flags & A2S_TEXT) {
+        return false;
+    }
+    if (!(flags & A2S_HIRES)) {
+        return false;
+    }
+    if (flags & A2S_COL80) {
+        return (flags & A2S_MIXED) && !(flags & A2S_DHIRES) && line < 160u;
+    }
+    if ((flags & A2S_MIXED) && line >= 160u) {
+        return false;
+    }
+    return true;
+}
+
+static bool flags_line_is_dhgr(uint32_t flags, uint16_t line)
+{
+    if (line >= APPLE2_VIDEO_VISIBLE_LINES) {
+        return false;
+    }
+    if (flags & A2S_TEXT) {
+        return false;
+    }
+    if (!(flags & A2S_HIRES) || !(flags & A2S_COL80)) {
+        return false;
+    }
+    if ((flags & A2S_MIXED) && !(flags & A2S_DHIRES)) {
+        return false;
+    }
+    if ((flags & A2S_MIXED) && line >= 160u) {
+        return false;
+    }
+    return true;
+}
+
+static bool flags_line_is_dlores(uint32_t flags, uint16_t line)
+{
+    if (line >= APPLE2_VIDEO_VISIBLE_LINES) {
+        return false;
+    }
+    if (flags & A2S_TEXT) {
+        return false;
+    }
+    if (flags & A2S_HIRES) {
+        return false;
+    }
+    if (!(flags & A2S_COL80)) {
+        return false;
+    }
+    if ((flags & A2S_MIXED) && line >= 160u) {
+        return false;
+    }
+    return true;
+}
+
+static bool flags_line_is_lores(uint32_t flags, uint16_t line)
+{
+    if (line >= APPLE2_VIDEO_VISIBLE_LINES) {
+        return false;
+    }
+    if (flags & A2S_TEXT) {
+        return false;
+    }
+    if (flags & A2S_HIRES) {
+        return false;
+    }
+    if (flags & A2S_COL80) {
+        return false;
+    }
+    if ((flags & A2S_MIXED) && line >= 160u) {
+        return false;
+    }
+    return true;
+}
+
+static void pixel_addr_fill(
+    uint16_t bank_base,
+    uint16_t offset,
+    bool from_aux,
+    apple2_video_pixel_addr *out)
+{
+    out->bank_base = bank_base;
+    out->offset = offset;
+    out->from_aux = from_aux;
+    out->host_addr = (from_aux ? 0x10000u : 0u) + (uint32_t)bank_base + (uint32_t)offset;
+}
+
+static uint16_t text_bank_base_flags(uint32_t flags)
+{
+    if ((flags & A2S_80STORE) && (flags & A2S_PAGE2)) {
+        return 0x0400u;
+    }
+    return (flags & A2S_PAGE2) ? 0x0800u : 0x0400u;
+}
+
+static uint16_t hgr_bank_base_flags(uint32_t flags)
+{
+    if ((flags & A2S_80STORE) && (flags & A2S_PAGE2)) {
+        return 0x2000u;
+    }
+    return (flags & A2S_PAGE2) ? 0x4000u : 0x2000u;
+}
+
+bool apple2_video_pixel_address(
+    uint32_t flags,
+    uint16_t px,
+    uint16_t py,
+    apple2_video_pixel_addr *out)
+{
+    uint16_t col;
+    uint16_t half;
+    uint8_t trow;
+    uint16_t page_off;
+
+    if (out == NULL ||
+        px >= (uint16_t)APPLE2_VIDEO_WIDTH ||
+        py >= (uint16_t)APPLE2_VIDEO_HEIGHT) {
+        return false;
+    }
+
+    col = (uint16_t)(px / (uint16_t)APPLE2_VIDEO_PIXELS_PER_COLUMN);
+    half = (uint16_t)(px % (uint16_t)APPLE2_VIDEO_PIXELS_PER_COLUMN);
+    trow = (uint8_t)(py / 8u);
+
+    if (flags_line_is_text(flags, py)) {
+        page_off = (uint16_t)(apple2_video_text_line_base(trow) + col);
+        if (flags & A2S_COL80) {
+            /* 80-col paint: always $400 main / $10400 aux (aux then main). */
+            pixel_addr_fill(0x0400u, page_off, half < 7u, out);
+            return true;
+        }
+        {
+            uint16_t bank = text_bank_base_flags(flags);
+            bool aux = (flags & A2S_80STORE) && (flags & A2S_PAGE2);
+            pixel_addr_fill(bank, page_off, aux, out);
+            return true;
+        }
+    }
+
+    if (flags_line_is_dhgr(flags, py)) {
+        /* paint_dhgr_line: groups of 28 host px = aux/main/aux/main for 2 cols. */
+        uint16_t group = (uint16_t)(px / 28u);
+        uint16_t bit = (uint16_t)(px % 28u);
+        uint16_t which = (uint16_t)(bit / 7u);
+        uint16_t page = (flags & A2S_PAGE2) ? 0x4000u : 0x2000u;
+        uint16_t scanner = (uint16_t)(group * 2u + ((which >= 2u) ? 1u : 0u));
+        bool aux = (which % 2u) == 0u;
+        page_off = (uint16_t)(apple2_video_hgr_line_offset((uint8_t)py) + scanner);
+        pixel_addr_fill(page, page_off, aux, out);
+        return true;
+    }
+
+    if (flags_line_is_hgr(flags, py)) {
+        uint16_t bank = hgr_bank_base_flags(flags);
+        bool aux = (flags & A2S_80STORE) && (flags & A2S_PAGE2);
+        page_off = (uint16_t)(apple2_video_hgr_line_offset((uint8_t)py) + col);
+        pixel_addr_fill(bank, page_off, aux, out);
+        return true;
+    }
+
+    if (flags_line_is_dlores(flags, py)) {
+        uint16_t page = 0x0400u;
+        if ((flags & A2S_PAGE2) && !(flags & A2S_80STORE)) {
+            page = 0x0800u;
+        }
+        page_off = (uint16_t)(apple2_video_text_line_base(trow) + col);
+        pixel_addr_fill(page, page_off, half < 7u, out);
+        return true;
+    }
+
+    if (flags_line_is_lores(flags, py)) {
+        uint16_t bank = text_bank_base_flags(flags);
+        bool aux = (flags & A2S_80STORE) && (flags & A2S_PAGE2);
+        page_off = (uint16_t)(apple2_video_text_line_base(trow) + col);
+        pixel_addr_fill(bank, page_off, aux, out);
+        return true;
+    }
+
+    return false;
+}
+
 static uint8_t scanner_fetch(apple2_t *m)
 {
     apple2_video *v = &m->video;

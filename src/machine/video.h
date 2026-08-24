@@ -117,3 +117,22 @@ void apple2_video_reseed_from_cycles(struct apple2 *m);
 uint16_t apple2_video_text_line_base(uint8_t text_row);
 /* HGR line base offset within $2000/$4000 page (0..191). */
 uint16_t apple2_video_hgr_line_offset(uint8_t pixel_row);
+
+/*
+ * Soft-switch-locked pixel -> host RAM address (Machine Display probe).
+ * flags: TEXT/MIXED/PAGE2/HIRES/COL80/DHIRES/80STORE (and ALTCHAR unused).
+ * (px, py) are host framebuffer coords in 0..559 x 0..191.
+ * host_addr uses the video plane convention: aux at +0x10000.
+ */
+typedef struct apple2_video_pixel_addr {
+    uint16_t bank_base; /* page base, e.g. $0400 / $2000 / $4000 */
+    uint16_t offset;    /* within page */
+    uint32_t host_addr; /* CPU space; aux via +0x10000 */
+    bool from_aux;
+} apple2_video_pixel_addr;
+
+bool apple2_video_pixel_address(
+    uint32_t flags,
+    uint16_t px,
+    uint16_t py,
+    apple2_video_pixel_addr *out);
