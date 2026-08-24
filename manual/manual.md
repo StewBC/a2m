@@ -1924,18 +1924,31 @@ feature and other valid values are 16 through 4096.
 | `history-close <cursor>` | Close a cursor; closing an absent cursor is harmless |
 
 Find, next, and read require the machine to be paused. Searches run newest-first
-unless `direction=forward` is specified. Find accepts these keys:
+unless `direction=forward` is specified. Find options are whitespace-separated
+`key=value` tokens (shared parser in `runtime_history_query_parse`). Defaults:
+`direction=backward`, `limit=64`. Unknown keys are rejected.
 
 ```text
-epoch timeline cycle from direction pc address access value opcodes limit
+pc address access direction limit from epoch timeline cycle value opcodes
 ```
 
-Ranges are inclusive. `from` is `oldest`, `newest`, or a retained record ID.
-Access values are `execute`, `opcode`, `operand`, `data-read`, `data-write`,
-`dummy-read`, `rmw-dummy-write`, `stack-read`, `stack-write`, or `vector-read`.
-Aliases are `fetch`, `read`, `write`, and `data`. Opcode patterns contain 1..32
-comma-separated bytes and may use `?` nibble wildcards, for example
-`A9,??,8D`.
+| Key | Value |
+|-----|--------|
+| `pc` / `address` | u16 or inclusive `lo-hi` range; `$` hex ok (`-` delimiter, not `..`) |
+| `access` | see access names below |
+| `direction` | `forward` or `backward` |
+| `limit` | decimal `1..256` |
+| `from` | `oldest`, `newest`, or a retained record ID (`1..`) |
+| `epoch` | u64 (decimal or `0x`) |
+| `timeline` | u32 |
+| `cycle` | u64 or inclusive `lo-hi` range (`-` delimiter); decimal or `0x` (not `$`) |
+| `value` | byte: decimal, `$NN`, or `0xNN`. Hex forms may use `?` nibble masks (`$2?`, `??`) |
+| `opcodes` | 1..32 comma-separated bytes (`A9`, `??`, `8?`); no `$` inside the list |
+
+Access names: `execute` (alias `fetch`; instruction stream / PC filters),
+`opcode`, `operand`, `data-read` (alias `read`), `data-write` (alias `write`),
+`data`, `dummy-read`, `rmw-dummy-write`, `stack-read`, `stack-write`,
+`vector-read`.
 
 Find, next, and read return a counted binary `data history` response with
 metadata:

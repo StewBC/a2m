@@ -813,6 +813,17 @@ class Ctl:
         return metadata
 
     def history_find(self, **options: Any) -> Dict[str, Any]:
+        """history-find [key=value ...].
+
+        Keys accepted by A2M (shared C parser): pc, address, access, direction,
+        limit, from, epoch, timeline, cycle, value, opcodes.
+
+        access names: execute|fetch, opcode, operand, data-read|read,
+        data-write|write, data, dummy-read, rmw-dummy-write, stack-read,
+        stack-write, vector-read. opcodes is 1..32 comma-separated bytes with
+        optional ? nibble wildcards (e.g. A9,??,8D). value hex forms may use
+        ? masks ($2?, 0x??). cycle ranges use '-' (decimal/0x, not $).
+        """
         tokens = []
         for key, value in options.items():
             wire_key = key[:-1] if key.endswith("_") else key

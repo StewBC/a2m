@@ -76,7 +76,7 @@ snapshot history assemble symbols sessions state-changed inspector`.
 | Frame | `get-frame` → ARGB **560×192**, stride = width×4, `format=argb8888` |
 | Frame ring | `frame-ring-info` `frame-ring-record` `frame-ring-clear` `get-frame-at frame=\|cycle=` |
 | Breakpoints | `break-create` / `break-update` / `break-list` / `break-enable` / `break-clear` / `break-clear-all` / `rearm-oneshots` / `break-exec`; `when=`; access exec/read/write |
-| History | `history-info` `history-record` `history-clear` `history-find` `history-next` `history-read` `history-close` → `data history` **HST1**. Marker 13 = `MEDIA_CHANGED`; `arg0` is `0 unknown / 1 guest-write / 2 host-directory`, `arg1` is `(slot<<8)\|device`. |
+| History | `history-info` `history-record` `history-clear` `history-find` `history-next` `history-read` `history-close` → `data history` **HST1**. Marker 13 = `MEDIA_CHANGED`; `arg0` is `0 unknown / 1 guest-write / 2 host-directory`, `arg1` is `(slot<<8)\|device`. Find options: shared `runtime_history_parse_find_options` — keys `pc address access direction limit from epoch timeline cycle value opcodes`; access includes `execute`/`fetch`, fine bus names, and `read`/`write`/`data` aliases. |
 | Inspector | Master switch is INI `[debug] inspector=0\|1` / CLI `--inspector` (default **off**). `get-state` reports `mode=live\|inspector focus_cycle=N`. `leave-inspector` (any session) restores live NOW. Mutating verbs fail with `error read-only-inspector`. **No enter/land/seek on the wire.** FIND stays. |
 | Waits | `wait-paused` `wait-running` `wait-frame` `wait-event` (incl. `assemble-complete` / `assemble-error`) |
 | Assembler | `assemble [address=] [run-address=] [auto-run=] [mli-launch=] [reset=] [auto-adjust-segments=] <path>` (deferred) |
@@ -118,6 +118,7 @@ Aliases for `kind=`: `disk` → diskii; `sp` / `hd` → smartport.
 - Addresses: prefix hex with `$` (`mem()` does this). `get-memory` length is **decimal**.
 - **Events:** `0 event state-changed …` may arrive at any time; do not treat as the next reply for id N. Prefer `Ctl` (`drain_events` / `events` list).
 - History FIND/NEXT cursors are **per session**; a step/poke/reset from any asker invalidates all cursors (`CURSOR_STALE` → re-FIND).
+- `history-find` grammar lives in `src/runtime/runtime_history_query_parse.*` (not a private control-only parse). Autocomplete / docs must use `runtime_history_find_option_keys()` / `_access_names()`.
 - While `mode=inspector`, `get-memory`/`get-cpu` return THEN; `run`/`set-memory`/`set-reg`/mount/reset fail with `read-only-inspector`. `leave-inspector` restores live NOW and does **not** auto-resume.
 - Control memory-mode enum order is remapped in dispatch; do not assume it matches `runtime_memory_mode`.
 

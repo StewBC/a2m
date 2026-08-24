@@ -27,7 +27,7 @@ This design adds a **full-window Forensics mode**: a scrollback transcript of FI
 |-------|------------|
 | `src/runtime/runtime_history.*` | Bounded arena recorder; `runtime_history_find` / `read` with full `runtime_history_query` (epoch, timeline, cycle, pc, address, access, value, opcodes, direction). |
 | `src/runtime/runtime_history_wire.*` | HST1 encode (24-byte header + 48-byte record headers + 8-byte accesses). Encode-only; no C decode API yet. |
-| `src/control/control_dispatch.c` (`parse_history_find_options`) | **Intentionally minimal** wire parse: `pc`, `address`, `access`, `direction`, `limit`, `from` only. |
+| `src/control/control_dispatch.c` | Thin caller of shared `runtime_history_parse_find_options` (full grammar; was minimal six-key before PR 1). |
 | `tools/a2m_control_client.py` | Decode + `format_hst1_record` / `format_hst1_page` (canonical human line shape, including marker forms and multi-access compact lines). |
 | Misc → Inspector (`frontend_draw_misc_inspector`) | Record / Inspect / slider / Leave. Uses `FRONTEND_DEBUGGER_INTENT_INSPECTOR_*` → `runtime_client_inspector_*`. |
 | Help overlay (`help_view.*`) | Precedent for a full-window UI mode flip. **Opt+H** opens Help and may auto-pause; Forensics must not clone that pause-on-open behavior. |
@@ -38,7 +38,7 @@ HST1 FIND/NEXT/READ already work on the worker via `runtime_client_history_*` (s
 ### Pain points
 
 1. Forensic digs require an external TCP client while the game is paused in the window.
-2. Manual § CPU Flight Recorder documents find keys (`epoch timeline cycle value opcodes` and fine access names) that `parse_history_find_options` rejects — users and agents get `bad-args`.
+2. ~~Manual § CPU Flight Recorder documents find keys the wire rejected~~ — **resolved in PR 1** via shared `runtime_history_query_parse`.
 3. Joining a FIND hit to time travel means manually scrubbing by cycle; no “land here” from a hit.
 4. Packing FIND into the Inspector Misc tab would conflate two products and crowd an already dense pane.
 

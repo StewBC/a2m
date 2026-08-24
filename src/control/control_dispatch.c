@@ -6,6 +6,7 @@
 #include "runtime.h"
 #include "runtime_event.h"
 #include "runtime_history.h"
+#include "runtime_history_query_parse.h"
 #include "runtime_slot_resolve.h"
 #include "runtime_inspector.h"
 #include "softswitch.h"
@@ -1333,184 +1334,6 @@ void control_dispatch_on_runtime_event(
     }
 }
 
-static bool parse_u16_range_token(
-    const char *value,
-    uint16_t *first,
-    uint16_t *last)
-{
-    char *dash;
-    char *end = NULL;
-    unsigned long a;
-    unsigned long b;
-    char buf[32];
-
-    if (value == NULL || first == NULL || last == NULL) {
-        return false;
-    }
-    strncpy(buf, value, sizeof(buf) - 1);
-    buf[sizeof(buf) - 1] = '\0';
-    dash = strchr(buf, '-');
-    if (dash != NULL) {
-        *dash = '\0';
-        if (buf[0] == '$') {
-            a = strtoul(buf + 1, &end, 16);
-        } else {
-            a = strtoul(buf, &end, 0);
-        }
-        if (end == buf || *end != '\0' || a > 0xfffful) {
-            return false;
-        }
-        if (dash[1] == '$') {
-            b = strtoul(dash + 2, &end, 16);
-        } else {
-            b = strtoul(dash + 1, &end, 0);
-        }
-        if (end == dash + 1 || *end != '\0' || b > 0xfffful || b < a) {
-            return false;
-        }
-        *first = (uint16_t)a;
-        *last = (uint16_t)b;
-        return true;
-    }
-    if (buf[0] == '$') {
-        a = strtoul(buf + 1, &end, 16);
-    } else {
-        a = strtoul(buf, &end, 0);
-    }
-    if (end == buf || *end != '\0' || a > 0xfffful) {
-        return false;
-    }
-    *first = (uint16_t)a;
-    *last = (uint16_t)a;
-    return true;
-}
-
-static uint16_t history_access_mask_from_name(const char *name)
-{
-    if (strcmp(name, "execute") == 0) {
-        return (uint16_t)(1u << C6510_BUS_ACCESS_OPCODE_FETCH); /* not used; special */
-    }
-    if (strcmp(name, "write") == 0 || strcmp(name, "data-write") == 0) {
-        return (uint16_t)((1u << C6510_BUS_ACCESS_DATA_WRITE) |
-                          (1u << C6510_BUS_ACCESS_RMW_DUMMY_WRITE) |
-                          (1u << C6510_BUS_ACCESS_STACK_WRITE));
-    }
-    if (strcmp(name, "read") == 0 || strcmp(name, "data-read") == 0) {
-        return (uint16_t)((1u << C6510_BUS_ACCESS_DATA_READ) |
-                          (1u << C6510_BUS_ACCESS_OPCODE_FETCH) |
-                          (1u << C6510_BUS_ACCESS_OPERAND_READ) |
-                          (1u << C6510_BUS_ACCESS_DUMMY_READ) |
-                          (1u << C6510_BUS_ACCESS_STACK_READ) |
-                          (1u << C6510_BUS_ACCESS_VECTOR_READ));
-    }
-    if (strcmp(name, "opcode") == 0) {
-        return (uint16_t)(1u << C6510_BUS_ACCESS_OPCODE_FETCH);
-    }
-    if (strcmp(name, "data") == 0) {
-        return (uint16_t)((1u << C6510_BUS_ACCESS_DATA_READ) |
-                          (1u << C6510_BUS_ACCESS_DATA_WRITE));
-    }
-    return 0;
-}
-
-/* Minimal history-find option parse: pc, address, access, direction, limit, from. */
-static bool parse_history_find_options(
-    const char *text,
-    runtime_history_query *query,
-    runtime_history_from_kind *from_kind,
-    uint64_t *from_id,
-    uint16_t *limit)
-{
-    char buf[CONTROL_LINE_MAX];
-    char *cursor;
-    char *token;
-
-    if (query == NULL || from_kind == NULL || from_id == NULL || limit == NULL) {
-        return false;
-    }
-    memset(query, 0, sizeof(*query));
-    query->direction = RUNTIME_HISTORY_QUERY_BACKWARD;
-    *from_kind = RUNTIME_HISTORY_FROM_DEFAULT;
-    *from_id = 0u;
-    *limit = 64u;
-
-    if (text == NULL || text[0] == '\0') {
-        return true;
-    }
-    strncpy(buf, text, sizeof(buf) - 1);
-    buf[sizeof(buf) - 1] = '\0';
-    cursor = buf;
-    while ((token = strtok(cursor, " \t")) != NULL) {
-        char *eq = strchr(token, '=');
-        char *key;
-        char *value;
-        cursor = NULL;
-        if (eq == NULL) {
-            return false;
-        }
-        *eq = '\0';
-        key = token;
-        value = eq + 1;
-        if (strcmp(key, "pc") == 0) {
-            if (!parse_u16_range_token(value, &query->pc_first, &query->pc_last)) {
-                return false;
-            }
-            query->has_pc = true;
-        } else if (strcmp(key, "address") == 0) {
-            if (!parse_u16_range_token(
-                    value, &query->address_first, &query->address_last)) {
-                return false;
-            }
-            query->has_address = true;
-        } else if (strcmp(key, "access") == 0) {
-            uint16_t mask = history_access_mask_from_name(value);
-            if (mask == 0 && strcmp(value, "execute") != 0) {
-                return false;
-            }
-            if (strcmp(value, "execute") == 0) {
-                /* PC predicate via has_pc only when address also set elsewhere;
-                   execute without address means all instructions — leave mask
-                   empty and rely on empty filter / pc filter. */
-                query->has_access = false;
-            } else {
-                query->has_access = true;
-                query->access_mask = mask;
-            }
-        } else if (strcmp(key, "direction") == 0) {
-            if (strcmp(value, "forward") == 0) {
-                query->direction = RUNTIME_HISTORY_QUERY_FORWARD;
-            } else if (strcmp(value, "backward") == 0) {
-                query->direction = RUNTIME_HISTORY_QUERY_BACKWARD;
-            } else {
-                return false;
-            }
-        } else if (strcmp(key, "limit") == 0) {
-            unsigned long v = strtoul(value, NULL, 0);
-            if (v < 1ul || v > 256ul) {
-                return false;
-            }
-            *limit = (uint16_t)v;
-        } else if (strcmp(key, "from") == 0) {
-            if (strcmp(value, "oldest") == 0) {
-                *from_kind = RUNTIME_HISTORY_FROM_OLDEST;
-            } else if (strcmp(value, "newest") == 0) {
-                *from_kind = RUNTIME_HISTORY_FROM_NEWEST;
-            } else {
-                char *end = NULL;
-                unsigned long v = strtoul(value, &end, 0);
-                if (end == value || *end != '\0' || v == 0ul) {
-                    return false;
-                }
-                *from_kind = RUNTIME_HISTORY_FROM_ID;
-                *from_id = (uint64_t)v;
-            }
-        } else {
-            return false;
-        }
-    }
-    return true;
-}
-
 static void handle_request(control_dispatch_t *disp, control_request *req)
 {
     runtime_client *client = disp->client;
@@ -2227,7 +2050,7 @@ static void handle_request(control_dispatch_t *disp, control_request *req)
         uint64_t token;
         deferred_control_response *d;
 
-        if (!parse_history_find_options(
+        if (!runtime_history_parse_find_options(
                 req->args.history_find_text,
                 &query,
                 &from_kind,
