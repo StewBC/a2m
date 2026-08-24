@@ -2369,15 +2369,24 @@ static void frontend_draw_config_machine_tab(frontend *ui, frontend_config_dialo
 
 static void frontend_draw_config_emulator_tab(frontend *ui, frontend_config_dialog_state *dialog, struct nk_context *ctx)
 {
+    /* Same 3-column split as the CRT sliders so the scroll-wheel property,
+       Mono radio, and phosphor combo share one left edge. Two-column rows
+       subtract one fewer spacer and would miss that line. */
+    const float label_w = 0.42f;
+    const float control_w = 0.43f;
+    const float trail_w = 0.15f;
+
     if (dialog->edited.symbol_files == NULL) {
         app_options_set_string(&dialog->edited.symbol_files, "");
     }
 
-    nk_layout_row_begin(ctx, NK_DYNAMIC, 22.0f, 2);
-    nk_layout_row_push(ctx, 0.55f);
+    nk_layout_row_begin(ctx, NK_DYNAMIC, 22.0f, 3);
+    nk_layout_row_push(ctx, label_w);
     nk_label(ctx, "Scroll Wheel Speed", NK_TEXT_LEFT);
-    nk_layout_row_push(ctx, 0.45f);
+    nk_layout_row_push(ctx, control_w);
     nk_property_int(ctx, "#L", 1, &dialog->edited.scroll_wheel_lines, 100, 1, 4.0f);
+    nk_layout_row_push(ctx, trail_w);
+    nk_spacing(ctx, 1);
     nk_layout_row_end(ctx);
 
     nk_layout_row_dynamic(ctx, 22.0f, 1);
@@ -2402,15 +2411,17 @@ static void frontend_draw_config_emulator_tab(frontend *ui, frontend_config_dial
     nk_layout_row_dynamic(ctx, 18.0f, 1);
     nk_label(ctx, "CRT display", NK_TEXT_LEFT);
 
-    nk_layout_row_begin(ctx, NK_DYNAMIC, 22.0f, 2);
-    nk_layout_row_push(ctx, 0.50f);
+    nk_layout_row_begin(ctx, NK_DYNAMIC, 22.0f, 3);
+    nk_layout_row_push(ctx, label_w);
     if (nk_option_label(ctx, "Colour", dialog->edited.colour_display)) {
         dialog->edited.colour_display = true;
     }
-    nk_layout_row_push(ctx, 0.50f);
+    nk_layout_row_push(ctx, control_w);
     if (nk_option_label(ctx, "Mono", !dialog->edited.colour_display)) {
         dialog->edited.colour_display = false;
     }
+    nk_layout_row_push(ctx, trail_w);
+    nk_spacing(ctx, 1);
     nk_layout_row_end(ctx);
 
     {
@@ -2421,14 +2432,16 @@ static void frontend_draw_config_emulator_tab(frontend *ui, frontend_config_dial
         if (selected < 0 || selected > 2) {
             selected = 0;
         }
-        nk_layout_row_begin(ctx, NK_DYNAMIC, 22.0f, 2);
-        nk_layout_row_push(ctx, 0.55f);
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 22.0f, 3);
+        nk_layout_row_push(ctx, label_w);
         nk_label(ctx, "Mono Mode", NK_TEXT_LEFT);
-        nk_layout_row_push(ctx, 0.45f);
+        nk_layout_row_push(ctx, control_w);
         next = nk_combo(ctx, mono_items, 3, selected, 18, nk_vec2(180.0f, 120.0f));
         if (next != selected) {
             dialog->edited.mono_mode = (app_mono_mode)next;
         }
+        nk_layout_row_push(ctx, trail_w);
+        nk_spacing(ctx, 1);
         nk_layout_row_end(ctx);
     }
 
@@ -2455,27 +2468,27 @@ static void frontend_draw_config_emulator_tab(frontend *ui, frontend_config_dial
     }
 
     nk_layout_row_begin(ctx, NK_DYNAMIC, 22.0f, 3);
-    nk_layout_row_push(ctx, 0.42f);
+    nk_layout_row_push(ctx, label_w);
     frontend_checkbox_bool(ctx, "CRT Scanlines", &dialog->edited.crt_scanlines);
     if (!dialog->edited.crt_scanlines) nk_widget_disable_begin(ctx);
-    nk_layout_row_push(ctx, 0.43f);
+    nk_layout_row_push(ctx, control_w);
     /* Minimum 1%: the checkbox is what turns the effect off, so a 0% setting
        would just make an enabled effect look broken. */
     dialog->edited.crt_scanline_strength = nk_slide_int(
         ctx, 1, dialog->edited.crt_scanline_strength, 100, 1);
-    nk_layout_row_push(ctx, 0.15f);
+    nk_layout_row_push(ctx, trail_w);
     nk_labelf(ctx, NK_TEXT_RIGHT, "%d%%", dialog->edited.crt_scanline_strength);
     if (!dialog->edited.crt_scanlines) nk_widget_disable_end(ctx);
     nk_layout_row_end(ctx);
 
     nk_layout_row_begin(ctx, NK_DYNAMIC, 22.0f, 3);
-    nk_layout_row_push(ctx, 0.42f);
+    nk_layout_row_push(ctx, label_w);
     frontend_checkbox_bool(ctx, "CRT Curvature", &dialog->edited.crt_curvature);
     if (!dialog->edited.crt_curvature) nk_widget_disable_begin(ctx);
-    nk_layout_row_push(ctx, 0.43f);
+    nk_layout_row_push(ctx, control_w);
     dialog->edited.crt_curvature_amount = nk_slide_int(
         ctx, 1, dialog->edited.crt_curvature_amount, 100, 1);
-    nk_layout_row_push(ctx, 0.15f);
+    nk_layout_row_push(ctx, trail_w);
     nk_labelf(ctx, NK_TEXT_RIGHT, "%d%%", dialog->edited.crt_curvature_amount);
     if (!dialog->edited.crt_curvature) nk_widget_disable_end(ctx);
     nk_layout_row_end(ctx);
