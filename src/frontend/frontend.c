@@ -1818,6 +1818,94 @@ static bool frontend_push_simple_intent(frontend *ui, frontend_debugger_intent_t
     return true;
 }
 
+static frontend_debugger_intent_type frontend_history_intent_type(
+    frontend_history_verb verb)
+{
+    switch (verb) {
+    case FRONTEND_HISTORY_VERB_FIND:
+        return FRONTEND_DEBUGGER_INTENT_HISTORY_FIND;
+    case FRONTEND_HISTORY_VERB_NEXT:
+        return FRONTEND_DEBUGGER_INTENT_HISTORY_NEXT;
+    case FRONTEND_HISTORY_VERB_READ:
+        return FRONTEND_DEBUGGER_INTENT_HISTORY_READ;
+    case FRONTEND_HISTORY_VERB_INFO:
+        return FRONTEND_DEBUGGER_INTENT_HISTORY_INFO;
+    case FRONTEND_HISTORY_VERB_CLOSE:
+        return FRONTEND_DEBUGGER_INTENT_HISTORY_CLOSE;
+    default:
+        return FRONTEND_DEBUGGER_INTENT_NONE;
+    }
+}
+
+static bool frontend_push_history_intent(
+    frontend *ui,
+    const frontend_forensics_query_parsed *parsed)
+{
+    size_t next;
+    frontend_debugger_intent *slot;
+    frontend_history_verb verb;
+    frontend_debugger_intent_type type;
+
+    if (ui == NULL || parsed == NULL || !parsed->ok || parsed->empty) {
+        return false;
+    }
+    verb = (frontend_history_verb)parsed->verb_code;
+    type = frontend_history_intent_type(verb);
+    if (type == FRONTEND_DEBUGGER_INTENT_NONE) {
+        return false;
+    }
+    next = (ui->intent_write + 1u) % FRONTEND_DEBUGGER_INTENT_CAPACITY;
+    if (next == ui->intent_read) {
+        return false;
+    }
+    slot = &ui->intents[ui->intent_write];
+    memset(slot, 0, sizeof(*slot));
+    slot->type = type;
+    slot->history_verb = verb;
+    slot->history_query = parsed->query;
+    slot->history_from_kind = parsed->from_kind;
+    slot->history_from_id = parsed->from_id;
+    slot->history_limit = parsed->limit;
+    slot->history_read_id = parsed->read_id;
+    slot->history_read_epoch = parsed->read_epoch;
+    slot->history_before = parsed->before;
+    slot->history_after = parsed->after;
+    snprintf(slot->history_label, sizeof(slot->history_label), "%s", parsed->label);
+    ui->intent_write = next;
+    return true;
+}
+
+static void frontend_forensics_flush_query_submit(frontend *ui)
+{
+    frontend_forensics_query_parsed parsed;
+
+    if (ui == NULL || !ui->forensics.request_submit) {
+        return;
+    }
+    ui->forensics.request_submit = false;
+    if (ui->forensics.query[0] == '\0') {
+        return;
+    }
+    if (!forensics_view_parse_query(
+            ui->forensics.query, ui->forensics.last_cursor, &parsed)) {
+        forensics_view_set_status(
+            &ui->forensics,
+            parsed.error[0] != '\0' ? parsed.error : "bad-args");
+        return;
+    }
+    if (parsed.empty) {
+        return;
+    }
+    forensics_view_query_history_push(&ui->forensics, ui->forensics.query);
+    if (!frontend_push_history_intent(ui, &parsed)) {
+        forensics_view_set_status(&ui->forensics, "history-request-active");
+        return;
+    }
+    forensics_view_set_status(&ui->forensics, "querying…");
+    ui->forensics.query[0] = '\0';
+    ui->forensics.query_history_index = 0u;
+}
+
 static bool frontend_push_machine_file_browse_intent(
     frontend *ui,
     frontend_debugger_intent_type type,
@@ -10303,6 +10391,7 @@ void frontend_render(frontend *ui, bool ui_visible, const frontend_debug_state *
     if (forensics_view_is_open(&ui->forensics)) {
         /* Full-window mode: no CRT behind (unlike Help overlay). */
         forensics_view_render(ui->ctx, &ui->forensics, width, height);
+        frontend_forensics_flush_query_submit(ui);
         nk_sdl_render(NK_ANTI_ALIASING_ON);
         return;
     }
@@ -10433,6 +10522,14 @@ void frontend_open_forensics(
                             FRONTEND_FORENSICS_ENTRY_CRT;
     forensics_view_open(&ui->forensics, entry, crt_was_running);
     frontend_set_active_view(ui, FRONTEND_ACTIVE_VIEW_NONE);
+    /* history-info on open (status strip only; no transcript note). */
+    {
+        frontend_forensics_query_parsed info;
+        memset(&info, 0, sizeof(info));
+        info.ok = true;
+        info.verb_code = (int)FRONTEND_HISTORY_VERB_INFO;
+        (void)frontend_push_history_intent(ui, &info);
+    }
 }
 
 void frontend_close_forensics(frontend *ui)
@@ -10489,10 +10586,65 @@ bool frontend_handle_forensics_key(frontend *ui, const SDL_KeyboardEvent *key)
             return forensics_view_query_history_prev(&ui->forensics);
         case SDLK_DOWN:
             return forensics_view_query_history_next(&ui->forensics);
+        case SDLK_TAB:
+            /* Always consume Tab in Forensics so focus does not escape. */
+            (void)forensics_view_autocomplete(&ui->forensics);
+            return true;
         default:
             break;
     }
     return false;
+}
+
+void frontend_forensics_apply_result(
+    frontend *ui,
+    frontend_history_verb verb,
+    const char *label,
+    const runtime_history_rpc_meta *meta,
+    const runtime_history_record *records,
+    size_t record_count,
+    const bool *anchor_matches)
+{
+    if (ui == NULL || !forensics_view_is_open(&ui->forensics)) {
+        return;
+    }
+    forensics_view_apply_result(
+        &ui->forensics,
+        (int)verb,
+        label,
+        meta,
+        records,
+        record_count,
+        anchor_matches);
+}
+
+void frontend_forensics_apply_status(
+    frontend *ui,
+    const runtime_history_status *status,
+    bool append_transcript_note)
+{
+    if (ui == NULL || !forensics_view_is_open(&ui->forensics)) {
+        return;
+    }
+    forensics_view_apply_status(&ui->forensics, status, append_transcript_note);
+}
+
+void frontend_forensics_apply_rpc_error(
+    frontend *ui,
+    runtime_history_rpc_status status)
+{
+    if (ui == NULL || !forensics_view_is_open(&ui->forensics)) {
+        return;
+    }
+    forensics_view_apply_rpc_error(&ui->forensics, status);
+}
+
+uint64_t frontend_forensics_last_cursor(const frontend *ui)
+{
+    if (ui == NULL) {
+        return 0u;
+    }
+    return ui->forensics.last_cursor;
 }
 
 bool frontend_help_is_open(const frontend *ui)

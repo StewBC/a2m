@@ -33,7 +33,7 @@ This design adds a **full-window Forensics mode** (same class as the F9 debugger
 | Help overlay (`help_view.*`) | Precedent for a full-window UI mode flip. **Opt+H** opens Help and may auto-pause; Forensics must not clone that pause-on-open behavior. |
 | Sessions | `RUNTIME_SESSION_CAPACITY = 4`. Slot 0 is pre-armed as `RUNTIME_SESSION_KIND_UI` with `default_session_id = 1`. Control clients open separate `KIND_CONTROL` sessions. |
 
-HST1 FIND/NEXT/READ already work on the worker via `runtime_client_history_*` (session-scoped cursor, paused-only, HST1 payload claimed with `runtime_client_claim_history_rpc`). Forensics shell (PR 3) is open/close UI only; `main.c` does not yet handle `RUNTIME_EVENT_HISTORY_*` for the window (PR 4) — only `control_dispatch_on_runtime_event` does for TCP.
+HST1 FIND/NEXT/READ work on the worker via `runtime_client_history_*` (session-scoped cursor, paused-only, HST1 payload claimed with `runtime_client_claim_history_rpc`). Forensics UI (PR 4) dispatches the same client path from `main.c` (token match → claim/decode → `frontend_forensics_apply_*`); control TCP continues to use `control_dispatch_on_runtime_event`.
 
 ### Pain points
 
@@ -640,15 +640,15 @@ Fuzz find-option strings in shared parse tests.
 - **Files:** `frontend.*`, **`main.c` (intent dispatch + HISTORY_STATUS/RESULT claim/decode → `frontend_forensics_apply_*`)**, formatters using PR 2, shared key table for autocomplete
 - **Dependencies:** PR 2; PR 1 preferred (key table must exist — six-key or full)
 - **Checklist:**
-  - [ ] Structured history fields on `frontend_debugger_intent`
-  - [ ] Parse in frontend via `runtime_history_parse_find_options`
-  - [ ] Autocomplete from `runtime_history_find_option_keys()` only
-  - [ ] `main.c` pending-token RPC state; one in-flight Forensics history request
-  - [ ] Handle `RUNTIME_EVENT_HISTORY_RESULT_RESPONSE` / `HISTORY_STATUS_RESPONSE` when token matches
-  - [ ] `claim_history_rpc` → decode → append transcript; free payload
-  - [ ] `session_id = 0`; `history_close` on Forensics exit
-  - [ ] Status-strip error mapping (parity with control_dispatch)
-  - [ ] Click line/block selection + Copy button
+  - [x] Structured history fields on `frontend_debugger_intent`
+  - [x] Parse in frontend via `runtime_history_parse_find_options`
+  - [x] Autocomplete from `runtime_history_find_option_keys()` only
+  - [x] `main.c` pending-token RPC state; one in-flight Forensics history request
+  - [x] Handle `RUNTIME_EVENT_HISTORY_RESULT_RESPONSE` / `HISTORY_STATUS_RESPONSE` when token matches
+  - [x] `claim_history_rpc` → decode → append transcript; free payload
+  - [x] `session_id = 0`; `history_close` on Forensics exit
+  - [x] Status-strip error mapping (parity with control_dispatch)
+  - [x] Click line/block selection + Copy button
 - **Description:** End-to-end FIND transcript; paused-only messaging.
 
 ### PR 5 — Land Inspector from selected hit (quantized)

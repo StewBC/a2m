@@ -1,8 +1,12 @@
 #pragma once
 
 #include "nuklear_config.h"
+#include "runtime_event.h"
+#include "runtime_history.h"
+#include "runtime_history_query_parse.h"
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -15,7 +19,8 @@ enum {
     FRONTEND_FR_FORMAT_CAP = 4096,
     FRONTEND_FR_QUERY_MAX = 256,
     FRONTEND_FR_QUERY_HISTORY = 64,
-    FRONTEND_FR_STATUS_MAX = 192
+    FRONTEND_FR_STATUS_MAX = 192,
+    FRONTEND_FR_LABEL_MAX = 160
 };
 
 typedef enum frontend_forensics_entry {
@@ -29,6 +34,7 @@ typedef struct frontend_fr_logical_entry {
     uint64_t id;
     bool has_cycle;
     bool is_record; /* vs header / metadata / blank */
+    bool is_header; /* block header (--- find … ---) */
     unsigned display_begin;
     unsigned display_count;
 } frontend_fr_logical_entry;
@@ -55,9 +61,13 @@ typedef struct frontend_forensics_state {
     bool has_land_selection;
     uint64_t last_cursor;
     bool last_more;
+    uint64_t last_epoch;
     char status[FRONTEND_FR_STATUS_MAX];
     bool request_close; /* Close button → leave to entry surface */
     bool request_host_pause; /* set on open; main pauses if still running */
+    bool request_submit; /* Query Enter → frontend parses + pushes intent */
+    bool line_truncated; /* last format hit FORMAT_CAP */
+    bool query_rewrite_pending; /* Tab autocomplete rewrote query; re-focus edit */
 } frontend_forensics_state;
 
 /* Result of leaving Forensics (main applies ui_visible + run/pause). */
@@ -65,6 +75,24 @@ typedef struct frontend_forensics_leave_result {
     bool show_debugger; /* true → debugger; false → full-screen CRT */
     bool resume_machine; /* true only when returning to CRT that was running */
 } frontend_forensics_leave_result;
+
+/* Parsed query-line → structured HISTORY fields (no RPC).
+   verb_code is FRONTEND_HISTORY_VERB_* (defined in frontend.h). */
+typedef struct frontend_forensics_query_parsed {
+    bool ok;
+    bool empty; /* blank Enter */
+    int verb_code;
+    runtime_history_query query;
+    runtime_history_from_kind from_kind;
+    uint64_t from_id;
+    uint16_t limit;
+    uint64_t read_id;
+    uint64_t read_epoch;
+    uint16_t before;
+    uint16_t after;
+    char label[FRONTEND_FR_LABEL_MAX];
+    char error[FRONTEND_FR_STATUS_MAX];
+} frontend_forensics_query_parsed;
 
 void forensics_view_init(frontend_forensics_state *state);
 void forensics_view_open(
@@ -90,6 +118,39 @@ void forensics_view_set_status(frontend_forensics_state *state, const char *text
 bool forensics_view_query_history_prev(frontend_forensics_state *state);
 bool forensics_view_query_history_next(frontend_forensics_state *state);
 void forensics_view_query_history_push(frontend_forensics_state *state, const char *text);
+
+/* Tab autocomplete from shared find key/access tables. */
+bool forensics_view_autocomplete(frontend_forensics_state *state);
+
+/* Parse query line (find/next/read/info). Uses shared find-option parser. */
+bool forensics_view_parse_query(
+    const char *text,
+    uint64_t last_cursor,
+    frontend_forensics_query_parsed *out);
+
+/* Compact HST1 line (north star: Ctl.format_hst1_record compact=True). */
+size_t forensics_format_hst1_record(
+    char *dst,
+    size_t dst_cap,
+    const runtime_history_record *record,
+    bool anchor_match,
+    bool compact);
+
+void forensics_view_apply_result(
+    frontend_forensics_state *state,
+    int verb_code,
+    const char *label,
+    const runtime_history_rpc_meta *meta,
+    const runtime_history_record *records,
+    size_t record_count,
+    const bool *anchor_matches);
+void forensics_view_apply_status(
+    frontend_forensics_state *state,
+    const runtime_history_status *status,
+    bool append_transcript_note);
+void forensics_view_apply_rpc_error(
+    frontend_forensics_state *state,
+    runtime_history_rpc_status status);
 
 void forensics_view_render(
     struct nk_context *ctx,

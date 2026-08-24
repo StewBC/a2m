@@ -12,7 +12,7 @@ catalog: `manual/manual.md`.
 | `src/frontend/debugger_layout.*` | Splitters |
 | `src/frontend/debugger_disasm.*` | Disassembly pane, PC-lock |
 | `src/frontend/help_view.*` | Help overlay: sections, search, hit highlighting |
-| `src/frontend/forensics_view.*` | Forensics full-window mode (HST1 FIND UI; shell in PR3) |
+| `src/frontend/forensics_view.*` | Forensics full-window mode (HST1 FIND/NEXT/READ transcript) |
 | `src/frontend/frontend_input.*` | Guest keyboard map |
 | `src/frontend/frontend_joystick_input.*` | Kbd stick → Apple axes/buttons |
 | `src/frontend/crt_renderer.*` | CRT presentation |
@@ -88,7 +88,10 @@ modes (one list).
 on enter. **Opt+R** / **Close** return to the entry surface (CRT restores prior
 run state if it was running; debugger stays paused). **F9** always opens the
 debugger paused. **Esc** does not leave Forensics. Mutually exclusive with Help.
-See [`design/forensics-ui.md`](../design/forensics-ui.md).
+Query line → `HISTORY_*` intents → `main.c` claim/decode → transcript (session 0;
+`history_close` on exit). Tab autocompletes from
+`runtime_history_find_option_keys()` / access names. See
+[`design/forensics-ui.md`](../design/forensics-ui.md).
 
 Entering **max** remembers Record, wipes the tape, turns Record off (checkbox
 locked). Leaving max restores Record into an empty window.
