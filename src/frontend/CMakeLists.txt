@@ -37,6 +37,8 @@ add_library(frontend STATIC
     frontend_joystick_input.h
     help_view.c
     help_view.h
+    forensics_view.c
+    forensics_view.h
     memory_search.c
     memory_search.h
     window_title.c

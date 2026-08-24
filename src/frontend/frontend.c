@@ -1,6 +1,7 @@
 #include "frontend.h"
 
 #include "frontend_input.h"
+#include "forensics_view.h"
 #include "help_view.h"
 #include "memory_search.h"
 #include "nuklear_config.h"
@@ -451,6 +452,7 @@ struct frontend {
     frontend_load_bin_dialog_state load_bin_dialog;
     frontend_save_bin_dialog_state save_bin_dialog;
     frontend_help_state help;
+    frontend_forensics_state forensics;
     frontend_symbol_lookup_state symbol_lookup;
     frontend_file_browser_state file_browser;
     /* Remembered default folder per browse slot (session memory; main.c bridges
@@ -7369,6 +7371,11 @@ static void frontend_draw_misc_inspector(
         }
     }
 
+    nk_layout_row_dynamic(ctx, 24.0f, 1);
+    if (nk_button_label(ctx, "Forensics...")) {
+        frontend_open_forensics(ui);
+    }
+
     if (debug == NULL || !debug->inspector_enabled) {
         return;
     }
@@ -7660,6 +7667,7 @@ frontend *frontend_create(platform_window *window)
     ui->limits.corner_px = 22;
     debugger_layout_init(&ui->layout);
     help_view_init(&ui->help);
+    forensics_view_init(&ui->forensics);
     ui->show_disk_leds = true; /* matches app_options default until set_config_state */
 
     ui->led_green_texture = frontend_load_png_texture(
@@ -8106,6 +8114,9 @@ void frontend_destroy(frontend *ui)
         return;
     }
 
+    forensics_view_clear_transcript(&ui->forensics);
+    (void)forensics_view_close(&ui->forensics);
+
     if (ui->ctx != NULL) {
         nk_sdl_shutdown();
     }
@@ -8147,7 +8158,7 @@ void frontend_handle_event(frontend *ui, SDL_Event *event)
         return;
     }
 
-    if (help_view_is_open(&ui->help)) {
+    if (help_view_is_open(&ui->help) || forensics_view_is_open(&ui->forensics)) {
         nk_sdl_handle_event(event);
         return;
     }
@@ -8253,6 +8264,7 @@ bool frontend_routes_keyboard_to_machine(const frontend *ui)
 {
     return ui != NULL && ui->machine_input_active
         && !help_view_is_open(&ui->help)
+        && !forensics_view_is_open(&ui->forensics)
         && !frontend_any_dialog_open(ui);
 }
 
@@ -8291,7 +8303,8 @@ bool frontend_handle_view_cycle_key(frontend *ui, const SDL_KeyboardEvent *key)
     if (ui == NULL || key == NULL || key->type != SDL_KEYDOWN || key->repeat != 0) {
         return false;
     }
-    if (help_view_is_open(&ui->help) || frontend_any_dialog_open(ui)) {
+    if (help_view_is_open(&ui->help) || forensics_view_is_open(&ui->forensics) ||
+        frontend_any_dialog_open(ui)) {
         return false;
     }
     if (key->keysym.sym != SDLK_TAB || (key->keysym.mod & KMOD_ALT) == 0) {
@@ -10266,19 +10279,29 @@ void frontend_render(frontend *ui, bool ui_visible, const frontend_debug_state *
         return;
     }
 
-    if (!ui_visible && !help_view_is_open(&ui->help)) {
+    if (!ui_visible && !help_view_is_open(&ui->help) &&
+        !forensics_view_is_open(&ui->forensics)) {
         frontend_render_display_only(ui);
         frontend_draw_disk_activity_leds(ui, width, height, debug_state);
         return;
     }
 
-    if (debug_state == NULL && ui_visible && !help_view_is_open(&ui->help)) {
+    if (debug_state == NULL && ui_visible && !help_view_is_open(&ui->help) &&
+        !forensics_view_is_open(&ui->forensics)) {
         return;
     }
 
     if (help_view_is_open(&ui->help)) {
         frontend_render_display_only(ui);
         help_view_render(ui->ctx, &ui->help, ui->help_font, width, height);
+        nk_sdl_render(NK_ANTI_ALIASING_ON);
+        frontend_draw_disk_activity_leds(ui, width, height, debug_state);
+        return;
+    }
+
+    if (forensics_view_is_open(&ui->forensics)) {
+        frontend_render_display_only(ui);
+        forensics_view_render(ui->ctx, &ui->forensics, width, height);
         nk_sdl_render(NK_ANTI_ALIASING_ON);
         frontend_draw_disk_activity_leds(ui, width, height, debug_state);
         return;
@@ -10369,6 +10392,14 @@ void frontend_open_help(frontend *ui, bool paused_by_help)
     if (ui == NULL) {
         return;
     }
+    /* Mutual exclusion: close Forensics without honoring its resume latch here;
+       transfer the latch into Help's paused_by_help instead. */
+    if (forensics_view_is_open(&ui->forensics)) {
+        bool fr_latch = forensics_view_close(&ui->forensics);
+        if (fr_latch) {
+            paused_by_help = true;
+        }
+    }
     help_view_open(&ui->help, paused_by_help);
     frontend_set_active_view(ui, FRONTEND_ACTIVE_VIEW_NONE);
 }
@@ -10384,6 +10415,65 @@ bool frontend_close_help(frontend *ui)
     paused_by_help = help_view_paused_by_help(&ui->help);
     help_view_close(&ui->help);
     return paused_by_help;
+}
+
+void frontend_open_forensics(frontend *ui)
+{
+    bool resume_on_exit = false;
+
+    if (ui == NULL) {
+        return;
+    }
+    /* Close Help without resuming; transfer paused_by_help latch if held. */
+    if (help_view_is_open(&ui->help)) {
+        resume_on_exit = help_view_paused_by_help(&ui->help);
+        help_view_close(&ui->help);
+    }
+    forensics_view_open(&ui->forensics, resume_on_exit);
+    frontend_set_active_view(ui, FRONTEND_ACTIVE_VIEW_NONE);
+}
+
+bool frontend_close_forensics(frontend *ui)
+{
+    bool resume;
+
+    if (ui == NULL || !forensics_view_is_open(&ui->forensics)) {
+        return false;
+    }
+    resume = forensics_view_close(&ui->forensics);
+    ui->misc.active_tab = FRONTEND_MISC_TAB_INSPECTOR;
+    ui->misc.initialized = true;
+    return resume;
+}
+
+bool frontend_forensics_is_open(const frontend *ui)
+{
+    return ui != NULL && forensics_view_is_open(&ui->forensics);
+}
+
+bool frontend_forensics_consume_close_request(frontend *ui)
+{
+    if (ui == NULL || !ui->forensics.request_close) {
+        return false;
+    }
+    ui->forensics.request_close = false;
+    return true;
+}
+
+bool frontend_handle_forensics_key(frontend *ui, const SDL_KeyboardEvent *key)
+{
+    if (ui == NULL || key == NULL || !forensics_view_is_open(&ui->forensics)) {
+        return false;
+    }
+    switch (key->keysym.sym) {
+        case SDLK_UP:
+            return forensics_view_query_history_prev(&ui->forensics);
+        case SDLK_DOWN:
+            return forensics_view_query_history_next(&ui->forensics);
+        default:
+            break;
+    }
+    return false;
 }
 
 bool frontend_help_is_open(const frontend *ui)

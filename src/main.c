@@ -2606,7 +2606,9 @@ int main(int argc, char **argv)
 
         frontend_begin_input(ui);
         while (SDL_PollEvent(&event)) {
-            bool send_event_to_frontend = ui_visible || frontend_help_is_open(ui);
+            bool send_event_to_frontend =
+                ui_visible || frontend_help_is_open(ui) ||
+                frontend_forensics_is_open(ui);
 
             if (event.type == SDL_QUIT) {
                 running = false;
@@ -2756,6 +2758,7 @@ int main(int argc, char **argv)
                             (void)runtime_client_run(client);
                         }
                     } else {
+                        /* frontend_open_help closes Forensics and transfers latch. */
                         bool was_running =
                             debug.runtime_state == FRONTEND_RUNTIME_STATE_RUNNING;
                         if (was_running) {
@@ -2764,16 +2767,40 @@ int main(int argc, char **argv)
                         frontend_open_help(ui, was_running);
                     }
                     send_event_to_frontend = false;
+                } else if (
+                    sym == SDLK_r &&
+                    frontend_input_has_option_modifier(&event.key) &&
+                    !frontend_input_has_shift_modifier(&event.key) &&
+                    ui_visible) {
+                    /* Opt+R: toggle Forensics (debugger visible). No auto-pause. */
+                    if (frontend_forensics_is_open(ui)) {
+                        bool resume = frontend_close_forensics(ui);
+                        if (resume) {
+                            (void)runtime_client_run(client);
+                        }
+                    } else {
+                        frontend_open_forensics(ui);
+                    }
+                    send_event_to_frontend = false;
+                } else if (sym == SDLK_ESCAPE && frontend_forensics_is_open(ui)) {
+                    bool resume = frontend_close_forensics(ui);
+                    if (resume) {
+                        (void)runtime_client_run(client);
+                    }
+                    send_event_to_frontend = false;
                 } else if (sym == SDLK_ESCAPE && frontend_help_is_open(ui)) {
                     bool paused_by_help = frontend_close_help(ui);
                     if (paused_by_help) {
                         (void)runtime_client_run(client);
                     }
                     send_event_to_frontend = false;
+                } else if (frontend_handle_forensics_key(ui, &event.key)) {
+                    send_event_to_frontend = false;
                 } else if (frontend_handle_help_key(
                                ui, &event.key, options.scroll_wheel_lines)) {
                     send_event_to_frontend = false;
-                } else if (frontend_help_is_open(ui)) {
+                } else if (
+                    frontend_help_is_open(ui) || frontend_forensics_is_open(ui)) {
                     send_event_to_frontend = true;
                 } else if (key_is_quicksave_shortcut(&event.key)) {
                     if (!debug.inspecting) {
@@ -3115,6 +3142,12 @@ int main(int argc, char **argv)
             break;
         }
         frontend_render(ui, ui_visible, &debug);
+        if (frontend_forensics_consume_close_request(ui)) {
+            bool resume = frontend_close_forensics(ui);
+            if (resume) {
+                (void)runtime_client_run(client);
+            }
+        }
         {
             /* After render, edit-focus is current — sync macOS text input
                so hold-to-type on machine keys does not pop accent menus. */

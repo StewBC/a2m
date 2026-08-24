@@ -8,7 +8,7 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-Expect **63** green. Run from repo root.
+Expect **64** green. Run from repo root.
 
 ## Registered tests
 
@@ -42,6 +42,7 @@ Expect **63** green. Run from repo root.
 | `memory_search` | String/hex parsing, wrap, invalid-plane bytes |
 | `frontend_input` | Backspace vs original Apple DEL; physical Delete |
 | `help_view` | Headless nuklear help overlay (search hits + scroll correction) |
+| `forensics_view` | Forensics shell state (open/close latch, query history, clear) |
 | `runtime_turbo` | turbo CSV MHz/max; Configure live ladder apply |
 | `runtime_slot_resolve` | prefer-home then scan for Disk II / SmartPort |
 | `runtime_savestate` | save/load `.a2state` via runtime client |

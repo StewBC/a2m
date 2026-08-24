@@ -282,6 +282,12 @@ bool frontend_close_help(frontend *ui);
 bool frontend_help_is_open(const frontend *ui);
 bool frontend_help_paused_by_help(const frontend *ui);
 bool frontend_handle_help_key(frontend *ui, const SDL_KeyboardEvent *key, int scroll_wheel_lines);
+/* Forensics full-window mode (mutually exclusive with Help; no auto-pause). */
+void frontend_open_forensics(frontend *ui);
+bool frontend_close_forensics(frontend *ui); /* returns resume_on_forensics_exit */
+bool frontend_forensics_is_open(const frontend *ui);
+bool frontend_forensics_consume_close_request(frontend *ui);
+bool frontend_handle_forensics_key(frontend *ui, const SDL_KeyboardEvent *key);
 bool frontend_poll_debugger_intent(frontend *ui, frontend_debugger_intent *out_intent);
 void frontend_set_layout_state(frontend *ui, const frontend_layout_state *state);
 void frontend_get_layout_state(frontend *ui, frontend_layout_state *out_state);

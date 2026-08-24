@@ -12,6 +12,7 @@ catalog: `manual/manual.md`.
 | `src/frontend/debugger_layout.*` | Splitters |
 | `src/frontend/debugger_disasm.*` | Disassembly pane, PC-lock |
 | `src/frontend/help_view.*` | Help overlay: sections, search, hit highlighting |
+| `src/frontend/forensics_view.*` | Forensics full-window mode (HST1 FIND UI; shell in PR3) |
 | `src/frontend/frontend_input.*` | Guest keyboard map |
 | `src/frontend/frontend_joystick_input.*` | Kbd stick → Apple axes/buttons |
 | `src/frontend/crt_renderer.*` | CRT presentation |
@@ -82,6 +83,11 @@ Record / Inspect / Leave. See [`timemachine.md`](timemachine.md). Window
 **headers** are dark cobalt while inspecting (`nk_rgb(24, 62, 118)`); do not
 tint the window background. Breakpoints tab chrome is the live panel in both
 modes (one list).
+
+**Forensics…** opens the full-window Forensics mode (also **Opt+R** while F9
+debugger is up). Mutually exclusive with Help; Forensics never auto-pauses.
+Esc / Close / Opt+R leave Forensics and select the Inspector tab. A Help pause
+latch transfers across Help↔Forensics. See [`design/forensics-ui.md`](../design/forensics-ui.md).
 
 Entering **max** remembers Record, wipes the tape, turns Record off (checkbox
 locked). Leaving max restores Record into an empty window.

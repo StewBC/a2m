@@ -33,7 +33,7 @@ This design adds a **full-window Forensics mode**: a scrollback transcript of FI
 | Help overlay (`help_view.*`) | Precedent for a full-window UI mode flip. **Opt+H** opens Help and may auto-pause; Forensics must not clone that pause-on-open behavior. |
 | Sessions | `RUNTIME_SESSION_CAPACITY = 4`. Slot 0 is pre-armed as `RUNTIME_SESSION_KIND_UI` with `default_session_id = 1`. Control clients open separate `KIND_CONTROL` sessions. |
 
-HST1 FIND/NEXT/READ already work on the worker via `runtime_client_history_*` (session-scoped cursor, paused-only, HST1 payload claimed with `runtime_client_claim_history_rpc`). The windowed UI never issues those commands; `main.c` does not handle `RUNTIME_EVENT_HISTORY_*` today (only `control_dispatch_on_runtime_event` does for TCP).
+HST1 FIND/NEXT/READ already work on the worker via `runtime_client_history_*` (session-scoped cursor, paused-only, HST1 payload claimed with `runtime_client_claim_history_rpc`). Forensics shell (PR 3) is open/close UI only; `main.c` does not yet handle `RUNTIME_EVENT_HISTORY_*` for the window (PR 4) — only `control_dispatch_on_runtime_event` does for TCP.
 
 ### Pain points
 

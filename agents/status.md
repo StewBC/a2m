@@ -38,6 +38,7 @@ binds in `src/main.c`:
 | **Opt+Shift+.** / **,** | Quicksave / quickload `.a2state` |
 | **Opt+Shift+A** | Assemble configured source (reset / auto-run / MLI / one-shot) |
 | **Opt+H** | Help (pauses while open). **Esc** closes it. |
+| **Opt+R** | Forensics full-window mode (when F9 debugger is up). No auto-pause. **Esc** closes it. |
 | **Opt+M** | Memory area cycle (disasm is Map/ROM/Main; memory pane is six areas) |
 | **Opt+F / Opt+G / Opt+Shift+G** | Active Memory view: Find / next / previous |
 | **Opt+Shift+M** | Kbd stick layout numpad ↔ WASD |
@@ -58,7 +59,7 @@ not latch BUTN0.
 
 | Area | Evidence |
 |------|----------|
-| Build / ctest | **61 green** — [`testing.md`](testing.md) |
+| Build / ctest | **64 green** — [`testing.md`](testing.md) |
 | Assembler | Misc → Assembler; `file=` HostFS; optional Auto-run; **MLI launch** gates auto-run on CPU-visible `$BF00 == $4C` (mutually exclusive with Reset). Sample: `samples/asm_mli_launch/` |
 | CLI / INI | model, mounts `sNdN` (multi-image queue), turbo MHz/`max`, `--video-display`, lifecycle, headless, `[DEBUG] break.*`, `--inspector` |
 | Turbo / step / reset | Opt+T (default ladder `1,max`); F10–F12 family; F8 / Opt+F8 |
