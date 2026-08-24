@@ -2,7 +2,7 @@
 
 **Status:** Roadmap (implementation brief).  
 **Epic:** [`timemachine.md`](timemachine.md)  
-**Prev / Next:** [`TMA0.md`](TMA0.md) / [`TMA2.md`](TMA2.md) (delete TM1 tape-nav + second BP bank — required)  
+**Prev / Next:** [`TMA0.md`](TMA0.md) / [`TMA2.md`](TMA2.md) (delete TM1 tape-nav + second BP bank — required). Max Record wipe: [`TMA3.md`](TMA3.md).  
 **Depends on:** TMA0 A1–A18 (do not re-litigate); TM2 checkpoint + seal; TM3 enter/exit NOW; TM4 Misc tab chrome.
 
 Related: [`TM4.md`](TM4.md) · [`rules.md`](rules.md) · [`testing.md`](testing.md) · [`frontend.md`](frontend.md).

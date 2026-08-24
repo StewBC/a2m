@@ -7249,26 +7249,25 @@ static void frontend_draw_misc_inspector(
     if (!forensic) {
         rec = (debug != NULL && debug->tm_enabled) ? nk_true : nk_false;
         nk_layout_row_dynamic(ctx, 22.0f, 1);
+        if (debug != NULL && debug->tm_stopped_for_max) {
+            nk_widget_disable_begin(ctx);
+        }
         if (nk_checkbox_label(ctx, "Record", &rec)) {
             bool want = rec != nk_false;
             bool have = debug != NULL && debug->tm_enabled;
-            if (want != have) {
+            if (want != have &&
+                (debug == NULL || !debug->tm_stopped_for_max)) {
                 frontend_push_tm_intent(
                     ui, FRONTEND_DEBUGGER_INTENT_TM_SET_ENABLED, want, 0u);
             }
+        }
+        if (debug != NULL && debug->tm_stopped_for_max) {
+            nk_widget_disable_end(ctx);
         }
     }
 
     if (debug == NULL || !debug->tm_enabled) {
         return;
-    }
-
-    if (debug->tm_stopped_for_max) {
-        nk_layout_row_dynamic(ctx, 36.0f, 1);
-        nk_label_wrap(
-            ctx,
-            "Recording is stopped in max turbo. Opt+T into max discards "
-            "the TimeMachine tape (window restarts when you leave max).");
     }
 
     if (!forensic) {

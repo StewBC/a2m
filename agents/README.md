@@ -32,6 +32,7 @@ Siblings (not submodules): `../a2m` (Apple domain / paint reference),
 | 11 | **[`TMA0.md`](TMA0.md)** | Inspector contract: **time travel** (film / land / re-execute to live) |
 | 12 | **[`TMA1.md`](TMA1.md)** | **Landed:** Inspector time travel (rewire TM4 tab) |
 | 13 | **[`TMA2.md`](TMA2.md)** | **Landed:** delete TM1 tape-nav + TM5 second BP bank (FIND stays) |
+| 14 | **[`TMA3.md`](TMA3.md)** | **Landed:** max turbo remembers Record, wipes tape, restores on leave |
 
 Open the component note only when the task touches that area:
 [`video.md`](video.md) · [`video-paint.md`](video-paint.md) ·
@@ -42,7 +43,8 @@ Open the component note only when the task touches that area:
 [`turbo-zip.md`](turbo-zip.md) · [`max-free-run.md`](max-free-run.md) ·
 [`sessions.md`](sessions.md) ·
 [`inspector.md`](inspector.md) · [`timemachine.md`](timemachine.md) ·
-[`TMA0.md`](TMA0.md) · [`TMA1.md`](TMA1.md) · [`TMA2.md`](TMA2.md).
+[`TMA0.md`](TMA0.md) · [`TMA1.md`](TMA1.md) · [`TMA2.md`](TMA2.md) ·
+[`TMA3.md`](TMA3.md).
 
 ## Document set
 
@@ -62,6 +64,7 @@ Open the component note only when the task touches that area:
 | `TMA0.md` | Addendum contract: Inspector **time travel** (film / land / re-execute to live) |
 | `TMA1.md` | Landed: implementer brief for TMA0 |
 | `TMA2.md` | Landed: delete TM1 tape-nav + TM5 second BP bank; keep HST1 FIND |
+| `TMA3.md` | Landed addendum: max turbo wipes Record; restore on leave |
 | `breakpoints.md` | Debugger BP product path (done through P5 + TRON) |
 | `video-paint.md` | Closed epic record: a2m-class paint into the beam |
 | `testing.md` | Gate, fixtures, deferred tests |

@@ -44,7 +44,9 @@ Opt+Shift+0/1/2 clears solid-apple so chords do not stick BUTN0.
 
 Misc tabs: Machine, Debugger, Breakpoints, Hardware, Assembler, **Inspector**
 (TimeMachine **time travel** entry; F7 unbound). Inspector tab: Record / Inspect /
-Leave; history start, live, duration; Inspect pauses. In time travel, window headers
+Leave; history start, live, duration; Inspect pauses. Opt+T into **max**
+remembers Record, wipes the tape, and turns Record off (checkbox locked);
+leaving max restores Record if it was on ([`TMA3.md`](TMA3.md)). In time travel, window headers
 are dark cobalt (A17); the panel background is not tinted. Breakpoints tab chrome
 is the live panel in both modes (one list, Opt+B; no extra Inspect copy). TMA2
 removed the TM5 second bank. Configure dialog is not F2. The Machine tab starts with model plus Slot

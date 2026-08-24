@@ -393,6 +393,8 @@ Host `apple2_set_key` / `gameport_set_axis` / `gameport_set_buttons` emit `input
 
 Follows `history_off_on_max` (still `[config]`, default true). Enter max: history stop + recorder off. Leave max: history resume (writes `RECORDER_RESUME`) then `runtime_tm_on_history_resume` moves the window to that marker. Configure checkbox and `manual.md` say this discards the TimeMachine tape.
 
+**Addendum:** product shape is now [`TMA3.md`](TMA3.md) — enter max remembers Record, wipes the tape, turns Record off; leave max restores Record into a fresh window. The paragraph above is the TM2 implementation history, not the current worker behaviour.
+
 ### Tests / gate
 
 - `apple2_snapshot` — PRNG round-trip

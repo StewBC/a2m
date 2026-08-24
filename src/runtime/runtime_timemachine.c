@@ -48,30 +48,40 @@ static void runtime_tm_warn_zero_budget(const runtime *rt)
 void runtime_tm_set_enabled(runtime *rt, bool enabled)
 {
     bool was_enabled;
+    bool on_max;
 
     if (rt == NULL) {
         return;
     }
-    was_enabled = rt->timemachine_enabled;
-    rt->timemachine_enabled = enabled;
+
+    on_max = rt->machine_ready &&
+        runtime_turbo_is_max_value(rt->active_turbo_multiplier) &&
+        rt->history_off_on_max;
+
     if (!enabled) {
+        if (on_max) {
+            rt->tm_enabled_saved_for_max = false;
+        }
+        rt->timemachine_enabled = false;
         runtime_tm_recorder_set_enabled(rt, false);
         return;
     }
+
+    if (on_max) {
+        /* Remember Record-on for leave-max; do not actually record in max. */
+        rt->tm_enabled_saved_for_max = true;
+        return;
+    }
+
+    was_enabled = rt->timemachine_enabled;
+    rt->timemachine_enabled = true;
     if (was_enabled) {
         return;
     }
 
     if (rt->history != NULL) {
-        bool on_max = rt->machine_ready &&
-            rt->active_turbo_multiplier == RUNTIME_TURBO_MAX;
-        if (on_max && rt->history_off_on_max) {
-            /* Max owns the pause; leave-max restores. Do not undo it. */
-            rt->history_paused_for_max = true;
-        } else {
-            uint64_t cycle = rt->machine_ready ? apple2_cycles(&rt->machine) : 0u;
-            (void)runtime_history_resume(rt->history, cycle);
-        }
+        uint64_t cycle = rt->machine_ready ? apple2_cycles(&rt->machine) : 0u;
+        (void)runtime_history_resume(rt->history, cycle);
     }
     if (rt->frame_ring_memory_mb > 0u) {
         runtime_frame_ring_set_recording(&rt->frame_ring, true);

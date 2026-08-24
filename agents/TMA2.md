@@ -2,7 +2,7 @@
 
 **Status:** Landed.  
 **Epic:** [`timemachine.md`](timemachine.md)  
-**Prev / Next:** [`TMA1.md`](TMA1.md) / —  
+**Prev / Next:** [`TMA1.md`](TMA1.md) / [`TMA3.md`](TMA3.md)  
 **Depends on:** **TMA1 Landed.** Do not rip TM1 while the Inspector still calls it.
 
 Related: [`TMA0.md`](TMA0.md) · [`TM1.md`](TM1.md) (history of what we are deleting) · [`TM5.md`](TM5.md).

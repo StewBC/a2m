@@ -199,6 +199,8 @@ struct runtime {
     bool history_off_on_max;
     /* True if we stopped history solely for max (so we may resume on leave). */
     bool history_paused_for_max;
+    /* Record checkbox to restore on leave-max (TMA3). */
+    bool tm_enabled_saved_for_max;
 
     /* TimeMachine master enable. Off→on arms HST1 + frame ring once. */
     bool timemachine_enabled;

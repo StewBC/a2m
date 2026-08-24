@@ -209,27 +209,56 @@ int main(void)
             RUNTIME_HISTORY_MEDIA_CHANGE_GUEST_WRITE);
     }
 
-    /* Max turbo kills the window (history_off_on_max). */
+    /* Max turbo (TMA3): remember Record, wipe tape, Record off; leave restores. */
     {
-        runtime_history_record rec;
+        uint64_t oldest = 0u;
+        uint64_t live = 0u;
+        uint64_t n = 0u;
+
         expect_true("run max", runtime_client_run(client));
         expect_true(
             "set max",
             runtime_client_set_turbo_multiplier(client, RUNTIME_TURBO_MAX));
-        SDL_Delay(30);
+        expect_true("pause in max", runtime_client_pause(client));
+        expect_true("paused in max", wait_event(client, RUNTIME_EVENT_PAUSED, 2.0));
+        drain(client);
+        expect_true("Record off in max", !runtime_tm_enabled(rt));
+        expect_true("tape wiped in max", runtime_tm_checkpoint_count(rt) == 0u);
+        runtime_tm_timeline_bounds(rt, &oldest, &live, &n);
+        expect_true("no timeline in max", n == 0u);
+
         expect_true(
             "set 1MHz",
             runtime_client_set_turbo_multiplier(client, RUNTIME_TURBO_MHZ_1));
-        expect_true("pause max", runtime_client_pause(client));
-        expect_true("paused max", wait_event(client, RUNTIME_EVENT_PAUSED, 2.0));
+        SDL_Delay(20);
         drain(client);
-        if (runtime_history_first(rt->history, &rec)) {
+        expect_true("Record restored on leave max", runtime_tm_enabled(rt));
+        expect_true(
+            "fresh tape after leave max",
+            runtime_tm_checkpoint_count(rt) >= 1u);
+        runtime_tm_timeline_bounds(rt, &oldest, &live, &n);
+        expect_true("timeline after leave max", n >= 1u);
+
+        /* Record-off stays off across a max round-trip. */
+        {
+            uint64_t token = runtime_client_alloc_request_token(client);
             expect_true(
-                "resume or media left edge",
-                rec.kind == RUNTIME_HISTORY_RECORD_MARKER &&
-                    (rec.marker_kind == RUNTIME_HISTORY_MARKER_RECORDER_RESUME ||
-                     rec.marker_kind == RUNTIME_HISTORY_MARKER_MEDIA_CHANGED ||
-                     rec.marker_kind == RUNTIME_HISTORY_MARKER_RECORDER_START));
+                "TM off before max",
+                runtime_client_tm_set_enabled(client, false, token));
+            SDL_Delay(20);
+            drain(client);
+            expect_true(
+                "set max again",
+                runtime_client_set_turbo_multiplier(client, RUNTIME_TURBO_MAX));
+            SDL_Delay(20);
+            drain(client);
+            expect_true("still off in max", !runtime_tm_enabled(rt));
+            expect_true(
+                "set 1MHz again",
+                runtime_client_set_turbo_multiplier(client, RUNTIME_TURBO_MHZ_1));
+            SDL_Delay(20);
+            drain(client);
+            expect_true("still off after leave max", !runtime_tm_enabled(rt));
         }
     }
 

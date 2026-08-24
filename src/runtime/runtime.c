@@ -339,6 +339,7 @@ runtime *runtime_create(const runtime_config *config)
         rt->history_memory_mb = config->history_memory_mb;
         rt->history_off_on_max = config->history_off_on_max;
         rt->history_paused_for_max = false;
+        rt->tm_enabled_saved_for_max = false;
         rt->timemachine_enabled = false;
         rt->timemachine_memory_mb = config->timemachine_memory_mb;
         if (rt->history_memory_mb > 0u) {

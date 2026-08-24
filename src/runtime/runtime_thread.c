@@ -2482,36 +2482,52 @@ static void runtime_apply_turbo_video_policy(runtime *rt, bool leaving_max)
     }
 }
 
-/* Pause/resume flight-recorder around max free-run (history_off_on_max policy). */
+static void runtime_tm_reattach_live_hooks(runtime *rt);
+
+/* Pause/resume flight-recorder around max free-run (history_off_on_max policy).
+   TMA3: entering max remembers Record, wipes the TM tape, and turns Record
+   off. Leaving max restores Record (fresh tape) if it was on. */
 static void runtime_history_apply_max_policy(runtime *rt, bool entering_max, bool leaving_max)
 {
     runtime_history_status st;
     uint64_t cycle;
 
-    if (rt == NULL || rt->history == NULL || !rt->history_off_on_max) {
+    if (rt == NULL || !rt->history_off_on_max) {
         return;
     }
-    cycle = apple2_cycles(&rt->machine);
-    runtime_history_get_status(rt->history, &st);
+    cycle = rt->machine_ready ? apple2_cycles(&rt->machine) : 0u;
 
     if (entering_max) {
-        if (st.available && st.recording) {
-            (void)runtime_history_stop(rt->history, cycle);
-            rt->history_paused_for_max = true;
-            runtime_history_sync_observer(rt);
+        if (rt->tm_forensic) {
+            runtime_tm_exit_forensic(rt);
+            runtime_tm_reattach_live_hooks(rt);
         }
+        rt->tm_enabled_saved_for_max = rt->timemachine_enabled;
+        if (rt->history != NULL) {
+            runtime_history_get_status(rt->history, &st);
+            if (st.available && st.recording) {
+                (void)runtime_history_stop(rt->history, cycle);
+                rt->history_paused_for_max = true;
+                runtime_history_sync_observer(rt);
+            }
+        }
+        runtime_tm_recorder_set_enabled(rt, false);
+        runtime_tm_on_history_invalidate(rt);
+        if (rt->tm_enabled_saved_for_max) {
+            runtime_frame_ring_set_recording(&rt->frame_ring, false);
+            runtime_frame_ring_clear(&rt->frame_ring);
+        }
+        rt->timemachine_enabled = false;
     } else if (leaving_max) {
-        if (rt->history_paused_for_max) {
+        if (rt->history_paused_for_max && rt->history != NULL) {
             (void)runtime_history_resume(rt->history, cycle);
             rt->history_paused_for_max = false;
             runtime_history_sync_observer(rt);
-            runtime_tm_on_history_resume(rt);
         }
-    }
-    if (entering_max && rt->timemachine_enabled) {
-        runtime_tm_recorder_set_enabled(rt, false);
-    } else if (leaving_max && rt->timemachine_enabled) {
-        runtime_tm_recorder_set_enabled(rt, true);
+        if (rt->tm_enabled_saved_for_max) {
+            rt->tm_enabled_saved_for_max = false;
+            runtime_tm_set_enabled(rt, true);
+        }
     }
 }
 

@@ -96,7 +96,8 @@ Rewire Misc → Inspector so it matches A1–A18.
 - Using HST1 for scrub, land, or time-travel F10  
 - Dual coarseness sliders  
 - Promote / Branch (TM6) — not this campaign  
-- Changing max-turbo “recording stops” or D10 media-write window cuts  
+- Changing max-turbo “recording stops” or D10 media-write window cuts
+  (max Record wipe/restore is later: [`TMA3.md`](TMA3.md); D10 unchanged)  
 - Flattening this story into a c64m-only brief (later, when we are happy)  
 - Renaming `mode=forensic` on the wire  
 - Implementation — that is [`TMA1.md`](TMA1.md)

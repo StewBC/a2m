@@ -271,10 +271,11 @@ peripherals, and Mockingboard stay in lock-step):
 | `4`, `8`, ... | `4 MHz`, `8 MHz`, ... | Zip-class finite MHz (best-effort), live paint |
 | `max` or `-1` | `max` | Free-run as fast as the host allows, still full live paint |
 
-The first entry is the startup speed. Paste does not change turbo. By default the CPU
-flight recorder is paused while turbo is `max` (Configure -> Machine, or
-`--history-off-on-max` / `--no-history-off-on-max`); recording resumes when you leave
-`max`.
+The first entry is the startup speed. Paste does not change turbo. By default
+entering `max` pauses the CPU flight recorder, turns TimeMachine Record off,
+and discards the tape (Configure -> Emulator, or `--history-off-on-max` /
+`--no-history-off-on-max`). Leaving `max` restores Record if it was on and
+starts a new window.
 
 ### Help
 
@@ -1342,7 +1343,7 @@ below the tab body on every tab.
 | Keyboard Joystick | `Off`, `Stick 1`, or `Stick 2`, plus the `Numpad` or `WASD` key layout |
 | Swap fire keys | While the stick is on: Space is button 0 and Option is button 1 (WASD-friendly). Off when the stick is Off |
 | Turbo | Comma-separated ladder, e.g. `1,max` or `1,4,8,max` |
-| History off on max | Pause the CPU flight recorder while turbo is `max` (faster free-run) |
+| History off on max | Pause the CPU flight recorder while turbo is `max` (faster free-run); TimeMachine Record is wiped and restored when you leave `max` |
 | Pause on BRK | Auto-pause free-run at the next `BRK` (`$00`); off by default |
 | Show disk LEDs | Draw green (read) and red (write) activity LEDs in the window corner |
 
@@ -1443,7 +1444,7 @@ Default layout: slot 4 Mockingboard, slot 6 Disk II, slot 7 SmartPort, others em
 |-----|-------|
 | `Save` | `yes` -- save INI on quit |
 | `turbo_speeds` | Comma-separated turbo ladder, e.g. `1,max` |
-| `history_off_on_max` | `true`/`false`; pause flight recorder on `max` (default true). With TimeMachine on, entering max and leaving it truncates the tape to the resume point. |
+| `history_off_on_max` | `true`/`false`; pause flight recorder on `max` (default true). With TimeMachine Record on, entering max wipes the tape and turns Record off; leaving max restores Record into a new window. |
 | `scroll_wheel_lines` | Integer; lines scrolled per wheel click |
 | `original_del` | `true`/`false`; Backspace sends `$7F` instead of `$08` |
 | `symbol_files` | Comma-separated list of symbol file paths |
@@ -1562,7 +1563,8 @@ the disassembly cursor. Pokes are rejected while Inspect is on.
 
 A guest disk write that succeeds drops earlier history: the scrubber's left
 edge is that write, not data loss. Saving to a writable disk mid-session will
-cut the window. Opt+T into max also discards the tape (`history_off_on_max`).
+cut the window. Opt+T into max also discards the tape and turns Record off
+(`history_off_on_max`); leaving max restores Record if it was on.
 
 ### [DEBUG]
 
