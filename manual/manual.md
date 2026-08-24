@@ -354,6 +354,7 @@ open.
 | Open Forensics | **Pauses** if the machine was running. Remembers whether you came from the CRT or the debugger. |
 | **Opt+R** / **Close** | Return to that entry surface. CRT entry resumes only if it was running when Forensics opened. Debugger entry stays paused. |
 | **F9** | Always open the debugger, paused (abandons any CRT resume latch). |
+| Successful **Land before** / **Land exact** | Same as **F9**: debugger, paused. Also selects Misc -> Inspector. Cancel or failed land stays in Forensics. |
 | **Esc** | Does **not** leave Forensics (Help still uses Esc). |
 
 FIND requires a paused machine and a recording window (turn **Record** on in
@@ -384,7 +385,9 @@ With a record selected:
 If you are not yet Inspecting but checkpoints exist, either land button asks to
 **Inspect & Land** first. Soft-fail if there is no Inspector window. Status
 reports the post-land `focus_cycle` versus the requested cycle (clamp, live, or
-quantized). You stay in Forensics after land.
+quantized). After a successful land, Forensics closes and the debugger opens
+paused on the Inspector tab. Cancel or a failed land leaves you in Forensics.
+**Opt+R** / **Close** still return to the entry surface as above.
 
 See **CPU Flight Recorder** for the wire grammar and **`[debug]`** for Record /
 budgets.
@@ -1643,7 +1646,8 @@ and stays paused. F7 is unbound. Opt+Left is unbound in time travel.
 
 **Forensics...** (or **Opt+R**) opens the full-window FIND UI over the same
 recorder. Land before / Land exact jump Inspect to a FIND hit's cycle; they do
-not drive the scrubber. See **Forensics**.
+not drive the scrubber. A successful land then opens the debugger on the
+Inspector tab. See **Forensics**.
 
 Breakpoints are **one list** in live and time travel. Opt+B toggles execute at
 the disassembly cursor. Pokes are rejected while Inspect is on.

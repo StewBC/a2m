@@ -320,6 +320,8 @@ bool frontend_forensics_is_open(const frontend *ui);
 bool frontend_forensics_entered_from_crt(const frontend *ui);
 bool frontend_forensics_crt_was_running(const frontend *ui);
 bool frontend_forensics_consume_close_request(frontend *ui);
+/* After successful Land: leave like F9 (debugger paused; Inspector tab). */
+bool frontend_forensics_consume_leave_debugger_request(frontend *ui);
 bool frontend_forensics_consume_pause_request(frontend *ui);
 bool frontend_handle_forensics_key(frontend *ui, const SDL_KeyboardEvent *key);
 /* Apply HISTORY RPC results (main.c after claim/decode). */

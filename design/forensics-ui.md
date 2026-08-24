@@ -4,7 +4,7 @@
 |-------|-------|
 | **Author** | swessels |
 | **Date** | 2026-08-24 |
-| **Status** | Landed |
+| **Status** | Landed (PR 8 addendum applied) |
 | **Canonical path** | [`design/forensics-ui.md`](forensics-ui.md) |
 
 ---
@@ -13,7 +13,7 @@
 
 a2m already records a dense instruction/bus log (HST1) and exposes FIND over the control port (`history-find` / `history-next` / `history-read`). That surface is useful to scripts and `tools/a2m_control_client.py`, but there is no in-emulator debugger UI for forensic queries such as “who wrote `$22` to `$2011`?”. The Inspector tab (Misc → Inspector) is a separate stream: checkpoint-based time travel with a scrubber. Product invariant: HST1 is FIND, not the slider.
 
-This design adds a **full-window Forensics mode** (same class as the F9 debugger layout — the whole client area, **not** a Help-style CRT overlay): a scrollback transcript of FIND/READ results, a thin query line over the real history verbs, a status strip, and a one-shot bridge to **Land Inspector at `machine_cycle`**. Entering **pauses** the machine; leaving returns to the debugger and **stays paused**. It does not drive the Inspector slider from HST1, does not embed another crowded Misc tab, and only advertises query keys the live shared find-option parser accepts.
+This design adds a **full-window Forensics mode** (same class as the F9 debugger layout — the whole client area, **not** a Help-style CRT overlay): a scrollback transcript of FIND/READ results, a thin query line over the real history verbs, a status strip, and a one-shot bridge to **Land Inspector at `machine_cycle`**. Entering **pauses** the machine. **Opt+R / Close** return to the entry surface (CRT may resume; debugger stays paused). **F9** and a **successful Land** both leave to the debugger paused (and select Misc → Inspector when closing Forensics). It does not drive the Inspector slider from HST1, does not embed another crowded Misc tab, and only advertises query keys the live shared find-option parser accepts.
 
 **Naming:** The UI mode is **Forensics** (the act of investigating). The underlying log remains the **CPU flight recorder** / HST1 — parallel to **Inspector** (UI) vs TimeMachine (mechanism).
 
@@ -57,7 +57,7 @@ Film frames, Inspector focus, and HST1 records share **`machine_cycle`**. They a
 3. **Query line**: thin wrapper over `history-find` / `history-next` / `history-read` (+ status via `history-info`); up/down query history; Tab autocomplete of keys/values from the **shared parser’s public key table**.
 4. **Status strip**: recording on/off, epoch, retained bytes / IDs, cursor/more, soft error (running, stale, unavailable).
 5. **Clear transcript** without clearing the recorder (`history-clear` is separate and destructive).
-6. One-shot **Land Inspector at cycle** from a selected hit. When live but `can_enter`, offer **Inspect & Land** confirm (enter Inspect, then land). Hard soft-fail only when no inspector window / cannot enter. Out-of-range cycles land and explain clamp/restore-live.
+6. One-shot **Land Inspector at cycle** from a selected hit. When live but `can_enter`, offer **Inspect & Land** confirm (enter Inspect, then land). Hard soft-fail only when no inspector window / cannot enter. Out-of-range cycles land and explain clamp/restore-live. **On successful land** (any post-land Inspect focus update, including clamp / live / quantized / partial exact): leave Forensics to the **debugger paused** and select **Misc → Inspector**. Cancel, soft-fail, or land not completed → stay in Forensics; Opt+R/Close leave rules unchanged.
 7. Honest syntax: UI and manual match the real wire via shared parse under `src/runtime/`.
 8. **Token-aware copy** in polish (PR 7): double-click / token hit on `id=` / `cyc=` / `pc=$…` copies that token (in addition to v1 whole-entry Copy).
 
@@ -84,6 +84,7 @@ Full-window mode swap — **not** a Help-style CRT overlay:
 Display-only (CRT) ──Opt+R──► Forensics ──Opt+R/Close──► CRT (restore run state)
 Debugger (F9 up)   ──Opt+R──► Forensics ──Opt+R/Close──► Debugger (paused)
 Forensics          ──F9─────► Debugger (always paused)
+Forensics          ──Land ok─► Debugger (paused; Misc → Inspector)
 Esc does not leave Forensics
 ```
 
@@ -98,6 +99,7 @@ Esc does not leave Forensics
 | Open Forensics | **Pause** if running. Record entry surface. If entry was CRT, also record whether it was running. |
 | Opt+R / Close | Return to **entry surface**. CRT entry → CRT and **resume** only if it was running at open. Debugger entry → debugger, **paused**. |
 | F9 | Always **debugger**, **paused** (abandons CRT resume latch). |
+| Successful Land before / Land exact | Same leave target as F9: **debugger**, **paused** (abandons CRT resume latch). Also select Misc → Inspector. Cancel / soft-fail / land not completed → stay in Forensics. |
 | Esc | No-op for Forensics. |
 | Forensics → Help (Opt+H) | Close Forensics (stay paused); Help with `paused_by_help=false`. |
 
@@ -110,7 +112,7 @@ stateDiagram-v2
     CRT --> Forensics: Opt+R (pause; remember was_running)
     Debugger --> Forensics: Opt+R / Forensics… (pause)
     Forensics --> CRT: Opt+R/Close if entry=CRT\n(restore was_running)
-    Forensics --> Debugger: Opt+R/Close if entry=dbg\nOR F9 (paused)
+    Forensics --> Debugger: Opt+R/Close if entry=dbg\nOR F9 (paused)\nOR successful Land (paused + Inspector tab)
 ```
 
 ### Layout
@@ -327,25 +329,29 @@ Analogous to how `control_dispatch.c` matches deferred HISTORY tokens and claims
 ```mermaid
 flowchart LR
     Hit["Selected Forensics hit cyc=N"] --> Win{"window_valid / can_enter?"}
-    Win -->|no| Soft["Status: cannot land — no checkpoints"]
+    Win -->|no| Soft["Status: cannot land — no checkpoints\n(stay in Forensics)"]
     Win -->|yes| Mode{"inspecting?"}
     Mode -->|no| Confirm["Inspect & Land confirm"]
-    Confirm -->|cancel| Stay["Stay in Forensics; no change"]
+    Confirm -->|cancel| Stay["Stay in Forensics; no Debug switch"]
     Confirm -->|ok| Enter["INSPECTOR_ENTER then land"]
     Mode -->|yes| Land["land / land_to_cycle"]
     Enter --> Land
-    Land --> Explain["Status: landed focus_cycle=…"]
+    Land --> Ok{"Inspect focus applied?"}
+    Ok -->|no| Stay2["Stay in Forensics"]
+    Ok -->|yes| Switch["Leave Forensics → debugger paused\n+ Misc → Inspector tab"]
 ```
 
 **Gates:**
 
 | Condition | Behavior |
 |-----------|----------|
-| `!debug->inspector_window_valid` (cannot enter) | **Hard soft-fail.** No checkpoints / Record never produced a window. |
-| `!debug->inspecting` but `can_enter` | **Inspect & Land** confirm dialog. On OK: `FRONTEND_DEBUGGER_INTENT_INSPECTOR_ENTER`, then land at selected cycle (quantized v1 / `land_to_cycle` after PR 6). On Cancel: no mode change. Remain in Forensics UI after either choice. |
+| `!debug->inspector_window_valid` (cannot enter) | **Hard soft-fail.** No checkpoints / Record never produced a window. Stay in Forensics; no Debug UI switch. |
+| `!debug->inspecting` but `can_enter` | **Inspect & Land** confirm dialog. On OK: `FRONTEND_DEBUGGER_INTENT_INSPECTOR_ENTER`, then land at selected cycle (quantized / `land_to_cycle`). On Cancel: no mode change, stay in Forensics, **no** Debug UI switch. |
 | Already inspecting | Land immediately (no confirm). |
 | Cycle `< oldest` or `>= live` | **Still call land** after any enter. Runtime clamps to oldest or `restore_live`. Status explains outcome using **post-land** `inspector_focus_cycle`. |
 | Cycle inside window | Land; status reports quantization or exact per API used. |
+| Land completed (Inspect focus update) | **Leave Forensics → debugger paused** (same leave target as F9; abandons CRT resume latch). Select **Misc → Inspector**. Applies to both Land before and Land exact, including clamp / live / quantized / partial exact. |
+| Land not completed | Stay in Forensics; no Debug UI switch. |
 
 **v1 land API:** push `FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND` with `inspector_cycle = selected_cycle` → `runtime_client_inspector_land` → checkpoint-quantized `runtime_inspector_land` (nearest checkpoint ≤ N). Inspect & Land sequences enter then that same land intent (main may coalesce or issue two intents in order).
 
@@ -377,8 +383,8 @@ Refresh from `history-info` on Forensics open, after record toggles, and after e
 | Esc / Close | Leave Forensics mode only |
 | Clear view | Clear transcript |
 | Copy | Clipboard selected line/block (or last result) |
-| Land before | Quantized land (checkpoint ≤ selected cycle); **Inspect & Land** confirm if live but `can_enter` |
-| Land exact | Exact `land_to_cycle` (PR 6); same confirm when live but `can_enter` |
+| Land before | Quantized land (checkpoint ≤ selected cycle); **Inspect & Land** confirm if live but `can_enter`. On success → debugger paused + Misc → Inspector (PR 8). |
+| Land exact | Exact `land_to_cycle` (PR 6); same confirm when live but `can_enter`. Same success leave as Land before (PR 8). |
 | Query Enter | Run verb |
 
 Record enable stays on the Inspector tab (and Configure/CLI). Forensics shows recording state but does not require a second Record checkbox in v1.
@@ -553,12 +559,13 @@ Fuzz find-option strings in shared parse tests.
 5. **Expand find parser early into `src/runtime/runtime_history_query_parse.*`** — Normative grammar above; public key table drives autocomplete; control and UI share one implementation. Docs-only stopgap only if expansion slips.
 6. **Land is one-shot; slider is never FIND-driven.** When live but `can_enter`, **Inspect & Land** confirm (not soft-fail-only).
 7. **Quantized land stays (`Land before`); exact = single worker `land_to_cycle` (`Land exact`) — not two RPCs, not a button switch.**
-8. **Reuse default UI session (`session_id = 0`); `history_close` on Forensics exit** — Isolates from control sessions without consuming another of 4 slots.
-9. **Clear view ≠ history-clear.**
-10. **Design docs live under `design/`.**
-11. **Shortcut Opt+R**; mutually exclusive with Help; button also required.
-12. **v1 copy = click line/block + Copy button**, not drag-select; **PR 7 includes token-aware copy** (`id=` / `cyc=` / `pc=$…`).
-13. **History intents carry structured `runtime_history_query` (parse in frontend).**
+8. **Successful land leaves Forensics to the debugger (paused) and selects Misc → Inspector** (PR 8). Same for already-inspecting and Inspect & Land. Cancel / soft-fail / incomplete land stay in Forensics. Opt+R/Close entry-surface rules are unchanged.
+9. **Reuse default UI session (`session_id = 0`); `history_close` on Forensics exit** — Isolates from control sessions without consuming another of 4 slots.
+10. **Clear view ≠ history-clear.**
+11. **Design docs live under `design/`.**
+12. **Shortcut Opt+R**; mutually exclusive with Help; button also required.
+13. **v1 copy = click line/block + Copy button**, not drag-select; **PR 7 includes token-aware copy** (`id=` / `cyc=` / `pc=$…`).
+14. **History intents carry structured `runtime_history_query` (parse in frontend).**
 
 ---
 
@@ -574,6 +581,8 @@ Fuzz find-option strings in shared parse tests.
 | Long lines | **Wrap-at-format** (~160 cols); store full text; no silent truncate |
 | Land while live | **Inspect & Land** confirm when `can_enter`; soft-fail only if no window |
 | Token-aware copy | **In PR 7** — double-click / token hit on `id=` / `cyc=` / `pc=$…` |
+| After successful land | **Leave Forensics → debugger paused + Misc → Inspector** (PR 8). Cancel / fail stay in Forensics. Opt+R/Close unchanged. |
+| “Landed” for UI switch | Any successful Inspect focus update (clamp / live / quantized / partial exact), same cases that set the land status strip |
 
 ---
 
@@ -662,7 +671,7 @@ Fuzz find-option strings in shared parse tests.
   - [x] Live + `can_enter` → **Inspect & Land** confirm → ENTER then LAND
   - [x] Soft-fail when `!inspector_window_valid` / cannot enter
   - [x] Status from post-land `inspector_focus_cycle` vs requested (clamp / live / quantized)
-  - [x] Remain in Forensics; no slider tracking
+  - [x] No slider tracking *(PR 5 originally stayed in Forensics; leave-on-land is PR 8)*
 - **Description:** If already inspecting, land immediately. If live but `can_enter`, show **Inspect & Land** confirm then enter+land. Soft-fail only when no inspector window. Explain clamp/restore-live using post-land `focus_cycle`. No slider tracking.
 
 ### PR 6 — Exact-cycle land (single worker helper)
@@ -690,3 +699,17 @@ Fuzz find-option strings in shared parse tests.
   - [x] Double-click token copy (`id=` / `cyc=` / `pc=$…`)
   - [x] `design/README.md` active → landed
 - **Description:** User docs for Opt+R, verbs, grammar, Inspect & Land, Land semantics. Ship **token-aware copy** (in addition to whole-entry Copy). Mark design landed.
+
+### PR 8 — Land success → debugger + Inspector tab
+
+- **Title:** `frontend: Forensics Land leaves to debugger + Inspector tab`
+- **Files:** `forensics_view.*`, `frontend.*`, `main.c` (consume leave-debugger request), `tests/frontend/test_forensics_view.c`, `design/forensics-ui.md`, `agents/frontend.md`, `manual/manual.md` (+ help regen)
+- **Dependencies:** PR 5–6 (land path already landed)
+- **Checklist:**
+  - [x] Soft-fail / Cancel → stay in Forensics; no Debug UI switch
+  - [x] Successful land (already inspecting or after Inspect & Land) → leave Forensics like F9 (debugger paused; abandon CRT resume latch)
+  - [x] On that leave, Misc active tab = Inspector (`frontend_close_forensics` already sets it)
+  - [x] Opt+R / Close leave rules unchanged
+  - [x] “Landed” = any Inspect focus update used for land status (clamp / live / quantized / partial exact)
+  - [x] Design + agents + manual reflect leave-on-land (c64m reuse)
+- **Description:** Tail on **Land before** / **Land exact**: after a successful land, switch to the Debug UI and select the Inspector Misc tab. Do not switch on cancel or failed/incomplete land. Keep Opt+R/Close entry-surface behavior as-is.

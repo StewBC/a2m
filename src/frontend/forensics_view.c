@@ -96,6 +96,7 @@ void forensics_view_open(
     state->land_awaiting_focus = false;
     state->land_awaiting_exact = false;
     state->land_requested_cycle = 0u;
+    state->request_leave_debugger = false;
     state->query_history_index = 0u;
     forensics_view_set_status(state, "paused — querying…");
 }
@@ -117,6 +118,7 @@ void forensics_view_close(frontend_forensics_state *state)
     state->request_land_enter = false;
     state->land_awaiting_focus = false;
     state->land_awaiting_exact = false;
+    state->request_leave_debugger = false;
     state->entry = FRONTEND_FORENSICS_ENTRY_DEBUGGER;
     state->crt_was_running = false;
 }
@@ -1298,6 +1300,8 @@ void forensics_view_apply_land_focus(
             (unsigned long long)requested);
     }
     forensics_view_set_status(state, text);
+    /* Successful Inspect focus update → leave to debugger + Inspector tab. */
+    state->request_leave_debugger = true;
 }
 
 static void forensics_try_land_button(
@@ -1619,7 +1623,7 @@ void forensics_view_render(
         nk_layout_row_dynamic(ctx, hint_h, 1);
         nk_label(
             ctx,
-            "Opt+R/Close return to entry. F9 -> debugger (paused). Tab completes keys. Double-click id=/cyc=/pc=$ to copy.",
+            "Opt+R/Close return to entry. Land/F9 -> debugger (paused). Tab completes keys. Double-click id=/cyc=/pc=$ to copy.",
             NK_TEXT_LEFT);
 
         ctx->style.window.background = fr_bg;

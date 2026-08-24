@@ -690,7 +690,7 @@ static void forensics_history_close_cursor(runtime_client *client, frontend *ui)
 
 /*
  * Leave Forensics.
- * force_debugger (F9): always debugger, never resume.
+ * force_debugger (F9 or successful Land): always debugger, never resume.
  * Otherwise (Opt+R / Close): return to entry surface; resume only if that
  * surface was full-screen CRT and it was running when Forensics opened.
  */
@@ -3501,6 +3501,10 @@ int main(int argc, char **argv)
         if (frontend_forensics_consume_close_request(ui)) {
             /* Close button == Opt+R (return to entry surface). */
             leave_forensics_mode(window, client, ui, &ui_visible, false);
+        }
+        if (frontend_forensics_consume_leave_debugger_request(ui)) {
+            /* Successful Land before/exact → debugger paused + Inspector tab. */
+            leave_forensics_mode(window, client, ui, &ui_visible, true);
         }
         {
             /* After render, edit-focus is current — sync macOS text input

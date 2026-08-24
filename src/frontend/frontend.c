@@ -10756,6 +10756,15 @@ bool frontend_forensics_consume_close_request(frontend *ui)
     return true;
 }
 
+bool frontend_forensics_consume_leave_debugger_request(frontend *ui)
+{
+    if (ui == NULL || !ui->forensics.request_leave_debugger) {
+        return false;
+    }
+    ui->forensics.request_leave_debugger = false;
+    return true;
+}
+
 bool frontend_forensics_consume_pause_request(frontend *ui)
 {
     if (ui == NULL || !ui->forensics.request_host_pause) {

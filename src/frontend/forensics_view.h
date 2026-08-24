@@ -78,6 +78,8 @@ typedef struct frontend_forensics_state {
     bool land_awaiting_focus; /* wait for post-land inspector_focus_cycle */
     bool land_awaiting_exact; /* status wording: exact vs quantized */
     uint64_t land_requested_cycle;
+    /* Set when land focus applied: main leaves to debugger (F9 path) + Inspector. */
+    bool request_leave_debugger;
 } frontend_forensics_state;
 
 /* Inspector gates for Land (from frontend_debug_state). */

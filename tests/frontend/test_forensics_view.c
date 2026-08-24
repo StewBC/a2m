@@ -334,41 +334,61 @@ static void test_land_focus_status(void)
         "quantized status",
         strstr(state.status, "focus_cycle=1200") != NULL &&
             strstr(state.status, "before/quantized") != NULL);
+    expect_true("leave dbg after land", state.request_leave_debugger);
 
+    state.request_leave_debugger = false;
     state.land_awaiting_focus = true;
     state.land_requested_cycle = 50u;
     land.focus_cycle = 100u;
     forensics_view_apply_land_focus(&state, &land);
     expect_true("clamp status", strstr(state.status, "clamped oldest") != NULL);
+    expect_true("leave dbg after clamp", state.request_leave_debugger);
 
+    state.request_leave_debugger = false;
     state.land_awaiting_focus = true;
     state.land_requested_cycle = 20000u;
     land.focus_cycle = 9999u;
     forensics_view_apply_land_focus(&state, &land);
     expect_true("live status", strstr(state.status, "live") != NULL);
+    expect_true("leave dbg after live", state.request_leave_debugger);
 
+    state.request_leave_debugger = false;
     state.land_awaiting_focus = true;
     state.land_awaiting_exact = false;
     state.land_requested_cycle = 500u;
     land.focus_cycle = 500u;
     forensics_view_apply_land_focus(&state, &land);
     expect_streq("land match", state.status, "landed focus_cycle=500");
+    expect_true("leave dbg after match", state.request_leave_debugger);
 
+    state.request_leave_debugger = false;
     state.land_awaiting_focus = true;
     state.land_awaiting_exact = true;
     state.land_requested_cycle = 500u;
     land.focus_cycle = 500u;
     forensics_view_apply_land_focus(&state, &land);
     expect_streq("exact match", state.status, "landed exact focus_cycle=500");
+    expect_true("leave dbg after exact", state.request_leave_debugger);
 
+    state.request_leave_debugger = false;
     state.land_awaiting_focus = true;
     state.land_awaiting_exact = true;
     state.land_requested_cycle = 1500u;
     land.focus_cycle = 1200u;
     forensics_view_apply_land_focus(&state, &land);
     expect_true("partial exact", strstr(state.status, "partial exact") != NULL);
+    expect_true("leave dbg after partial", state.request_leave_debugger);
+
+    /* Not inspecting yet: keep awaiting; do not request Debug leave. */
+    state.request_leave_debugger = false;
+    state.land_awaiting_focus = true;
+    land.inspecting = false;
+    forensics_view_apply_land_focus(&state, &land);
+    expect_true("still awaiting", state.land_awaiting_focus);
+    expect_true("no leave while not inspecting", !state.request_leave_debugger);
 
     forensics_view_close(&state);
+    expect_true("close clears leave", !state.request_leave_debugger);
 }
 
 int main(void)
