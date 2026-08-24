@@ -158,7 +158,7 @@ The file extension determines how the file is handled:
 | Extension | Action |
 |-----------|--------|
 | `.nib` `.dsk` `.do` `.woz` | Add the image to Disk II drive 0 (prefer slot 6, else scan 7 down to 1; ignored if no Disk II card is installed) |
-| `.po` | If the file is exactly 143360 bytes (35×16×256 floppy), treat as Disk II; otherwise live-insert as SmartPort HD (same slot scans / refuse rules as above) |
+| `.po` | If the file is exactly 143360 bytes (35x16x256 floppy), treat as Disk II; otherwise live-insert as SmartPort HD (same slot scans / refuse rules as above) |
 | `.a2state` | Load a saved machine state snapshot |
 | `.hdv` `.2mg` | Live-insert on SmartPort unit 0 (scan slots 7 down to 1; ignored if no SmartPort card is installed) |
 | anything else | Ignored |
@@ -656,7 +656,7 @@ power-cycle reset.
 cc65 AppleSingle, NAPS filenames such as `demo#060803` (BIN) or
 `chess.system#ff2000` (SYS), and the four-byte DOS header used by older cc65
 releases; otherwise it loads raw bytes at the entered address. NAPS/AppleSingle
-Auto-load accepts ProDOS **BIN (`$06`)** and **SYS (`$FF`)** only — both carry
+Auto-load accepts ProDOS **BIN (`$06`)** and **SYS (`$FF`)** only - both carry
 the load address in aux. **Run after load** sets PC to that same load address
 (there is no separate entry point). A soft note appears if Run is checked for a
 non-BIN/SYS NAPS file loaded via Raw.
@@ -945,7 +945,7 @@ come back from reset before writing code. When it is unchecked, the assembler wr
 directly into live RAM in whatever state the machine is in. If **Auto-run at** is
 also set, the emulator immediately jumps to that address and resumes execution.
 
-**MLI launch** does not change assemble itself — `file=` HostFS outputs and memory
+**MLI launch** does not change assemble itself - `file=` HostFS outputs and memory
 `dest=` writes still happen. It only gates the post-success auto-run chain: after a
 successful assemble, a2m reads the CPU-visible byte at `$BF00`. If it is `$4C`,
 auto-run proceeds as usual (so a user shim can `JSR $BF00`). If not, assemble still
@@ -1873,7 +1873,7 @@ for low-latency automation; a windowed session is still paced by present/vsync.
 `symbols`, `sessions`, `state-changed`, and `inspector`.
 
 The TCP client is bound to one runtime **session** (history FIND/NEXT cursor
-state). Disconnect frees that session. Mutations (step, run, poke, reset, …)
+state). Disconnect frees that session. Mutations (step, run, poke, reset, ...)
 invalidate all history cursors and may emit `0 event state-changed ...` so other
 askers notice (awareness only; no permission lock).
 
@@ -2038,7 +2038,7 @@ and `assemble-error`. Completion events are sticky until consumed.
 
 The control port can assemble a source file into the running machine and look up
 the labels that result. This drives the same assembler and settings as the Misc
-→ Assembler tab, so a script can build code, find where a routine landed, and set
+-> Assembler tab, so a script can build code, find where a routine landed, and set
 a breakpoint on it.
 
 | Command | Meaning |
@@ -2094,11 +2094,11 @@ published symbols yet, the reply is `error not-ready`.
 | Command | Meaning |
 |---------|---------|
 | `key <byte>` | Inject one Apple keystroke (`$C000` path). `$8D` / CR becomes Return |
-| `mount [kind=diskii\|smartport] [slot] [drive] <path>` | Mount media. Omit `kind=` to infer from path (floppy exts → Disk II; dir/`.hdv`/`.2mg` → SmartPort; `.po` needs `kind=`). Omitted slot resolves the installed card |
-| `mount-disk …` | Alias for `mount kind=diskii …` |
+| `mount [kind=diskii\|smartport] [slot] [drive] <path>` | Mount media. Omit `kind=` to infer from path (floppy exts -> Disk II; dir/`.hdv`/`.2mg` -> SmartPort; `.po` needs `kind=`). Omitted slot resolves the installed card |
+| `mount-disk ...` | Alias for `mount kind=diskii ...` |
 | `unmount [kind=diskii\|smartport] [slot] [drive]` | Eject media. Omit `kind=` only when exactly one Disk II or SmartPort card is installed |
-| `select-disk [slot] [drive] <index>` | Make the 1-based queued Disk II image current (omitted slot → resolve; drive defaults to 0) |
-| `set-disk-writable [slot] [drive] <0\|1>` | Set the Disk II write-protect notch (`0`=read-only, `1`=writable; omitted slot → resolve) |
+| `select-disk [slot] [drive] <index>` | Make the 1-based queued Disk II image current (omitted slot -> resolve; drive defaults to 0) |
+| `set-disk-writable [slot] [drive] <0\|1>` | Set the Disk II write-protect notch (`0`=read-only, `1`=writable; omitted slot -> resolve) |
 | `break-exec <addr>` | Set an execute breakpoint |
 | `break-create <definition>` | Create a full breakpoint (same tokens as `[DEBUG]`) |
 | `break-update <id> <definition>` | Replace an existing breakpoint |

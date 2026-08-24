@@ -1,5 +1,5 @@
 /*
- * Real-time / turbo-zip headroom probe (not in ctest).
+ * Real-time / max-turbo headroom probe (not in ctest).
  *
  *   ./build/bench_realtime [seconds_emulated] [mode]
  *
@@ -9,8 +9,7 @@
  *   block  — A-lite free-run + full-frame block paint every ~1/60 s of emu time
  *            (approximates product max presentation cost on the machine path)
  *
- * Reports emulated MHz vs APPLE2_CPU_FREQUENCY_HZ. Use a Release build for
- * turbo-zip Phase 5 gates.
+ * Reports emulated MHz vs APPLE2_CPU_FREQUENCY_HZ. Use a Release build.
  */
 #include "apple2.h"
 #include "video.h"

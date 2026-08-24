@@ -1,80 +1,46 @@
 # a2m agent handoff
 
-Implementation handoff for agents. **Source is authoritative** — if a doc and
+Implementation brief for agents. **Source is authoritative** — if a doc and
 the code disagree, fix the doc (or the code) in the same change. These files
-are a live brief, not project history.
+describe the product as it is, not how it was built.
 
 ## Product
 
-C99 **Apple ][+ / //e Enhanced** emulator:
+C99 **Apple ][+ / //e Enhanced** emulator (version **3.0.0**).
 
-- **Product shell:** c64m-style debugger UI, layout, Configure, CRT, turbo, intents
-- **Machine:** Apple II (`src/machine`) — soft switches, banking, Disk II,
-  SmartPort, Mockingboard, 6502/65C02, beam-stepped video
+This tree is a descendant of V1–V2 notes in [`doc/a2m-v1-2/`](../doc/a2m-v1-2/README-v1-2.md).
+It also shares a lot of DNA with the sibling C64 emulator **c64m**: the debugger
+UI, remote control port, and Inspector / time-travel shape are intentionally
+similar, so muscle memory transfers. Treat that as ancestry, not a second
+source of truth — do not open c64m to decide how a2m should work.
 
-Siblings (not submodules): `../a2m` (Apple domain / paint reference),
-`../c64m` (debugger product gold).
+**am65** (`src/tools/am65/`) is the shared 6502 / 65C02 assembler (in-emulator
+Assembler tab and standalone `am65` CLI). It is designed to be the same
+assembler other products consume. See `src/tools/am65/README.md`.
 
 ## Read order
 
-| # | Doc | Why |
-|---|-----|-----|
-| 1 | **[`status.md`](status.md)** | What works / tree / keys **now** |
-| 2 | **[`rules.md`](rules.md)** | Golden rules (threads, ownership, product) |
-| 3 | **[`testing.md`](testing.md)** | Build + ctest gate |
-| 4 | **[`snapshots.md`](snapshots.md)** | Closed: machine save/load (c64m port) |
-| 5 | **[`remote-debug.md`](remote-debug.md)** | Closed epic: control / frame ring / history wire |
-| 6 | **[`control-tools.md`](control-tools.md)** | **Drive a2m over the control port** (A2M/13 ops brief) |
-| 7 | **[`turbo-zip.md`](turbo-zip.md)** | Closed: Zip MHz + max block paint |
-| 8 | **[`sessions.md`](sessions.md)** | Closed foundation: multi-asker sessions + state-changed |
-| 9 | **[`inspector.md`](inspector.md)** | **Retired F7 spine:** lessons only (join key, unified disasm) — no live code |
-| 10 | **[`timemachine.md`](timemachine.md)** | Epic roadmap (TM0–TM6 landed history) + **TMA addendum** |
-| 11 | **[`TMA0.md`](TMA0.md)** | Inspector contract: **time travel** (film / land / re-execute to live) |
-| 12 | **[`TMA1.md`](TMA1.md)** | **Landed:** Inspector time travel (rewire TM4 tab) |
-| 13 | **[`TMA2.md`](TMA2.md)** | **Landed:** delete TM1 tape-nav + TM5 second BP bank (FIND stays) |
-| 14 | **[`TMA3.md`](TMA3.md)** | **Landed:** max turbo remembers Record, wipes tape, restores on leave |
+1. [`status.md`](status.md) — what the product is now
+2. [`rules.md`](rules.md) — constraints that must not be broken
+3. [`testing.md`](testing.md) — build + ctest gate
 
-Open the component note only when the task touches that area:
-[`video.md`](video.md) · [`video-paint.md`](video-paint.md) ·
-[`machine.md`](machine.md) · [`frontend.md`](frontend.md) · [`runtime.md`](runtime.md) ·
-[`disk.md`](disk.md) · [`breakpoints.md`](breakpoints.md) ·
-[`snapshots.md`](snapshots.md) ·
-[`remote-debug.md`](remote-debug.md) · [`control-tools.md`](control-tools.md) ·
-[`turbo-zip.md`](turbo-zip.md) · [`max-free-run.md`](max-free-run.md) ·
-[`sessions.md`](sessions.md) ·
-[`inspector.md`](inspector.md) · [`timemachine.md`](timemachine.md) ·
-[`TMA0.md`](TMA0.md) · [`TMA1.md`](TMA1.md) · [`TMA2.md`](TMA2.md) ·
-[`TMA3.md`](TMA3.md).
+Then open the component note for the area you are changing:
 
-## Document set
+[`machine.md`](machine.md) · [`video.md`](video.md) · [`disk.md`](disk.md) ·
+[`runtime.md`](runtime.md) · [`frontend.md`](frontend.md) ·
+[`breakpoints.md`](breakpoints.md) · [`snapshots.md`](snapshots.md) ·
+[`timemachine.md`](timemachine.md) · [`control-tools.md`](control-tools.md)
 
-| Doc | Role |
-|------|------|
-| `status.md` | Live product snapshot |
-| `rules.md` | Must-not-break architecture / host rules |
-| `snapshots.md` | Closed: machine save/load — c64m reuse + Apple payload |
-| `turbo-zip.md` | Closed: Zip MHz ladder + max presentation (block) paint |
-| `max-free-run.md` | Closed: instruction-quanta free-run (S2) + 60 Hz block paint |
-| `control-tools.md` | Agent ops: control-port scripting via `Ctl` + coop_watch (A2M/13) |
-| `remote-debug.md` | Closed epic record: control/history/frame-ring wire |
-| `sessions.md` | Closed foundation: runtime sessions + state-changed |
-| `inspector.md` | Retired F7 Inspector: lessons kept, code archived at `archive/f7-inspector` |
-| `timemachine.md` | TimeMachine epic (D1–D18; TM0–TM6 history) + TMA addendum |
-| `TM0.md` … `TM6.md` | Landed phase briefs (V1 = TM0–TM4; V1.1 = TM5–TM6). **Not going to TM6.** |
-| `TMA0.md` | Addendum contract: Inspector **time travel** (film / land / re-execute to live) |
-| `TMA1.md` | Landed: implementer brief for TMA0 |
-| `TMA2.md` | Landed: delete TM1 tape-nav + TM5 second BP bank; keep HST1 FIND |
-| `TMA3.md` | Landed addendum: max turbo wipes Record; restore on leave |
-| `breakpoints.md` | Debugger BP product path (done through P5 + TRON) |
-| `video-paint.md` | Closed epic record: a2m-class paint into the beam |
-| `testing.md` | Gate, fixtures, deferred tests |
-| `video.md` | Current beam / paint facts |
-| `machine.md` | Machine API / banking sketch |
-| `frontend.md` | Host keys + frontend files |
-| `runtime.md` | Runtime client / turbo / frames |
-| `disk.md` | Disk II + SmartPort mount surface (incl. HostFS folder volumes) |
+Parked / not-now work lives in [`known-gaps.md`](known-gaps.md). Read it only
+if asked.
 
 ## Manual (users, not agents)
 
-`manual/manual.md`, `RELEASE.md`, root `README.md`.
-Before making changes to `manual/manual.md`, read `manual/HELP_MARKDOWN.md`.
+[`manual/manual.md`](../manual/manual.md) is the user-facing manual. It is also
+compiled into the in-emulator help overlay (`tools/gen_help.py` →
+`src/frontend/help_view.*`).
+
+Before editing `manual/manual.md`, read [`manual/HELP_MARKDOWN.md`](../manual/HELP_MARKDOWN.md)
+(ASCII-only subset; the help renderer is not full Markdown). If you add or
+change a user-facing feature, update `manual/manual.md` in the same change.
+Do not put agent notes or `agents/` links in the manual.

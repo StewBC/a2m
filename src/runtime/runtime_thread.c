@@ -2061,8 +2061,8 @@ static bool runtime_execute_breakpoint_actions(runtime *rt, const runtime_breakp
     bool turbo_changed = false;
 
     /*
-     * FAST → max free-run; SLOW → 1 MHz (real-time). Zip policy (turbo-zip.md).
-     * If both bits are set, apply FAST then SLOW so SLOW wins (c64m order).
+     * FAST -> max free-run; SLOW -> 1 MHz (real-time).
+     * If both bits are set, apply FAST then SLOW so SLOW wins.
      */
     if ((breakpoint->action_mask & RUNTIME_BREAKPOINT_ACTION_FAST) != 0) {
         if (rt->active_turbo_multiplier != RUNTIME_TURBO_MAX) {

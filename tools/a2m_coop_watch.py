@@ -10,7 +10,7 @@ saw in chat and the coder looks around. The coder steers the daemon through a
 file inbox: arm a watchpoint, dump more state, scrub the frame ring, or resume.
 
 Nothing here needs an a2m change; pure control-port orchestration on top of
-`tools/a2m_control_client.Ctl`. Epic: agents/control-tools.md.
+`tools/a2m_control_client.Ctl`. Ops brief: agents/control-tools.md.
 
 LAUNCH a2m (windowed, real-time so you play at speed and see real pixels):
 

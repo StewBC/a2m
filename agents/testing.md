@@ -10,7 +10,7 @@ ctest --test-dir build --output-on-failure
 
 Expect **61** green. Run from repo root.
 
-## Registered tests (product gate)
+## Registered tests
 
 | Name | Area |
 |------|------|
@@ -26,7 +26,7 @@ Expect **61** green. Run from repo root.
 | `video_block_paint` | full-frame block paint (text/hgr/lores/dlores) |
 | `diskii` | NIB mount + boot free-run |
 | `peripherals` | Mockingboard + SmartPort unit |
-| `hostfs` | HostFS NAPS parse/map, nested dirs, file+dir write-through, rescan, access-triggered refresh, CREATE reconcile, `hostfs.order`, mixed mount |
+| `hostfs` | HostFS NAPS, nested dirs, write-through, rescan, `hostfs.order` |
 | `cxxx_map` | CXXX / SETC3ROM / INTCXROM / MB hide / C800 latch |
 | `memview` | VIEW_FLAGS memory windows |
 | `apple2_snapshot` | Machine `.a2state` serialize round-trip |
@@ -34,46 +34,49 @@ Expect **61** green. Run from repo root.
 | `app_options_mounts` | Disk II / SmartPort / model CLI |
 | `runtime_stepping` | step + run_cycles |
 | `runtime_display_stop` | stop-path CRT: Override dumps RAM; beam keeps mid-frame raster |
-| `runtime_smartport_boot` | INI-style configured SmartPort startup redirects PC to `$Cn00` after mount |
+| `runtime_smartport_boot` | configured SmartPort startup redirects PC to `$Cn00` |
 | `runtime_step_nested` | step-over / out / run-to-cursor |
 | `runtime_memory_rpc` | token memory claim |
-| `runtime_breakpoint` | exec create/enable, composite RAM/C100/D000 mapping, access-aware write watchpoint |
+| `runtime_breakpoint` | exec create/enable, composite mapping, write watchpoint |
 | `runtime_breakpoint_ini` | `[DEBUG] break.*` load + save round-trip |
-| `memory_search` | String/hex parsing, case folding, next/previous, wrap, invalid-plane bytes |
-| `frontend_input` | Modern Backspace vs original Apple DEL mapping and physical Delete |
-| `help_view` | Headless nuklear render of the help overlay: search hit highlighting and the measured scroll correction |
-| `runtime_turbo` | turbo CSV MHz/max cycle / set; Configure live ladder apply |
-| `runtime_slot_resolve` | prefer-home then scan for Disk II / SmartPort slots |
+| `memory_search` | String/hex parsing, wrap, invalid-plane bytes |
+| `frontend_input` | Backspace vs original Apple DEL; physical Delete |
+| `help_view` | Headless nuklear help overlay (search hits + scroll correction) |
+| `runtime_turbo` | turbo CSV MHz/max; Configure live ladder apply |
+| `runtime_slot_resolve` | prefer-home then scan for Disk II / SmartPort |
 | `runtime_savestate` | save/load `.a2state` via runtime client |
-| `runtime_machine_files` | worker raw/NAPS load-save + Applesoft ASCII round trip |
-| `runtime_frame_ring` | ARGB rolling frame ring unit |
-| `runtime_history_basic` | Flight recorder free-run records (C3) |
-| `runtime_history_commands` | HISTORY_INFO/RECORD/CLEAR (C4a) |
-| `runtime_history_query` | FIND/READ/CLOSE + HST1 (C4b) |
-| `runtime_history_sessions` | Dual session FIND/NEXT isolation (S0/S1) |
-| `runtime_state_changed` | state-changed inform + cursor stale (S3) |
-| `runtime_inspector` | TM0: master enable arms HST1 + frame ring; pin-3 no re-arm; zero-budget empty tape |
-| `runtime_inspector_replay` | TM2: checkpoint + sealed materialize; media truncate; max kills window |
-| `runtime_inspector_mode` | TM3/TMA1: enter/exit NOW; land; read-only; sealed step; control mode/exit |
-| `runtime_inspector_bp` | TMA2: one BP list; time-travel run-until hits it or live; leave keeps it |
+| `runtime_machine_files` | worker raw/NAPS load-save + Applesoft ASCII |
+| `runtime_frame_ring` | ARGB rolling frame ring |
+| `runtime_history_basic` | Flight recorder free-run records |
+| `runtime_history_commands` | HISTORY_INFO/RECORD/CLEAR |
+| `runtime_history_query` | FIND/READ/CLOSE + HST1 |
+| `runtime_history_sessions` | Dual session FIND/NEXT isolation |
+| `runtime_state_changed` | state-changed inform + cursor stale |
+| `runtime_inspector` | master enable arms HST1 + frame ring; pin-3 no re-arm |
+| `runtime_inspector_replay` | checkpoint + sealed materialize; media truncate; max wipes window |
+| `runtime_inspector_mode` | enter/exit NOW; land; read-only; sealed step |
+| `runtime_inspector_bp` | one BP list; time-travel run-until hits it or live |
 | `control_protocol` | A2M parse + format (`src/control`) |
 | `assembler_*` | expressions/conditionals/loops/macros/scopes/targets/CPU profiles/multifile |
 | `runtime_assembler` | live RAM assembly + runtime event path |
-| `runtime_assembler_mli` | Assembler MLI launch gate (`$BF00`) + auto-run skip notice |
+| `runtime_assembler_mli` | MLI launch gate (`$BF00`) + auto-run skip notice |
 | `disasm_6502` | disassembler |
 | `disasm_pc_lock` | PC-centered disasm wrap ($FFFF/$0000) |
+| `am65_cli_65c02` / `am65_cli_wdc` | standalone `am65` CPU profiles |
+| `am65_cli_default_rejects_65c02` / `am65_cli_rockwell_rejects_wdc` | WILL_FAIL (wrong profile) |
 
-## Deferred (not in gate)
+A leftover `test_runtime_timemachine*` binary in `build/` is not in the gate.
 
-| Test | Why deferred |
-|------|----------------|
-| full history / HST1 control tests | Expand with remote-debug **C4** wire |
-| `frontend_help` | Generated help_view content |
+## Not in the gate
+
+| Item | Why |
+|------|-----|
+| Dedicated `frontend_help` content unit | Overlay is covered by `help_view`; CMake notes a content test if the public help API grows |
 
 ## Fixtures
 
 - `tests/fixtures/Apple DOS 3.3 January 1983.nib` — `diskii` + manual boot
-- `tests/fixtures/hostfs/` — NAPS-tagged files + `PRODOS#FF0000` for HostFS (`hostfs` ctest + manual `--smart s7d0=...`)
+- `tests/fixtures/hostfs/` — NAPS-tagged files + `PRODOS#FF0000` for HostFS
 
 ## Perf smoke
 

@@ -1,87 +1,91 @@
 # Runtime
 
-## Ownership
+Worker thread owns live `apple2_t` (`src/runtime/runtime_internal.h`).
+Frontend and control use **`runtime_client` only**. No live machine pointers
+in queues.
 
-- Worker thread owns live `apple2_t`.  
-- Frontend / control use **`runtime_client` only**.  
-- Frames: mutexed latest-wins ARGB slot (`poll_argb_frame`).  
-- No live machine pointers in queues.
+| Side channel | Notes |
+|--------------|-------|
+| Command / event queues | 256 slots each |
+| ARGB frame slot | Mutexed latest-wins (`poll_argb_frame`) |
+| Frame ring, debug memory, breakpoints, symbols, RPC pool | Own mutexes |
 
-## Turbo (Zip MHz + max)
+Solicited RPC uses a non-zero `request_token` (echoed on completions). Token
+`0` is unsolicited / UI telemetry and must not complete control deferred work.
+See `src/runtime/runtime_command.h`.
 
-Finite ladder entries are **MHz targets** (`N ×` Apple base Φ0 rate, beam paint).
-**`max` / `-1`** free-runs with **machine full-frame (block) paint** ~60 Hz wall
-(A-lite beam counters only; no beam pixel paint). Default ladder: **`1,max`**.
+Some identifiers still have leftover C64-shaped names
+(`RUNTIME_MEMORY_MODE_CPU_MAP` / `RAM` / `DRIVE8_MAP`, history KERNAL marker
+enums). They alias Apple meanings. Do not restore 1541/KERNAL product
+behavior.
 
-| Entry | Pacing | Video / free-run |
-|-------|--------|------------------|
-| Finite `N` | Aim `N ×` ~1.02 MHz (frame-quantum pace) | Beam path, Φ0 step |
-| `max` | Free-run **instruction quanta** (S2) | A-lite H/V/VBL (no pixel paint); block paint ~60 Hz wall; reseed beam on leave |
+Sessions: **`RUNTIME_SESSION_CAPACITY = 4`**. Default UI session id 1. Control
+TCP binds one `RUNTIME_SESSION_KIND_CONTROL` session. Mutations publish
+`RUNTIME_EVENT_STATE_CHANGED` (no exclusive lock). History FIND cursors are
+per session; a step/poke/reset from any asker marks them `CURSOR_STALE`.
 
-CLI `--turbo` / INI `turbo_speeds`. Opt+T cycles. Paste does **not** change turbo.
-FAST → max; SLOW → 1 MHz. Control: `set-turbo` accepts MHz, `max`, `-1`.
+## Turbo
 
-Epics: [`turbo-zip.md`](turbo-zip.md) (ladder/paint) · [`max-free-run.md`](max-free-run.md) (S2 speed path).
+Finite ladder entries are **MHz targets** (`N ×` Apple base Φ0, beam paint).
+**`max` / `0` / `-1`** free-runs with **instruction quanta** and **machine
+full-frame (block) paint** ~60 Hz wall. Encoding: milli-MHz, or
+`RUNTIME_TURBO_MAX` (0). Default ladder: **`1,max`**.
 
-## Client surface (product)
+| Entry | Pacing | Video / audio |
+|-------|--------|----------------|
+| Finite `N` | Aim `N ×` ~1.02 MHz (frame-quantum pace) | Beam path, Φ0 step; per-cycle audio |
+| `max` | Instruction quanta, ≤2e6 insns / ~1/60 s wall | A-lite H/V/VBL (no pixel paint); one `paint_full_frame` per quantum; **no host PCM** (AY time still advanced); reseed beam on leave |
 
-run/pause/reset/quit · step family · run_cycles/instructions · registers ·
-memory via VIEW_FLAGS · breakpoints · turbo · gameport · keyboard · paste ·
-mount helpers · poll events/frames/debug memory/breakpoints ·
-**`save_state` / `load_state`** (`.a2state` — [`snapshots.md`](snapshots.md)) ·
-machine-file load/save (raw, NAPS, AppleSingle, legacy DOS, Applesoft text).
+CLI `--turbo` / INI `turbo_speeds`. Opt+T cycles. Paste and TYPE do **not**
+change turbo. FAST → max; SLOW → 1 MHz. Control: `set-turbo` accepts MHz,
+`max`, or `-1` — not ladder indices.
 
-Machine-file parsing and all live-memory mutation run on the worker. Binary Auto
-uses AppleSingle magic first, then NAPS filename metadata, then a validated legacy
-four-byte address/length header, with raw fallback at the dialog address. Applesoft
-import sorts lines, rejects duplicates, tokenizes contextually, writes main RAM at
-`$0801`, and resets TXTTAB/VARTAB/ARYTAB/STREND/FRETOP/PRGEND and execution/data
-pointers. Export validates the linked program through VARTAB before detokenizing.
+Default `history_off_on_max` (true): entering max wipes TimeMachine Record.
+See [`timemachine.md`](timemachine.md). Opt-out: `--no-history-off-on-max`.
 
-Machine snapshots include copied slot/card and per-device media/queue state.
-Live media commands use `(slot, device)` for Disk II insert/eject/swap,
-SmartPort insert/eject, and slot boot; the frontend never reads `apple2_t`.
+## Client surface
 
-## Breakpoints
+run / pause / warm+cold reset / quit · step family · run_cycles/instructions ·
+registers · memory via VIEW_FLAGS · breakpoints · turbo · gameport · keyboard ·
+paste · media insert/eject/swap/boot · poll events/frames/debug memory ·
+**`save_state` / `load_state`** · machine-file load/save · assembler ·
+Inspector enter/leave/land/frame-step.
 
-Full epic: [`breakpoints.md`](breakpoints.md).
+Machine-file parsing and all live-memory mutation run on the worker. Binary
+Auto uses AppleSingle magic first, then NAPS filename metadata, then a
+validated legacy four-byte address/length header, with raw fallback at the
+dialog address. Applesoft import sorts lines, rejects duplicates, tokenizes
+contextually, writes main RAM at `$0801`, and repairs BASIC pointers. Export
+validates the linked program through VARTAB before detokenizing.
 
-| Piece | Status |
-|-------|--------|
-| CREATE/UPDATE/enable/rearm + full snapshot | **Works** (Phase 0) |
-| Free-run **execute** match (range, counter, condition) | **Works** (Phase 1) |
-| Mapping Map/Aux/LC1/LC2/ROM | **Works** (Phase 2) |
-| READ/WRITE access | **Works** (Phase 3) — `apple2` bus callback + hit-pending |
-| FAST/SLOW, TYPE, SWAP | **Works** (P4a/c/d); TRON deferred (P4b) |
-| INI `[DEBUG] break.*` | **Works** (P4e) — load at start; save on quit |
-| Client API | Full command surface |
-| Caveat | Host traps (e.g. SP `$C800`) are not opcode fetches |
-| Control BP RPC | **Done** (A2M/3, remote-debug C1) |
+Live media commands use `(slot, device)`. The frontend never reads `apple2_t`.
 
-Files: `runtime_thread.c`, `apple2` bus callback, `runtime_breakpoint_condition.*`, `runtime_breakpoint_ini.*`.
+## Assembler
 
-### Memory areas
+`runtime_assembler.c` wraps **am65**. Default CPU profile: 6502 for ][+, 65C02
+for //e Enhanced, then source directives. Predefines `AM65=0` and `APPLE2=1`.
 
-Map · Main · Aux · LC1 · LC2 · ROM (`apple2_read_in_view` / `write_in_view`).
+Named targets: `dest=` writes `map` / `main` / `aux` / `lc1` / `lc2`
+(combinations allowed); `file=` writes a host file beside the source; both
+together do both. A `file=`-only scope does not poke memory. Standalone `am65`
+uses `file=` and ignores `dest=` (and predefines `AM65=1`, no `APPLE2`).
 
-## Control port / remote debug
+**MLI launch:** mutually exclusive with Reset. Auto-run only if CPU-visible
+`$BF00 == $4C`; otherwise a notice and skip. Sets PC = run address, SP =
+`$01FF`, resumes.
 
-Full epic: [`remote-debug.md`](remote-debug.md).
+## Inspector / history
 
-| Item | Status |
-|------|--------|
-| Product wire | **Done** — A2M/13; `--control-port` windowed + headless |
-| A2M/13 | A2M/12 + Inspector names: `mode=live\|inspector` / `leave-inspector` / `read-only-inspector` / `inspector-*` `state-changed` reasons / capability `inspector` · ops: [`control-tools.md`](control-tools.md) |
-| Product `src/control` | Parked c64-shaped library (not linked) |
-| Frame ring | **Done** — ARGB ring, live push, control wire |
-| CPU history | **Done through C4c** — arena, observer, worker RPC, control wire |
-| Options | `history_memory_mb`, `frame_ring_memory_mb`, `inspector`, `inspector_memory_mb` wired into runtime |
-| Sessions | Fixed table N=4; per-session history cursors; `runtime_client_session_open/close`; control TCP binds `kind=control`; `RUNTIME_EVENT_STATE_CHANGED` |
+Time travel engine is runtime-owned (`runtime_inspector.*`,
+`runtime_history.*`, `runtime_frame_ring.*`). Product behavior:
+[`timemachine.md`](timemachine.md). Breakpoints: [`breakpoints.md`](breakpoints.md).
 
-## Deferred tests
+Budgets (defaults): history 256 MiB, frame ring 128 MiB, inspector checkpoints
+128 MiB. Master switch `[debug] inspector` / `--inspector` defaults **off**.
+Off → on arms HST1 + frame ring + checkpoint recorder.
 
-`runtime_assembler`, frame ring, history, savestate, and `control_protocol` are
-in the product ctest gate. Runtime assembly defaults to 6502 for Apple ][+ and
-65C02 for Apple //e Enhanced, then honors CPU directives in the source. It
-predefines `AM65=0` and `APPLE2=1`; named targets validate and resolve
-`map/main/aux/lc1/lc2` through Apple `VIEW_FLAGS` before writing bytes.
+## Tests
+
+Stepping, turbo, savestate, machine files, frame ring, history, sessions,
+state-changed, inspector (enable / replay / mode / bp), assembler + MLI,
+slot resolve, memory RPC, display stop.
