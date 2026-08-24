@@ -17,7 +17,7 @@
 | Machine | Apple II `src/machine` (//e Enhanced or ][+, Disk II, SmartPort, Mockingboard) |
 | Runtime | Two-thread; worker owns `apple2_t`; UI uses `runtime_client` only |
 | Display | ARGB **560×192** throughout (`display_frame` / runtime slot / frontend) |
-| Video paint | Beam-stepped **560×192** a2m-class: LORES, DLORES, 40/80 text, HGR colour, DHGR; max uses full-frame block paint |
+| Video paint | Beam-stepped **560×192** a2m-class: LORES, DLORES, 40/80 text, HGR colour, DHGR; host Colour vs discrete-bit Mono (White/Green/Amber); max uses full-frame block paint |
 | Memory areas | Map · Main · Aux · LC1 · LC2 · ROM |
 | Control port | **A2M/13 product-wired** (A2M/12 + Inspector names: `mode=live\|inspector`, `leave-inspector`, `read-only-inspector`, `inspector-*` `state-changed` reasons, capability `inspector`). Epic: [`remote-debug.md`](remote-debug.md) · [`sessions.md`](sessions.md). |
 | Snapshots | **`.a2state`** path save/load — drop, `--sna`, Opt+Shift+`.`/`,`, control. Epic: [`snapshots.md`](snapshots.md) |
@@ -34,6 +34,7 @@
 | **F12** / Shift+F12 | Run · run to cursor (time travel: re-execute to a breakpoint or **live**; stay in Inspect) |
 | **Opt+B** | Toggle execute BP at disasm cursor (same list in live and time travel) |
 | **Opt+T** | Cycle turbo ladder (MHz / max — [`turbo-zip.md`](turbo-zip.md)) |
+| **Shift+Opt+C** | Toggle colour / configured mono phosphor (White, Green, Amber) |
 | **Opt+Shift+.** / **,** | Quicksave / quickload `.a2state` |
 | **Opt+Shift+A** | Assemble configured source; honor reset / auto-run / MLI launch / one-shot options |
 | **Opt+H** / F1 | Help |
@@ -55,7 +56,7 @@ Keyboard stick (when on): Option/KP0 and Space are fire keys (optional swap in C
 |------|----------|
 | Build / ctest | **61 green** (`testing.md`; includes sessions + state-changed, file-codec, assembler MLI launch, TM0/TM2–TM3 + TMA1/TMA2, PC-lock disasm wrap) |
 | Assembler | Misc → Assembler: assemble to RAM / `file=` HostFS; optional Auto-run; **MLI launch** gates auto-run on CPU-visible `$BF00 == $4C` (mutually exclusive with Reset); sample shim in `samples/asm_mli_launch/` |
-| CLI / INI | model, mounts sNdN (multi-image queue), turbo MHz/`max`, lifecycle, headless; `[DEBUG] break.*` |
+| CLI / INI | model, mounts sNdN (multi-image queue), turbo MHz/`max`, `--video-display`, lifecycle, headless; `[DEBUG] break.*` |
 | Turbo / step / reset | Opt+T (MHz/max); F10–F12 family; F8 / Opt+F8 |
 | Display path | Full frame in display-only and F9 debugger |
 | Memory RPC | `runtime_memory_rpc` (ctest) |

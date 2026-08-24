@@ -74,6 +74,9 @@ typedef struct runtime_config {
     } smartport_mounts[16];
     int smartport_mount_count;
     int smartport_boot_slot; /* 1..7 forces startup at $Cn00 after unit 0 mounts. */
+    /* Host monitor: true = colour artefact decoder. phosphor 0=white 1=green 2=amber. */
+    bool video_colour;
+    uint8_t video_phosphor;
 } runtime_config;
 
 void runtime_config_set_turbo_defaults(runtime_config *config);

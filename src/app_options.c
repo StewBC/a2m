@@ -1735,6 +1735,20 @@ static void apply_config(app_options *options, config *cfg)
     }
     options->true_aspect = config_get_bool(
         cfg, "Video", "true_aspect", options->true_aspect);
+    if (config_get(cfg, "Video", "colour") != NULL) {
+        options->colour_display = config_get_bool(
+            cfg, "Video", "colour", options->colour_display);
+    } else if (config_get(cfg, "Video", "color") != NULL) {
+        options->colour_display = config_get_bool(
+            cfg, "Video", "color", options->colour_display);
+    }
+    value = config_get(cfg, "Video", "mono_mode");
+    if (value != NULL && value[0] != '\0') {
+        app_mono_mode parsed_mono = APP_MONO_WHITE;
+        if (app_mono_mode_from_string(value, &parsed_mono)) {
+            options->mono_mode = parsed_mono;
+        }
+    }
     options->crt_smoothing = config_get_bool(
         cfg, "Video", "crt_smoothing", options->crt_smoothing);
     options->crt_scanlines = config_get_bool(
@@ -1995,6 +2009,111 @@ static void apply_config(app_options *options, config *cfg)
     }
 }
 
+const char *app_mono_mode_name(app_mono_mode mode)
+{
+    switch (mode) {
+    case APP_MONO_GREEN:
+        return "green";
+    case APP_MONO_AMBER:
+        return "amber";
+    case APP_MONO_WHITE:
+    default:
+        return "white";
+    }
+}
+
+bool app_mono_mode_from_string(const char *s, app_mono_mode *out_mode)
+{
+    if (s == NULL || out_mode == NULL) {
+        return false;
+    }
+    if (strcasecmp(s, "white") == 0) {
+        *out_mode = APP_MONO_WHITE;
+        return true;
+    }
+    if (strcasecmp(s, "green") == 0) {
+        *out_mode = APP_MONO_GREEN;
+        return true;
+    }
+    if (strcasecmp(s, "amber") == 0) {
+        *out_mode = APP_MONO_AMBER;
+        return true;
+    }
+    return false;
+}
+
+static bool video_display_is_colour_token(const char *s)
+{
+    return s != NULL &&
+        (strcasecmp(s, "colour") == 0 || strcasecmp(s, "color") == 0);
+}
+
+static void video_display_trim_copy(char *dst, size_t dst_size, const char *src, size_t len)
+{
+    while (len > 0u && isspace((unsigned char)*src)) {
+        src++;
+        len--;
+    }
+    while (len > 0u && isspace((unsigned char)src[len - 1u])) {
+        len--;
+    }
+    if (dst_size == 0u) {
+        return;
+    }
+    if (len >= dst_size) {
+        len = dst_size - 1u;
+    }
+    memcpy(dst, src, len);
+    dst[len] = '\0';
+}
+
+bool app_options_apply_video_display_arg(app_options *options, const char *value)
+{
+    const char *comma;
+    char first[32];
+    char second[32];
+
+    if (options == NULL || value == NULL) {
+        return false;
+    }
+
+    comma = strchr(value, ',');
+    if (comma != NULL) {
+        video_display_trim_copy(
+            first, sizeof(first), value, (size_t)(comma - value));
+        video_display_trim_copy(
+            second, sizeof(second), comma + 1, strlen(comma + 1));
+        if (!video_display_is_colour_token(first) ||
+            !app_mono_mode_from_string(second, &options->mono_mode)) {
+            fprintf(
+                stderr,
+                "invalid --video-display `%s`; expected colour|color|white|"
+                "green|amber or colour,<mono>\n",
+                value);
+            return false;
+        }
+        options->colour_display = true;
+        return true;
+    }
+
+    video_display_trim_copy(first, sizeof(first), value, strlen(value));
+    if (video_display_is_colour_token(first)) {
+        options->colour_display = true;
+        return true;
+    }
+    if (app_mono_mode_from_string(first, &options->mono_mode)) {
+        options->colour_display = false;
+        return true;
+    }
+
+    fprintf(
+        stderr,
+        "invalid --video-display `%s`; expected colour|color|white|"
+        "green|amber or colour,<mono>\n",
+        value);
+    return false;
+}
+
 static bool apply_video_standard_arg(app_options *options, const char *value)
 {
     if (value == NULL) {
@@ -2072,6 +2191,7 @@ static bool parse_command_line_overrides(app_options *options, int argc, char **
     const char *disk_help = NULL;
     const char *hd_help = NULL;
     const char *kbdjoy_layout = NULL;
+    const char *video_display_s = NULL;
     float audio_record_start = 0.0f;
     float audio_record_duration = 0.0f;
     int show_version = 0;
@@ -2119,6 +2239,9 @@ static bool parse_command_line_overrides(app_options *options, int argc, char **
         OPT_BOOLEAN('r', "remember", &remember, "add save at quit to ini file", NULL, 0, OPT_NONEG),
         OPT_BOOLEAN('v', "saveini", &save_ini, "save to ini file at quit", NULL, 0, OPT_NONEG),
         OPT_STRING('t', "turbo", &turbo, "turbo ladder CSV: MHz and/or max (e.g. 1,max or 1,4,8,max)", NULL, 0, 0),
+        OPT_STRING('\0', "video-display", &video_display_s,
+                   "display decoder: colour|color|white|green|amber or colour,<mono>",
+                   NULL, 0, 0),
         OPT_INTEGER('\0', "kbdjoy", &kbdjoy_port,
                     "keyboard joystick on gameport stick: 0 off, 1 or 2", NULL, 0, 0),
         OPT_STRING('\0', "kbdjoy-layout", &kbdjoy_layout,
@@ -2133,6 +2256,7 @@ static bool parse_command_line_overrides(app_options *options, int argc, char **
         "\nDisk/HD: repeat -d/--disk and --hd/--smart; form s6d0=path.\n"
         "  Same drive twice (e.g. -d s6d0=a.nib -d s6d0=b.nib) builds a multi-image queue.\n"
         "Keyboard stick: --kbdjoy 0|1|2 and --kbdjoy-layout numpad|wasd.\n"
+        "Display: --video-display colour|white|green|amber or colour,<mono>.\n"
         "INI: --noini / --saveini / --remember / --defaults.\n");
     argparse_parse(&argparse, argc, (const char **)argv);
     (void)disk_help;
@@ -2216,6 +2340,10 @@ static bool parse_command_line_overrides(app_options *options, int argc, char **
             return false;
         }
         replace_string(&options->keyboard_joystick_layout, kbdjoy_layout);
+    }
+    if (video_display_s != NULL &&
+        !app_options_apply_video_display_arg(options, video_display_s)) {
+        return false;
     }
 
     if (remember) {
@@ -2317,6 +2445,8 @@ void app_options_init(app_options *options)
     options->scroll_wheel_lines = A2M_DEFAULT_SCROLL_WHEEL_LINES;
     options->original_del = false;
     replace_string(&options->video_standard, A2M_DEFAULT_VIDEO_STANDARD);
+    options->colour_display = true;
+    options->mono_mode = APP_MONO_WHITE;
     options->crt_scanline_strength = A2M_DEFAULT_CRT_SCANLINE_STRENGTH;
     options->crt_curvature_amount = A2M_DEFAULT_CRT_CURVATURE_AMOUNT;
     replace_string(&options->keyboard_joystick_layout,
@@ -2402,6 +2532,8 @@ bool app_options_copy(app_options *dest, const app_options *src)
     dest->pause_on_brk = src->pause_on_brk;
     dest->history_off_on_max = src->history_off_on_max;
     dest->true_aspect = src->true_aspect;
+    dest->colour_display = src->colour_display;
+    dest->mono_mode = src->mono_mode;
     dest->crt_smoothing = src->crt_smoothing;
     dest->crt_scanlines = src->crt_scanlines;
     dest->crt_scanline_strength = src->crt_scanline_strength;
@@ -2597,6 +2729,8 @@ bool app_options_save_shutdown(const app_options *options)
         config_set(cfg, "Video", "standard", options->video_standard);
     }
     config_set_bool(cfg, "Video", "true_aspect", options->true_aspect);
+    config_set_bool(cfg, "Video", "colour", options->colour_display);
+    config_set(cfg, "Video", "mono_mode", app_mono_mode_name(options->mono_mode));
     config_set_bool(cfg, "Video", "crt_smoothing", options->crt_smoothing);
     config_set_bool(cfg, "Video", "crt_scanlines", options->crt_scanlines);
     config_set_int(cfg, "Video", "crt_scanline_strength", options->crt_scanline_strength);

@@ -47,6 +47,12 @@ typedef struct app_smartport_mount {
     char *path;
 } app_smartport_mount;
 
+typedef enum app_mono_mode {
+    APP_MONO_WHITE = 0,
+    APP_MONO_GREEN = 1,
+    APP_MONO_AMBER = 2
+} app_mono_mode;
+
 typedef struct app_options {
     bool use_ini;
     bool save_ini;
@@ -62,6 +68,9 @@ typedef struct app_options {
     char *turbo_multipliers;
     char *symbol_files;
     char *video_standard;
+    /* Host monitor: colour artefact decoder vs discrete-bit mono phosphor. */
+    bool colour_display;
+    app_mono_mode mono_mode;
     /* Optional frontend-only CRT presentation. Strength/amount are 1..100. */
     bool true_aspect;
     /* Filter the display instead of showing hard pixel edges. Scanlines and
@@ -157,6 +166,12 @@ bool app_options_parse_slot_unit_key(const char *key, int *out_slot, int *out_un
 void app_options_sync_convenience_paths(app_options *options);
 /* Apply convenience buffers into mount lists (replaces those four targets). */
 bool app_options_apply_convenience_paths(app_options *options);
+
+const char *app_mono_mode_name(app_mono_mode mode);
+bool app_mono_mode_from_string(const char *s, app_mono_mode *out_mode);
+/* colour|color, white|green|amber, or colour,<mono>. Updates colour_display
+   and/or mono_mode. Prints to stderr and returns false on a bad token. */
+bool app_options_apply_video_display_arg(app_options *options, const char *value);
 
 void app_options_init(app_options *options);
 bool app_options_load_startup(app_options *options, int argc, char **argv);

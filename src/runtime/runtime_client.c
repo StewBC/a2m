@@ -687,6 +687,20 @@ bool runtime_client_set_display_override(
     return runtime_client_push(client, &command);
 }
 
+bool runtime_client_set_video_display(
+    runtime_client *client,
+    bool colour,
+    uint8_t phosphor) {
+    runtime_command command = { .type = RUNTIME_COMMAND_SET_VIDEO_DISPLAY };
+
+    if (!client) {
+        return false;
+    }
+    command.data.set_video_display.colour = colour ? 1u : 0u;
+    command.data.set_video_display.phosphor = phosphor;
+    return runtime_client_push(client, &command);
+}
+
 bool runtime_client_assemble_file(runtime_client *client, const char *path, uint16_t address) {
     runtime_command command = {
         .type = RUNTIME_COMMAND_ASSEMBLE_FILE,

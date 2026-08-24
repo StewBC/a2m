@@ -416,6 +416,9 @@ struct frontend {
     bool true_aspect;
     bool crt_smoothing;
     frontend_crt_effects crt_effects;
+    bool video_display_preview_valid;
+    bool video_display_preview_colour;
+    app_mono_mode video_display_preview_mono;
     uint32_t disk_led_seen_write_seq[2];
     uint64_t disk_led_write_until_ms;
     display_frame current_frame;
@@ -1283,6 +1286,45 @@ static const runtime_breakpoint_snapshot_entry *frontend_find_execute_breakpoint
     return NULL;
 }
 
+static void frontend_push_video_display_intent(
+    frontend *ui,
+    bool colour,
+    app_mono_mode mono_mode)
+{
+    size_t next;
+
+    if (ui == NULL) {
+        return;
+    }
+    next = (ui->intent_write + 1u) % FRONTEND_DEBUGGER_INTENT_CAPACITY;
+    if (next == ui->intent_read) {
+        return;
+    }
+    memset(&ui->intents[ui->intent_write], 0, sizeof(ui->intents[ui->intent_write]));
+    ui->intents[ui->intent_write].type =
+        FRONTEND_DEBUGGER_INTENT_SET_VIDEO_DISPLAY;
+    ui->intents[ui->intent_write].enabled = colour;
+    ui->intents[ui->intent_write].value = (uint16_t)mono_mode;
+    ui->intent_write = next;
+}
+
+static void frontend_preview_video_display(frontend *ui, const app_options *options)
+{
+    if (ui == NULL || options == NULL) {
+        return;
+    }
+    if (ui->video_display_preview_valid &&
+        ui->video_display_preview_colour == options->colour_display &&
+        ui->video_display_preview_mono == options->mono_mode) {
+        return;
+    }
+    ui->video_display_preview_valid = true;
+    ui->video_display_preview_colour = options->colour_display;
+    ui->video_display_preview_mono = options->mono_mode;
+    frontend_push_video_display_intent(
+        ui, options->colour_display, options->mono_mode);
+}
+
 static void frontend_push_display_override_intent(frontend *ui)
 {
     size_t next;
@@ -1631,6 +1673,7 @@ static void frontend_config_dialog_cancel(frontend *ui)
         return;
     }
     frontend_preview_crt_options(ui, &ui->config_dialog.original);
+    frontend_preview_video_display(ui, &ui->config_dialog.original);
     ui->config_dialog.open = false;
 }
 
@@ -2358,6 +2401,37 @@ static void frontend_draw_config_emulator_tab(frontend *ui, frontend_config_dial
     nk_spacing(ctx, 1);
     nk_layout_row_dynamic(ctx, 18.0f, 1);
     nk_label(ctx, "CRT display", NK_TEXT_LEFT);
+
+    nk_layout_row_begin(ctx, NK_DYNAMIC, 22.0f, 2);
+    nk_layout_row_push(ctx, 0.50f);
+    if (nk_option_label(ctx, "Colour", dialog->edited.colour_display)) {
+        dialog->edited.colour_display = true;
+    }
+    nk_layout_row_push(ctx, 0.50f);
+    if (nk_option_label(ctx, "Mono", !dialog->edited.colour_display)) {
+        dialog->edited.colour_display = false;
+    }
+    nk_layout_row_end(ctx);
+
+    {
+        static const char *mono_items[] = { "White", "Green", "Amber" };
+        int selected = (int)dialog->edited.mono_mode;
+        int next;
+
+        if (selected < 0 || selected > 2) {
+            selected = 0;
+        }
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 22.0f, 2);
+        nk_layout_row_push(ctx, 0.55f);
+        nk_label(ctx, "Mono Mode", NK_TEXT_LEFT);
+        nk_layout_row_push(ctx, 0.45f);
+        next = nk_combo(ctx, mono_items, 3, selected, 18, nk_vec2(180.0f, 120.0f));
+        if (next != selected) {
+            dialog->edited.mono_mode = (app_mono_mode)next;
+        }
+        nk_layout_row_end(ctx);
+    }
+
     nk_layout_row_dynamic(ctx, 22.0f, 1);
     frontend_checkbox_bool(ctx, "True Aspect Ratio", &dialog->edited.true_aspect);
 
@@ -2409,6 +2483,7 @@ static void frontend_draw_config_emulator_tab(frontend *ui, frontend_config_dial
     /* CRT presentation is a transactional live preview: edited values drive the
        frontend immediately, while Cancel restores dialog->original. */
     frontend_preview_crt_options(ui, &dialog->edited);
+    frontend_preview_video_display(ui, &dialog->edited);
 }
 
 /* Per-purpose default browse folders. They bind to the live ui->browse_dirs so
@@ -7647,6 +7722,9 @@ void frontend_set_config_state(frontend *ui, const app_options *options)
     keep_tab = ui->config_dialog.active_tab;
     ui->show_disk_leds = options->show_disk_leds;
     frontend_preview_crt_options(ui, options);
+    ui->video_display_preview_valid = true;
+    ui->video_display_preview_colour = options->colour_display;
+    ui->video_display_preview_mono = options->mono_mode;
 
     frontend_config_dialog_reset(&ui->config_dialog);
     if (!app_options_copy(&ui->config_dialog.original, options) ||
@@ -7675,6 +7753,17 @@ void frontend_sync_config_media_mounts(frontend *ui, const app_options *options)
 bool frontend_config_dialog_is_open(const frontend *ui)
 {
     return ui != NULL && ui->config_dialog.open;
+}
+
+bool frontend_config_toggle_colour_preview(frontend *ui)
+{
+    if (ui == NULL || !ui->config_dialog.open || !ui->config_dialog.initialized) {
+        return false;
+    }
+    ui->config_dialog.edited.colour_display =
+        !ui->config_dialog.edited.colour_display;
+    frontend_preview_video_display(ui, &ui->config_dialog.edited);
+    return true;
 }
 
 void frontend_set_disk_queue(frontend *ui, uint8_t device, const app_disk_slot *slot)

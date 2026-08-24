@@ -4288,6 +4288,16 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         apple2_video_paint_full_frame(&rt->machine);
         runtime_publish_argb_frame(rt);
         break;
+    case RUNTIME_COMMAND_SET_VIDEO_DISPLAY:
+        rt->config.video_colour = cmd->data.set_video_display.colour != 0u;
+        rt->config.video_phosphor = cmd->data.set_video_display.phosphor;
+        apple2_video_set_monitor(
+            &rt->machine,
+            rt->config.video_colour,
+            (apple2_video_phosphor)rt->config.video_phosphor);
+        apple2_video_paint_full_frame(&rt->machine);
+        runtime_publish_argb_frame(rt);
+        break;
 
     /* ---- History C4a: info / record on|off / clear ---- */
     case RUNTIME_COMMAND_HISTORY_INFO:
@@ -4651,6 +4661,10 @@ int runtime_thread_main(void *userdata)
         rt->symbols = NULL;
         return 1;
     }
+    apple2_video_set_monitor(
+        &rt->machine,
+        rt->config.video_colour,
+        (apple2_video_phosphor)rt->config.video_phosphor);
     apple2_set_memory_access_callback(&rt->machine, runtime_on_memory_access, rt);
     apple2_set_model(
         &rt->machine,

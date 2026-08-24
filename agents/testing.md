@@ -22,7 +22,7 @@ Expect **61** green. Run from repo root.
 | `cpu65_basic` | CPU |
 | `softswitch` | banking / LC / kbd / gameport |
 | `rom_boot` | //e and ][+ banners |
-| `video_beam` | VBL / floating bus / PAGE2 / LORES / DLORES / HGR / 80-col / DHGR |
+| `video_beam` | VBL / floating bus / PAGE2 / LORES / DLORES / HGR / 80-col / DHGR / mono bits |
 | `video_block_paint` | full-frame block paint (text/hgr/lores/dlores) |
 | `diskii` | NIB mount + boot free-run |
 | `peripherals` | Mockingboard + SmartPort unit |

@@ -654,6 +654,146 @@ static void test_dhgr_nonblack(void)
     apple2_shutdown(&m);
 }
 
+static const uint32_t MONO_WHITE = 0xFFFFFFFFu;
+static const uint32_t MONO_GREEN = 0xFF33FF66u;
+static const uint32_t MONO_AMBER = 0xFFFFB000u;
+
+static uint32_t expect_phosphor_luma(uint32_t phosphor, uint32_t src)
+{
+    unsigned int r = (src >> 16) & 0xffu;
+    unsigned int g = (src >> 8) & 0xffu;
+    unsigned int b = src & 0xffu;
+    unsigned int y = (299u * r + 587u * g + 114u * b) / 1000u;
+    unsigned int pr = (phosphor >> 16) & 0xffu;
+    unsigned int pg = (phosphor >> 8) & 0xffu;
+    unsigned int pb = phosphor & 0xffu;
+    return 0xFF000000u |
+        (((pr * y) / 255u) << 16) |
+        (((pg * y) / 255u) << 8) |
+        ((pb * y) / 255u);
+}
+
+static void test_hgr_mono_discrete_bits(void)
+{
+    apple2_t m;
+    const uint32_t *fb;
+    uint16_t off;
+    int b;
+
+    if (!apple2_init(&m)) {
+        fail("init");
+    }
+
+    softswitch_c0_write(&m, 0xC050, 0);
+    softswitch_c0_write(&m, 0xC052, 0);
+    softswitch_c0_write(&m, 0xC057, 0);
+    softswitch_c0_write(&m, 0xC054, 0);
+
+    off = apple2_video_hgr_line_offset(0);
+    memset(m.ram_main + 0x2000u + off, 0, 40);
+    /* bit0 leftmost; 0x55 = on/off/on/off/on/off/on. bit7 of 0xAA ignored. */
+    m.ram_main[0x2000u + off + 0] = 0x55u;
+    m.ram_main[0x2000u + off + 1] = 0xAAu;
+
+    apple2_video_set_monitor(&m, false, APPLE2_VIDEO_PHOSPHOR_GREEN);
+    apple2_video_paint_full_frame(&m);
+    fb = apple2_video_framebuffer(&m);
+
+    for (b = 0; b < 7; b++) {
+        uint32_t want = ((0x55u >> b) & 1u) ? MONO_GREEN : 0xFF000000u;
+        expect_u32("hgr mono 0x55 even", want, fb[(size_t)(b * 2)]);
+        expect_u32("hgr mono 0x55 odd", want, fb[(size_t)(b * 2 + 1)]);
+    }
+    for (b = 0; b < 7; b++) {
+        uint32_t want = ((0x2Au >> b) & 1u) ? MONO_GREEN : 0xFF000000u;
+        expect_u32("hgr mono 0xAA ignores bit7", want, fb[(size_t)(14 + b * 2)]);
+    }
+
+    apple2_video_set_monitor(&m, true, APPLE2_VIDEO_PHOSPHOR_WHITE);
+    apple2_video_paint_full_frame(&m);
+    {
+        int saw_violet = 0;
+        int x;
+        for (x = 0; x < 14; x++) {
+            if (fb[x] == HGR_VIOLET) {
+                saw_violet = 1;
+            }
+        }
+        expect_true("colour decoder restored", saw_violet);
+    }
+
+    apple2_shutdown(&m);
+}
+
+static void test_dhgr_mono_discrete_bits(void)
+{
+    apple2_t m;
+    const uint32_t *fb;
+    uint16_t off;
+    int x;
+
+    if (!apple2_init(&m)) {
+        fail("init");
+    }
+
+    softswitch_c0_write(&m, 0xC050, 0);
+    softswitch_c0_write(&m, 0xC052, 0);
+    softswitch_c0_write(&m, 0xC057, 0);
+    softswitch_c0_write(&m, 0xC00D, 0);
+    softswitch_c0_write(&m, 0xC05E, 0);
+
+    off = apple2_video_hgr_line_offset(0);
+    for (x = 0; x < 40; x++) {
+        m.ram_main[0x2000u + off + (uint16_t)x] = 0;
+        m.ram_main[0x10000u + 0x2000u + off + (uint16_t)x] = 0;
+    }
+    m.ram_main[0x10000u + 0x2000u + off] = 0x01u;
+
+    apple2_video_set_monitor(&m, false, APPLE2_VIDEO_PHOSPHOR_AMBER);
+    apple2_video_paint_full_frame(&m);
+    fb = apple2_video_framebuffer(&m);
+    expect_u32("dhgr mono bit0 on", MONO_AMBER, fb[0]);
+    expect_u32("dhgr mono bit1 off", 0xFF000000u, fb[1]);
+    expect_u32("dhgr mono bit2 off", 0xFF000000u, fb[2]);
+
+    apple2_shutdown(&m);
+}
+
+static void test_lores_mono_phosphor_luma(void)
+{
+    apple2_t m;
+    const uint32_t *fb;
+    uint16_t base;
+
+    if (!apple2_init(&m)) {
+        fail("init");
+    }
+
+    softswitch_c0_write(&m, 0xC050, 0);
+    softswitch_c0_write(&m, 0xC052, 0);
+    softswitch_c0_write(&m, 0xC056, 0);
+    base = apple2_video_text_line_base(0);
+    m.ram_main[0x400u + base + 0] = 0x0Fu; /* white */
+    m.ram_main[0x400u + base + 1] = 0x00u; /* black */
+    m.ram_main[0x400u + base + 2] = 0x05u; /* gray1 */
+
+    apple2_video_set_monitor(&m, false, APPLE2_VIDEO_PHOSPHOR_GREEN);
+    apple2_video_paint_full_frame(&m);
+    fb = apple2_video_framebuffer(&m);
+
+    expect_u32("lores mono white", MONO_GREEN, fb[0]);
+    expect_u32("lores mono black", 0xFF000000u, fb[14]);
+    expect_u32(
+        "lores mono gray",
+        expect_phosphor_luma(MONO_GREEN, EXPECT_LORES[5]),
+        fb[28]);
+    expect_true(
+        "gray darker than white",
+        (fb[28] & 0x00FF00u) < (MONO_GREEN & 0x00FF00u));
+
+    apple2_shutdown(&m);
+}
+
 int main(void)
 {
     test_timing_constants();
@@ -669,6 +809,9 @@ int main(void)
     test_hgr_color_bits();
     test_text80_interleave();
     test_dhgr_nonblack();
+    test_hgr_mono_discrete_bits();
+    test_dhgr_mono_discrete_bits();
+    test_lores_mono_phosphor_luma();
     printf("video_beam: all tests passed\n");
     return 0;
 }

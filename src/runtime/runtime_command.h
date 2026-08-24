@@ -67,6 +67,7 @@ typedef enum runtime_command_type {
     RUNTIME_COMMAND_MEDIA_SWAP,
     RUNTIME_COMMAND_BOOT_SLOT,
     RUNTIME_COMMAND_SET_DISPLAY_OVERRIDE,
+    RUNTIME_COMMAND_SET_VIDEO_DISPLAY,
     RUNTIME_COMMAND_INSPECTOR_SET_ENABLED,
     RUNTIME_COMMAND_INSPECTOR_ENTER,
     RUNTIME_COMMAND_INSPECTOR_LEAVE,
@@ -204,6 +205,11 @@ typedef struct runtime_command {
             uint32_t flags;
             uint8_t enabled;
         } set_display_override;
+
+        struct {
+            uint8_t colour;   /* 1 = colour artefact decoder */
+            uint8_t phosphor; /* 0 white, 1 green, 2 amber */
+        } set_video_display;
 
         /* Disk II write-protect notch (slot 1–7, drive 0/1). */
         struct {

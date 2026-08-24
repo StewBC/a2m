@@ -562,6 +562,80 @@ int main(void)
         expect_true("remove inspector INI", remove(path) == 0);
     }
 
+    {
+        char *argv_green[] = {
+            (char *)"a2m",
+            (char *)"--noini",
+            (char *)"--video-display",
+            (char *)"green",
+        };
+        char *argv_colour_amber[] = {
+            (char *)"a2m",
+            (char *)"--noini",
+            (char *)"--video-display",
+            (char *)"colour,amber",
+        };
+        char *argv_color[] = {
+            (char *)"a2m",
+            (char *)"--noini",
+            (char *)"--video-display",
+            (char *)"color",
+        };
+        app_options scratch;
+
+        app_options_init(&scratch);
+        expect_true("default colour", scratch.colour_display);
+        expect_true("default white", scratch.mono_mode == APP_MONO_WHITE);
+        expect_true(
+            "apply green token",
+            app_options_apply_video_display_arg(&scratch, "green"));
+        expect_true("green is mono", !scratch.colour_display);
+        expect_true("green phosphor", scratch.mono_mode == APP_MONO_GREEN);
+        expect_true(
+            "colour leaves phosphor",
+            app_options_apply_video_display_arg(&scratch, "colour"));
+        expect_true("back to colour", scratch.colour_display);
+        expect_true("phosphor still green", scratch.mono_mode == APP_MONO_GREEN);
+        expect_true(
+            "compound colour,white",
+            app_options_apply_video_display_arg(&scratch, "color, white"));
+        expect_true("compound stays colour", scratch.colour_display);
+        expect_true("compound sets white", scratch.mono_mode == APP_MONO_WHITE);
+        expect_true(
+            "bad token rejected",
+            !app_options_apply_video_display_arg(&scratch, "blue"));
+        app_options_destroy(&scratch);
+
+        expect_true(
+            "cli green",
+            app_options_load_startup(
+                &options,
+                (int)(sizeof(argv_green) / sizeof(argv_green[0])),
+                argv_green));
+        expect_true("cli green mono", !options.colour_display);
+        expect_true("cli green mode", options.mono_mode == APP_MONO_GREEN);
+        app_options_destroy(&options);
+
+        expect_true(
+            "cli colour,amber",
+            app_options_load_startup(
+                &options,
+                (int)(sizeof(argv_colour_amber) / sizeof(argv_colour_amber[0])),
+                argv_colour_amber));
+        expect_true("cli compound colour", options.colour_display);
+        expect_true("cli compound amber", options.mono_mode == APP_MONO_AMBER);
+        app_options_destroy(&options);
+
+        expect_true(
+            "cli color spelling",
+            app_options_load_startup(
+                &options,
+                (int)(sizeof(argv_color) / sizeof(argv_color[0])),
+                argv_color));
+        expect_true("cli color is colour", options.colour_display);
+        app_options_destroy(&options);
+    }
+
     printf("OK app_options_mounts\n");
     return 0;
 }

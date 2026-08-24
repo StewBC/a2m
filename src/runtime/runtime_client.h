@@ -162,6 +162,11 @@ bool runtime_client_set_display_override(
     runtime_client *client,
     bool enabled,
     uint32_t flags);
+/* Host monitor decoder. colour=true is artefact paint; phosphor is 0..2. */
+bool runtime_client_set_video_display(
+    runtime_client *client,
+    bool colour,
+    uint8_t phosphor);
 bool runtime_client_assemble_file(runtime_client *client, const char *path, uint16_t address);
 bool runtime_client_assemble_file_full(
     runtime_client *client,

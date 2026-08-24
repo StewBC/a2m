@@ -47,11 +47,6 @@ uint16_t apple2_video_hgr_line_offset(uint8_t pixel_row)
     return hgr_row_start[pixel_row];
 }
 
-static uint32_t rgb(uint8_t r, uint8_t g, uint8_t b)
-{
-    return 0xFF000000u | ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
-}
-
 /* a2m palette_16 — LORES (and text on/off). ARGB8888. */
 static const uint32_t LORES_PALETTE[16] = {
     0xFF000000u, /* 0  Black */
@@ -71,6 +66,17 @@ static const uint32_t LORES_PALETTE[16] = {
     0xFF62F699u, /* 14 Aqua */
     0xFFFFFFFFu  /* 15 White */
 };
+
+/* P4 white, P1-ish green, P3-ish amber. On-pixel colour for discrete bits. */
+static const uint32_t PHOSPHOR_ARGB[3] = {
+    0xFFFFFFFFu,
+    0xFF33FF66u,
+    0xFFFFB000u
+};
+
+/* LORES/DLORES: phosphor x Rec.601 luma of LORES_PALETTE, one table per
+   phosphor. Filled in paint_init_luts. */
+static uint32_t mono_lores[3][16];
 
 /*
  * a2m HGR Holger-Picker 3-bit window palette (phase selects green/violet vs
@@ -174,8 +180,52 @@ static void paint_init_luts(void)
         }
     }
 
+    for (pattern = 0; pattern < 16; pattern++) {
+        uint32_t src = LORES_PALETTE[pattern];
+        unsigned int r = (src >> 16) & 0xffu;
+        unsigned int g = (src >> 8) & 0xffu;
+        unsigned int b = src & 0xffu;
+        unsigned int y = (299u * r + 587u * g + 114u * b) / 1000u;
+        int ph;
+        for (ph = 0; ph < 3; ph++) {
+            unsigned int pr = (PHOSPHOR_ARGB[ph] >> 16) & 0xffu;
+            unsigned int pg = (PHOSPHOR_ARGB[ph] >> 8) & 0xffu;
+            unsigned int pb = PHOSPHOR_ARGB[ph] & 0xffu;
+            mono_lores[ph][pattern] =
+                0xFF000000u |
+                (((pr * y) / 255u) << 16) |
+                (((pg * y) / 255u) << 8) |
+                ((pb * y) / 255u);
+        }
+    }
+
     paint_luts_ready = 1;
-    (void)rgb;
+}
+
+static int video_phosphor_index(const apple2_video *v)
+{
+    int p = (v != NULL) ? (int)v->phosphor : 0;
+    if (p < 0 || p > 2) {
+        return 0;
+    }
+    return p;
+}
+
+static uint32_t paint_on_colour(const apple2_video *v)
+{
+    if (v == NULL || !v->mono) {
+        return LORES_PALETTE[15];
+    }
+    return PHOSPHOR_ARGB[video_phosphor_index(v)];
+}
+
+static uint32_t paint_cell_colour(const apple2_video *v, unsigned int nibble)
+{
+    nibble &= 15u;
+    if (v == NULL || !v->mono) {
+        return LORES_PALETTE[nibble];
+    }
+    return mono_lores[video_phosphor_index(v)][nibble];
 }
 
 static uint8_t video_read_host(const apple2_t *m, uint32_t host_offset)
@@ -474,7 +524,7 @@ static void paint_text_glyph(apple2_t *m, uint16_t line, uint16_t x0, uint8_t ch
     /* a2m: leftmost host pixel is bit6 of the glyph row. */
     for (b = 0; b < 7; b++) {
         int on = (bits >> (6 - b)) & 1;
-        uint32_t color = on ? LORES_PALETTE[15] : LORES_PALETTE[0];
+        uint32_t color = on ? paint_on_colour(v) : LORES_PALETTE[0];
         if (pixel_double) {
             paint_dot_x2(v, line, (uint16_t)(x0 + (uint16_t)(b * 2)), color);
         } else {
@@ -512,7 +562,7 @@ static void paint_lores_column(apple2_t *m, uint16_t line, uint16_t col, uint8_t
     apple2_video *v = &m->video;
     uint8_t nibble =
         ((line & 7u) < 4u) ? (uint8_t)(byte & 0x0Fu) : (uint8_t)((byte >> 4) & 0x0Fu);
-    uint32_t color = LORES_PALETTE[nibble & 0x0Fu];
+    uint32_t color = paint_cell_colour(v, nibble);
     uint16_t x0 = (uint16_t)(col * (uint16_t)APPLE2_VIDEO_PIXELS_PER_COLUMN);
     int b;
 
@@ -550,7 +600,7 @@ static void paint_dlores_half(
         return;
     }
 
-    color = LORES_PALETTE[nibble & 0x0Fu];
+    color = paint_cell_colour(v, nibble);
     for (b = 0; b < 7; b++) {
         v->fb[(size_t)line * (size_t)APPLE2_VIDEO_WIDTH + (size_t)x0 + (size_t)b] =
             color;
@@ -608,6 +658,17 @@ static void paint_hgr_column(apple2_t *m, uint16_t line, uint16_t col, uint8_t b
 
     if (x0 + (uint16_t)APPLE2_VIDEO_PIXELS_PER_COLUMN > APPLE2_VIDEO_WIDTH ||
         line >= APPLE2_VIDEO_HEIGHT || v->fb == NULL) {
+        return;
+    }
+
+    if (v->mono) {
+        uint32_t on = paint_on_colour(v);
+        int bit;
+        for (bit = 0; bit < 7; bit++) {
+            uint32_t color = ((byte >> bit) & 1) ? on : LORES_PALETTE[0];
+            paint_dot_x2(
+                v, line, (uint16_t)(x0 + (uint16_t)(bit * 2)), color);
+        }
         return;
     }
 
@@ -671,6 +732,15 @@ static void paint_dhgr_line(apple2_t *m, uint16_t line)
             row_bits[index++] = (uint8_t)(stream & 1u);
             stream >>= 1;
         }
+    }
+
+    if (v->mono) {
+        uint32_t on = paint_on_colour(v);
+        for (x = 0; x < APPLE2_VIDEO_WIDTH; x++) {
+            v->fb[(size_t)line * (size_t)APPLE2_VIDEO_WIDTH + (size_t)x] =
+                row_bits[2 + x] ? on : LORES_PALETTE[0];
+        }
+        return;
     }
 
     for (x = 0; x < APPLE2_VIDEO_WIDTH; x++) {
@@ -810,6 +880,22 @@ void apple2_video_set_display_override(
     }
     m->video.display_override_enabled = enabled;
     m->video.display_override_flags = flags & mask;
+}
+
+void apple2_video_set_monitor(
+    apple2_t *m,
+    bool colour,
+    apple2_video_phosphor phosphor)
+{
+    if (m == NULL) {
+        return;
+    }
+    paint_init_luts();
+    m->video.mono = !colour;
+    if (phosphor > APPLE2_VIDEO_PHOSPHOR_AMBER) {
+        phosphor = APPLE2_VIDEO_PHOSPHOR_WHITE;
+    }
+    m->video.phosphor = phosphor;
 }
 
 void apple2_video_init(apple2_t *m)

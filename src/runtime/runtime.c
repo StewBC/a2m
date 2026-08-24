@@ -50,6 +50,8 @@ void runtime_config_init(runtime_config *config)
     config->diskii_mount_count = 0;
     config->smartport_mount_count = 0;
     config->smartport_boot_slot = 0;
+    config->video_colour = true;
+    config->video_phosphor = 0;
 }
 
 bool runtime_turbo_parse_token(const char *token, uint32_t *out_milli_mhz)

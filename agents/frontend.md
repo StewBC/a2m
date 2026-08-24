@@ -64,6 +64,11 @@ it is still on the list. The resulting machine snapshot refreshes Misc.
 Configure → Emulator places **Original DEL behaviour** immediately below Scroll
 Wheel Speed. It persists as `[config] original_del` and live-switches Backspace
 between cursor-left `$08` (off) and Apple DEL `$7F` (on); Delete is always `$7F`.
+Under **CRT display**, Colour / Mono radios and Mono Mode (White / Green / Amber)
+live-preview via a worker repaint; Cancel restores the decoder from dialog open.
+INI `[Video] colour` + `mono_mode`. **Shift+Opt+C** toggles Colour and the
+configured phosphor (works display-only). `--video-display` uses the same CLI
+pipeline as other flags.
 
 ## Machine media view
 

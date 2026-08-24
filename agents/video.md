@@ -32,12 +32,14 @@ Floating bus: active video = scanner byte; blanking = last latch.
 
 | Mode | Quality |
 |------|---------|
-| Text 40 | a2m-class flash/inverse; white on black; dots ×2 into 560 |
+| Text 40 | a2m-class flash/inverse; white (or phosphor) on black; dots ×2 into 560 |
 | Text 80 | a2m main/aux interleave; 7 host px/glyph into 560 |
-| LORES | a2m 16-colour cells (upper/lower nibble); 14 px/cell |
+| LORES | a2m 16-colour cells; Mono = phosphor × luma lookup of the same 16 |
 | DLORES | a2m aux/main 7-px half-columns + `double_aux_map`; PAGE2; mixed → 80-col text |
-| HGR | a2m Holger-Picker colour LUT; dots ×2 into 560 |
-| DHGR | a2m 5-bit window + LORES palette; full line at h=0 |
+| HGR | Colour: Holger-Picker neighbour LUT, dots ×2. Mono: 7 data bits on/off, bit 7 ignored |
+| DHGR | Colour: 5-bit window + LORES palette. Mono: the same 560 bits on/off |
+
+Host monitor (`apple2_video_set_monitor`): Colour vs discrete Mono. Phosphor White / Green / Amber. Not snapshotted. CLI `--video-display`, INI `[Video] colour` + `mono_mode`, Shift+Opt+C, Configure → Emulator.
 
 ## Tests
 

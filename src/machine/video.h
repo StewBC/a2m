@@ -28,6 +28,12 @@ enum {
     APPLE2_VIDEO_PIXELS_PER_COLUMN = 14
 };
 
+typedef enum apple2_video_phosphor {
+    APPLE2_VIDEO_PHOSPHOR_WHITE = 0,
+    APPLE2_VIDEO_PHOSPHOR_GREEN = 1,
+    APPLE2_VIDEO_PHOSPHOR_AMBER = 2
+} apple2_video_phosphor;
+
 typedef struct apple2_video {
     uint16_t cycle_in_line; /* 0..64 */
     uint16_t line;          /* 0..261 */
@@ -38,6 +44,10 @@ typedef struct apple2_video {
     bool paint_enabled;
     bool display_override_enabled;
     uint32_t display_override_flags;
+    /* Host monitor: 0 = colour artefact decoder, 1 = discrete bits. Not
+       snapshotted; memset default is colour + white phosphor. */
+    bool mono;
+    apple2_video_phosphor phosphor;
 
     /* ARGB8888, row-major APPLE2_VIDEO_WIDTH × APPLE2_VIDEO_HEIGHT */
     uint32_t *fb;
@@ -86,6 +96,15 @@ void apple2_video_set_display_override(
     struct apple2 *m,
     bool enabled,
     uint32_t flags);
+
+/* Host monitor decoder. colour=true is the artefact LUT path; false paints
+   discrete on/off bits (HGR/DHGR/text) and phosphor-luma LORES cells.
+   Does not paint; caller issues paint_full_frame when a coherent frame is
+   needed. */
+void apple2_video_set_monitor(
+    struct apple2 *m,
+    bool colour,
+    apple2_video_phosphor phosphor);
 
 /*
  * After max free-run (video offline), re-seed beam H/V from total Φ0 so

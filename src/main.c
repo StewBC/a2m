@@ -997,6 +997,14 @@ static bool key_is_quick_assemble_shortcut(const SDL_KeyboardEvent *key)
         frontend_input_has_shift_modifier(key);
 }
 
+static bool key_is_video_display_shortcut(const SDL_KeyboardEvent *key)
+{
+    return key != NULL &&
+        key->keysym.sym == SDLK_c &&
+        frontend_input_has_option_modifier(key) &&
+        frontend_input_has_shift_modifier(key);
+}
+
 static bool send_quicksave(
     runtime_client *client,
     const app_options *options,
@@ -1682,6 +1690,10 @@ static void dispatch_intent(
         (void)runtime_client_set_display_override(
             client, intent->enabled, intent->display_override_flags);
         break;
+    case FRONTEND_DEBUGGER_INTENT_SET_VIDEO_DISPLAY:
+        (void)runtime_client_set_video_display(
+            client, intent->enabled, (uint8_t)intent->value);
+        break;
     case FRONTEND_DEBUGGER_INTENT_ASSEMBLE_RUN:
         if (intent->assemble_rearm_oneshots) {
             (void)runtime_client_rearm_oneshot_breakpoints(client);
@@ -1976,6 +1988,10 @@ static void dispatch_intent(
             if (client != NULL) {
                 (void)runtime_client_set_history_off_on_max(
                     client, options->history_off_on_max);
+                (void)runtime_client_set_video_display(
+                    client,
+                    options->colour_display,
+                    (uint8_t)options->mono_mode);
             }
         }
         break;
@@ -2263,6 +2279,8 @@ static bool apply_options_to_runtime_config(const app_options *options, runtime_
     }
     rt_config->smartport_mount_count = n;
     rt_config->smartport_boot_slot = options->smartport_boot_slot;
+    rt_config->video_colour = options->colour_display;
+    rt_config->video_phosphor = (uint8_t)options->mono_mode;
     return true;
 }
 
@@ -2779,6 +2797,22 @@ int main(int argc, char **argv)
                     uint16_t addr = 0;
                     if (frontend_get_disassembly_cursor(ui, &addr)) {
                         (void)runtime_client_run_to_cursor(client, addr);
+                    }
+                    send_event_to_frontend = false;
+                } else if (key_is_video_display_shortcut(&event.key)) {
+                    release_solid_apple_keys(client);
+                    if (ui == NULL ||
+                        !frontend_config_toggle_colour_preview(ui)) {
+                        options.colour_display = !options.colour_display;
+                        if (client != NULL) {
+                            (void)runtime_client_set_video_display(
+                                client,
+                                options.colour_display,
+                                (uint8_t)options.mono_mode);
+                        }
+                        if (ui != NULL) {
+                            frontend_set_config_state(ui, &options);
+                        }
                     }
                     send_event_to_frontend = false;
                 } else if (sym == SDLK_t &&

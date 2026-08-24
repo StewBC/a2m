@@ -127,6 +127,7 @@ typedef enum frontend_debugger_intent_type {
     FRONTEND_DEBUGGER_INTENT_MEDIA_SWAP,
     FRONTEND_DEBUGGER_INTENT_BOOT_SLOT,
     FRONTEND_DEBUGGER_INTENT_SET_DISPLAY_OVERRIDE,
+    FRONTEND_DEBUGGER_INTENT_SET_VIDEO_DISPLAY,
     FRONTEND_DEBUGGER_INTENT_INSPECTOR_SET_ENABLED,
     FRONTEND_DEBUGGER_INTENT_INSPECTOR_ENTER,
     FRONTEND_DEBUGGER_INTENT_INSPECTOR_LEAVE,
@@ -290,6 +291,9 @@ void frontend_set_config_state(frontend *ui, const app_options *options);
    options without discarding other in-progress Configure edits. */
 void frontend_sync_config_media_mounts(frontend *ui, const app_options *options);
 bool frontend_config_dialog_is_open(const frontend *ui);
+/* If Configure is open, flip the edited Colour/Mono radios and queue a live
+   preview. Returns true when the dialog handled it (Cancel still undoes). */
+bool frontend_config_toggle_colour_preview(frontend *ui);
 bool frontend_trigger_assembler(frontend *ui);
 /* device: Disk II drive 0 or 1. */
 void frontend_set_disk_queue(frontend *ui, uint8_t device, const app_disk_slot *slot);

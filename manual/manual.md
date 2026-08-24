@@ -38,6 +38,7 @@ Useful flags:
 | `--control-port N` | Listen on localhost TCP for A2M/13 remote control (`0`=off) |
 | `--inspector` / `--no-inspector` | Enable Inspector recording (default off) |
 | `--audio-smoke` | Emit a 440 Hz test tone to verify audio output |
+| `--video-display <mode>` | Display decoder: `colour`/`color`, `white`, `green`, `amber`, or `colour,<mono>` |
 
 By default, a2m loads `a2m.ini` from the current directory. The INI file stores
 configuration, window size, debugger layout, media mounts, and breakpoints.
@@ -1359,16 +1360,24 @@ titles that expect a gameport have a keyboard stick without a pad.
 | Scroll Wheel Speed | Number of rows scrolled per wheel click (1-100) |
 | Original DEL behaviour | Backspace sends Apple II DEL (`$7F`) instead of cursor-left (`$08`). The physical Delete key always sends DEL |
 | Symbol Files | Add symbol files and display the comma-separated list of selected files |
+| Colour / Mono | Colour uses artefact colour (HGR neighbour LUT, DHGR 5-bit window). Mono paints discrete on/off bits in the selected phosphor. Live preview; Cancel restores the decoder that was active when Configure opened |
+| Mono Mode | Phosphor for Mono, and the target **Shift+Opt+C** switches to: White, Green, or Amber. Editable while Colour is selected |
 | True Aspect Ratio | Keep a classic 4:3 Apple monitor shape; off stretches the picture to fill the view |
 | CRT Smoothing | Filter the picture instead of showing hard pixel edges; forced on by CRT Scanlines and CRT Curvature |
 | CRT Scanlines | Simulate the dark gap between raster lines; the slider sets strength from 1-100% |
 | CRT Curvature | Bend the picture toward a curved CRT surface; the slider sets amount from 1-100% |
 
 The CRT controls are a live preview: checkboxes and sliders update the Apple 2 display
-while Configure remains open. **[Cancel]** or the dialog close button restores the
+while Configure remains open. Colour / Mono and Mono Mode are the same: they repaint
+the current frame immediately. **[Cancel]** or the dialog close button restores the
 values that were active when Configure opened. **[OK]** accepts them. All three
 effects are optional and independent; with them disabled, a2m uses the original
 rectangular render path.
+
+**Shift+Opt+C** toggles Colour and the configured Mono Mode. It works with Debug Mode
+closed. While Configure is open it moves the radios (Cancel still undoes). Lo-res
+cells keep their brightness as shades of the phosphor; HGR and DHGR drop artefact
+colour and show the raw bits.
 
 ### Paths
 
@@ -1456,6 +1465,8 @@ Default layout: slot 4 Mockingboard, slot 6 Disk II, slot 7 SmartPort, others em
 | Key | Value |
 |-----|-------|
 | `true_aspect` | `true`/`false`; true keeps 4:3, false fills the view |
+| `colour` | `true`/`false`; true is the artefact colour decoder (also read from `color`) |
+| `mono_mode` | `white`, `green`, or `amber`; phosphor for Mono and for **Shift+Opt+C** |
 | `crt_smoothing` | `true`/`false`; filter the picture rather than show hard pixel edges |
 | `crt_scanlines` | `true`/`false`; enable scanlines |
 | `crt_scanline_strength` | Integer 1-100; scanline darkness (default `35`) |
@@ -1638,6 +1649,7 @@ macOS, **Opt** = Option/Alt.
 | **F8** | Warm reset (CTRL+RESET) |
 | **Opt+F8** | Cold reset (CTRL+Open-Apple+RESET) |
 | **Opt+T** | Cycle turbo mode |
+| **Shift+Opt+C** | Toggle Colour and the configured Mono CRT (White / Green / Amber) |
 | **Opt+Tab** | Cycle active view: Apple 2 -> Disassembly -> Misc -> Memory |
 | **Shift+Opt+Tab** | Cycle active view in reverse |
 | **Opt+1** | Map gamepad to stick 1 |
