@@ -78,7 +78,7 @@ turbo = 1,2.5,max      # fractional MHz OK if parser allows
 | Entry | Pacing | Video |
 |-------|--------|--------|
 | Finite `N` | Aim `N × APPLE2_CPU_FREQUENCY_HZ` Φ0/wall-s (frame-quantum pace like a2m) | Full **beam** path (current accurate path) |
-| `max` / `-1` | Free-run (no cycle budget) | **No** beam paint; **block** full-frame paint ~60 Hz wall |
+| `max` / `-1` | Free-run (no cycle budget) | **No** beam pixel paint; A-lite H/V so `$C019` still tracks elapsed Φ0; **block** full-frame paint ~60 Hz wall |
 
 Opt+T cycles the configured list (same UX as today, new meanings).
 

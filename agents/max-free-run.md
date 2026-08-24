@@ -30,7 +30,8 @@ Product intent for **max**:
 |-------|---------|-----|
 | **C0** | Instruction + mem + softswitches + banking | **Keep** |
 | **C1** | Devices on *elapsed* Φ0 (disk spin, VIA/AY budgets, paddles) | **Keep** (batch by insn cycle count) |
-| **C2** | Beam position / VBL exact mid-insn | **Drop** while max; reseed on exit |
+| **C1v** | VBL/HBL visible via `$C019` / beam counters | **Keep** at instruction granularity (O(1) A-lite). Frozen `$C019` hangs VBL waiters (Total Replay). Mid-insn exactness is not required. |
+| **C2** | Per-Φ0 beam **pixel paint** / mid-insn scanner | **Drop** while max; reseed on exit |
 | **C3** | Floating bus / vapor-lock pixels | **Drop** while max |
 | **C4** | Debugger (history every insn) | Prefer keep; degrade only if gate fails |
 
@@ -44,12 +45,12 @@ Product intent for **max**:
 each wall quantum (~1/60 s):
   while wall time remains in quantum:
     BP check at instruction boundary (if any BP / temp)
-    apple2_step_instruction_max()   // whole insn, no video_step
+    apple2_step_instruction_max()   // whole insn; O(1) A-lite H/V; no paint
     type-script tick with ran cycles (cheap)
   block paint full frame + publish (live slot + ring)
 ```
 
-- **No** per-Φ0 `video_step` / scanner / paint-at-beam.
+- **No** per-Φ0 scanner / paint-at-beam. A-lite H/V (and `$C019`) advance O(1) per instruction from elapsed Φ0.
 - **No** per-Φ0 audio PCM path (same as today free-run: AY reconcile optional / once per quantum max).
 - Peripherals: **once per instruction** with `ran` cycles (`peripherals_step(ran)`).
 - Finite N MHz: unchanged paced beam path.
@@ -77,7 +78,7 @@ each wall quantum (~1/60 s):
 
 | Task | Detail |
 |------|--------|
-| `apple2_step_instruction_max` | Full instruction; **no** video; `peripherals_step(ran)` once; return Φ0 ran |
+| `apple2_step_instruction_max` | Full instruction; **no** pixel paint; O(1) A-lite H/V/VBL; `peripherals_step(ran)` once; return Φ0 ran |
 | `apple2_video_reseed_from_cycles` | `line` / `cycle_in_line` from `cycles % frame_geometry` |
 
 ### M1 — Runtime max loop
@@ -87,6 +88,7 @@ each wall quantum (~1/60 s):
 | Free-run max | Wall-quantum insn loop (a2m-shaped), not 1024× `step_cycle` |
 | Finite free-run | Keep existing Φ0 batch + pace |
 | Audio | Max: no per-cycle produce; optional no-op / quantum reconcile |
+| VBL | O(1) A-lite H/V per insn so `$C019` waiters complete; not per-Φ0 paint |
 | Leave max | Reseed beam |
 
 ### M2 — Gate + docs

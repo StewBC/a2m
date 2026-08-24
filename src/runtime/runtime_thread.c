@@ -2581,7 +2581,8 @@ static void runtime_free_run_max_quantum(runtime *rt)
     rt->next_block_paint_counter = deadline;
 
     /*
-     * Instruction-quantized free-run (S2). No per-Φ0 video/audio.
+     * Instruction-quantized free-run (S2). No per-Φ0 paint/audio; A-lite
+     * H/V/VBL rides each insn so $C019 waiters still complete.
      * Guard caps a pathological host so the command queue still services.
      */
     {

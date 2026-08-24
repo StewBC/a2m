@@ -132,13 +132,103 @@ int main(void)
     expect_true("reseed line", m.video.line == 10);
     expect_true("reseed h", m.video.cycle_in_line == 7);
 
-    /* Max instruction path advances cycles without moving beam. */
+    /* A-lite jump: wrap a frame and land in VBL without painting. */
     {
-        uint16_t line0 = m.video.line;
-        uint16_t h0 = m.video.cycle_in_line;
-        size_t ran = apple2_step_instruction_max(&m);
+        uint32_t pixel0;
+        m.video.line = 261;
+        m.video.cycle_in_line = 60;
+        m.video.frame_number = 5;
+        m.video.paint_enabled = false;
+        pixel0 = fb[0];
+        apple2_video_advance_alite(&m, 10u);
+        expect_true("alite wrap line", m.video.line == 0);
+        expect_true("alite wrap h", m.video.cycle_in_line == 5);
+        expect_true("alite wrap frame", m.video.frame_number == 6);
+        expect_true("alite wrap not vbl", !apple2_video_in_vbl(&m));
+        apple2_video_advance_alite(
+            &m,
+            (uint32_t)APPLE2_VIDEO_VBL_START_LINE * APPLE2_VIDEO_CYCLES_PER_LINE);
+        expect_true("alite vbl line", m.video.line == APPLE2_VIDEO_VBL_START_LINE);
+        expect_true("alite vbl", apple2_video_in_vbl(&m));
+        expect_true(
+            "alite C019", (softswitch_c0_read(&m, 0xC019) & 0x80u) != 0);
+        expect_true("alite does not paint", fb[0] == pixel0);
+        m.video.paint_enabled = true;
+    }
+
+    /* Max instruction path advances A-lite H/V (and thus $C019) by ran. */
+    {
+        uint16_t line0;
+        uint16_t h0;
+        size_t ran;
+        uint32_t pos1;
+        m.video.line = 10;
+        m.video.cycle_in_line = 7;
+        m.video.paint_enabled = false;
+        line0 = m.video.line;
+        h0 = m.video.cycle_in_line;
+        ran = apple2_step_instruction_max(&m);
         expect_true("max insn ran", ran > 0);
-        expect_true("max insn beam still", m.video.line == line0 && m.video.cycle_in_line == h0);
+        pos1 = ((uint32_t)line0 * (uint32_t)APPLE2_VIDEO_CYCLES_PER_LINE +
+                (uint32_t)h0 + (uint32_t)ran) %
+            (uint32_t)APPLE2_VIDEO_CYCLES_PER_FRAME;
+        expect_true(
+            "max insn beam advanced",
+            m.video.line ==
+                    (uint16_t)(pos1 / (uint32_t)APPLE2_VIDEO_CYCLES_PER_LINE) &&
+                m.video.cycle_in_line ==
+                    (uint16_t)(pos1 % (uint32_t)APPLE2_VIDEO_CYCLES_PER_LINE));
+    }
+
+    /*
+     * Guest $C019 waiters (Total Replay, most games) hang forever if max
+     * freezes the beam. Drive enough max instructions to enter and leave VBL.
+     */
+    {
+        uint64_t start;
+        uint32_t guard;
+        const uint64_t vbl_cycles =
+            (uint64_t)APPLE2_VIDEO_VBL_START_LINE *
+            (uint64_t)APPLE2_VIDEO_CYCLES_PER_LINE;
+        const uint64_t frame_cycles = (uint64_t)APPLE2_VIDEO_CYCLES_PER_FRAME;
+
+        m.video.paint_enabled = false;
+        m.video.line = 0;
+        m.video.cycle_in_line = 0;
+        expect_true("max start not vbl", !apple2_video_in_vbl(&m));
+        expect_true(
+            "max start C019 low",
+            (softswitch_c0_read(&m, 0xC019) & 0x80u) == 0);
+
+        start = apple2_cycles(&m);
+        guard = 0u;
+        while ((apple2_cycles(&m) - start) < (vbl_cycles + 8u)) {
+            expect_true("max to vbl ran", apple2_step_instruction_max(&m) > 0);
+            if (++guard > 2000000u) {
+                expect_true("max to vbl finished", 0);
+                break;
+            }
+        }
+        expect_true("max path reaches vbl", apple2_video_in_vbl(&m));
+        expect_true(
+            "max path C019 high",
+            (softswitch_c0_read(&m, 0xC019) & 0x80u) != 0);
+
+        start = apple2_cycles(&m);
+        guard = 0u;
+        while ((apple2_cycles(&m) - start) <
+               ((frame_cycles - vbl_cycles) + 8u)) {
+            expect_true("max out of vbl ran", apple2_step_instruction_max(&m) > 0);
+            if (++guard > 2000000u) {
+                expect_true("max out of vbl finished", 0);
+                break;
+            }
+        }
+        expect_true("max path leaves vbl", !apple2_video_in_vbl(&m));
+        expect_true(
+            "max path C019 low",
+            (softswitch_c0_read(&m, 0xC019) & 0x80u) == 0);
+        m.video.paint_enabled = true;
     }
 
     apple2_shutdown(&m);

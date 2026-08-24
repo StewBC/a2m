@@ -1002,7 +1002,7 @@ uint32_t apple2_state_flags(const apple2_t *machine)
 
 /*
  * begin_video_devices: true for beam-accurate path (video + peripherals per
- * quantum). false for max free-run (caller batches peripherals; no video).
+ * quantum). false for max free-run (caller batches A-lite H/V + peripherals).
  */
 static void apple2_begin_cpu_work(apple2_t *machine, bool begin_video_devices)
 {
@@ -1174,7 +1174,7 @@ size_t apple2_step_instruction_max(apple2_t *machine)
     machine->instruction_complete = false;
     apple2_begin_cpu_work(machine, false);
     while (machine->cpu.micro_active) {
-        /* IRQ/NMI still use micro; finish without video. */
+        /* IRQ/NMI still use micro; A-lite H/V applied below from ran. */
         if (cpu65_micro_step(&machine->cpu)) {
             machine->instruction_complete = true;
             apple2_observer_complete(machine);
@@ -1183,12 +1183,11 @@ size_t apple2_step_instruction_max(apple2_t *machine)
 
     ran = (size_t)(machine->cpu.cpu.cycles - start);
     /*
-     * Caller may batch peripherals (runtime max loop). When ran==0, error.
-     * Peripherals applied here so standalone callers stay C1-correct; runtime
-     * may call apple2_peripherals_step in coarser batches after several insns
-     * only if it uses a no-periph variant — for now step here once per insn.
+     * A-lite H/V so $C019 / HBL still track elapsed Φ0 (C1-visible video
+     * timing). No per-cycle paint. Peripherals once per insn (C1 devices).
      */
     if (ran > 0u) {
+        apple2_video_advance_alite(machine, (uint32_t)ran);
         apple2_peripherals_step(machine, (uint32_t)ran);
     }
     return ran;

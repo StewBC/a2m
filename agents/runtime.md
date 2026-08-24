@@ -16,7 +16,7 @@ Finite ladder entries are **MHz targets** (`N ×` Apple base Φ0 rate, beam pain
 | Entry | Pacing | Video / free-run |
 |-------|--------|------------------|
 | Finite `N` | Aim `N ×` ~1.02 MHz (frame-quantum pace) | Beam path, Φ0 step |
-| `max` | Free-run **instruction quanta** (S2) | No beam; block paint ~60 Hz wall; reseed beam on leave |
+| `max` | Free-run **instruction quanta** (S2) | A-lite H/V/VBL (no pixel paint); block paint ~60 Hz wall; reseed beam on leave |
 
 CLI `--turbo` / INI `turbo_speeds`. Opt+T cycles. Paste does **not** change turbo.
 FAST → max; SLOW → 1 MHz. Control: `set-turbo` accepts MHz, `max`, `-1`.

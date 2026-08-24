@@ -862,8 +862,8 @@ void apple2_video_step(apple2_t *m)
     }
     v = &m->video;
 
-    /* A-lite (max turbo): advance H/V only — no paint, no scanner RAM peeks.
-       VBL soft-switch still tracks line. Floating-bus is stale until beam resumes. */
+    /* Paint-off: advance H/V only — no scanner RAM peeks. VBL still tracks
+       line. Floating-bus is stale until beam paint resumes. */
     if (v->paint_enabled) {
         paint_at_beam(m);
     }
@@ -878,6 +878,30 @@ void apple2_video_step(apple2_t *m)
             v->frame_gen++;
             v->frame_ready = true;
         }
+    }
+}
+
+void apple2_video_advance_alite(apple2_t *m, uint32_t n)
+{
+    apple2_video *v;
+    uint64_t pos;
+    uint64_t frames;
+
+    if (m == NULL || n == 0u) {
+        return;
+    }
+    v = &m->video;
+    pos = (uint64_t)v->line * (uint64_t)APPLE2_VIDEO_CYCLES_PER_LINE +
+        (uint64_t)v->cycle_in_line + (uint64_t)n;
+    frames = pos / (uint64_t)APPLE2_VIDEO_CYCLES_PER_FRAME;
+    pos %= (uint64_t)APPLE2_VIDEO_CYCLES_PER_FRAME;
+    v->line = (uint16_t)(pos / (uint64_t)APPLE2_VIDEO_CYCLES_PER_LINE);
+    v->cycle_in_line =
+        (uint16_t)(pos % (uint64_t)APPLE2_VIDEO_CYCLES_PER_LINE);
+    if (frames > 0u) {
+        v->frame_number += frames;
+        v->frame_gen += (uint32_t)frames;
+        v->frame_ready = true;
     }
 }
 

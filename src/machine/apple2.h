@@ -248,7 +248,8 @@ void apple2_set_key(apple2_t *machine, uint8_t key_with_strobe);
 size_t apple2_step_instruction(apple2_t *machine);
 /*
  * Max free-run: complete one instruction (or finish current micro) with no
- * video_step. Advances peripherals once by Φ0 ran. Returns Φ0 executed.
+ * per-Φ0 beam paint. Advances A-lite H/V/VBL and peripherals once by Φ0 ran.
+ * Returns Φ0 executed.
  */
 size_t apple2_step_instruction_max(apple2_t *machine);
 bool apple2_step_cycle(apple2_t *machine);

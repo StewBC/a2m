@@ -54,6 +54,12 @@ void apple2_video_step(struct apple2 *m);
 /* Advance video by N cycles (for multi-cycle CPU atomic fallback). */
 void apple2_video_step_n(struct apple2 *m, uint32_t n);
 
+/*
+ * Max / A-lite: jump H/V (and thus $C019 VBL / HBL) by n Φ0 with no paint
+ * and no scanner. O(1) so the max instruction loop stays flat-out.
+ */
+void apple2_video_advance_alite(struct apple2 *m, uint32_t n);
+
 bool apple2_video_in_vbl(const struct apple2 *m);
 bool apple2_video_in_hblank(const struct apple2 *m);
 
