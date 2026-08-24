@@ -26,7 +26,7 @@ This design adds a **full-window Forensics mode**: a scrollback transcript of FI
 | Layer | Role today |
 |-------|------------|
 | `src/runtime/runtime_history.*` | Bounded arena recorder; `runtime_history_find` / `read` with full `runtime_history_query` (epoch, timeline, cycle, pc, address, access, value, opcodes, direction). |
-| `src/runtime/runtime_history_wire.*` | HST1 encode (24-byte header + 48-byte record headers + 8-byte accesses). Encode-only; no C decode API yet. |
+| `src/runtime/runtime_history_wire.*` | HST1 encode/decode (24-byte header + 48-byte record headers + 8-byte accesses). Decode validates like `Ctl.decode_hst1`. |
 | `src/control/control_dispatch.c` | Thin caller of shared `runtime_history_parse_find_options` (full grammar; was minimal six-key before PR 1). |
 | `tools/a2m_control_client.py` | Decode + `format_hst1_record` / `format_hst1_page` (canonical human line shape, including marker forms and multi-access compact lines). |
 | Misc → Inspector (`frontend_draw_misc_inspector`) | Record / Inspect / slider / Leave. Uses `FRONTEND_DEBUGGER_INTENT_INSPECTOR_*` → `runtime_client_inspector_*`. |

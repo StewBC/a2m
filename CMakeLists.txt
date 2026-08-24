@@ -395,6 +395,17 @@ target_compile_features(test_runtime_history_query_parse PRIVATE c_std_99)
 target_link_libraries(test_runtime_history_query_parse PRIVATE runtime)
 add_test(NAME runtime_history_query_parse COMMAND test_runtime_history_query_parse)
 
+# HST1 decode API (round-trip + Python Ctl.decode_hst1 golden).
+add_executable(test_runtime_history_wire_decode
+    tests/runtime/test_runtime_history_wire_decode.c
+)
+target_compile_features(test_runtime_history_wire_decode PRIVATE c_std_99)
+target_compile_definitions(test_runtime_history_wire_decode PRIVATE
+    A2M_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+)
+target_link_libraries(test_runtime_history_wire_decode PRIVATE runtime)
+add_test(NAME runtime_history_wire_decode COMMAND test_runtime_history_wire_decode)
+
 add_executable(test_runtime_history_sessions
     tests/runtime/test_runtime_history_sessions.c
 )

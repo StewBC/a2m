@@ -29,3 +29,17 @@ runtime_history_wire_result runtime_history_wire_encode(
     uint32_t *out_length,
     size_t *out_encoded_count,
     bool *out_clipped);
+
+/*
+ * Decode one HST1 v1 payload (same validation as Ctl.decode_hst1).
+ * On OK: *out_records is malloc'd (count elements); caller free()s it.
+ * If out_anchor_matches != NULL, also malloc a parallel bool array (free it).
+ * On failure: outs are NULL/0 and nothing is allocated.
+ */
+runtime_history_wire_result runtime_history_wire_decode(
+    const uint8_t *bytes,
+    size_t length,
+    uint64_t *out_epoch,
+    runtime_history_record **out_records,
+    bool **out_anchor_matches,
+    size_t *out_count);

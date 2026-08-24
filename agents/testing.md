@@ -8,7 +8,7 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-Expect **62** green. Run from repo root.
+Expect **63** green. Run from repo root.
 
 ## Registered tests
 
@@ -51,6 +51,7 @@ Expect **62** green. Run from repo root.
 | `runtime_history_commands` | HISTORY_INFO/RECORD/CLEAR |
 | `runtime_history_query` | FIND/READ/CLOSE + HST1 |
 | `runtime_history_query_parse` | Shared history-find option grammar + key tables |
+| `runtime_history_wire_decode` | HST1 decode round-trip + Python `Ctl.decode_hst1` golden |
 | `runtime_history_sessions` | Dual session FIND/NEXT isolation |
 | `runtime_state_changed` | state-changed inform + cursor stale |
 | `runtime_inspector` | master enable arms HST1 + frame ring; pin-3 no re-arm |
