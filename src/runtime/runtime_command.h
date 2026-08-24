@@ -72,6 +72,7 @@ typedef enum runtime_command_type {
     RUNTIME_COMMAND_INSPECTOR_ENTER,
     RUNTIME_COMMAND_INSPECTOR_LEAVE,
     RUNTIME_COMMAND_INSPECTOR_LAND,
+    RUNTIME_COMMAND_INSPECTOR_LAND_TO_CYCLE,
     RUNTIME_COMMAND_INSPECTOR_FRAME_STEP
 } runtime_command_type;
 
@@ -332,6 +333,10 @@ typedef struct runtime_command {
         struct {
             uint64_t cycle;
         } inspector_land;
+
+        struct {
+            uint64_t cycle;
+        } inspector_land_to_cycle;
 
         struct {
             int8_t direction; /* +1 forward frame, -1 previous frame */

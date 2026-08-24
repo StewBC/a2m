@@ -1889,6 +1889,12 @@ static void dispatch_intent(
         (void)runtime_client_inspector_land(client, intent->inspector_cycle, token);
         break;
     }
+    case FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND_TO_CYCLE: {
+        uint64_t token = runtime_client_alloc_request_token(client);
+        (void)runtime_client_inspector_land_to_cycle(
+            client, intent->inspector_cycle, token);
+        break;
+    }
     case FRONTEND_DEBUGGER_INTENT_INSPECTOR_PAUSE:
         (void)runtime_client_pause(client);
         break;

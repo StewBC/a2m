@@ -68,12 +68,15 @@ typedef struct frontend_forensics_state {
     bool request_submit; /* Query Enter → frontend parses + pushes intent */
     bool line_truncated; /* last format hit FORMAT_CAP */
     bool query_rewrite_pending; /* Tab autocomplete rewrote query; re-focus edit */
-    /* PR5 Land Inspector (quantized). */
+    /* Land Inspector: quantized (before) and exact (PR6). */
     bool land_confirm_open; /* Inspect & Land popup */
-    bool request_land; /* flush: push LAND (and ENTER if request_land_enter) */
-    bool request_land_enter; /* ENTER before LAND */
+    bool land_confirm_exact; /* confirm is for Land exact */
+    bool request_land; /* flush: push land (and ENTER if request_land_enter) */
+    bool request_land_exact; /* LAND_TO_CYCLE vs quantized LAND */
+    bool request_land_enter; /* ENTER before land */
     uint64_t pending_land_cycle;
     bool land_awaiting_focus; /* wait for post-land inspector_focus_cycle */
+    bool land_awaiting_exact; /* status wording: exact vs quantized */
     uint64_t land_requested_cycle;
 } frontend_forensics_state;
 

@@ -4484,6 +4484,18 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
             }
         }
         break;
+    case RUNTIME_COMMAND_INSPECTOR_LAND_TO_CYCLE:
+        if (rt->inspecting) {
+            /* Publish once after exact land even on partial (best-effort focus). */
+            (void)runtime_inspector_land_to_cycle(
+                rt, cmd->data.inspector_land_to_cycle.cycle);
+            runtime_inspector_publish_head(rt);
+            runtime_publish_state_changed(
+                rt,
+                RUNTIME_STATE_CHANGED_INSPECTOR_LAND,
+                cmd->session_id);
+        }
+        break;
     case RUNTIME_COMMAND_INSPECTOR_FRAME_STEP:
         if (rt->inspecting) {
             if (runtime_inspector_frame_step(rt, (int)cmd->data.inspector_frame_step.direction)) {
@@ -4589,7 +4601,9 @@ static void runtime_free_run_batch(runtime *rt)
 
 static bool runtime_command_is_inspector_land(const runtime_command *cmd)
 {
-    return cmd != NULL && cmd->type == RUNTIME_COMMAND_INSPECTOR_LAND;
+    return cmd != NULL &&
+        (cmd->type == RUNTIME_COMMAND_INSPECTOR_LAND ||
+         cmd->type == RUNTIME_COMMAND_INSPECTOR_LAND_TO_CYCLE);
 }
 
 static bool runtime_command_preempts_inspector_land(const runtime_command *cmd)

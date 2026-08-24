@@ -93,6 +93,10 @@ void runtime_inspector_apply_logged_inputs(
 bool runtime_inspector_load_nearest_checkpoint(runtime *rt, uint64_t cycle);
 bool runtime_inspector_restore_live(runtime *rt);
 bool runtime_inspector_land(runtime *rt, uint64_t cycle);
+/* Exact land: nearest checkpoint ≤ target then sealed reexecute_to(target)
+   in one call (no intermediate UI publish). Returns false on hard failure or
+   if focus could not reach the clamped target (best-effort focus still set). */
+bool runtime_inspector_land_to_cycle(runtime *rt, uint64_t target_cycle);
 bool runtime_inspector_reexecute_to(runtime *rt, uint64_t target_cycle);
 bool runtime_inspector_frame_step(runtime *rt, int direction);
 

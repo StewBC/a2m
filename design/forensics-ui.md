@@ -117,8 +117,8 @@ stateDiagram-v2
 
 ```text
 +---------------------------------------------------+
-|  [Close]  Forensics  [Clear view] [Copy]    |
-|           [Land at cycle]                         |
+|  [Close]  Forensics  [Clear view] [Copy]          |
+|           [Land before] [Land exact]              |
 +---------------------------------------------------+
 |                text results go here               |
 |              (scrollback transcript)              |
@@ -355,7 +355,7 @@ flowchart LR
 2. Sealed `reexecute_to(target)` without publishing an intermediate quantized focus/CRT flash to the UI,  
 3. Syncs focus.
 
-Slider release stays on quantized `runtime_inspector_land` only. Forensics Land button switches to the exact client API when PR 6 lands.
+Slider release stays on quantized `runtime_inspector_land` only. Forensics exposes **two** land actions (PR 6): **Land before** (quantized ≤ N — land early, step into the hit) and **Land exact** (`land_to_cycle`). Do not replace the quantized control when exact ships.
 
 **Failure/partial:** if reexecute cannot reach N (step failure / target above live after clamp), helper restores best-effort focus, returns false, and Forensics status reports `focus_cycle` vs requested N. Do **not** implement exact land as two UI→worker RPCs (`land` then `reexecute_to`) — that flashes an intermediate state and races other inspector intents.
 
@@ -377,7 +377,8 @@ Refresh from `history-info` on Forensics open, after record toggles, and after e
 | Esc / Close | Leave Forensics mode only |
 | Clear view | Clear transcript |
 | Copy | Clipboard selected line/block (or last result) |
-| Land at cycle | One-shot land when a record selection exists; **Inspect & Land** confirm if live but `can_enter` |
+| Land before | Quantized land (checkpoint ≤ selected cycle); **Inspect & Land** confirm if live but `can_enter` |
+| Land exact | Exact `land_to_cycle` (PR 6); same confirm when live but `can_enter` |
 | Query Enter | Run verb |
 
 Record enable stays on the Inspector tab (and Configure/CLI). Forensics shows recording state but does not require a second Record checkbox in v1.
@@ -551,7 +552,7 @@ Fuzz find-option strings in shared parse tests.
 4. **In-process `runtime_client_history_*`, not self-TCP** — Claim via `runtime_client_claim_history_rpc` in `main.c`.
 5. **Expand find parser early into `src/runtime/runtime_history_query_parse.*`** — Normative grammar above; public key table drives autocomplete; control and UI share one implementation. Docs-only stopgap only if expansion slips.
 6. **Land is one-shot; slider is never FIND-driven.** When live but `can_enter`, **Inspect & Land** confirm (not soft-fail-only).
-7. **v1 land = quantized `runtime_inspector_land`; exact = single worker `land_to_cycle` helper (not two RPCs).**
+7. **Quantized land stays (`Land before`); exact = single worker `land_to_cycle` (`Land exact`) — not two RPCs, not a button switch.**
 8. **Reuse default UI session (`session_id = 0`); `history_close` on Forensics exit** — Isolates from control sessions without consuming another of 4 slots.
 9. **Clear view ≠ history-clear.**
 10. **Design docs live under `design/`.**
@@ -667,9 +668,16 @@ Fuzz find-option strings in shared parse tests.
 ### PR 6 — Exact-cycle land (single worker helper)
 
 - **Title:** `inspector: land_to_cycle helper for Forensics`
-- **Files:** `runtime_inspector.c/.h`, `runtime_client.*`, `runtime_command` / thread dispatch, `main.c` intent, Forensics Land button switch, `tests/runtime/test_runtime_inspector*.c`
+- **Files:** `runtime_inspector.c/.h`, `runtime_client.*`, `runtime_command` / thread dispatch, `main.c` intent, Forensics dual land buttons, `tests/runtime/test_runtime_inspector*.c`
 - **Dependencies:** PR 5
-- **Description:** Atomic nearest-checkpoint + sealed `reexecute_to` without intermediate UI publish. Slider remains quantized `land`. Document partial failure → status with actual `focus_cycle`.
+- **Checklist:**
+  - [x] `runtime_inspector_land_to_cycle` (checkpoint ≤ N + sealed reexecute_to; one publish)
+  - [x] Client/command/intent `LAND_TO_CYCLE`
+  - [x] Forensics **Land before** (keep PR5 quantized) + **Land exact**
+  - [x] Inspect & Land confirm for either when live + can_enter
+  - [x] Slider stays quantized `land` only
+  - [x] Partial failure → status with actual `focus_cycle`
+- **Description:** Atomic nearest-checkpoint + sealed `reexecute_to` without intermediate UI publish. Keep quantized **Land before**; add **Land exact**. Slider remains quantized `land`.
 
 ### PR 7 — Polish & docs
 

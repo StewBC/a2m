@@ -415,6 +415,41 @@ bool runtime_inspector_land(runtime *rt, uint64_t cycle)
     return true;
 }
 
+bool runtime_inspector_land_to_cycle(runtime *rt, uint64_t target_cycle)
+{
+    uint64_t oldest = 0u;
+    uint64_t live = 0u;
+    uint64_t count = 0u;
+    uint64_t want;
+
+    if (rt == NULL || !rt->machine_ready || !rt->inspecting) {
+        return false;
+    }
+    runtime_inspector_timeline_bounds(rt, &oldest, &live, &count);
+    if (count == 0u) {
+        return false;
+    }
+    if (target_cycle >= live) {
+        return runtime_inspector_restore_live(rt);
+    }
+    want = target_cycle;
+    if (want < oldest) {
+        want = oldest;
+    }
+    /* Checkpoint ≤ want, then fill forward — one publish at command end. */
+    if (!runtime_inspector_load_nearest_checkpoint(rt, want)) {
+        return false;
+    }
+    if (!runtime_inspector_reexecute_to(rt, want)) {
+        return false;
+    }
+    /* Partial: step failed short of want (focus is best-effort). */
+    if (rt->inspector_focus.valid && rt->inspector_focus.cycle != want) {
+        return false;
+    }
+    return true;
+}
+
 bool runtime_inspector_reexecute_to(runtime *rt, uint64_t target_cycle)
 {
     uint64_t live;

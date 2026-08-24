@@ -300,7 +300,7 @@ static void test_land_focus_status(void)
     expect_true(
         "quantized status",
         strstr(state.status, "focus_cycle=1200") != NULL &&
-            strstr(state.status, "quantized") != NULL);
+            strstr(state.status, "before/quantized") != NULL);
 
     state.land_awaiting_focus = true;
     state.land_requested_cycle = 50u;
@@ -315,10 +315,25 @@ static void test_land_focus_status(void)
     expect_true("live status", strstr(state.status, "live") != NULL);
 
     state.land_awaiting_focus = true;
+    state.land_awaiting_exact = false;
     state.land_requested_cycle = 500u;
     land.focus_cycle = 500u;
     forensics_view_apply_land_focus(&state, &land);
-    expect_streq("exact land", state.status, "landed focus_cycle=500");
+    expect_streq("land match", state.status, "landed focus_cycle=500");
+
+    state.land_awaiting_focus = true;
+    state.land_awaiting_exact = true;
+    state.land_requested_cycle = 500u;
+    land.focus_cycle = 500u;
+    forensics_view_apply_land_focus(&state, &land);
+    expect_streq("exact match", state.status, "landed exact focus_cycle=500");
+
+    state.land_awaiting_focus = true;
+    state.land_awaiting_exact = true;
+    state.land_requested_cycle = 1500u;
+    land.focus_cycle = 1200u;
+    forensics_view_apply_land_focus(&state, &land);
+    expect_true("partial exact", strstr(state.status, "partial exact") != NULL);
 
     forensics_view_close(&state);
 }

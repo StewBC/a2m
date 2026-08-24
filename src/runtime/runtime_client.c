@@ -1015,6 +1015,20 @@ bool runtime_client_inspector_land(
     return runtime_client_push(client, &command);
 }
 
+bool runtime_client_inspector_land_to_cycle(
+    runtime_client *client, uint64_t cycle, uint64_t request_token)
+{
+    runtime_command command = {
+        .type = RUNTIME_COMMAND_INSPECTOR_LAND_TO_CYCLE,
+        .request_token = request_token,
+    };
+    if (client == NULL) {
+        return false;
+    }
+    command.data.inspector_land_to_cycle.cycle = cycle;
+    return runtime_client_push(client, &command);
+}
+
 bool runtime_client_inspector_frame_step(
     runtime_client *client, int direction, uint64_t request_token)
 {

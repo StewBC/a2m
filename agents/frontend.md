@@ -90,9 +90,9 @@ run state if it was running; debugger stays paused). **F9** always opens the
 debugger paused. **Esc** does not leave Forensics. Mutually exclusive with Help.
 Query line → `HISTORY_*` intents → `main.c` claim/decode → transcript (session 0;
 `history_close` on exit). Tab autocompletes from
-`runtime_history_find_option_keys()` / access names. **Land at cycle** (selected
-hit): inspecting → quantized `INSPECTOR_LAND`; live + can enter → **Inspect &
-Land** confirm then ENTER+LAND; soft-fail without checkpoints. Stay in Forensics.
+`runtime_history_find_option_keys()` / access names. **Land before** / **Land exact** (selected hit): quantized checkpoint ≤ N vs
+`land_to_cycle`. Live + can enter → **Inspect & Land** confirm then ENTER+land;
+soft-fail without checkpoints. Stay in Forensics.
 See [`design/forensics-ui.md`](../design/forensics-ui.md).
 
 Entering **max** remembers Record, wipes the tape, turns Record off (checkbox

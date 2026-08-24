@@ -425,6 +425,40 @@ int main(void)
             expect_true("hst1 unchanged", st.record_count == hst1_before);
         }
 
+        /* Exact land: checkpoint ≤ mid then reexecute to mid. */
+        {
+            uint64_t mid = old + (live - old) / 2u;
+            if (mid <= old) {
+                mid = old + 1u;
+            }
+            if (mid >= live) {
+                mid = live > old + 1u ? live - 1u : old;
+            }
+            token = runtime_client_alloc_request_token(client);
+            expect_true(
+                "land_to_cycle",
+                runtime_client_inspector_land_to_cycle(client, mid, token));
+            {
+                clock_t t0 = clock();
+                while (apple2_cycles(&rt->machine) != mid &&
+                       (double)(clock() - t0) / (double)CLOCKS_PER_SEC < 3.0) {
+                    SDL_Delay(1);
+                }
+            }
+            expect_true("cpu after exact", wait_cpu(client, &cpu_back, 2.0));
+            if (apple2_cycles(&rt->machine) != mid) {
+                fprintf(
+                    stderr,
+                    "land_to_cycle got=%llu want=%llu old=%llu live=%llu\n",
+                    (unsigned long long)apple2_cycles(&rt->machine),
+                    (unsigned long long)mid,
+                    (unsigned long long)old,
+                    (unsigned long long)live);
+            }
+            expect_true("exact cycle", apple2_cycles(&rt->machine) == mid);
+            expect_true("sealed after exact", rt->machine.replay_sealed);
+        }
+
         /* Step insn from the landed snapshot. */
         {
             uint64_t c0 = apple2_cycles(&rt->machine);
