@@ -68,7 +68,24 @@ typedef struct frontend_forensics_state {
     bool request_submit; /* Query Enter → frontend parses + pushes intent */
     bool line_truncated; /* last format hit FORMAT_CAP */
     bool query_rewrite_pending; /* Tab autocomplete rewrote query; re-focus edit */
+    /* PR5 Land Inspector (quantized). */
+    bool land_confirm_open; /* Inspect & Land popup */
+    bool request_land; /* flush: push LAND (and ENTER if request_land_enter) */
+    bool request_land_enter; /* ENTER before LAND */
+    uint64_t pending_land_cycle;
+    bool land_awaiting_focus; /* wait for post-land inspector_focus_cycle */
+    uint64_t land_requested_cycle;
 } frontend_forensics_state;
+
+/* Inspector gates for Land (from frontend_debug_state). */
+typedef struct frontend_forensics_land_context {
+    bool inspecting;
+    bool window_valid;
+    bool can_enter; /* enabled && window_valid */
+    uint64_t focus_cycle;
+    uint64_t oldest_cycle;
+    uint64_t newest_cycle;
+} frontend_forensics_land_context;
 
 /* Result of leaving Forensics (main applies ui_visible + run/pause). */
 typedef struct frontend_forensics_leave_result {
@@ -156,7 +173,13 @@ void forensics_view_render(
     struct nk_context *ctx,
     frontend_forensics_state *state,
     int width,
-    int height);
+    int height,
+    const frontend_forensics_land_context *land);
+
+/* After machine_state: explain clamp/quantize using post-land focus. */
+void forensics_view_apply_land_focus(
+    frontend_forensics_state *state,
+    const frontend_forensics_land_context *land);
 
 #ifdef __cplusplus
 }

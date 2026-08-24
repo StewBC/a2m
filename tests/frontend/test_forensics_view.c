@@ -280,12 +280,56 @@ static void test_apply_and_select(void)
     forensics_view_close(&state);
 }
 
+static void test_land_focus_status(void)
+{
+    frontend_forensics_state state;
+    frontend_forensics_land_context land;
+
+    forensics_view_init(&state);
+    forensics_view_open(&state, FRONTEND_FORENSICS_ENTRY_DEBUGGER, false);
+    state.land_awaiting_focus = true;
+    state.land_requested_cycle = 1234u;
+    memset(&land, 0, sizeof(land));
+    land.inspecting = true;
+    land.window_valid = true;
+    land.focus_cycle = 1200u;
+    land.oldest_cycle = 100u;
+    land.newest_cycle = 9999u;
+    forensics_view_apply_land_focus(&state, &land);
+    expect_true("await cleared", !state.land_awaiting_focus);
+    expect_true(
+        "quantized status",
+        strstr(state.status, "focus_cycle=1200") != NULL &&
+            strstr(state.status, "quantized") != NULL);
+
+    state.land_awaiting_focus = true;
+    state.land_requested_cycle = 50u;
+    land.focus_cycle = 100u;
+    forensics_view_apply_land_focus(&state, &land);
+    expect_true("clamp status", strstr(state.status, "clamped oldest") != NULL);
+
+    state.land_awaiting_focus = true;
+    state.land_requested_cycle = 20000u;
+    land.focus_cycle = 9999u;
+    forensics_view_apply_land_focus(&state, &land);
+    expect_true("live status", strstr(state.status, "live") != NULL);
+
+    state.land_awaiting_focus = true;
+    state.land_requested_cycle = 500u;
+    land.focus_cycle = 500u;
+    forensics_view_apply_land_focus(&state, &land);
+    expect_streq("exact land", state.status, "landed focus_cycle=500");
+
+    forensics_view_close(&state);
+}
+
 int main(void)
 {
     test_shell();
     test_parse();
     test_format_golden();
     test_apply_and_select();
+    test_land_focus_status();
     printf("ok\n");
     return 0;
 }

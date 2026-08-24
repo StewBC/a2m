@@ -1906,6 +1906,8 @@ static void frontend_forensics_flush_query_submit(frontend *ui)
     ui->forensics.query_history_index = 0u;
 }
 
+
+
 static bool frontend_push_machine_file_browse_intent(
     frontend *ui,
     frontend_debugger_intent_type type,
@@ -7256,11 +7258,12 @@ static void frontend_draw_misc_assembler(frontend *ui)
     }
 }
 
-static void frontend_push_inspector_intent(
+static void frontend_push_inspector_intent_ex(
     frontend *ui,
     frontend_debugger_intent_type type,
     bool enabled,
-    uint64_t cycle)
+    uint64_t cycle,
+    bool coalesce_land)
 {
     size_t next;
     size_t i;
@@ -7268,7 +7271,7 @@ static void frontend_push_inspector_intent(
     if (ui == NULL) {
         return;
     }
-    if (type == FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND) {
+    if (coalesce_land && type == FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND) {
         i = ui->intent_read;
         while (i != ui->intent_write) {
             if (ui->intents[i].type == FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND) {
@@ -7287,6 +7290,60 @@ static void frontend_push_inspector_intent(
     ui->intents[ui->intent_write].enabled = enabled;
     ui->intents[ui->intent_write].inspector_cycle = cycle;
     ui->intent_write = next;
+}
+
+static void frontend_push_inspector_intent(
+    frontend *ui,
+    frontend_debugger_intent_type type,
+    bool enabled,
+    uint64_t cycle)
+{
+    frontend_push_inspector_intent_ex(ui, type, enabled, cycle, true);
+}
+
+static void frontend_forensics_land_context_from_debug(
+    const frontend_debug_state *debug,
+    frontend_forensics_land_context *out)
+{
+    if (out == NULL) {
+        return;
+    }
+    memset(out, 0, sizeof(*out));
+    if (debug == NULL) {
+        return;
+    }
+    out->inspecting = debug->inspecting;
+    out->window_valid = debug->inspector_window_valid;
+    out->can_enter = debug->inspector_enabled && debug->inspector_window_valid;
+    out->focus_cycle = debug->inspector_focus_cycle;
+    out->oldest_cycle = debug->inspector_oldest_cycle;
+    out->newest_cycle = debug->inspector_newest_cycle;
+}
+
+static void frontend_forensics_flush_land(frontend *ui)
+{
+    uint64_t cycle;
+    bool need_enter;
+
+    if (ui == NULL || !ui->forensics.request_land) {
+        return;
+    }
+    cycle = ui->forensics.pending_land_cycle;
+    need_enter = ui->forensics.request_land_enter;
+    ui->forensics.request_land = false;
+    ui->forensics.request_land_enter = false;
+    if (need_enter) {
+        /* ENTER then LAND must stay ordered; do not coalesce over a prior LAND. */
+        frontend_push_inspector_intent_ex(
+            ui, FRONTEND_DEBUGGER_INTENT_INSPECTOR_ENTER, false, 0u, false);
+        frontend_push_inspector_intent_ex(
+            ui, FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND, false, cycle, false);
+    } else {
+        frontend_push_inspector_intent(
+            ui, FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND, false, cycle);
+    }
+    ui->forensics.land_requested_cycle = cycle;
+    ui->forensics.land_awaiting_focus = true;
 }
 
 static void frontend_format_inspector_window_reason(
@@ -10389,9 +10446,13 @@ void frontend_render(frontend *ui, bool ui_visible, const frontend_debug_state *
     }
 
     if (forensics_view_is_open(&ui->forensics)) {
+        frontend_forensics_land_context land;
         /* Full-window mode: no CRT behind (unlike Help overlay). */
-        forensics_view_render(ui->ctx, &ui->forensics, width, height);
+        frontend_forensics_land_context_from_debug(debug_state, &land);
+        forensics_view_apply_land_focus(&ui->forensics, &land);
+        forensics_view_render(ui->ctx, &ui->forensics, width, height, &land);
         frontend_forensics_flush_query_submit(ui);
+        frontend_forensics_flush_land(ui);
         nk_sdl_render(NK_ANTI_ALIASING_ON);
         return;
     }

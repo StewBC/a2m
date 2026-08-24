@@ -656,6 +656,12 @@ Fuzz find-option strings in shared parse tests.
 - **Title:** `frontend: Land Inspector at Forensics cycle`
 - **Files:** Forensics view; `FRONTEND_DEBUGGER_INTENT_INSPECTOR_ENTER` + `INSPECTOR_LAND` (Inspect & Land sequence)
 - **Dependencies:** PR 4
+- **Checklist:**
+  - [x] Already inspecting → quantized `INSPECTOR_LAND` immediately
+  - [x] Live + `can_enter` → **Inspect & Land** confirm → ENTER then LAND
+  - [x] Soft-fail when `!inspector_window_valid` / cannot enter
+  - [x] Status from post-land `inspector_focus_cycle` vs requested (clamp / live / quantized)
+  - [x] Remain in Forensics; no slider tracking
 - **Description:** If already inspecting, land immediately. If live but `can_enter`, show **Inspect & Land** confirm then enter+land. Soft-fail only when no inspector window. Explain clamp/restore-live using post-land `focus_cycle`. No slider tracking.
 
 ### PR 6 — Exact-cycle land (single worker helper)

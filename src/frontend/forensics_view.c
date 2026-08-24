@@ -87,6 +87,12 @@ void forensics_view_open(
     state->request_host_pause = true;
     state->request_submit = false;
     state->query_rewrite_pending = false;
+    state->land_confirm_open = false;
+    state->request_land = false;
+    state->request_land_enter = false;
+    state->pending_land_cycle = 0u;
+    state->land_awaiting_focus = false;
+    state->land_requested_cycle = 0u;
     state->query_history_index = 0u;
     forensics_view_set_status(state, "paused — querying…");
 }
@@ -101,6 +107,10 @@ void forensics_view_close(frontend_forensics_state *state)
     state->request_close = false;
     state->request_host_pause = false;
     state->request_submit = false;
+    state->land_confirm_open = false;
+    state->request_land = false;
+    state->request_land_enter = false;
+    state->land_awaiting_focus = false;
     state->entry = FRONTEND_FORENSICS_ENTRY_DEBUGGER;
     state->crt_was_running = false;
 }
@@ -1090,6 +1100,120 @@ void forensics_view_apply_rpc_error(
     forensics_view_set_status(state, msg);
 }
 
+void forensics_view_apply_land_focus(
+    frontend_forensics_state *state,
+    const frontend_forensics_land_context *land)
+{
+    char text[FRONTEND_FR_STATUS_MAX];
+    uint64_t requested;
+    uint64_t focus;
+
+    if (state == NULL || land == NULL || !state->land_awaiting_focus) {
+        return;
+    }
+    if (!land->inspecting) {
+        return;
+    }
+    requested = state->land_requested_cycle;
+    focus = land->focus_cycle;
+    state->land_awaiting_focus = false;
+    if (focus == requested) {
+        snprintf(
+            text,
+            sizeof(text),
+            "landed focus_cycle=%llu",
+            (unsigned long long)focus);
+    } else if (land->newest_cycle > 0u && focus >= land->newest_cycle) {
+        snprintf(
+            text,
+            sizeof(text),
+            "landed focus_cycle=%llu (requested %llu → live)",
+            (unsigned long long)focus,
+            (unsigned long long)requested);
+    } else if (land->oldest_cycle > 0u && requested < land->oldest_cycle) {
+        snprintf(
+            text,
+            sizeof(text),
+            "landed focus_cycle=%llu (requested %llu → clamped oldest)",
+            (unsigned long long)focus,
+            (unsigned long long)requested);
+    } else {
+        snprintf(
+            text,
+            sizeof(text),
+            "landed focus_cycle=%llu (requested %llu, quantized)",
+            (unsigned long long)focus,
+            (unsigned long long)requested);
+    }
+    forensics_view_set_status(state, text);
+}
+
+static void forensics_try_land_button(
+    frontend_forensics_state *state,
+    const frontend_forensics_land_context *land)
+{
+    if (state == NULL || !state->has_land_selection) {
+        return;
+    }
+    if (land == NULL || !land->window_valid) {
+        forensics_view_set_status(state, "cannot land — no checkpoints");
+        return;
+    }
+    state->pending_land_cycle = state->selected_cycle;
+    if (land->inspecting) {
+        state->request_land = true;
+        state->request_land_enter = false;
+        forensics_view_set_status(state, "landing…");
+        return;
+    }
+    if (land->can_enter) {
+        state->land_confirm_open = true;
+        return;
+    }
+    forensics_view_set_status(state, "cannot land — no checkpoints");
+}
+
+static void forensics_draw_land_confirm(
+    struct nk_context *ctx,
+    frontend_forensics_state *state)
+{
+    char line[160];
+
+    if (ctx == NULL || state == NULL || !state->land_confirm_open) {
+        return;
+    }
+    snprintf(
+        line,
+        sizeof(line),
+        "Enter Inspect and land at cycle %llu?",
+        (unsigned long long)state->pending_land_cycle);
+    if (nk_popup_begin(
+            ctx,
+            NK_POPUP_STATIC,
+            "Inspect & Land",
+            NK_WINDOW_BORDER | NK_WINDOW_TITLE,
+            nk_rect(180.0f, 160.0f, 420.0f, 120.0f))) {
+        nk_layout_row_dynamic(ctx, 22.0f, 1);
+        nk_label_wrap(ctx, line);
+        nk_layout_row_dynamic(ctx, 26.0f, 2);
+        if (nk_button_label(ctx, "Inspect & Land")) {
+            state->land_confirm_open = false;
+            state->request_land = true;
+            state->request_land_enter = true;
+            forensics_view_set_status(state, "entering Inspect & landing…");
+            nk_popup_close(ctx);
+        }
+        if (nk_button_label(ctx, "Cancel")) {
+            state->land_confirm_open = false;
+            forensics_view_set_status(state, "land canceled");
+            nk_popup_close(ctx);
+        }
+        nk_popup_end(ctx);
+    } else {
+        state->land_confirm_open = false;
+    }
+}
+
 void forensics_view_apply_status(
     frontend_forensics_state *state,
     const runtime_history_status *status,
@@ -1240,7 +1364,8 @@ void forensics_view_render(
     struct nk_context *ctx,
     frontend_forensics_state *state,
     int width,
-    int height)
+    int height,
+    const frontend_forensics_land_context *land)
 {
     struct nk_rect bounds;
     struct nk_style_window saved_window;
@@ -1308,8 +1433,7 @@ void forensics_view_render(
         nk_layout_row_push(ctx, 120.0f);
         if (state->has_land_selection) {
             if (nk_button_label(ctx, "Land at cycle")) {
-                forensics_view_set_status(
-                    state, "Land at cycle — wired in PR5");
+                forensics_try_land_button(state, land);
             }
         } else {
             nk_widget_disable_begin(ctx);
@@ -1430,6 +1554,8 @@ void forensics_view_render(
             }
         }
         nk_layout_row_end(ctx);
+
+        forensics_draw_land_confirm(ctx, state);
     }
     nk_end(ctx);
     ctx->style.window = saved_window;
