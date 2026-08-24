@@ -705,7 +705,9 @@ static void format_softswitches_text(
         return;
     }
     f = ms->apple_state_flags;
-    model = (ms->apple_model == (uint8_t)APPLE2_MODEL_IIE_ENHANCED) ? "//e-enh" : "][+";
+    /* machine_state.apple_model is the options/UI convention (0=//e, 1=][+),
+     * not apple2_model (0=][+, 1=//e). Frontend hardware tab uses 0=//e. */
+    model = (ms->apple_model == 0u) ? "//e-enh" : "][+";
     snprintf(
         text,
         text_size,
