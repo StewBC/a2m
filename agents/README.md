@@ -34,6 +34,13 @@ Then open the component note for the area you are changing:
 Parked / not-now work lives in [`known-gaps.md`](known-gaps.md). Read it only
 if asked.
 
+## Design docs (proposals, not product-as-is)
+
+In-flight and historical design writeups live under [`design/`](../design/).
+Start at [`design/README.md`](../design/README.md) for the index (active /
+landed / abandoned). Do not treat design drafts as agent handoff truth —
+source and `agents/*.md` win when they disagree.
+
 ## Manual (users, not agents)
 
 [`manual/manual.md`](../manual/manual.md) is the user-facing manual. It is also
