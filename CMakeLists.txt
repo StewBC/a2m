@@ -147,6 +147,19 @@ target_compile_features(test_frontend_input PRIVATE c_std_99)
 target_link_libraries(test_frontend_input PRIVATE machine SDL2::SDL2)
 add_test(NAME frontend_input COMMAND test_frontend_input)
 
+add_executable(test_crt_pixel_map
+    tests/frontend/test_crt_pixel_map.c
+    src/frontend/crt_renderer.c
+)
+target_include_directories(test_crt_pixel_map PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/frontend
+)
+target_compile_features(test_crt_pixel_map PRIVATE c_std_99)
+if(UNIX AND NOT APPLE)
+    target_link_libraries(test_crt_pixel_map PRIVATE m)
+endif()
+add_test(NAME crt_pixel_map COMMAND test_crt_pixel_map)
+
 add_executable(test_apple_type_script
     tests/util/test_apple_type_script.c
 )

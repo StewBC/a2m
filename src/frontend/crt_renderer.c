@@ -11,6 +11,166 @@ static int crt_clamp_percent(int value)
     return value;
 }
 
+float frontend_crt_curve_amount(const frontend_crt_effects *effects)
+{
+    int curvature;
+
+    if (effects == NULL || !effects->curvature) {
+        return 0.0f;
+    }
+    curvature = crt_clamp_percent(effects->curvature_amount);
+    return (float)curvature * 0.0015f;
+}
+
+bool frontend_crt_output_to_source(
+    float nx,
+    float ny,
+    float curve,
+    float *out_sxn,
+    float *out_syn)
+{
+    float sxn;
+    float syn;
+
+    if (out_sxn == NULL || out_syn == NULL) {
+        return false;
+    }
+    sxn = nx * (1.0f + curve * ny * ny);
+    syn = ny * (1.0f + curve * nx * nx);
+    /* Inclusive rim so flat (curve=0) corners still map; curved glass
+       outside uses |s| > 1 from the barrel expansion. */
+    if (fabsf(sxn) > 1.0f || fabsf(syn) > 1.0f) {
+        return false;
+    }
+    *out_sxn = sxn;
+    *out_syn = syn;
+    return true;
+}
+
+bool frontend_crt_source_to_output(
+    float sxn,
+    float syn,
+    float curve,
+    float *out_nx,
+    float *out_ny)
+{
+    float nx;
+    float ny;
+    int iter;
+
+    if (out_nx == NULL || out_ny == NULL) {
+        return false;
+    }
+    if (fabsf(sxn) > 1.0f || fabsf(syn) > 1.0f) {
+        return false;
+    }
+    if (curve <= 0.0f) {
+        *out_nx = sxn;
+        *out_ny = syn;
+        return true;
+    }
+
+    /* Seed with identity; Newton on f(n) = n * (1 + c * other^2) - s. */
+    nx = sxn;
+    ny = syn;
+    for (iter = 0; iter < 8; iter++) {
+        float f1 = nx * (1.0f + curve * ny * ny) - sxn;
+        float f2 = ny * (1.0f + curve * nx * nx) - syn;
+        float a = 1.0f + curve * ny * ny;
+        float b = nx * (2.0f * curve * ny);
+        float c = ny * (2.0f * curve * nx);
+        float d = 1.0f + curve * nx * nx;
+        float det = a * d - b * c;
+        float inv_det;
+        float dx;
+        float dy;
+
+        if (fabsf(det) < 1.0e-8f) {
+            return false;
+        }
+        inv_det = 1.0f / det;
+        dx = (d * f1 - b * f2) * inv_det;
+        dy = (-c * f1 + a * f2) * inv_det;
+        nx -= dx;
+        ny -= dy;
+        if (fabsf(dx) < 1.0e-6f && fabsf(dy) < 1.0e-6f) {
+            break;
+        }
+    }
+    if (fabsf(nx) > 1.0f || fabsf(ny) > 1.0f) {
+        return false;
+    }
+    *out_nx = nx;
+    *out_ny = ny;
+    return true;
+}
+
+bool frontend_crt_mouse_to_pixel(
+    float mouse_x,
+    float mouse_y,
+    float image_x,
+    float image_y,
+    float image_w,
+    float image_h,
+    int crop_w,
+    int crop_h,
+    const frontend_crt_effects *effects,
+    uint16_t *out_px,
+    uint16_t *out_py)
+{
+    float u;
+    float v;
+    float nx;
+    float ny;
+    float sxn;
+    float syn;
+    float curve;
+    int px;
+    int py;
+
+    if (out_px == NULL || out_py == NULL || crop_w <= 0 || crop_h <= 0 ||
+        image_w <= 0.0f || image_h <= 0.0f) {
+        return false;
+    }
+    if (mouse_x < image_x || mouse_y < image_y ||
+        mouse_x >= image_x + image_w || mouse_y >= image_y + image_h) {
+        return false;
+    }
+
+    u = (mouse_x - image_x) / image_w;
+    v = (mouse_y - image_y) / image_h;
+    nx = u * 2.0f - 1.0f;
+    ny = v * 2.0f - 1.0f;
+    curve = frontend_crt_curve_amount(effects);
+    if (!frontend_crt_output_to_source(nx, ny, curve, &sxn, &syn)) {
+        return false;
+    }
+
+    u = (sxn + 1.0f) * 0.5f;
+    v = (syn + 1.0f) * 0.5f;
+    if (u < 0.0f || v < 0.0f || u > 1.0f || v > 1.0f) {
+        return false;
+    }
+    px = (int)(u * (float)crop_w);
+    py = (int)(v * (float)crop_h);
+    /* u/v == 1.0 maps to crop_w/h before clamp. */
+    if (px < 0) {
+        px = 0;
+    }
+    if (py < 0) {
+        py = 0;
+    }
+    if (px >= crop_w) {
+        px = crop_w - 1;
+    }
+    if (py >= crop_h) {
+        py = crop_h - 1;
+    }
+    *out_px = (uint16_t)px;
+    *out_py = (uint16_t)py;
+    return true;
+}
+
 static uint32_t crt_darken(uint32_t pixel, int strength)
 {
     unsigned int factor = (unsigned int)(1000 - crt_clamp_percent(strength) * 8);
@@ -148,7 +308,6 @@ void frontend_crt_process(
     int output_height;
     int output_frame_width;
     int output_frame_height;
-    int curvature;
     float curve;
     float edge_x;
     float edge_y;
@@ -167,8 +326,7 @@ void frontend_crt_process(
     output_frame_height = frame_height * output_scale;
     memset(destination, 0,
         (size_t)output_frame_width * (size_t)output_frame_height * sizeof(*destination));
-    curvature = effects->curvature ? crt_clamp_percent(effects->curvature_amount) : 0;
-    curve = (float)curvature * 0.0015f;
+    curve = frontend_crt_curve_amount(effects);
     edge_x = 2.0f / (float)output_width;
     edge_y = 2.0f / (float)output_height;
 
