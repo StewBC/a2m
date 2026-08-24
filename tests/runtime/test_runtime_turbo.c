@@ -54,6 +54,38 @@ static void drain_events(runtime_client *client)
     }
 }
 
+static void fill_default_machine_config(runtime_machine_config *mc)
+{
+    memset(mc, 0, sizeof(*mc));
+    mc->apple_model = 0u;
+    mc->slot_cards[4] = RUNTIME_SLOT_CARD_MOCKINGBOARD;
+    mc->slot_cards[6] = RUNTIME_SLOT_CARD_DISKII;
+    mc->slot_cards[7] = RUNTIME_SLOT_CARD_SMARTPORT;
+}
+
+static int poll_machine_without_reset(
+    runtime_client *client,
+    runtime_event *event,
+    double timeout_s)
+{
+    clock_t start = clock();
+    while ((double)(clock() - start) / (double)CLOCKS_PER_SEC < timeout_s) {
+        while (runtime_client_poll_event(client, event)) {
+            if (event->type == RUNTIME_EVENT_ERROR) {
+                fprintf(stderr, "runtime error: %s\n", event->data.error.message);
+                exit(1);
+            }
+            if (event->type == RUNTIME_EVENT_RESET_COMPLETE) {
+                return 0;
+            }
+            if (event->type == RUNTIME_EVENT_MACHINE_STATE_RESPONSE) {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
 int main(void)
 {
     runtime_config config;
@@ -152,6 +184,94 @@ int main(void)
     expect_true(
         "8MHz mode",
         event.data.machine_state.active_turbo_multiplier == 8000u);
+
+    /* Configure OK live-applies the ladder without a machine reset. */
+    {
+        runtime_machine_config machine_config;
+        runtime_config ladder;
+
+        fill_default_machine_config(&machine_config);
+        runtime_config_init(&ladder);
+        expect_true(
+            "parse live ladder",
+            runtime_config_set_turbo_csv(&ladder, "1,4,8,max"));
+        drain_events(client);
+        expect_true(
+            "apply live ladder",
+            runtime_client_apply_machine_config(
+                client,
+                &machine_config,
+                &ladder,
+                NULL,
+                NULL,
+                false,
+                false,
+                false));
+        expect_true(
+            "ladder apply no reset",
+            poll_machine_without_reset(client, &event, 2.0));
+        expect_true("live count 4", event.data.machine_state.turbo_speed_count == 4u);
+        expect_true(
+            "keep 8MHz if still listed",
+            event.data.machine_state.active_turbo_multiplier == 8000u);
+        drain_events(client);
+
+        expect_true("cycle after live apply", runtime_client_cycle_turbo_speed(client));
+        expect_true(
+            "state after live cycle",
+            poll_event(client, &event, RUNTIME_EVENT_MACHINE_STATE_RESPONSE, 2.0));
+        expect_true(
+            "cycled 8 to max",
+            event.data.machine_state.active_turbo_multiplier == RUNTIME_TURBO_MAX);
+        drain_events(client);
+
+        runtime_config_init(&ladder);
+        expect_true(
+            "parse shrink ladder",
+            runtime_config_set_turbo_csv(&ladder, "1,max"));
+        expect_true(
+            "apply shrink ladder",
+            runtime_client_apply_machine_config(
+                client,
+                &machine_config,
+                &ladder,
+                NULL,
+                NULL,
+                false,
+                false,
+                false));
+        expect_true(
+            "shrink apply no reset",
+            poll_machine_without_reset(client, &event, 2.0));
+        expect_true("shrink count 2", event.data.machine_state.turbo_speed_count == 2u);
+        expect_true(
+            "keep max when still listed",
+            event.data.machine_state.active_turbo_multiplier == RUNTIME_TURBO_MAX);
+        drain_events(client);
+
+        expect_true("set 4MHz off list", runtime_client_set_turbo_multiplier(client, 4000u));
+        expect_true(
+            "state after off-list 4",
+            poll_event(client, &event, RUNTIME_EVENT_MACHINE_STATE_RESPONSE, 2.0));
+        drain_events(client);
+        expect_true(
+            "apply drop off-list",
+            runtime_client_apply_machine_config(
+                client,
+                &machine_config,
+                &ladder,
+                NULL,
+                NULL,
+                false,
+                false,
+                false));
+        expect_true(
+            "drop apply no reset",
+            poll_machine_without_reset(client, &event, 2.0));
+        expect_true(
+            "off-list falls to first",
+            event.data.machine_state.active_turbo_multiplier == RUNTIME_TURBO_MHZ_1);
+    }
 
     runtime_stop(rt);
     runtime_destroy(rt);

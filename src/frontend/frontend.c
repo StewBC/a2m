@@ -2150,6 +2150,21 @@ static bool frontend_config_validate(frontend_config_dialog_state *dialog)
         snprintf(dialog->error, sizeof(dialog->error), "INI file path is required");
         return false;
     }
+    {
+        runtime_config turbo_check;
+
+        runtime_config_init(&turbo_check);
+        if (dialog->edited.turbo_multipliers == NULL ||
+            dialog->edited.turbo_multipliers[0] == '\0' ||
+            !runtime_config_set_turbo_csv(
+                &turbo_check, dialog->edited.turbo_multipliers)) {
+            snprintf(
+                dialog->error,
+                sizeof(dialog->error),
+                "Turbo list must be MHz values and/or max (e.g. 1,4,8,max)");
+            return false;
+        }
+    }
     dialog->error[0] = '\0';
     return true;
 }

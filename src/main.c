@@ -1525,6 +1525,37 @@ static bool intent_mutates_in_inspect(frontend_debugger_intent_type type)
     }
 }
 
+static void machine_config_from_options(
+    const app_options *options,
+    runtime_machine_config *out)
+{
+    int slot;
+
+    memset(out, 0, sizeof(*out));
+    if (options == NULL) {
+        return;
+    }
+    out->pause_on_brk = options->pause_on_brk;
+    out->apple_model = (uint8_t)options->apple_model;
+    for (slot = 1; slot <= 7; ++slot) {
+        switch (options->slot_cards[slot]) {
+        case APP_SLOT_CARD_DISKII:
+            out->slot_cards[slot] = RUNTIME_SLOT_CARD_DISKII;
+            break;
+        case APP_SLOT_CARD_SMARTPORT:
+            out->slot_cards[slot] = RUNTIME_SLOT_CARD_SMARTPORT;
+            break;
+        case APP_SLOT_CARD_MOCKINGBOARD:
+            out->slot_cards[slot] = RUNTIME_SLOT_CARD_MOCKINGBOARD;
+            break;
+        case APP_SLOT_CARD_EMPTY:
+        default:
+            out->slot_cards[slot] = RUNTIME_SLOT_CARD_EMPTY;
+            break;
+        }
+    }
+}
+
 static void dispatch_intent(
     runtime_client *client,
     frontend *ui,
@@ -1887,38 +1918,34 @@ static void dispatch_intent(
             app_options_destroy(&media_live);
             options->save_ini = options->remember;
             app_options_reconcile_slot_cards(options);
-            if (intent->config_result.machine_changed) {
+            if (client != NULL) {
                 runtime_machine_config machine_config;
-                memset(&machine_config, 0, sizeof(machine_config));
-                machine_config.pause_on_brk = options->pause_on_brk;
-                machine_config.apple_model = (uint8_t)options->apple_model;
-                for (slot = 1; slot <= 7; ++slot) {
-                    switch (options->slot_cards[slot]) {
-                    case APP_SLOT_CARD_DISKII:
-                        machine_config.slot_cards[slot] = RUNTIME_SLOT_CARD_DISKII;
-                        break;
-                    case APP_SLOT_CARD_SMARTPORT:
-                        machine_config.slot_cards[slot] = RUNTIME_SLOT_CARD_SMARTPORT;
-                        break;
-                    case APP_SLOT_CARD_MOCKINGBOARD:
-                        machine_config.slot_cards[slot] = RUNTIME_SLOT_CARD_MOCKINGBOARD;
-                        break;
-                    case APP_SLOT_CARD_EMPTY:
-                    default:
-                        machine_config.slot_cards[slot] = RUNTIME_SLOT_CARD_EMPTY;
-                        break;
-                    }
+                runtime_config turbo_cfg;
+                const runtime_config *turbo_arg = NULL;
+
+                machine_config_from_options(options, &machine_config);
+                runtime_config_init(&turbo_cfg);
+                if (options->turbo_multipliers != NULL &&
+                    runtime_config_set_turbo_csv(
+                        &turbo_cfg, options->turbo_multipliers)) {
+                    turbo_arg = &turbo_cfg;
+                } else if (options->turbo_multipliers != NULL) {
+                    SDL_Log(
+                        "Configure: invalid turbo ladder, leaving live list unchanged");
                 }
                 if (!runtime_client_apply_machine_config(
                         client,
                         &machine_config,
+                        turbo_arg,
                         NULL,
                         NULL,
-                        NULL,
-                        true,
+                        intent->config_result.machine_changed,
                         false,
                         runtime_running)) {
-                    SDL_Log("Configure: could not queue machine power cycle");
+                    SDL_Log(
+                        intent->config_result.machine_changed ?
+                            "Configure: could not queue machine power cycle" :
+                            "Configure: could not queue turbo ladder");
                 }
             }
             if (ui != NULL) {

@@ -58,7 +58,9 @@ persist in `[Slots]`; media selected from Misc → Machine persists in `[DiskII]
 Binary, Basic, and Snapshot browser starting folders. OK (or Save INI now)
 compares model/cards to the live machine: no change means no
 reset; a model/card change is applied on the worker and followed by a cold,
-power-cycle-style machine reset. The resulting machine snapshot refreshes Misc.
+power-cycle-style machine reset. The turbo ladder is live-applied either way
+(no reset): Opt+T uses the new list immediately; the current speed is kept if
+it is still on the list. The resulting machine snapshot refreshes Misc.
 Configure → Emulator places **Original DEL behaviour** immediately below Scroll
 Wheel Speed. It persists as `[config] original_del` and live-switches Backspace
 between cursor-left `$08` (off) and Apple DEL `$7F` (on); Delete is always `$7F`.

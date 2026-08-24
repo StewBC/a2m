@@ -2531,6 +2531,39 @@ static void runtime_history_apply_max_policy(runtime *rt, bool entering_max, boo
     }
 }
 
+static void runtime_set_active_turbo(runtime *rt, uint32_t milli_mhz);
+
+/* Install a Configure/OK turbo ladder. Keep the current speed if it is still
+   on the list; otherwise switch to the first entry (enter/leave max correctly). */
+static void runtime_install_turbo_ladder(
+    runtime *rt,
+    const uint32_t *speeds,
+    uint8_t count)
+{
+    uint8_t i;
+    bool keep;
+
+    if (rt == NULL || speeds == NULL || count == 0u) {
+        return;
+    }
+    memcpy(rt->turbo_speeds, speeds, sizeof(rt->turbo_speeds));
+    rt->turbo_speed_count = count;
+    memcpy(rt->config.turbo_speeds, speeds, sizeof(rt->config.turbo_speeds));
+    rt->config.turbo_speed_count = count;
+
+    keep = false;
+    for (i = 0; i < count; i++) {
+        if (rt->turbo_speeds[i] == rt->active_turbo_multiplier) {
+            keep = true;
+            break;
+        }
+    }
+    if (!keep) {
+        runtime_set_active_turbo(rt, rt->turbo_speeds[0]);
+    }
+    rt->config.active_turbo_multiplier = rt->active_turbo_multiplier;
+}
+
 static void runtime_set_active_turbo(runtime *rt, uint32_t milli_mhz)
 {
     bool was_max;
@@ -3729,7 +3762,16 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
             runtime_publish_error(rt, "invalid slot card configuration");
             break;
         }
+        if (cmd->data.apply_machine_config.turbo_speed_count > 0u) {
+            runtime_install_turbo_ladder(
+                rt,
+                cmd->data.apply_machine_config.turbo_speeds,
+                cmd->data.apply_machine_config.turbo_speed_count);
+        }
         if (!changed) {
+            if (cmd->data.apply_machine_config.turbo_speed_count > 0u) {
+                runtime_publish_machine(rt);
+            }
             break;
         }
         if (!apple2_flush_media(&rt->machine)) {
