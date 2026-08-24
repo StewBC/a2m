@@ -2353,6 +2353,9 @@ int main(int argc, char **argv)
     uint64_t last_title_focus = 0u;
     /* Keep SDL text input off unless a UI field is focused (c64m / macOS). */
     bool text_input_active = false;
+    /* After Opt+letter host chords, swallow TEXTINPUT until Option is released
+       so e.g. Opt+R opening Forensics does not type 'r' into the query field. */
+    bool suppress_text_after_option_chord = false;
     uint32_t pixels[APPLE2_VIDEO_WIDTH * APPLE2_VIDEO_HEIGHT];
 
     memset(&options, 0, sizeof(options));
@@ -2647,6 +2650,13 @@ int main(int argc, char **argv)
                 ui_visible || frontend_help_is_open(ui) ||
                 frontend_forensics_is_open(ui);
 
+            if (event.type == SDL_TEXTINPUT && suppress_text_after_option_chord) {
+                send_event_to_frontend = false;
+            } else if (event.type == SDL_KEYUP &&
+                       (SDL_GetModState() & KMOD_ALT) == 0) {
+                suppress_text_after_option_chord = false;
+            }
+
             if (event.type == SDL_QUIT) {
                 running = false;
             } else if (event.type == SDL_CONTROLLERDEVICEADDED ||
@@ -2811,6 +2821,7 @@ int main(int argc, char **argv)
                         }
                         frontend_open_help(ui, was_running);
                     }
+                    suppress_text_after_option_chord = true;
                     send_event_to_frontend = false;
                 } else if (
                     sym == SDLK_r &&
@@ -2827,6 +2838,9 @@ int main(int argc, char **argv)
                         frontend_open_forensics(
                             ui, from_debugger, was_running);
                     }
+                    /* KEYDOWN is consumed, but SDL may still emit TEXTINPUT "r"
+                       later in this pump; block it until Option is released. */
+                    suppress_text_after_option_chord = true;
                     send_event_to_frontend = false;
                 } else if (sym == SDLK_ESCAPE && frontend_help_is_open(ui)) {
                     bool paused_by_help = frontend_close_help(ui);
