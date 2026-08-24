@@ -1376,7 +1376,7 @@ rectangular render path.
 
 **Shift+Opt+C** toggles Colour and the configured Mono Mode. It works with Debug Mode
 closed. While Configure is open it moves the radios (Cancel still undoes). Lo-res
-cells keep their brightness as shades of the phosphor; HGR and DHGR drop artefact
+cells stay solid fills in 16 spaced phosphor shades; HGR and DHGR drop artefact
 colour and show the raw bits.
 
 ### Paths

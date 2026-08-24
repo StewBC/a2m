@@ -74,8 +74,32 @@ static const uint32_t PHOSPHOR_ARGB[3] = {
     0xFFFFB000u
 };
 
-/* LORES/DLORES: phosphor x Rec.601 luma of LORES_PALETTE, one table per
-   phosphor. Filled in paint_init_luts. */
+/*
+ * LORES/DLORES mono: solid fill, 16 hand-spaced phosphor strengths.
+ * Rec.601 of LORES_PALETTE collapses gray1/orange/green (and magenta to a
+ * pit). These ranks keep black/white at the ends and spread the middle so
+ * a lo-res board still reads. Same Y for white/green/amber; tinted in
+ * paint_init_luts.
+ */
+static const uint8_t MONO_LORES_Y[16] = {
+    0,   /*  0 black */
+    48,  /*  1 magenta */
+    32,  /*  2 dark blue */
+    112, /*  3 purple */
+    64,  /*  4 dark green */
+    96,  /*  5 gray1 */
+    128, /*  6 medium blue */
+    176, /*  7 light blue */
+    80,  /*  8 brown */
+    144, /*  9 orange */
+    160, /* 10 gray2 */
+    192, /* 11 pink */
+    120, /* 12 green */
+    224, /* 13 yellow */
+    208, /* 14 aqua */
+    255  /* 15 white */
+};
+
 static uint32_t mono_lores[3][16];
 
 /*
@@ -181,11 +205,7 @@ static void paint_init_luts(void)
     }
 
     for (pattern = 0; pattern < 16; pattern++) {
-        uint32_t src = LORES_PALETTE[pattern];
-        unsigned int r = (src >> 16) & 0xffu;
-        unsigned int g = (src >> 8) & 0xffu;
-        unsigned int b = src & 0xffu;
-        unsigned int y = (299u * r + 587u * g + 114u * b) / 1000u;
+        unsigned int y = MONO_LORES_Y[pattern];
         int ph;
         for (ph = 0; ph < 3; ph++) {
             unsigned int pr = (PHOSPHOR_ARGB[ph] >> 16) & 0xffu;

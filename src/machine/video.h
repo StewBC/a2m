@@ -98,7 +98,8 @@ void apple2_video_set_display_override(
     uint32_t flags);
 
 /* Host monitor decoder. colour=true is the artefact LUT path; false paints
-   discrete on/off bits (HGR/DHGR/text) and phosphor-luma LORES cells.
+   discrete on/off bits (HGR/DHGR/text) and 16 spaced phosphor fills for
+   LORES/DLORES cells.
    Does not paint; caller issues paint_full_frame when a coherent frame is
    needed. */
 void apple2_video_set_monitor(

@@ -658,12 +658,8 @@ static const uint32_t MONO_WHITE = 0xFFFFFFFFu;
 static const uint32_t MONO_GREEN = 0xFF33FF66u;
 static const uint32_t MONO_AMBER = 0xFFFFB000u;
 
-static uint32_t expect_phosphor_luma(uint32_t phosphor, uint32_t src)
+static uint32_t tint_phosphor(uint32_t phosphor, unsigned int y)
 {
-    unsigned int r = (src >> 16) & 0xffu;
-    unsigned int g = (src >> 8) & 0xffu;
-    unsigned int b = src & 0xffu;
-    unsigned int y = (299u * r + 587u * g + 114u * b) / 1000u;
     unsigned int pr = (phosphor >> 16) & 0xffu;
     unsigned int pg = (phosphor >> 8) & 0xffu;
     unsigned int pb = phosphor & 0xffu;
@@ -776,6 +772,9 @@ static void test_lores_mono_phosphor_luma(void)
     m.ram_main[0x400u + base + 0] = 0x0Fu; /* white */
     m.ram_main[0x400u + base + 1] = 0x00u; /* black */
     m.ram_main[0x400u + base + 2] = 0x05u; /* gray1 */
+    m.ram_main[0x400u + base + 3] = 0x09u; /* orange */
+    m.ram_main[0x400u + base + 4] = 0x0Cu; /* green */
+    m.ram_main[0x400u + base + 5] = 0x01u; /* magenta */
 
     apple2_video_set_monitor(&m, false, APPLE2_VIDEO_PHOSPHOR_GREEN);
     apple2_video_paint_full_frame(&m);
@@ -783,13 +782,19 @@ static void test_lores_mono_phosphor_luma(void)
 
     expect_u32("lores mono white", MONO_GREEN, fb[0]);
     expect_u32("lores mono black", 0xFF000000u, fb[14]);
-    expect_u32(
-        "lores mono gray",
-        expect_phosphor_luma(MONO_GREEN, EXPECT_LORES[5]),
-        fb[28]);
-    expect_true(
-        "gray darker than white",
+    expect_u32("lores mono gray", tint_phosphor(MONO_GREEN, 96u), fb[28]);
+    expect_u32("lores mono orange", tint_phosphor(MONO_GREEN, 144u), fb[42]);
+    expect_u32("lores mono green", tint_phosphor(MONO_GREEN, 120u), fb[56]);
+    expect_u32("lores mono magenta", tint_phosphor(MONO_GREEN, 48u), fb[70]);
+    expect_true("gray darker than white",
         (fb[28] & 0x00FF00u) < (MONO_GREEN & 0x00FF00u));
+    expect_true("orange brighter than gray",
+        (fb[42] & 0x00FF00u) > (fb[28] & 0x00FF00u));
+    expect_true("green between gray and orange",
+        (fb[56] & 0x00FF00u) > (fb[28] & 0x00FF00u) &&
+        (fb[56] & 0x00FF00u) < (fb[42] & 0x00FF00u));
+    expect_true("magenta above black",
+        (fb[70] & 0x00FF00u) > 0u);
 
     apple2_shutdown(&m);
 }
