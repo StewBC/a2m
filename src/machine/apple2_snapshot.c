@@ -460,6 +460,7 @@ static void write_soft(snapshot_writer *w, const apple2_t *m)
     }
     w_u8(w, m->gameport_buttons);
     w_u64(w, m->gameport_ptrig_cycle);
+    w_i32(w, m->c800_card);
     end_chunk(w, chunk);
 }
 
@@ -931,6 +932,14 @@ static bool apply_soft(apple2_t *m, const uint8_t *p, size_t len)
     }
     m->gameport_buttons = r_u8(&r);
     m->gameport_ptrig_cycle = r_u64(&r);
+    if (r.ok && r.pos + 4u <= r.len) {
+        m->c800_card = r_i32(&r);
+    } else if (m->strobed_slot >= 1 && m->strobed_slot <= 7) {
+        m->c800_card = m->strobed_slot;
+    } else {
+        m->c800_card = -1;
+    }
+    m->c800_internal = (m->strobed_slot == 8);
     return r.ok;
 }
 

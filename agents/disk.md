@@ -43,13 +43,12 @@ red LED when wired.
 Default card: **slot 7**. Two units. Softswitches `$C0s4` data / `$C0s5` status
 (`sp_read` / `sp_write`).
 
-There is no `$C800` expansion firmware in tree. SmartPort `$Csxx` does not
-take the C800 map. `sp_host_trap` fires at `$C800` / `$C89B` / `$C9AA` when
-the call is SmartPort: slot-ROM dispatch (last I/O SELECT was an SP `$Csxx`)
-or `JSR` to that entry with inline cmd. 80-col firmware
-`JMP $C800` from `$C3xx` is not trapped. Dispatch is **STATUS / READ_BLOCK /
-WRITE_BLOCK** only; other commands return `$27`. The trap is not a 6502
-opcode fetch.
+There is no `$C800` expansion firmware in tree. SmartPort `$Csxx` claims the
+card C800 latch when free. While that latch is held and 80-col is not
+overlaid (no CXROM / no `$C3xx` overlay), PC at `$C800` / `$C89B` / `$C9AA`
+is the missing ROM: `sp_host_trap` dispatches **STATUS / READ_BLOCK /
+WRITE_BLOCK**. Other commands return `$27`. The trap is not a 6502 opcode
+fetch.
 
 ```bash
 ./build/a2m --noini --hd s7d0=volume.po

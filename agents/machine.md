@@ -56,11 +56,12 @@ CXXX slot map — `cxxx_map` tests are the contract.
 - Empty-slot `$Cn` shadows are captured from RAM underlay **before** bank apply.
 - `SETCXROM` (`$C007`): internal `$C100–$CFFF` ROM **hides** slot-card I/O
   (Mockingboard `$Cn` must not intercept while INTCXROM is on).
-- `$C800` is a sticky I/O SELECT flip-flop, released only by `$CFFF` (IIe
-  TRM / Sather) — not last-wins. Internal `$C3xx` (when C3ROM is internal)
-  takes the motherboard 80-col firmware latch. Cards without expansion ROM
-  (SmartPort, Disk II, Mockingboard) do not take the map. `SETC3ROM`
-  (`$C00B`) is not I/O SELECT, so a prior `$C3xx` latch stays until `$CFFF`
+- `$C800` card latch: first I/O SELECT (`$Cnxx` read or write) until `$CFFF`.
+  SmartPort claims like an expansion-ROM card; there is no ROM image, so the
+  host trap *is* that mapping. Internal `$C3xx` sets a motherboard 80-col
+  overlay (does not drop the card latch). INTCXROM overlays `$C100–$CFFF`
+  and restores the card latch when cleared. `$CFFF` drops both latches.
+  `SETC3ROM` (`$C00B`) is not I/O SELECT; the overlay stays until `$CFFF`
   (a2audit E000B).
 
 `apple2_debug_read` / `write` skip softswitch side effects. Live bus is

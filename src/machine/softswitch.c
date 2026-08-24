@@ -96,39 +96,47 @@ static void map_lc_write(apple2_t *m)
     }
 }
 
+static void c800_sync_visible(apple2_t *m)
+{
+    m->strobed_slot = m->c800_internal ? C800_INTERNAL : m->c800_card;
+}
+
+void softswitch_c800_release(apple2_t *m)
+{
+    if (m == NULL) {
+        return;
+    }
+    m->c800_card = C800_NONE;
+    m->c800_internal = false;
+    c800_sync_visible(m);
+}
+
 static void apply_c800(apple2_t *m)
 {
-    /* CXROM active: C800 is always internal firmware (not card-strobed). */
+    /* CXROM: motherboard overlay of $C100-$CFFF; card latch is unchanged. */
     if (FLAG(m, A2S_CXSLOTROM_MB_ENABLE) && m->rom_c000 != NULL) {
         apple2_pages_map_rom(m, 0xC800, 0x800, m->rom_c000 + 0x800);
         return;
     }
     /*
-     * Once $C3xx has strobed the internal C800 latch (C800_INTERNAL), the
-     * 80-col firmware stays mapped until $CFFF — even after SETC3ROM turns
-     * $C300 over to the slot. Matches original a2m io_apply_c800_latch and
-     * a2audit E000B (LDA $C300 / STA $C00B → C800 still ROM).
+     * $C3xx 80-col overlay maps firmware until $CFFF (a2audit E000B:
+     * SETC3ROM does not drop C800). Card I/O SELECT latch stays underneath.
      */
-    if (m->strobed_slot == C800_INTERNAL && m->rom_c000 != NULL) {
+    if (m->c800_internal && m->rom_c000 != NULL) {
         apple2_pages_map_rom(m, 0xC800, 0x800, m->rom_c000 + 0x800);
         return;
     }
-    /* Card-owned C800 (Franklin / etc.). SmartPort has no expansion ROM;
-       the host trap is a calling-convention intercept, not a C800 map. */
-    if (m->strobed_slot >= 1 && m->strobed_slot <= 7) {
-        /* Fall through to RAM underlay. */
-    }
+    /* SmartPort claimed C800 but has no expansion ROM image — trap. */
     apple2_pages_map_ram(m, false, 0xC800, 0x800);
 }
 
 /*
- * I/O SELECT ($Cnxx): a C800 owner (internal 80-col, or a card with
- * expansion ROM) sets a sticky flip-flop; $CFFF is the only release
- * (IIe TRM / Sather). Not last-wins. SmartPort has no C800 ROM, so
- * $Csxx must not take the map — record last_io_select_slot only, so
- * the host trap can still see a slot-ROM JMP $C800.
- * SETC3ROM ($C00B) is not I/O SELECT; a prior $C3xx latch stays
- * until $CFFF (a2audit E000B).
+ * I/O SELECT ($Cnxx). Read or write is enough.
+ * Card latch: first claimant until $CFFF. SmartPort claims like any
+ * expansion-ROM card; mapping its missing $C800 ROM enables the trap.
+ * $C3xx with internal C3 sets a motherboard overlay (does not steal the
+ * card latch). CXROM is a separate overlay (does not change latches).
+ * $CFFF drops both latches.
  */
 void softswitch_slot_io_select(apple2_t *m, uint16_t address)
 {
@@ -138,21 +146,24 @@ void softswitch_slot_io_select(apple2_t *m, uint16_t address)
         return;
     }
     if (FLAG(m, A2S_CXSLOTROM_MB_ENABLE)) {
-        return; /* INTCXROM: cards do not own C800 */
+        return; /* INTCXROM: slot I/O SELECT is hidden */
     }
 
     slot = (address >> 8) & 0x7;
     m->last_io_select_slot = slot;
 
-    if (m->strobed_slot != C800_NONE) {
-        return; /* already latched until $CFFF */
-    }
-
     if (slot == 3 && !FLAG(m, A2S_SLOT3ROM_MB_DISABLE)) {
-        m->strobed_slot = C800_INTERNAL;
+        m->c800_internal = true;
+        c800_sync_visible(m);
+        apply_c800(m);
+        return;
+    }
+    if (m->slot_type[slot] == SLOT_TYPE_SMARTPORT &&
+        m->c800_card == C800_NONE) {
+        m->c800_card = slot;
+        c800_sync_visible(m);
         apply_c800(m);
     }
-    /* SmartPort / Disk II / MB: no expansion ROM at $C800. */
 }
 
 static void map_cxrom(apple2_t *m)
@@ -323,7 +334,7 @@ void softswitch_apply_full_map(apple2_t *m)
 void softswitch_setup_after_reset(apple2_t *m)
 {
     m->state_flags &= ~A2S_RESET_MASK;
-    m->strobed_slot = C800_NONE;
+    softswitch_c800_release(m);
     m->last_io_select_slot = 0;
 
     softswitch_bank_clear(m, A2S_BANK_MASK);

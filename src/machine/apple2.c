@@ -202,7 +202,7 @@ static uint8_t apple2_bus_read(void *user, uint16_t address)
         return value;
     }
     if (address == SS_CLRROM) {
-        m->strobed_slot = -1;
+        softswitch_c800_release(m);
         softswitch_apply_full_map(m);
     }
     if (address >= 0xC100 && address < 0xC800) {
@@ -245,7 +245,7 @@ static void apple2_bus_write(void *user, uint16_t address, uint8_t value)
         return;
     }
     if (address == SS_CLRROM) {
-        m->strobed_slot = -1;
+        softswitch_c800_release(m);
         softswitch_apply_full_map(m);
         apple2_report_memory_access(m, APPLE2_MEMORY_ACCESS_WRITE, address, value);
         return;
@@ -336,6 +336,8 @@ bool apple2_init(apple2_t *machine)
     machine->pages.num_pages = APPLE2_NUM_PAGES;
     machine->model = APPLE2_MODEL_IIE_ENHANCED;
     machine->strobed_slot = -1;
+    machine->c800_card = -1;
+    machine->c800_internal = false;
     machine->last_io_select_slot = 0;
 
     /* Pattern underlay like a2m floating IO area. */

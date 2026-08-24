@@ -292,8 +292,8 @@ static void test_smartport_host_trap(void)
     if (m.last_io_select_slot != 7) {
         fail("SP I/O SELECT not recorded");
     }
-    if (m.strobed_slot != -1) {
-        fail("SP must not take C800 latch");
+    if (m.c800_card != 7 || m.strobed_slot != 7) {
+        fail("SP did not claim C800");
     }
 
     /* --- STATUS unit 0 --- */
@@ -391,16 +391,18 @@ static void test_smartport_host_trap(void)
     }
 
     /*
-     * $C3xx maps 80-col firmware (C800 latch). JMP $C800 from that firmware
-     * must not trap. JSR $C800 (inline SP protocol) still traps.
-     * Slot-ROM $C7xx does not steal the C800 *map* (first-wins until $CFFF).
+     * $C3xx overlays 80-col firmware; SP card latch remains. $C800 execute
+     * is firmware, not the trap. $CFFF drops both; $C7xx can claim again.
      */
     {
         uint8_t c800_rom = m.rom_c000[0x800];
 
         softswitch_slot_io_select(&m, 0xC300);
-        if (m.strobed_slot != 8) {
-            fail("C3 did not latch 80-col C800");
+        if (m.strobed_slot != 8 || !m.c800_internal) {
+            fail("C3 did not overlay 80-col C800");
+        }
+        if (m.c800_card != 7) {
+            fail("SP card latch dropped by C3 overlay");
         }
         if (apple2_debug_read(&m, 0xC800) != c800_rom) {
             fail("C800 not 80-col firmware after C3");
@@ -413,33 +415,13 @@ static void test_smartport_host_trap(void)
             fail("80-col $C800 PC mutated");
         }
 
-        /* Inline JSR $C800 while 80-col still owns the map. */
-        m.ram_main[0x07FD] = 0x20;
-        m.ram_main[0x07FE] = 0x00;
-        m.ram_main[0x07FF] = 0xC8;
-        m.cpu.cpu.sp = 0x1FDu;
-        m.ram_main[0x1FE] = 0xFF;
-        m.ram_main[0x1FF] = 0x07;
-        m.cpu.cpu.pc = 0xC800;
-        m.ram_main[0x0800] = 0x00;
-        m.ram_main[0x0801] = (uint8_t)(plist & 0xFF);
-        m.ram_main[0x0802] = (uint8_t)(plist >> 8);
-        m.ram_main[plist + 0] = 3;
-        m.ram_main[plist + 1] = 0;
-        m.ram_main[plist + 2] = 0x00;
-        m.ram_main[plist + 3] = 0x04;
-        m.ram_main[plist + 4] = 0;
-        if (!sp_host_trap(&m)) {
-            fail("inline JSR $C800 trap not taken while 80-col mapped");
+        (void)m.cpu.read(m.cpu.user, 0xCFFF);
+        if (m.strobed_slot != -1 || m.c800_card != -1 || m.c800_internal) {
+            fail("CFFF did not release both C800 latches");
         }
-
-        /* Slot ROM path: $C7xx I/O SELECT, C800 map stays 80-col. */
         softswitch_slot_io_select(&m, 0xC700);
-        if (m.strobed_slot != 8) {
-            fail("SP I/O SELECT stole C800 map");
-        }
-        if (m.last_io_select_slot != 7) {
-            fail("SP I/O SELECT not last");
+        if (m.c800_card != 7 || m.strobed_slot != 7) {
+            fail("SP did not reclaim C800 after CFFF");
         }
         m.cpu.cpu.sp = 0x1FDu;
         m.ram_main[0x1FE] = 0xFF;
@@ -454,7 +436,7 @@ static void test_smartport_host_trap(void)
         m.ram_main[plist + 3] = 0x04;
         m.ram_main[plist + 4] = 0;
         if (!sp_host_trap(&m)) {
-            fail("slot-ROM $C800 trap not taken");
+            fail("SP trap not taken after reclaim");
         }
     }
 

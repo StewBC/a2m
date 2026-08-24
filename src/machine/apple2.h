@@ -101,7 +101,9 @@ typedef struct apple2 {
 
     uint32_t state_flags;
     uint8_t key_held;
-    int strobed_slot; /* -1 none, 8 internal C800, 1..7 slot with C800 ROM */
+    int strobed_slot; /* visible C800: -1 none, 8 80-col overlay, 1..7 card */
+    int c800_card; /* card I/O SELECT latch until $CFFF; -1 none */
+    bool c800_internal; /* motherboard 80-col overlay from $C3xx until $CFFF */
     int last_io_select_slot; /* 1..7 last $Cnxx I/O SELECT; 0 none */
 
     /* Shadow of C100-C7FF read page pointers for CXROM off restore. */

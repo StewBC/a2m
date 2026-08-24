@@ -51,6 +51,8 @@ void softswitch_language_card(struct apple2 *m, uint16_t address, int write_acce
 
 /* First $Cnxx access may latch $C800 expansion ROM (//e C3 / card). */
 void softswitch_slot_io_select(struct apple2 *m, uint16_t address);
+/* $CFFF: drop card C800 latch and 80-col overlay. */
+void softswitch_c800_release(struct apple2 *m);
 
 void softswitch_bank_set(struct apple2 *m, uint32_t bits);
 void softswitch_bank_clear(struct apple2 *m, uint32_t bits);

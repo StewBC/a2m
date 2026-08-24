@@ -80,6 +80,8 @@ static void test_c3_strobes_c800(void)
 
     /* Force C800 to RAM underlay first. */
     m.strobed_slot = -1;
+    m.c800_card = -1;
+    m.c800_internal = false;
     softswitch_apply_full_map(&m);
     c800_before = apple2_debug_read(&m, 0xC800);
     c800_rom = m.rom_c000[0x800];
@@ -161,9 +163,8 @@ static void test_a2audit_c300_then_setc3rom(void)
 }
 
 /*
- * SmartPort has no C800 ROM, so $C7xx must not take the C800 latch (v1-2
- * map_cx_rom = NULL). $C3xx can still enable 80-col firmware after SP I/O
- * SELECT — that is first-wins, not last-wins. PR#3 then sets COL80.
+ * SmartPort $C7xx claims the card C800 latch. $C3xx overlays 80-col firmware
+ * without dropping that latch. Visible C800 is firmware until $CFFF.
  */
 static void test_c3_maps_c800_after_smartport_select(void)
 {
@@ -177,14 +178,18 @@ static void test_c3_maps_c800_after_smartport_select(void)
     c800_rom = m.rom_c000[0x800];
 
     m.strobed_slot = -1;
+    m.c800_card = -1;
+    m.c800_internal = false;
     softswitch_apply_full_map(&m);
 
     softswitch_slot_io_select(&m, 0xC700);
     expect_true("SP I/O SELECT recorded", m.last_io_select_slot == 7);
-    expect_true("SP does not take C800 latch", m.strobed_slot == -1);
+    expect_true("SP claimed card C800", m.c800_card == 7);
+    expect_true("visible C800 is SP", m.strobed_slot == 7);
 
     softswitch_slot_io_select(&m, 0xC300);
-    expect_true("C3 latched", m.strobed_slot == 8);
+    expect_true("C3 overlay", m.strobed_slot == 8);
+    expect_true("SP latch remains under overlay", m.c800_card == 7);
     expect_true(
         "C800 is 80-col firmware after C3",
         apple2_debug_read(&m, 0xC800) == c800_rom);
@@ -192,10 +197,10 @@ static void test_c3_maps_c800_after_smartport_select(void)
         "bus C800 firmware after C3",
         m.cpu.read(m.cpu.user, 0xC800) == c800_rom);
 
-    /* First-wins: $C7xx after $C3xx must not steal C800 from 80-col. */
+    /* Card latch already held; overlay stays 80-col. */
     softswitch_slot_io_select(&m, 0xC700);
     expect_true("C800 still 80-col after later SP select", m.strobed_slot == 8);
-    expect_true("last I/O SELECT is SP", m.last_io_select_slot == 7);
+    expect_true("card latch still SP", m.c800_card == 7);
 
     /* PR#3 from a $C3xx fetch (last I/O SELECT = 3). */
     softswitch_slot_io_select(&m, 0xC300);
