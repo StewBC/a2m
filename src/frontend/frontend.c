@@ -7408,7 +7408,11 @@ static void frontend_draw_misc(frontend *ui, struct nk_rect bounds, const fronte
         frontend_draw_misc_tab_button(ui, FRONTEND_MISC_TAB_ASSEMBLER, "Assembler");
         frontend_draw_misc_tab_button(ui, FRONTEND_MISC_TAB_INSPECTOR, "Inspector");
 
-        content_h = bounds.h - (tab_h * 2.0f) - 55.0f;
+        /* 55.0f is the original one-row chrome (title, pad, borders, reserved
+           window scrollbar). Each extra tab row also costs window.spacing.y,
+           which Nuklear adds to every row; omitting it made the group overflow
+           and drew a second scrollbar outside every tab. */
+        content_h = bounds.h - (tab_h * 2.0f) - 55.0f - ctx->style.window.spacing.y;
         if (content_h < 24.0f) {
             content_h = 24.0f;
         }
