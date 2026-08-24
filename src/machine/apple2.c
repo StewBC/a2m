@@ -336,6 +336,7 @@ bool apple2_init(apple2_t *machine)
     machine->pages.num_pages = APPLE2_NUM_PAGES;
     machine->model = APPLE2_MODEL_IIE_ENHANCED;
     machine->strobed_slot = -1;
+    machine->last_io_select_slot = 0;
 
     /* Pattern underlay like a2m floating IO area. */
     memset(machine->ram_main + 0xC001, 0xA0, 0x0FFE);

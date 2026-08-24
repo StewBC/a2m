@@ -289,8 +289,11 @@ static void test_smartport_host_trap(void)
     }
 
     softswitch_slot_io_select(&m, 0xC700);
-    if (m.strobed_slot != 7) {
-        fail("SP not latched");
+    if (m.last_io_select_slot != 7) {
+        fail("SP I/O SELECT not recorded");
+    }
+    if (m.strobed_slot != -1) {
+        fail("SP must not take C800 latch");
     }
 
     /* --- STATUS unit 0 --- */
@@ -385,6 +388,74 @@ static void test_smartport_host_trap(void)
     }
     if (m.sp_device[7].sp_buffer[1] != 0xAB || m.sp_device[7].sp_buffer[2] != 0xCD) {
         fail("write data mismatch");
+    }
+
+    /*
+     * $C3xx maps 80-col firmware (C800 latch). JMP $C800 from that firmware
+     * must not trap. JSR $C800 (inline SP protocol) still traps.
+     * Slot-ROM $C7xx does not steal the C800 *map* (first-wins until $CFFF).
+     */
+    {
+        uint8_t c800_rom = m.rom_c000[0x800];
+
+        softswitch_slot_io_select(&m, 0xC300);
+        if (m.strobed_slot != 8) {
+            fail("C3 did not latch 80-col C800");
+        }
+        if (apple2_debug_read(&m, 0xC800) != c800_rom) {
+            fail("C800 not 80-col firmware after C3");
+        }
+        m.cpu.cpu.pc = 0xC800;
+        if (sp_host_trap(&m)) {
+            fail("SP trap stole 80-col $C800");
+        }
+        if (m.cpu.cpu.pc != 0xC800) {
+            fail("80-col $C800 PC mutated");
+        }
+
+        /* Inline JSR $C800 while 80-col still owns the map. */
+        m.ram_main[0x07FD] = 0x20;
+        m.ram_main[0x07FE] = 0x00;
+        m.ram_main[0x07FF] = 0xC8;
+        m.cpu.cpu.sp = 0x1FDu;
+        m.ram_main[0x1FE] = 0xFF;
+        m.ram_main[0x1FF] = 0x07;
+        m.cpu.cpu.pc = 0xC800;
+        m.ram_main[0x0800] = 0x00;
+        m.ram_main[0x0801] = (uint8_t)(plist & 0xFF);
+        m.ram_main[0x0802] = (uint8_t)(plist >> 8);
+        m.ram_main[plist + 0] = 3;
+        m.ram_main[plist + 1] = 0;
+        m.ram_main[plist + 2] = 0x00;
+        m.ram_main[plist + 3] = 0x04;
+        m.ram_main[plist + 4] = 0;
+        if (!sp_host_trap(&m)) {
+            fail("inline JSR $C800 trap not taken while 80-col mapped");
+        }
+
+        /* Slot ROM path: $C7xx I/O SELECT, C800 map stays 80-col. */
+        softswitch_slot_io_select(&m, 0xC700);
+        if (m.strobed_slot != 8) {
+            fail("SP I/O SELECT stole C800 map");
+        }
+        if (m.last_io_select_slot != 7) {
+            fail("SP I/O SELECT not last");
+        }
+        m.cpu.cpu.sp = 0x1FDu;
+        m.ram_main[0x1FE] = 0xFF;
+        m.ram_main[0x1FF] = 0x07;
+        m.cpu.cpu.pc = 0xC800;
+        m.ram_main[0x0800] = 0x00;
+        m.ram_main[0x0801] = (uint8_t)(plist & 0xFF);
+        m.ram_main[0x0802] = (uint8_t)(plist >> 8);
+        m.ram_main[plist + 0] = 3;
+        m.ram_main[plist + 1] = 0;
+        m.ram_main[plist + 2] = 0x00;
+        m.ram_main[plist + 3] = 0x04;
+        m.ram_main[plist + 4] = 0;
+        if (!sp_host_trap(&m)) {
+            fail("slot-ROM $C800 trap not taken");
+        }
     }
 
     apple2_shutdown(&m);

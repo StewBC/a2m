@@ -113,15 +113,23 @@ static void apply_c800(apple2_t *m)
         apple2_pages_map_rom(m, 0xC800, 0x800, m->rom_c000 + 0x800);
         return;
     }
-    /* Card-owned C800 (SmartPort / Franklin / etc.). SmartPort has no
-       expansion ROM image — host trap handles $C800 entries (see sp_host_trap). */
+    /* Card-owned C800 (Franklin / etc.). SmartPort has no expansion ROM;
+       the host trap is a calling-convention intercept, not a C800 map. */
     if (m->strobed_slot >= 1 && m->strobed_slot <= 7) {
-        /* Fall through to RAM underlay; pure-SP calls are PC-trapped. */
+        /* Fall through to RAM underlay. */
     }
     apple2_pages_map_ram(m, false, 0xC800, 0x800);
 }
 
-/* IO Select: first access to $Cnxx may latch $C800-$CFFF. */
+/*
+ * I/O SELECT ($Cnxx): a C800 owner (internal 80-col, or a card with
+ * expansion ROM) sets a sticky flip-flop; $CFFF is the only release
+ * (IIe TRM / Sather). Not last-wins. SmartPort has no C800 ROM, so
+ * $Csxx must not take the map — record last_io_select_slot only, so
+ * the host trap can still see a slot-ROM JMP $C800.
+ * SETC3ROM ($C00B) is not I/O SELECT; a prior $C3xx latch stays
+ * until $CFFF (a2audit E000B).
+ */
 void softswitch_slot_io_select(apple2_t *m, uint16_t address)
 {
     int slot;
@@ -132,22 +140,19 @@ void softswitch_slot_io_select(apple2_t *m, uint16_t address)
     if (FLAG(m, A2S_CXSLOTROM_MB_ENABLE)) {
         return; /* INTCXROM: cards do not own C800 */
     }
+
+    slot = (address >> 8) & 0x7;
+    m->last_io_select_slot = slot;
+
     if (m->strobed_slot != C800_NONE) {
         return; /* already latched until $CFFF */
     }
 
-    slot = (address >> 8) & 0x7;
     if (slot == 3 && !FLAG(m, A2S_SLOT3ROM_MB_DISABLE)) {
         m->strobed_slot = C800_INTERNAL;
         apply_c800(m);
-        return;
     }
-    /* SmartPort: latch slot so pure-SP $C800 entries know which card. */
-    if (m->slot_type[slot] == SLOT_TYPE_SMARTPORT) {
-        m->strobed_slot = slot;
-        apply_c800(m);
-        return;
-    }
+    /* SmartPort / Disk II / MB: no expansion ROM at $C800. */
 }
 
 static void map_cxrom(apple2_t *m)
@@ -319,6 +324,7 @@ void softswitch_setup_after_reset(apple2_t *m)
 {
     m->state_flags &= ~A2S_RESET_MASK;
     m->strobed_slot = C800_NONE;
+    m->last_io_select_slot = 0;
 
     softswitch_bank_clear(m, A2S_BANK_MASK);
 

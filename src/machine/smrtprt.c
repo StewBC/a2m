@@ -334,6 +334,15 @@ static void sp_cpu_write(apple2_t *m, uint16_t addr, uint8_t value)
     apple2_debug_write(m, addr, value);
 }
 
+static uint16_t sp_stack_peek16(apple2_t *m)
+{
+    uint16_t sp = m->cpu.cpu.sp;
+    uint16_t a1 = (uint16_t)(0x100u | ((sp + 1u) & 0xFFu));
+    uint16_t a2 = (uint16_t)(0x100u | ((sp + 2u) & 0xFFu));
+
+    return (uint16_t)((uint16_t)sp_cpu_read(m, a2) << 8) | sp_cpu_read(m, a1);
+}
+
 static uint16_t sp_stack_pop16(apple2_t *m)
 {
     CPU *cpu = &m->cpu.cpu;
@@ -351,13 +360,31 @@ static uint16_t sp_stack_pop16(apple2_t *m)
     return (uint16_t)(((uint16_t)hi << 8) | lo);
 }
 
+/* Documented SmartPort call is JSR dispatcher; 80-col firmware JMPs to $C800. */
+static bool sp_stack_is_jsr_to(apple2_t *m, uint16_t pc)
+{
+    uint16_t stacked = sp_stack_peek16(m);
+    uint16_t op = (uint16_t)(stacked - 2u);
+    uint16_t dest;
+
+    if (sp_cpu_read(m, op) != 0x20u) {
+        return false;
+    }
+    dest = (uint16_t)(sp_cpu_read(m, (uint16_t)(op + 1u)) |
+                      ((uint16_t)sp_cpu_read(m, (uint16_t)(op + 2u)) << 8));
+    return dest == pc;
+}
+
 static int sp_slot_for_trap(const apple2_t *m)
 {
-    int slot = m->strobed_slot;
+    int slot = m->last_io_select_slot;
     if (slot >= 1 && slot <= 7 && m->slot_type[slot] == SLOT_TYPE_SMARTPORT) {
         return slot;
     }
-    /* Fallback: first SmartPort with mounted media (rare unlatched call). */
+    slot = m->strobed_slot;
+    if (slot >= 1 && slot <= 7 && m->slot_type[slot] == SLOT_TYPE_SMARTPORT) {
+        return slot;
+    }
     for (slot = 1; slot <= 7; slot++) {
         if (m->slot_type[slot] == SLOT_TYPE_SMARTPORT &&
             sp_unit_mounted(&m->sp_device[slot], 0)) {
@@ -524,6 +551,22 @@ bool sp_host_trap(apple2_t *m)
 
     pc = m->cpu.cpu.pc;
     if (pc != SP_ENTRY_C800 && pc != SP_ENTRY_C89B && pc != SP_ENTRY_C9AA) {
+        return false;
+    }
+
+    /*
+     * SmartPort vs 80-col firmware at the same addresses: slot-ROM JMP
+     * $C800 after $Csxx I/O SELECT, or JSR $C800/$C89B/$C9AA with inline
+     * cmd. 80-col PR#3 JMPs to $C800 from $C3xx — not a JSR to these
+     * entries.
+     */
+    if (m->last_io_select_slot >= 1 &&
+        m->last_io_select_slot <= 7 &&
+        m->slot_type[m->last_io_select_slot] == SLOT_TYPE_SMARTPORT) {
+        /* Slot ROM dispatch. */
+    } else if (sp_stack_is_jsr_to(m, pc)) {
+        /* Inline JSR protocol. */
+    } else {
         return false;
     }
 

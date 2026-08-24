@@ -924,6 +924,7 @@ static bool apply_soft(apple2_t *m, const uint8_t *p, size_t len)
     m->state_flags = r_u32(&r);
     m->key_held = r_u8(&r);
     m->strobed_slot = r_i32(&r);
+    m->last_io_select_slot = 0;
     m->speaker_level = r_bool(&r);
     for (i = 0; i < 4; ++i) {
         m->gameport_axis[i] = r_u8(&r);

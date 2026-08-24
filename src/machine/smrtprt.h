@@ -54,9 +54,11 @@ const char *sp_unit_display_name(const SP_DEVICE *spd, int device);
 
 /*
  * Pure SmartPort entry host trap (no $C800 card firmware in tree).
- * When PC is at a known SP entry ($C800 / $C89B / $C9AA) and a SmartPort
- * slot has latched $C800, parse the inline call (cmd + param list pointer)
- * and dispatch STATUS / READ_BLOCK / WRITE_BLOCK via sp_*.
+ * When PC is at a known SP entry ($C800 / $C89B / $C9AA) and the call is
+ * SmartPort (slot-ROM JMP after $Csxx I/O SELECT, or JSR to that entry),
+ * parse the inline cmd + param list and dispatch STATUS / READ_BLOCK /
+ * WRITE_BLOCK via sp_*. 80-col firmware at the same addresses is not
+ * trapped.
  * Returns true if the trap handled the call (PC/SP/flags updated).
  */
 bool sp_host_trap(struct apple2 *m);
