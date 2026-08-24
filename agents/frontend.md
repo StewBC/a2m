@@ -92,8 +92,9 @@ Query line → `HISTORY_*` intents → `main.c` claim/decode → transcript (ses
 `history_close` on exit). Tab autocompletes from
 `runtime_history_find_option_keys()` / access names. **Land before** / **Land exact** (selected hit): quantized checkpoint ≤ N vs
 `land_to_cycle`. Live + can enter → **Inspect & Land** confirm then ENTER+land;
-soft-fail without checkpoints. Stay in Forensics.
-See [`design/forensics-ui.md`](../design/forensics-ui.md).
+soft-fail without checkpoints. Stay in Forensics. Double-click `id=` / `cyc=` /
+`pc=$...` copies that token. User docs: `manual/manual.md` (**Forensics**).
+Design (landed): [`design/forensics-ui.md`](../design/forensics-ui.md).
 
 Entering **max** remembers Record, wipes the tape, turns Record off (checkbox
 locked). Leaving max restores Record into an empty window.

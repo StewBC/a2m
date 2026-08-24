@@ -4,7 +4,7 @@
 |-------|-------|
 | **Author** | swessels |
 | **Date** | 2026-08-24 |
-| **Status** | Draft |
+| **Status** | Landed |
 | **Canonical path** | [`design/forensics-ui.md`](forensics-ui.md) |
 
 ---
@@ -684,4 +684,9 @@ Fuzz find-option strings in shared parse tests.
 - **Title:** `manual+help: Forensics UI; token-aware copy`
 - **Files:** `manual/manual.md`, help regen, Forensics token hit-test / double-click copy for `id=` / `cyc=` / `pc=$…`, `design/README.md` → landed
 - **Dependencies:** PR 4–5 (PR 6 if exact land shipped)
+- **Checklist:**
+  - [x] Manual **Forensics** section (Opt+R, verbs, copy, Land before/exact)
+  - [x] Cross-links from Interface / `[debug]` / flight recorder
+  - [x] Double-click token copy (`id=` / `cyc=` / `pc=$…`)
+  - [x] `design/README.md` active → landed
 - **Description:** User docs for Opt+R, verbs, grammar, Inspect & Land, Land semantics. Ship **token-aware copy** (in addition to whole-entry Copy). Mark design landed.

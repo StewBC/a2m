@@ -1073,6 +1073,141 @@ static void forensics_copy_selection(frontend_forensics_state *state)
     free(buf);
 }
 
+bool forensics_token_at_offset(
+    const char *text,
+    size_t byte_offset,
+    char *out,
+    size_t out_cap)
+{
+    static const char *const keys[] = {"id=", "cyc=", "pc=$", NULL};
+    size_t i;
+    size_t len;
+
+    if (out != NULL && out_cap > 0u) {
+        out[0] = '\0';
+    }
+    if (text == NULL || out == NULL || out_cap == 0u) {
+        return false;
+    }
+    len = strlen(text);
+    if (byte_offset > len) {
+        byte_offset = len;
+    }
+    if (byte_offset == len && len > 0u) {
+        byte_offset = len - 1u;
+    }
+    for (i = 0u; keys[i] != NULL; ++i) {
+        const char *key = keys[i];
+        size_t key_len = strlen(key);
+        const char *p = text;
+        while ((p = strstr(p, key)) != NULL) {
+            size_t start = (size_t)(p - text);
+            size_t end = start + key_len;
+            if (strcmp(key, "pc=$") == 0) {
+                while (end < len && isxdigit((unsigned char)text[end])) {
+                    end++;
+                }
+            } else {
+                while (end < len && isdigit((unsigned char)text[end])) {
+                    end++;
+                }
+            }
+            if (end > start + key_len &&
+                byte_offset >= start && byte_offset < end) {
+                size_t n = end - start;
+                if (n + 1u > out_cap) {
+                    n = out_cap - 1u;
+                }
+                memcpy(out, text + start, n);
+                out[n] = '\0';
+                return true;
+            }
+            p += key_len;
+        }
+    }
+    return false;
+}
+
+static size_t forensics_char_index_at_x(
+    const struct nk_user_font *font,
+    const char *line,
+    size_t line_len,
+    float x)
+{
+    size_t i;
+    float acc = 0.0f;
+
+    if (font == NULL || line == NULL || line_len == 0u || x <= 0.0f) {
+        return 0u;
+    }
+    for (i = 0u; i < line_len; ++i) {
+        float w = font->width(font->userdata, font->height, line + i, 1);
+        if (x < acc + w) {
+            return i;
+        }
+        acc += w;
+    }
+    return line_len > 0u ? line_len - 1u : 0u;
+}
+
+static bool forensics_copy_token_at_row(
+    struct nk_context *ctx,
+    frontend_forensics_state *state,
+    unsigned display_index,
+    struct nk_rect row_bounds)
+{
+    unsigned li;
+    const frontend_fr_logical_entry *entry;
+    char line[FRONTEND_FR_DISPLAY_COLS + 4u];
+    char token[64];
+    unsigned off;
+    unsigned len;
+    size_t char_index;
+    size_t byte_offset;
+    float x;
+
+    if (ctx == NULL || state == NULL || display_index >= state->display_count) {
+        return false;
+    }
+    li = state->display_logical_index[display_index];
+    if (li >= state->logical_count) {
+        return false;
+    }
+    entry = &state->logical[li];
+    if (entry->text == NULL || !entry->is_record) {
+        return false;
+    }
+    off = state->display_off[display_index];
+    len = state->display_len[display_index];
+    if (off > strlen(entry->text)) {
+        return false;
+    }
+    if (len > FRONTEND_FR_DISPLAY_COLS) {
+        len = FRONTEND_FR_DISPLAY_COLS;
+    }
+    if (off + len > strlen(entry->text)) {
+        len = (unsigned)strlen(entry->text) - off;
+    }
+    memcpy(line, entry->text + off, len);
+    line[len] = '\0';
+    x = ctx->input.mouse.pos.x - row_bounds.x;
+    char_index = forensics_char_index_at_x(ctx->style.font, line, len, x);
+    byte_offset = (size_t)off + char_index;
+    if (!forensics_token_at_offset(entry->text, byte_offset, token, sizeof(token))) {
+        return false;
+    }
+    if (SDL_SetClipboardText(token) != 0) {
+        forensics_view_set_status(state, "copy failed");
+        return true;
+    }
+    {
+        char status[FRONTEND_FR_STATUS_MAX];
+        snprintf(status, sizeof(status), "copied %s", token);
+        forensics_view_set_status(state, status);
+    }
+    return true;
+}
+
 void forensics_view_apply_rpc_error(
     frontend_forensics_state *state,
     runtime_history_rpc_status status)
@@ -1484,7 +1619,7 @@ void forensics_view_render(
         nk_layout_row_dynamic(ctx, hint_h, 1);
         nk_label(
             ctx,
-            "Opt+R/Close return to entry. F9 → debugger (paused). Tab completes unique key prefixes.",
+            "Opt+R/Close return to entry. F9 -> debugger (paused). Tab completes keys. Double-click id=/cyc=/pc=$ to copy.",
             NK_TEXT_LEFT);
 
         ctx->style.window.background = fr_bg;
@@ -1536,7 +1671,12 @@ void forensics_view_render(
                      */
                     nk_layout_row_dynamic(ctx, row_h, 1);
                     row_bounds = nk_widget_bounds(ctx);
-                    if (nk_input_is_mouse_pressed(&ctx->input, NK_BUTTON_LEFT) &&
+                    if (nk_input_is_mouse_click_down_in_rect(
+                            &ctx->input, NK_BUTTON_DOUBLE, row_bounds, nk_true)) {
+                        (void)forensics_copy_token_at_row(
+                            ctx, state, i, row_bounds);
+                    } else if (
+                        nk_input_is_mouse_pressed(&ctx->input, NK_BUTTON_LEFT) &&
                         nk_input_has_mouse_click_in_rect(
                             &ctx->input, NK_BUTTON_LEFT, row_bounds)) {
                         forensics_select_logical(state, li);

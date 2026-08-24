@@ -156,6 +156,13 @@ size_t forensics_format_hst1_record(
     bool anchor_match,
     bool compact);
 
+/* Token under byte offset in a formatted line: id= / cyc= / pc=$… */
+bool forensics_token_at_offset(
+    const char *text,
+    size_t byte_offset,
+    char *out,
+    size_t out_cap);
+
 void forensics_view_apply_result(
     frontend_forensics_state *state,
     int verb_code,

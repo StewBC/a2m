@@ -280,6 +280,39 @@ static void test_apply_and_select(void)
     forensics_view_close(&state);
 }
 
+static void test_token_at_offset(void)
+{
+    char token[64];
+    static const char *line =
+        "id=13523 pc=$FCAC a=00 x=00 y=00 sp=F2 p=24 opcode=$D0 cyc=1234 "
+        "[access_truncated] accesses: write $C000=22 @+1";
+    const char *id = strstr(line, "id=");
+    const char *pc = strstr(line, "pc=$");
+    const char *cyc = strstr(line, "cyc=");
+    const char *acc = strstr(line, "accesses:");
+
+    expect_true("anchors", id != NULL && pc != NULL && cyc != NULL && acc != NULL);
+    expect_true(
+        "id token",
+        forensics_token_at_offset(
+            line, (size_t)(id - line) + 3u, token, sizeof(token)));
+    expect_streq("id value", token, "id=13523");
+    expect_true(
+        "pc token",
+        forensics_token_at_offset(
+            line, (size_t)(pc - line) + 4u, token, sizeof(token)));
+    expect_streq("pc value", token, "pc=$FCAC");
+    expect_true(
+        "cyc token",
+        forensics_token_at_offset(
+            line, (size_t)(cyc - line) + 4u, token, sizeof(token)));
+    expect_streq("cyc value", token, "cyc=1234");
+    expect_true(
+        "no token on accesses",
+        !forensics_token_at_offset(
+            line, (size_t)(acc - line) + 2u, token, sizeof(token)));
+}
+
 static void test_land_focus_status(void)
 {
     frontend_forensics_state state;
@@ -344,6 +377,7 @@ int main(void)
     test_parse();
     test_format_golden();
     test_apply_and_select();
+    test_token_at_offset();
     test_land_focus_status();
     printf("ok\n");
     return 0;

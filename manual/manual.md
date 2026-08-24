@@ -212,7 +212,9 @@ scanner column is two 7-pixel half-cells (auxiliary RAM, then main). Mixed
 double LORES keeps 80-column text in the bottom four lines.
 
 Press **F9** to open or close Debug Mode. Press **Opt+H** to open or close the
-in-emulator help. On macOS, **Cmd+Q** quits; on Windows and Linux, **Opt+Q** quits.
+in-emulator help. Press **Opt+R** to open or close **Forensics** (CPU flight
+recorder FIND UI; see **Forensics**). On macOS, **Cmd+Q** quits; on Windows and
+Linux, **Opt+Q** quits.
 
 ### Window Title
 
@@ -316,6 +318,56 @@ Keyboard shortcuts active while the help overlay is open:
 | **Home** | Scroll to top of the current section |
 | **End** | Scroll to bottom of the current section |
 | **ESC** | Close the help overlay |
+
+### Forensics
+
+**Forensics** is a full-window debugger mode for searching the CPU flight
+recorder (HST1 FIND / NEXT / READ). It is not the Inspector slider: FIND answers
+"who wrote this?", then you can land Inspect at a hit's machine cycle.
+
+Open from Misc -> Inspector (**Forensics...**) or **Opt+R** (works from the
+full-screen CRT or with F9 Debug Mode up). Forensics and Help cannot both be
+open.
+
+| Transition | Behavior |
+|------------|----------|
+| Open Forensics | **Pauses** if the machine was running. Remembers whether you came from the CRT or the debugger. |
+| **Opt+R** / **Close** | Return to that entry surface. CRT entry resumes only if it was running when Forensics opened. Debugger entry stays paused. |
+| **F9** | Always open the debugger, paused (abandons any CRT resume latch). |
+| **Esc** | Does **not** leave Forensics (Help still uses Esc). |
+
+FIND requires a paused machine and a recording window (turn **Record** on in
+Misc -> Inspector and run a bit before searching). **Clear view** clears the
+transcript only; it does not call `history-clear`.
+
+**Query line** (Enter to run). Up/Down browses recent queries. Tab completes
+unique find-option keys and some values (`access=`, `direction=`, `from=`).
+
+| Input | Meaning |
+|-------|---------|
+| `find [key=value ...]` or bare `key=value...` | FIND with the shared option grammar (same keys as `history-find`) |
+| `next [limit=N]` | Continue the last FIND page |
+| `read <id> [before=N] [after=N] [epoch=N]` | Read one retained id with context |
+| `info` | Refresh recorder status (also runs quietly when Forensics opens) |
+
+Click a transcript line to select it (or a `---` header to select the whole
+result block). **Copy** copies the full selected text. Double-click `id=`,
+`cyc=`, or `pc=$...` on a record line to copy that token alone.
+
+With a record selected:
+
+| Button | Meaning |
+|--------|---------|
+| **Land before** | Inspect land at the nearest checkpoint at or before `cyc=` (often early so you can step into the hit) |
+| **Land exact** | Inspect land exactly at `cyc=` (checkpoint then re-execute to that cycle) |
+
+If you are not yet Inspecting but checkpoints exist, either land button asks to
+**Inspect & Land** first. Soft-fail if there is no Inspector window. Status
+reports the post-land `focus_cycle` versus the requested cycle (clamp, live, or
+quantized). You stay in Forensics after land.
+
+See **CPU Flight Recorder** for the wire grammar and **`[debug]`** for Record /
+budgets.
 
 ## CPU View
 
@@ -1569,6 +1621,10 @@ slider to preview stored film or pink (no still); release lands a snapshot.
 breakpoint or at live; you stay in Inspect. Leave Inspector restores live NOW
 and stays paused. F7 is unbound. Opt+Left is unbound in time travel.
 
+**Forensics...** (or **Opt+R**) opens the full-window FIND UI over the same
+recorder. Land before / Land exact jump Inspect to a FIND hit's cycle; they do
+not drive the scrubber. See **Forensics**.
+
 Breakpoints are **one list** in live and time travel. Opt+B toggles execute at
 the disassembly cursor. Pokes are rejected while Inspect is on.
 
@@ -1912,6 +1968,10 @@ The flight recorder continuously retains recent main-CPU execution and physical
 bus accesses in a bounded memory arena. The default budget is 256 MiB. Set it
 with `--history-memory=<MiB>` or `[debug] history_memory_mb`; `0` disables the
 feature and other valid values are 16 through 4096.
+
+In the debugger UI, **Forensics** (**Opt+R**) is the interactive FIND surface
+over this recorder (see **Forensics**). The control-port verbs below are the
+same engine for scripts.
 
 | Command | Meaning |
 |---------|---------|
