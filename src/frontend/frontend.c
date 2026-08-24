@@ -3178,11 +3178,36 @@ static void frontend_commit_register_edit(
     frontend_format_register_buffers(state, &debug_state->cpu, FRONTEND_REGISTER_FIELD_NONE);
 }
 
-static void frontend_draw_display_placeholder(frontend *ui, struct nk_rect bounds)
+static uint32_t frontend_display_probe_flags(
+    const frontend *ui,
+    const frontend_debug_state *debug_state)
+{
+    const uint32_t mask = A2S_COL80 | A2S_ALTCHARSET | A2S_TEXT |
+        A2S_MIXED | A2S_PAGE2 | A2S_HIRES | A2S_DHIRES;
+    uint32_t flags;
+
+    if (debug_state == NULL || !debug_state->has_apple_flags) {
+        return 0u;
+    }
+    flags = debug_state->apple_state_flags;
+    if (ui != NULL && ui->misc.display_override_enabled) {
+        flags = (flags & ~mask) | (ui->misc.display_override_flags & mask);
+    }
+    return flags;
+}
+
+static void frontend_draw_display_placeholder(
+    frontend *ui,
+    struct nk_rect bounds,
+    const frontend_debug_state *debug_state)
 {
     if (nk_begin(ui->ctx, "Machine Display", bounds, pane_flags)) {
         struct nk_rect canvas_bounds;
         struct nk_command_buffer *canvas;
+        struct nk_rect image_bounds;
+        bool have_image_bounds = false;
+        char status[80];
+        int status_len = 0;
 
         nk_layout_row_dynamic(ui->ctx, bounds.h - 52.0f, 1);
         canvas_bounds = nk_widget_bounds(ui->ctx);
@@ -3200,7 +3225,6 @@ static void frontend_draw_display_placeholder(frontend *ui, struct nk_rect bound
             int tex_h = 0;
             int fit_w = 0;
             int fit_h = 0;
-            struct nk_rect image_bounds;
 
             /* Nuklear UVs are region/tex_size — always query the real texture
                size so UV math cannot silently crop the Apple 560×192 frame. */
@@ -3228,6 +3252,7 @@ static void frontend_draw_display_placeholder(frontend *ui, struct nk_rect bound
                     image_bounds = frontend_fit_nk_rect(
                         canvas_bounds, (uint32_t)fit_w, (uint32_t)fit_h);
                 }
+                have_image_bounds = true;
 
                 nk_draw_image(canvas, image_bounds, &image, nk_rgba(255, 255, 255, 255));
                 if (!(render_texture == ui->crt_texture && ui->crt_effects.curvature)) {
@@ -3243,6 +3268,75 @@ static void frontend_draw_display_placeholder(frontend *ui, struct nk_rect bound
                 17,
                 ui->ctx->style.font,
                 nk_rgb(17, 22, 28),
+                nk_rgb(196, 214, 228));
+        }
+
+        /* Soft-switch-locked pixel address in the reserved bottom band.
+           Active only while paused (or inspecting) and hovering the picture. */
+        if (have_image_bounds &&
+            debug_state != NULL &&
+            debug_state->has_apple_flags &&
+            (debug_state->runtime_state == FRONTEND_RUNTIME_STATE_PAUSED ||
+             debug_state->inspecting) &&
+            !frontend_any_dialog_open(ui)) {
+            uint16_t px = 0;
+            uint16_t py = 0;
+            int crop_w = frontend_display_crop_w_for_frame(&ui->current_frame);
+            int crop_h = frontend_display_crop_h_for_frame(&ui->current_frame);
+            const frontend_crt_effects *crt =
+                (ui->crt_effects.curvature) ? &ui->crt_effects : NULL;
+
+            if (frontend_crt_mouse_to_pixel(
+                    ui->ctx->input.mouse.pos.x,
+                    ui->ctx->input.mouse.pos.y,
+                    image_bounds.x,
+                    image_bounds.y,
+                    image_bounds.w,
+                    image_bounds.h,
+                    crop_w,
+                    crop_h,
+                    crt,
+                    &px,
+                    &py)) {
+                apple2_video_pixel_addr addr;
+                uint32_t flags = frontend_display_probe_flags(ui, debug_state);
+
+                if (apple2_video_pixel_address(flags, px, py, &addr)) {
+                    if (addr.from_aux) {
+                        status_len = snprintf(
+                            status,
+                            sizeof(status),
+                            "bank: aux $%04X ofs: $%04X adr: $%X",
+                            (unsigned)addr.bank_base,
+                            (unsigned)addr.offset,
+                            (unsigned)addr.host_addr);
+                    } else {
+                        status_len = snprintf(
+                            status,
+                            sizeof(status),
+                            "bank: $%04X ofs: $%04X adr: $%04X",
+                            (unsigned)addr.bank_base,
+                            (unsigned)addr.offset,
+                            (unsigned)addr.host_addr);
+                    }
+                }
+            }
+        }
+
+        if (status_len > 0) {
+            nk_draw_text(
+                canvas,
+                nk_rect(
+                    canvas_bounds.x + 8.0f,
+                    canvas_bounds.y + canvas_bounds.h + 10.0f,
+                    canvas_bounds.w - 16.0f,
+                    20.0f),
+                status,
+                status_len,
+                ui->ctx->style.font,
+                nk_rgb(FRONTEND_DISPLAY_MATTE_R,
+                    FRONTEND_DISPLAY_MATTE_G,
+                    FRONTEND_DISPLAY_MATTE_B),
                 nk_rgb(196, 214, 228));
         }
 
@@ -10507,7 +10601,7 @@ void frontend_render(frontend *ui, bool ui_visible, const frontend_debug_state *
                 ui->layout.drag_active = DEBUGGER_LAYOUT_DRAG_NONE;
             }
 
-            frontend_draw_display_placeholder(ui, ui->layout.display);
+            frontend_draw_display_placeholder(ui, ui->layout.display, debug_state);
             frontend_draw_registers(ui, ui->layout.registers, debug_state);
             frontend_draw_disassembly_view(ui, ui->layout.disassembly, debug_state);
             frontend_draw_memory(ui, ui->layout.memory, debug_state);
