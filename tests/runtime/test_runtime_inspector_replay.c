@@ -6,7 +6,7 @@
 #include "runtime_event.h"
 #include "runtime_history.h"
 #include "runtime_internal.h"
-#include "runtime_timemachine.h"
+#include "runtime_inspector.h"
 
 #include <SDL.h>
 #include <stdio.h>
@@ -62,7 +62,7 @@ int main(void)
     apple2_t scratch2;
     runtime_history_status st_before;
     runtime_history_status st_after;
-    runtime_tm_window window;
+    runtime_inspector_window window;
     uint64_t mid;
     uint16_t pc1;
     uint16_t pc2;
@@ -76,9 +76,9 @@ int main(void)
 
     runtime_config_init(&config);
     config.start_running = false;
-    config.timemachine = true;
-    config.timemachine_memory_mb = 16;
-    config.timemachine_memory_mb_configured = true;
+    config.inspector = true;
+    config.inspector_memory_mb = 16;
+    config.inspector_memory_mb_configured = true;
     config.history_memory_mb = 16;
     config.history_memory_mb_configured = true;
     config.frame_ring_memory_mb = 8;
@@ -103,17 +103,17 @@ int main(void)
     drain(client);
     expect_true("worker paused", rt->exec_state != RUNTIME_EXEC_RUNNING);
 
-    expect_true("TM on", runtime_tm_enabled(rt));
-    expect_true("has CP", runtime_tm_checkpoint_count(rt) >= 1u);
+    expect_true("TM on", runtime_inspector_enabled(rt));
+    expect_true("has CP", runtime_inspector_checkpoint_count(rt) >= 1u);
     size_blob = (uint32_t)apple2_snapshot_size(&rt->machine);
     expect_true("snapshot size", size_blob > 100000u && size_blob < 400000u);
     printf("tm2 snapshot_size=%u cadence=%u cps=%llu\n",
         size_blob,
-        (unsigned)RUNTIME_TM_CHECKPOINT_CADENCE_CYCLES,
-        (unsigned long long)runtime_tm_checkpoint_count(rt));
+        (unsigned)RUNTIME_INSPECTOR_CHECKPOINT_CADENCE_CYCLES,
+        (unsigned long long)runtime_inspector_checkpoint_count(rt));
 
-    (void)runtime_tm_checkpoint_take(rt);
-    runtime_tm_window_info(rt, &window);
+    (void)runtime_inspector_checkpoint_take(rt);
+    runtime_inspector_window_info(rt, &window);
     expect_true("window valid", window.valid);
     mid = window.newest_cycle;
     if (mid < window.oldest_cycle || !window.valid) {
@@ -128,7 +128,7 @@ int main(void)
 
     expect_true("init scratch", apple2_init(&scratch));
     runtime_history_get_status(rt->history, &st_before);
-    expect_true("materialize", runtime_tm_materialize(rt, mid, &scratch));
+    expect_true("materialize", runtime_inspector_materialize(rt, mid, &scratch));
     runtime_history_get_status(rt->history, &st_after);
     if (st_before.record_count != st_after.record_count) {
         fprintf(
@@ -144,7 +144,7 @@ int main(void)
     ram0 = apple2_debug_read(&scratch, 0x0000);
 
     expect_true("init scratch2", apple2_init(&scratch2));
-    expect_true("materialize 2", runtime_tm_materialize(rt, mid, &scratch2));
+    expect_true("materialize 2", runtime_inspector_materialize(rt, mid, &scratch2));
     pc2 = scratch2.cpu.cpu.pc;
     expect_true("determinism pc", pc1 == pc2);
     expect_true(
@@ -156,44 +156,44 @@ int main(void)
 
     /* Housekeeping flush must not truncate. */
     {
-        uint64_t trunc = runtime_tm_media_truncations(rt);
+        uint64_t trunc = runtime_inspector_media_truncations(rt);
         expect_true("flush media", apple2_snapshot_flush_media(&rt->machine));
         expect_true(
             "flush does not truncate",
-            runtime_tm_media_truncations(rt) == trunc);
+            runtime_inspector_media_truncations(rt) == trunc);
     }
 
     /* Off path: disable TM, CPs stop growing on further run. */
     {
-        uint64_t cps = runtime_tm_checkpoint_count(rt);
+        uint64_t cps = runtime_inspector_checkpoint_count(rt);
         uint64_t token = runtime_client_alloc_request_token(client);
-        expect_true("TM off", runtime_client_tm_set_enabled(client, false, token));
+        expect_true("TM off", runtime_client_inspector_set_enabled(client, false, token));
         SDL_Delay(20);
         drain(client);
         expect_true("run off", runtime_client_run(client));
         SDL_Delay(40);
         expect_true("pause off", runtime_client_pause(client));
         expect_true("paused off", wait_event(client, RUNTIME_EVENT_PAUSED, 2.0));
-        expect_true("no new CP while off", runtime_tm_checkpoint_count(rt) == cps);
+        expect_true("no new CP while off", runtime_inspector_checkpoint_count(rt) == cps);
     }
 
     /* Media truncate: marker retained as window left edge. */
     {
         uint64_t token;
         runtime_history_record rec;
-        uint64_t trunc_before = runtime_tm_media_truncations(rt);
+        uint64_t trunc_before = runtime_inspector_media_truncations(rt);
 
         token = runtime_client_alloc_request_token(client);
         expect_true(
-            "TM on again", runtime_client_tm_set_enabled(client, true, token));
+            "TM on again", runtime_client_inspector_set_enabled(client, true, token));
         SDL_Delay(20);
         drain(client);
-        (void)runtime_tm_checkpoint_take(rt);
-        runtime_tm_on_media_event(
+        (void)runtime_inspector_checkpoint_take(rt);
+        runtime_inspector_on_media_event(
             rt, apple2_cycles(&rt->machine), 6, 0, APPLE2_MEDIA_EVENT_GUEST_WRITE);
         expect_true(
             "trunc count",
-            runtime_tm_media_truncations(rt) > trunc_before);
+            runtime_inspector_media_truncations(rt) > trunc_before);
         expect_true("first after cut", runtime_history_first(rt->history, &rec));
         expect_true(
             "MEDIA_CHANGED",
@@ -202,7 +202,7 @@ int main(void)
         expect_true(
             "cause guest write",
             rec.marker_arg0 == RUNTIME_HISTORY_MEDIA_CHANGE_GUEST_WRITE);
-        runtime_tm_window_info(rt, &window);
+        runtime_inspector_window_info(rt, &window);
         expect_true("window after cut", window.valid);
         expect_true("window oldest id is marker", window.oldest_id == rec.id);
         expect_true("start kind", window.start_kind ==
@@ -222,9 +222,9 @@ int main(void)
         expect_true("pause in max", runtime_client_pause(client));
         expect_true("paused in max", wait_event(client, RUNTIME_EVENT_PAUSED, 2.0));
         drain(client);
-        expect_true("Record off in max", !runtime_tm_enabled(rt));
-        expect_true("tape wiped in max", runtime_tm_checkpoint_count(rt) == 0u);
-        runtime_tm_timeline_bounds(rt, &oldest, &live, &n);
+        expect_true("Record off in max", !runtime_inspector_enabled(rt));
+        expect_true("tape wiped in max", runtime_inspector_checkpoint_count(rt) == 0u);
+        runtime_inspector_timeline_bounds(rt, &oldest, &live, &n);
         expect_true("no timeline in max", n == 0u);
 
         expect_true(
@@ -232,11 +232,11 @@ int main(void)
             runtime_client_set_turbo_multiplier(client, RUNTIME_TURBO_MHZ_1));
         SDL_Delay(20);
         drain(client);
-        expect_true("Record restored on leave max", runtime_tm_enabled(rt));
+        expect_true("Record restored on leave max", runtime_inspector_enabled(rt));
         expect_true(
             "fresh tape after leave max",
-            runtime_tm_checkpoint_count(rt) >= 1u);
-        runtime_tm_timeline_bounds(rt, &oldest, &live, &n);
+            runtime_inspector_checkpoint_count(rt) >= 1u);
+        runtime_inspector_timeline_bounds(rt, &oldest, &live, &n);
         expect_true("timeline after leave max", n >= 1u);
 
         /* Record-off stays off across a max round-trip. */
@@ -244,7 +244,7 @@ int main(void)
             uint64_t token = runtime_client_alloc_request_token(client);
             expect_true(
                 "TM off before max",
-                runtime_client_tm_set_enabled(client, false, token));
+                runtime_client_inspector_set_enabled(client, false, token));
             SDL_Delay(20);
             drain(client);
             expect_true(
@@ -252,13 +252,13 @@ int main(void)
                 runtime_client_set_turbo_multiplier(client, RUNTIME_TURBO_MAX));
             SDL_Delay(20);
             drain(client);
-            expect_true("still off in max", !runtime_tm_enabled(rt));
+            expect_true("still off in max", !runtime_inspector_enabled(rt));
             expect_true(
                 "set 1MHz again",
                 runtime_client_set_turbo_multiplier(client, RUNTIME_TURBO_MHZ_1));
             SDL_Delay(20);
             drain(client);
-            expect_true("still off after leave max", !runtime_tm_enabled(rt));
+            expect_true("still off after leave max", !runtime_inspector_enabled(rt));
         }
     }
 

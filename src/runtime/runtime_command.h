@@ -67,11 +67,11 @@ typedef enum runtime_command_type {
     RUNTIME_COMMAND_MEDIA_SWAP,
     RUNTIME_COMMAND_BOOT_SLOT,
     RUNTIME_COMMAND_SET_DISPLAY_OVERRIDE,
-    RUNTIME_COMMAND_TM_SET_ENABLED,
-    RUNTIME_COMMAND_TM_ENTER_FORENSIC,
-    RUNTIME_COMMAND_TM_EXIT_FORENSIC,
-    RUNTIME_COMMAND_TM_LAND,
-    RUNTIME_COMMAND_TM_FRAME_STEP
+    RUNTIME_COMMAND_INSPECTOR_SET_ENABLED,
+    RUNTIME_COMMAND_INSPECTOR_ENTER,
+    RUNTIME_COMMAND_INSPECTOR_LEAVE,
+    RUNTIME_COMMAND_INSPECTOR_LAND,
+    RUNTIME_COMMAND_INSPECTOR_FRAME_STEP
 } runtime_command_type;
 
 enum {
@@ -321,14 +321,14 @@ typedef struct runtime_command {
 
         struct {
             uint8_t enabled;
-        } tm_set_enabled;
+        } inspector_set_enabled;
 
         struct {
             uint64_t cycle;
-        } tm_land;
+        } inspector_land;
 
         struct {
             int8_t direction; /* +1 forward frame, -1 previous frame */
-        } tm_frame_step;
+        } inspector_frame_step;
     } data;
 } runtime_command;

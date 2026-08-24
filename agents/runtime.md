@@ -70,12 +70,12 @@ Full epic: [`remote-debug.md`](remote-debug.md).
 
 | Item | Status |
 |------|--------|
-| Product wire | **Done** — A2M/12; `--control-port` windowed + headless |
-| A2M/12 | A2M/11 + forensic `mode` / `exit-forensic` / `read-only-forensic` + forensic `state-changed` reasons · ops: [`control-tools.md`](control-tools.md) · [`TM3.md`](TM3.md) |
+| Product wire | **Done** — A2M/13; `--control-port` windowed + headless |
+| A2M/13 | A2M/12 + Inspector names: `mode=live\|inspector` / `leave-inspector` / `read-only-inspector` / `inspector-*` `state-changed` reasons / capability `inspector` · ops: [`control-tools.md`](control-tools.md) |
 | Product `src/control` | Parked c64-shaped library (not linked) |
 | Frame ring | **Done** — ARGB ring, live push, control wire |
 | CPU history | **Done through C4c** — arena, observer, worker RPC, control wire |
-| Options | `history_memory_mb`, `frame_ring_memory_mb`, `timemachine`, `timemachine_memory_mb` wired into runtime |
+| Options | `history_memory_mb`, `frame_ring_memory_mb`, `inspector`, `inspector_memory_mb` wired into runtime |
 | Sessions | Fixed table N=4; per-session history cursors; `runtime_client_session_open/close`; control TCP binds `kind=control`; `RUNTIME_EVENT_STATE_CHANGED` |
 
 ## Deferred tests

@@ -29,7 +29,7 @@ char debugger_disasm_row_marker(bool is_focus, bool is_browse)
 
 const char *debugger_disasm_footer_hint(debugger_disasm_mode mode)
 {
-    if (mode == DEBUGGER_DISASM_MODE_FORENSIC) {
+    if (mode == DEBUGGER_DISASM_MODE_INSPECT) {
         return "Right=THEN | Opt+A=goto | Opt+B=BP | Opt+Left unbound";
     }
     return "Right=PC | Opt+A=goto | Opt+B=BP | Opt+Left=set PC";

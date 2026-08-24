@@ -15,7 +15,7 @@
 #include "platform_fs.h"
 #include "runtime.h"
 #include "runtime_history.h"
-#include "runtime_timemachine.h"
+#include "runtime_inspector.h"
 #include "softswitch.h"
 #include "symbol_table.h"
 
@@ -2300,7 +2300,7 @@ static void frontend_draw_config_machine_tab(frontend *ui, frontend_config_dialo
     nk_layout_row_dynamic(ctx, 22.0f, 1);
     frontend_checkbox_bool(
         ctx,
-        "History off on max (faster free-run; discards TimeMachine tape)",
+        "History off on max (faster free-run; discards Inspector tape)",
         &dialog->edited.history_off_on_max);
 
     nk_layout_row_dynamic(ctx, 22.0f, 1);
@@ -2911,7 +2911,7 @@ static void frontend_commit_register_edit(
 
     state = &ui->registers;
     if (debug_state->runtime_state != FRONTEND_RUNTIME_STATE_PAUSED ||
-        debug_state->tm_forensic) {
+        debug_state->inspecting) {
         frontend_format_register_buffers(state, &debug_state->cpu, FRONTEND_REGISTER_FIELD_NONE);
         return;
     }
@@ -3145,7 +3145,7 @@ static void frontend_draw_registers(
 
     editable = debug_state->has_cpu &&
         debug_state->runtime_state == FRONTEND_RUNTIME_STATE_PAUSED &&
-        !debug_state->tm_forensic;
+        !debug_state->inspecting;
 
     if (!editable) {
         ui->registers.active_field = FRONTEND_REGISTER_FIELD_NONE;
@@ -4023,7 +4023,7 @@ static void frontend_disassembly_handle_key(
     if (sym == SDLK_LEFT) {
         if (alt && debug_state != NULL &&
             debug_state->runtime_state == FRONTEND_RUNTIME_STATE_PAUSED) {
-            if (debug_state->tm_forensic) {
+            if (debug_state->inspecting) {
                 /* Time travel: Opt+Left is unbound. */
             } else {
                 frontend_push_debugger_intent(
@@ -5029,7 +5029,7 @@ static void frontend_memory_write_byte(
 
     if (debug_state == NULL ||
         debug_state->runtime_state != FRONTEND_RUNTIME_STATE_PAUSED ||
-        debug_state->tm_forensic) {
+        debug_state->inspecting) {
         return;
     }
     if (!frontend_memory_mode_is_editable(memory->mode) ||
@@ -5318,7 +5318,7 @@ static void frontend_memory_draw_status_footer(
         (memory->edit_field == FRONTEND_MEMORY_EDIT_ADDRESS ? "Address" : "Hex");
     editable = debug_state != NULL &&
         debug_state->runtime_state == FRONTEND_RUNTIME_STATE_PAUSED &&
-        !debug_state->tm_forensic &&
+        !debug_state->inspecting &&
         frontend_memory_mode_is_editable(memory->mode) ?
         "editable" : "read-only";
     snprintf(address, sizeof(address), "Address: %04X", memory->cursor_address);
@@ -7063,7 +7063,7 @@ static void frontend_draw_misc_assembler(frontend *ui)
     }
 }
 
-static void frontend_push_tm_intent(
+static void frontend_push_inspector_intent(
     frontend *ui,
     frontend_debugger_intent_type type,
     bool enabled,
@@ -7075,11 +7075,11 @@ static void frontend_push_tm_intent(
     if (ui == NULL) {
         return;
     }
-    if (type == FRONTEND_DEBUGGER_INTENT_TM_LAND) {
+    if (type == FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND) {
         i = ui->intent_read;
         while (i != ui->intent_write) {
-            if (ui->intents[i].type == FRONTEND_DEBUGGER_INTENT_TM_LAND) {
-                ui->intents[i].tm_cycle = cycle;
+            if (ui->intents[i].type == FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND) {
+                ui->intents[i].inspector_cycle = cycle;
                 return;
             }
             i = (i + 1u) % FRONTEND_DEBUGGER_INTENT_CAPACITY;
@@ -7092,11 +7092,11 @@ static void frontend_push_tm_intent(
     memset(&ui->intents[ui->intent_write], 0, sizeof(ui->intents[ui->intent_write]));
     ui->intents[ui->intent_write].type = type;
     ui->intents[ui->intent_write].enabled = enabled;
-    ui->intents[ui->intent_write].tm_cycle = cycle;
+    ui->intents[ui->intent_write].inspector_cycle = cycle;
     ui->intent_write = next;
 }
 
-static void frontend_format_tm_window_reason(
+static void frontend_format_inspector_window_reason(
     const frontend_debug_state *debug,
     char *out,
     size_t out_size)
@@ -7109,14 +7109,14 @@ static void frontend_format_tm_window_reason(
         return;
     }
     out[0] = '\0';
-    if (debug == NULL || !debug->tm_window_valid) {
+    if (debug == NULL || !debug->inspector_window_valid) {
         return;
     }
-    slot = (unsigned)((debug->tm_window_start_arg1 >> 8) & 0xffu);
-    drive = (unsigned)(debug->tm_window_start_arg1 & 0xffu) + 1u;
-    kind = runtime_tm_window_start_name(
-        (runtime_history_media_change_kind)debug->tm_window_start_kind);
-    if (debug->tm_window_start_kind ==
+    slot = (unsigned)((debug->inspector_window_start_arg1 >> 8) & 0xffu);
+    drive = (unsigned)(debug->inspector_window_start_arg1 & 0xffu) + 1u;
+    kind = runtime_inspector_window_start_name(
+        (runtime_history_media_change_kind)debug->inspector_window_start_kind);
+    if (debug->inspector_window_start_kind ==
         RUNTIME_HISTORY_MEDIA_CHANGE_GUEST_WRITE) {
         snprintf(
             out,
@@ -7124,8 +7124,8 @@ static void frontend_format_tm_window_reason(
             "history starts here: disk write, s%ud%u @ cycle %llu",
             slot,
             drive,
-            (unsigned long long)debug->tm_oldest_cycle);
-    } else if (debug->tm_window_start_kind ==
+            (unsigned long long)debug->inspector_oldest_cycle);
+    } else if (debug->inspector_window_start_kind ==
         RUNTIME_HISTORY_MEDIA_CHANGE_HOST_DIRECTORY) {
         snprintf(
             out,
@@ -7133,57 +7133,57 @@ static void frontend_format_tm_window_reason(
             "history starts here: host folder change, s%ud%u @ cycle %llu",
             slot,
             drive,
-            (unsigned long long)debug->tm_oldest_cycle);
-    } else if (debug->tm_oldest_cycle > 0u) {
+            (unsigned long long)debug->inspector_oldest_cycle);
+    } else if (debug->inspector_oldest_cycle > 0u) {
         snprintf(
             out,
             out_size,
             "history starts here: %s @ cycle %llu",
             kind,
-            (unsigned long long)debug->tm_oldest_cycle);
+            (unsigned long long)debug->inspector_oldest_cycle);
     }
 }
 
-static int frontend_tm_cycle_to_slider(
+static int frontend_inspector_cycle_to_slider(
     const frontend_debug_state *debug,
     uint64_t cycle)
 {
     uint64_t span;
 
-    if (debug == NULL || !debug->tm_window_valid ||
-        debug->tm_newest_cycle <= debug->tm_oldest_cycle) {
+    if (debug == NULL || !debug->inspector_window_valid ||
+        debug->inspector_newest_cycle <= debug->inspector_oldest_cycle) {
         return 1000;
     }
-    if (cycle <= debug->tm_oldest_cycle) {
+    if (cycle <= debug->inspector_oldest_cycle) {
         return 0;
     }
-    if (cycle >= debug->tm_newest_cycle) {
+    if (cycle >= debug->inspector_newest_cycle) {
         return 1000;
     }
-    span = debug->tm_newest_cycle - debug->tm_oldest_cycle;
-    return (int)(((cycle - debug->tm_oldest_cycle) * 1000ull) / span);
+    span = debug->inspector_newest_cycle - debug->inspector_oldest_cycle;
+    return (int)(((cycle - debug->inspector_oldest_cycle) * 1000ull) / span);
 }
 
-static uint64_t frontend_tm_slider_to_cycle(
+static uint64_t frontend_inspector_slider_to_cycle(
     const frontend_debug_state *debug,
     int slider)
 {
     uint64_t span;
 
-    if (debug == NULL || !debug->tm_window_valid) {
+    if (debug == NULL || !debug->inspector_window_valid) {
         return 0u;
     }
     if (slider <= 0) {
-        return debug->tm_oldest_cycle;
+        return debug->inspector_oldest_cycle;
     }
-    if (slider >= 1000 || debug->tm_newest_cycle <= debug->tm_oldest_cycle) {
-        return debug->tm_newest_cycle;
+    if (slider >= 1000 || debug->inspector_newest_cycle <= debug->inspector_oldest_cycle) {
+        return debug->inspector_newest_cycle;
     }
-    span = debug->tm_newest_cycle - debug->tm_oldest_cycle;
-    return debug->tm_oldest_cycle + (span * (uint64_t)slider) / 1000ull;
+    span = debug->inspector_newest_cycle - debug->inspector_oldest_cycle;
+    return debug->inspector_oldest_cycle + (span * (uint64_t)slider) / 1000ull;
 }
 
-static void frontend_draw_tm_window_summary(
+static void frontend_draw_inspector_window_summary(
     struct nk_context *ctx,
     const frontend_debug_state *debug)
 {
@@ -7194,11 +7194,11 @@ static void frontend_draw_tm_window_summary(
     uint64_t cps;
     uint64_t secs;
 
-    if (ctx == NULL || debug == NULL || !debug->tm_window_valid) {
+    if (ctx == NULL || debug == NULL || !debug->inspector_window_valid) {
         return;
     }
-    oldest = debug->tm_oldest_cycle;
-    live = debug->tm_newest_cycle;
+    oldest = debug->inspector_oldest_cycle;
+    live = debug->inspector_newest_cycle;
     span = live >= oldest ? live - oldest : 0u;
     cps = (uint64_t)APPLE2_VIDEO_CYCLES_PER_FRAME * 60u;
     secs = (span + cps / 2u) / cps;
@@ -7235,7 +7235,7 @@ static void frontend_draw_misc_inspector(
     struct nk_context *ctx;
     char line[192];
     nk_bool rec;
-    bool forensic;
+    bool inspecting;
     bool can_enter;
     int slider;
 
@@ -7243,71 +7243,71 @@ static void frontend_draw_misc_inspector(
         return;
     }
     ctx = ui->ctx;
-    forensic = debug != NULL && debug->tm_forensic;
-    can_enter = debug != NULL && debug->tm_enabled && debug->tm_window_valid;
+    inspecting = debug != NULL && debug->inspecting;
+    can_enter = debug != NULL && debug->inspector_enabled && debug->inspector_window_valid;
 
-    if (!forensic) {
-        rec = (debug != NULL && debug->tm_enabled) ? nk_true : nk_false;
+    if (!inspecting) {
+        rec = (debug != NULL && debug->inspector_enabled) ? nk_true : nk_false;
         nk_layout_row_dynamic(ctx, 22.0f, 1);
-        if (debug != NULL && debug->tm_stopped_for_max) {
+        if (debug != NULL && debug->inspector_stopped_for_max) {
             nk_widget_disable_begin(ctx);
         }
         if (nk_checkbox_label(ctx, "Record", &rec)) {
             bool want = rec != nk_false;
-            bool have = debug != NULL && debug->tm_enabled;
+            bool have = debug != NULL && debug->inspector_enabled;
             if (want != have &&
-                (debug == NULL || !debug->tm_stopped_for_max)) {
-                frontend_push_tm_intent(
-                    ui, FRONTEND_DEBUGGER_INTENT_TM_SET_ENABLED, want, 0u);
+                (debug == NULL || !debug->inspector_stopped_for_max)) {
+                frontend_push_inspector_intent(
+                    ui, FRONTEND_DEBUGGER_INTENT_INSPECTOR_SET_ENABLED, want, 0u);
             }
         }
-        if (debug != NULL && debug->tm_stopped_for_max) {
+        if (debug != NULL && debug->inspector_stopped_for_max) {
             nk_widget_disable_end(ctx);
         }
     }
 
-    if (debug == NULL || !debug->tm_enabled) {
+    if (debug == NULL || !debug->inspector_enabled) {
         return;
     }
 
-    if (!forensic) {
+    if (!inspecting) {
         if (can_enter) {
             nk_layout_row_dynamic(ctx, 24.0f, 1);
             if (nk_button_label(ctx, "Inspect")) {
-                frontend_push_tm_intent(
-                    ui, FRONTEND_DEBUGGER_INTENT_TM_ENTER_FORENSIC, false, 0u);
+                frontend_push_inspector_intent(
+                    ui, FRONTEND_DEBUGGER_INTENT_INSPECTOR_ENTER, false, 0u);
             }
-            frontend_draw_tm_window_summary(ctx, debug);
-        } else if (!debug->tm_window_valid) {
+            frontend_draw_inspector_window_summary(ctx, debug);
+        } else if (!debug->inspector_window_valid) {
             nk_layout_row_dynamic(ctx, 36.0f, 1);
-            nk_label_wrap(ctx, "No TimeMachine snapshots yet.");
+            nk_label_wrap(ctx, "No Inspector snapshots yet.");
         }
         return;
     }
 
     nk_layout_row_dynamic(ctx, 24.0f, 1);
     if (nk_button_label(ctx, "Leave Inspector")) {
-        frontend_push_tm_intent(
-            ui, FRONTEND_DEBUGGER_INTENT_TM_EXIT_FORENSIC, false, 0u);
+        frontend_push_inspector_intent(
+            ui, FRONTEND_DEBUGGER_INTENT_INSPECTOR_LEAVE, false, 0u);
     }
 
     slider = ui->misc.inspector_slider;
     {
         bool down = nk_input_is_mouse_down(&ctx->input, NK_BUTTON_LEFT);
-        bool at_oldest = debug->tm_focus_cycle <= debug->tm_oldest_cycle;
-        bool at_live = debug->tm_focus_cycle >= debug->tm_newest_cycle;
+        bool at_oldest = debug->inspector_focus_cycle <= debug->inspector_oldest_cycle;
+        bool at_live = debug->inspector_focus_cycle >= debug->inspector_newest_cycle;
         bool thumb = ui->misc.inspector_thumb_down;
 
         if (!thumb) {
-            slider = frontend_tm_cycle_to_slider(debug, debug->tm_focus_cycle);
+            slider = frontend_inspector_cycle_to_slider(debug, debug->inspector_focus_cycle);
         }
 
         nk_layout_row_begin(ctx, NK_DYNAMIC, 22.0f, 3);
         nk_layout_row_push(ctx, 0.08f);
         if (frontend_nk_action_button(
                 ctx, "-", !thumb && !at_oldest)) {
-            frontend_push_tm_intent(
-                ui, FRONTEND_DEBUGGER_INTENT_TM_FRAME_STEP, false, 0u);
+            frontend_push_inspector_intent(
+                ui, FRONTEND_DEBUGGER_INTENT_INSPECTOR_FRAME_STEP, false, 0u);
         }
         nk_layout_row_push(ctx, 0.84f);
         {
@@ -7322,12 +7322,12 @@ static void frontend_draw_misc_inspector(
                 ui->misc.inspector_thumb_down = true;
             }
             if (ui->misc.inspector_thumb_down) {
-                uint64_t cycle = frontend_tm_slider_to_cycle(debug, slider);
+                uint64_t cycle = frontend_inspector_slider_to_cycle(debug, slider);
                 ui->misc.inspector_preview_cycle = cycle;
                 if (!down) {
-                    frontend_push_tm_intent(
+                    frontend_push_inspector_intent(
                         ui,
-                        FRONTEND_DEBUGGER_INTENT_TM_LAND,
+                        FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND,
                         false,
                         cycle);
                     ui->misc.inspector_thumb_down = false;
@@ -7335,13 +7335,13 @@ static void frontend_draw_misc_inspector(
             } else if ((hovered || moved) && down) {
                 ui->misc.inspector_thumb_down = true;
                 ui->misc.inspector_preview_cycle =
-                    frontend_tm_slider_to_cycle(debug, slider);
+                    frontend_inspector_slider_to_cycle(debug, slider);
             }
         }
         nk_layout_row_push(ctx, 0.08f);
         if (frontend_nk_action_button(ctx, "+", !thumb && !at_live)) {
-            frontend_push_tm_intent(
-                ui, FRONTEND_DEBUGGER_INTENT_TM_FRAME_STEP, true, 0u);
+            frontend_push_inspector_intent(
+                ui, FRONTEND_DEBUGGER_INTENT_INSPECTOR_FRAME_STEP, true, 0u);
         }
         nk_layout_row_end(ctx);
         ui->misc.inspector_slider = slider;
@@ -7355,10 +7355,10 @@ static void frontend_draw_misc_inspector(
         line,
         sizeof(line),
         "%llu",
-        (unsigned long long)debug->tm_focus_cycle);
+        (unsigned long long)debug->inspector_focus_cycle);
     nk_label(ctx, line, NK_TEXT_LEFT);
     nk_layout_row_end(ctx);
-    frontend_draw_tm_window_summary(ctx, debug);
+    frontend_draw_inspector_window_summary(ctx, debug);
 }
 
 static void frontend_draw_misc_tab_button(
@@ -10171,15 +10171,15 @@ void frontend_render(frontend *ui, bool ui_visible, const frontend_debug_state *
         int min_debug_w = ui->limits.min_display_w_px + ui->limits.min_right_w_px;
         int min_debug_h = ui->limits.registers_h_px + ui->limits.min_disassembly_h_px + ui->limits.min_bottom_h_px;
         struct nk_style_window saved_window_style;
-        int forensic_style = 0;
+        int inspect_style = 0;
 
         if (width < min_debug_w || height < min_debug_h) {
             frontend_render_display_only(ui);
         } else {
             parent = nk_rect(0.0f, 0.0f, (float)width, (float)height);
-            if (debug_state->tm_forensic) {
+            if (debug_state->inspecting) {
                 saved_window_style = ui->ctx->style.window;
-                forensic_style = 1;
+                inspect_style = 1;
                 ui->ctx->style.window.header.normal =
                     nk_style_item_color(nk_rgb(24, 62, 118));
                 ui->ctx->style.window.header.hover =
@@ -10235,7 +10235,7 @@ void frontend_render(frontend *ui, bool ui_visible, const frontend_debug_state *
             frontend_draw_memory_search(ui, width, height, debug_state);
             frontend_draw_symbol_lookup(ui, width, height);
             frontend_draw_file_browser(ui, width, height);
-            if (forensic_style) {
+            if (inspect_style) {
                 ui->ctx->style.window = saved_window_style;
             }
         }

@@ -6,7 +6,7 @@
 #include "runtime_breakpoint_ini.h"
 #include "runtime_command.h"
 #include "runtime_internal.h"
-#include "runtime_timemachine.h"
+#include "runtime_inspector.h"
 #include "thread.h"
 
 #include <ctype.h>
@@ -339,9 +339,9 @@ runtime *runtime_create(const runtime_config *config)
         rt->history_memory_mb = config->history_memory_mb;
         rt->history_off_on_max = config->history_off_on_max;
         rt->history_paused_for_max = false;
-        rt->tm_enabled_saved_for_max = false;
-        rt->timemachine_enabled = false;
-        rt->timemachine_memory_mb = config->timemachine_memory_mb;
+        rt->inspector_enabled_saved_for_max = false;
+        rt->inspector_enabled = false;
+        rt->inspector_memory_mb = config->inspector_memory_mb;
         if (rt->history_memory_mb > 0u) {
             uint64_t hbudget =
                 (uint64_t)rt->history_memory_mb * 1024ull * 1024ull;
@@ -437,8 +437,8 @@ void runtime_destroy(runtime *rt)
         rt->trace_file = NULL;
     }
     runtime_frame_ring_destroy(&rt->frame_ring);
-    runtime_tm_forensic_destroy(rt);
-    runtime_tm_recorder_destroy(rt);
+    runtime_inspector_destroy(rt);
+    runtime_inspector_recorder_destroy(rt);
     runtime_history_destroy(rt->history);
     rt->history = NULL;
     free(rt->frame_slot.argb);

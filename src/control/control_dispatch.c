@@ -7,7 +7,7 @@
 #include "runtime_event.h"
 #include "runtime_history.h"
 #include "runtime_slot_resolve.h"
-#include "runtime_timemachine.h"
+#include "runtime_inspector.h"
 #include "softswitch.h"
 
 #include <SDL.h>
@@ -148,12 +148,12 @@ static const char *state_changed_reason_name(runtime_state_changed_reason reason
         return "history-clear";
     case RUNTIME_STATE_CHANGED_MEDIA:
         return "media";
-    case RUNTIME_STATE_CHANGED_FORENSIC_ENTER:
-        return "forensic-enter";
-    case RUNTIME_STATE_CHANGED_FORENSIC_SEEK:
-        return "forensic-seek";
-    case RUNTIME_STATE_CHANGED_FORENSIC_EXIT:
-        return "forensic-exit";
+    case RUNTIME_STATE_CHANGED_INSPECTOR_ENTER:
+        return "inspector-enter";
+    case RUNTIME_STATE_CHANGED_INSPECTOR_LAND:
+        return "inspector-land";
+    case RUNTIME_STATE_CHANGED_INSPECTOR_LEAVE:
+        return "inspector-leave";
     case RUNTIME_STATE_CHANGED_OTHER:
     default:
         return "other";
@@ -911,10 +911,10 @@ void control_dispatch_on_runtime_event(
         disp->last_sp = event->data.machine_state.sp;
         disp->last_p = event->data.machine_state.p;
         disp->turbo_mode = event->data.machine_state.active_turbo_multiplier;
-        disp->forensic = event->data.machine_state.tm_mode != 0u;
-        disp->tm_focus_cycle = event->data.machine_state.tm_focus_cycle;
-        disp->tm_window_start_kind = event->data.machine_state.tm_window_start_kind;
-        disp->tm_window_start_arg1 = event->data.machine_state.tm_window_start_arg1;
+        disp->inspecting = event->data.machine_state.inspector_mode != 0u;
+        disp->inspector_focus_cycle = event->data.machine_state.inspector_focus_cycle;
+        disp->inspector_window_start_kind = event->data.machine_state.inspector_window_start_kind;
+        disp->inspector_window_start_arg1 = event->data.machine_state.inspector_window_start_arg1;
         cache_slot_map_from_machine_state(disp, &event->data.machine_state);
         if (event->data.machine_state.running == 0u) {
             disp->machine_running = false;
@@ -961,15 +961,15 @@ void control_dispatch_on_runtime_event(
         disp->latch_assemble_error = true;
     } else if (event->type == RUNTIME_EVENT_STATE_CHANGED) {
         control_dispatch_post_state_changed(disp, event);
-    } else if (event->type == RUNTIME_EVENT_TM_MODE) {
-        disp->forensic = event->data.tm_mode.mode != 0u;
-        if (event->data.tm_mode.focus.valid) {
-            disp->tm_focus_cycle = event->data.tm_mode.focus.cycle;
-        } else if (!disp->forensic) {
-            disp->tm_focus_cycle = 0u;
+    } else if (event->type == RUNTIME_EVENT_INSPECTOR_MODE) {
+        disp->inspecting = event->data.inspector_mode.mode != 0u;
+        if (event->data.inspector_mode.focus.valid) {
+            disp->inspector_focus_cycle = event->data.inspector_mode.focus.cycle;
+        } else if (!disp->inspecting) {
+            disp->inspector_focus_cycle = 0u;
         }
-        disp->tm_window_start_kind = event->data.tm_mode.start_kind;
-        disp->tm_window_start_arg1 = event->data.tm_mode.start_arg1;
+        disp->inspector_window_start_kind = event->data.inspector_mode.start_kind;
+        disp->inspector_window_start_arg1 = event->data.inspector_mode.start_arg1;
     }
 
     if (event->type == RUNTIME_EVENT_CPU_STATE_RESPONSE) {
@@ -1513,12 +1513,12 @@ static void handle_request(control_dispatch_t *disp, control_request *req)
 {
     runtime_client *client = disp->client;
 
-    if (disp->forensic && control_command_mutates_machine(req->type)) {
+    if (disp->inspecting && control_command_mutates_machine(req->type)) {
         post_error(
             disp,
             req->id,
-            RUNTIME_ERROR_READ_ONLY_FORENSIC,
-            "machine is read-only in forensic mode");
+            RUNTIME_ERROR_READ_ONLY_INSPECTOR,
+            "machine is read-only while Inspecting");
         control_request_release(req);
         return;
     }
@@ -1588,18 +1588,18 @@ static void handle_request(control_dispatch_t *disp, control_request *req)
             (unsigned long long)disp->cycle,
             disp->stop_reason,
             turbo_label,
-            disp->forensic ? "forensic" : "live",
-            (unsigned long long)disp->tm_focus_cycle,
-            runtime_tm_window_start_name(
-                (runtime_history_media_change_kind)disp->tm_window_start_kind),
-            (unsigned)disp->tm_window_start_arg1);
+            disp->inspecting ? "inspector" : "live",
+            (unsigned long long)disp->inspector_focus_cycle,
+            runtime_inspector_window_start_name(
+                (runtime_history_media_change_kind)disp->inspector_window_start_kind),
+            (unsigned)disp->inspector_window_start_arg1);
         post_ok(disp, req->id, text);
         break;
     }
 
-    case CONTROL_COMMAND_EXIT_FORENSIC: {
+    case CONTROL_COMMAND_LEAVE_INSPECTOR: {
         uint64_t token = runtime_client_alloc_request_token(client);
-        (void)runtime_client_tm_exit_forensic(client, token);
+        (void)runtime_client_inspector_leave(client, token);
         post_ok(disp, req->id, "accepted=1");
         break;
     }

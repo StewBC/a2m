@@ -43,7 +43,7 @@ Opt+Shift+0/1/2 clears solid-apple so chords do not stick BUTN0.
 ## Configure
 
 Misc tabs: Machine, Debugger, Breakpoints, Hardware, Assembler, **Inspector**
-(TimeMachine **time travel** entry; F7 unbound). Inspector tab: Record / Inspect /
+(Inspector **time travel** entry; F7 unbound). Inspector tab: Record / Inspect /
 Leave; history start, live, duration; Inspect pauses. Opt+T into **max**
 remembers Record, wipes the tape, and turns Record off (checkbox locked);
 leaving max restores Record if it was on ([`TMA3.md`](TMA3.md)). In time travel, window headers

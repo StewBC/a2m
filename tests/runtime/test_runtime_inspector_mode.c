@@ -12,7 +12,7 @@
 #include "runtime_frame_ring.h"
 #include "runtime_history.h"
 #include "runtime_internal.h"
-#include "runtime_timemachine.h"
+#include "runtime_inspector.h"
 
 #include <SDL.h>
 #include <stdio.h>
@@ -58,7 +58,7 @@ static int wait_event_type(
     return 0;
 }
 
-static int wait_tm_mode(
+static int wait_inspector_mode(
     runtime_client *client,
     uint64_t token,
     runtime_event *out,
@@ -80,7 +80,7 @@ static int wait_tm_mode(
                     *saw_reason = 1;
                 }
             }
-            if (event.type == RUNTIME_EVENT_TM_MODE &&
+            if (event.type == RUNTIME_EVENT_INSPECTOR_MODE &&
                 event.request_token == token) {
                 if (out != NULL) {
                     *out = event;
@@ -237,7 +237,7 @@ int main(void)
     uint8_t ram_now;
     uint8_t motor_now;
     uint16_t via_t1_now;
-    runtime_tm_window window;
+    runtime_inspector_window window;
 
     if (SDL_Init(SDL_INIT_TIMER | SDL_INIT_EVENTS) != 0) {
         fprintf(stderr, "FAIL: SDL_Init\n");
@@ -246,9 +246,9 @@ int main(void)
 
     runtime_config_init(&config);
     config.start_running = false;
-    config.timemachine = true;
-    config.timemachine_memory_mb = 16;
-    config.timemachine_memory_mb_configured = true;
+    config.inspector = true;
+    config.inspector_memory_mb = 16;
+    config.inspector_memory_mb_configured = true;
     config.history_memory_mb = 16;
     config.history_memory_mb_configured = true;
     config.frame_ring_memory_mb = 8;
@@ -271,9 +271,9 @@ int main(void)
     expect_true("paused", wait_event_type(client, RUNTIME_EVENT_PAUSED, 2.0));
     drain_ignore_error(client);
 
-    expect_true("TM on", runtime_tm_enabled(rt));
-    expect_true("has CP", runtime_tm_checkpoint_count(rt) >= 1u);
-    runtime_tm_window_info(rt, &window);
+    expect_true("TM on", runtime_inspector_enabled(rt));
+    expect_true("has CP", runtime_inspector_checkpoint_count(rt) >= 1u);
+    runtime_inspector_window_info(rt, &window);
     expect_true("window valid", window.valid);
 
     pc_now = rt->machine.cpu.cpu.pc;
@@ -285,24 +285,24 @@ int main(void)
     /* Empty enter: TM off. */
     {
         uint64_t tok = runtime_client_alloc_request_token(client);
-        expect_true("tm off", runtime_client_tm_set_enabled(client, false, tok));
+        expect_true("tm off", runtime_client_inspector_set_enabled(client, false, tok));
         SDL_Delay(30);
         drain_ignore_error(client);
         tok = runtime_client_alloc_request_token(client);
-        expect_true("enter off", runtime_client_tm_enter_forensic(client, tok));
+        expect_true("enter off", runtime_client_inspector_enter(client, tok));
         expect_true(
             "enter off event",
-            wait_tm_mode(
+            wait_inspector_mode(
                 client, tok, &ev, NULL, RUNTIME_STATE_CHANGED_OTHER, 2.0));
         expect_true(
             "enter unavailable",
-            ev.data.tm_mode.status == RUNTIME_TM_ENTER_UNAVAILABLE);
-        expect_true("still live", !runtime_tm_in_forensic(rt));
+            ev.data.inspector_mode.status == RUNTIME_INSPECTOR_ENTER_UNAVAILABLE);
+        expect_true("still live", !runtime_inspector_inspecting(rt));
         tok = runtime_client_alloc_request_token(client);
-        expect_true("tm on", runtime_client_tm_set_enabled(client, true, tok));
+        expect_true("tm on", runtime_client_inspector_set_enabled(client, true, tok));
         SDL_Delay(30);
         drain_ignore_error(client);
-        (void)runtime_tm_checkpoint_take(rt);
+        (void)runtime_inspector_checkpoint_take(rt);
     }
 
     /* HST1 off is not an Inspect gate (TMA0 A7). */
@@ -311,28 +311,28 @@ int main(void)
         expect_true("hist off", runtime_client_history_record(client, false, tok));
         SDL_Delay(30);
         drain_ignore_error(client);
-        (void)runtime_tm_checkpoint_take(rt);
+        (void)runtime_inspector_checkpoint_take(rt);
         tok = runtime_client_alloc_request_token(client);
-        expect_true("enter hst1 off", runtime_client_tm_enter_forensic(client, tok));
+        expect_true("enter hst1 off", runtime_client_inspector_enter(client, tok));
         expect_true(
             "enter hst1 off event",
-            wait_tm_mode(
-                client, tok, &ev, NULL, RUNTIME_STATE_CHANGED_FORENSIC_ENTER, 2.0));
+            wait_inspector_mode(
+                client, tok, &ev, NULL, RUNTIME_STATE_CHANGED_INSPECTOR_ENTER, 2.0));
         expect_true(
             "enter hst1 off ok",
-            ev.data.tm_mode.status == RUNTIME_TM_ENTER_OK);
-        expect_true("hst1 off forensic", runtime_tm_in_forensic(rt));
+            ev.data.inspector_mode.status == RUNTIME_INSPECTOR_ENTER_OK);
+        expect_true("hst1 off inspecting", runtime_inspector_inspecting(rt));
         tok = runtime_client_alloc_request_token(client);
-        expect_true("leave hst1 off", runtime_client_tm_exit_forensic(client, tok));
+        expect_true("leave hst1 off", runtime_client_inspector_leave(client, tok));
         expect_true(
             "leave hst1 off event",
-            wait_tm_mode(
-                client, tok, &ev, NULL, RUNTIME_STATE_CHANGED_FORENSIC_EXIT, 2.0));
+            wait_inspector_mode(
+                client, tok, &ev, NULL, RUNTIME_STATE_CHANGED_INSPECTOR_LEAVE, 2.0));
         tok = runtime_client_alloc_request_token(client);
         expect_true("hist on", runtime_client_history_record(client, true, tok));
         SDL_Delay(30);
         drain_ignore_error(client);
-        (void)runtime_tm_checkpoint_take(rt);
+        (void)runtime_inspector_checkpoint_take(rt);
     }
 
     /* Frame ring off is not an Inspect gate. */
@@ -340,43 +340,43 @@ int main(void)
         uint64_t tok;
         runtime_frame_ring_set_recording(&rt->frame_ring, false);
         tok = runtime_client_alloc_request_token(client);
-        expect_true("enter film off", runtime_client_tm_enter_forensic(client, tok));
+        expect_true("enter film off", runtime_client_inspector_enter(client, tok));
         expect_true(
             "enter film off event",
-            wait_tm_mode(
-                client, tok, &ev, NULL, RUNTIME_STATE_CHANGED_FORENSIC_ENTER, 2.0));
+            wait_inspector_mode(
+                client, tok, &ev, NULL, RUNTIME_STATE_CHANGED_INSPECTOR_ENTER, 2.0));
         expect_true(
             "enter film off ok",
-            ev.data.tm_mode.status == RUNTIME_TM_ENTER_OK);
+            ev.data.inspector_mode.status == RUNTIME_INSPECTOR_ENTER_OK);
         tok = runtime_client_alloc_request_token(client);
-        expect_true("leave film off", runtime_client_tm_exit_forensic(client, tok));
+        expect_true("leave film off", runtime_client_inspector_leave(client, tok));
         expect_true(
             "leave film off event",
-            wait_tm_mode(
-                client, tok, &ev, NULL, RUNTIME_STATE_CHANGED_FORENSIC_EXIT, 2.0));
+            wait_inspector_mode(
+                client, tok, &ev, NULL, RUNTIME_STATE_CHANGED_INSPECTOR_LEAVE, 2.0));
         runtime_frame_ring_set_recording(&rt->frame_ring, true);
-        (void)runtime_tm_checkpoint_take(rt);
+        (void)runtime_inspector_checkpoint_take(rt);
     }
 
     token = runtime_client_alloc_request_token(client);
-    expect_true("enter", runtime_client_tm_enter_forensic(client, token));
+    expect_true("enter", runtime_client_inspector_enter(client, token));
     expect_true(
         "enter event",
-        wait_tm_mode(
+        wait_inspector_mode(
             client,
             token,
             &ev,
             &saw_reason,
-            RUNTIME_STATE_CHANGED_FORENSIC_ENTER,
+            RUNTIME_STATE_CHANGED_INSPECTOR_ENTER,
             2.0));
-    expect_true("enter ok", ev.data.tm_mode.status == RUNTIME_TM_ENTER_OK);
-    expect_true("mode forensic", ev.data.tm_mode.mode == RUNTIME_TM_MODE_FORENSIC);
-    expect_true("in forensic", runtime_tm_in_forensic(rt));
+    expect_true("enter ok", ev.data.inspector_mode.status == RUNTIME_INSPECTOR_ENTER_OK);
+    expect_true("mode inspect", ev.data.inspector_mode.mode == RUNTIME_INSPECTOR_MODE_INSPECT);
+    expect_true("in inspect", runtime_inspector_inspecting(rt));
     expect_true("enter inform", saw_reason);
 
     expect_true("cpu after enter", wait_cpu(client, &cpu_then, 2.0));
     expect_true("sealed", rt->machine.replay_sealed);
-    expect_true("paused forensic", rt->exec_state != RUNTIME_EXEC_RUNNING);
+    expect_true("paused inspecting", rt->exec_state != RUNTIME_EXEC_RUNNING);
     pc_now = rt->machine.cpu.cpu.pc;
     cycles_now = apple2_cycles(&rt->machine);
     ram_now = apple2_debug_read(&rt->machine, 0x0000);
@@ -391,8 +391,8 @@ int main(void)
             client, 0x0300, 0xA9, RUNTIME_MEMORY_MODE_MAIN));
     expect_true(
         "poke error",
-        wait_error_code(client, RUNTIME_ERROR_READ_ONLY_FORENSIC, 2.0));
-    expect_true("still forensic after poke", runtime_tm_in_forensic(rt));
+        wait_error_code(client, RUNTIME_ERROR_READ_ONLY_INSPECTOR, 2.0));
+    expect_true("still inspecting after poke", runtime_inspector_inspecting(rt));
 
     /* Land oldest snapshot. */
     {
@@ -402,14 +402,14 @@ int main(void)
         uint64_t hst1_before = 0u;
         runtime_history_status st;
 
-        runtime_tm_timeline_bounds(rt, &old, &live, &n);
+        runtime_inspector_timeline_bounds(rt, &old, &live, &n);
         expect_true("timeline", n >= 1u);
         if (rt->history != NULL) {
             runtime_history_get_status(rt->history, &st);
             hst1_before = st.record_count;
         }
         token = runtime_client_alloc_request_token(client);
-        expect_true("land old", runtime_client_tm_land(client, old, token));
+        expect_true("land old", runtime_client_inspector_land(client, old, token));
         {
             clock_t t0 = clock();
             while (apple2_cycles(&rt->machine) != old &&
@@ -432,29 +432,29 @@ int main(void)
             expect_true("step tt", runtime_client_step_instruction(client));
             t0 = clock();
             while (apple2_cycles(&rt->machine) == c0 &&
-                   !runtime_tm_at_live(rt) &&
+                   !runtime_inspector_at_live(rt) &&
                    (double)(clock() - t0) / (double)CLOCKS_PER_SEC < 2.0) {
                 SDL_Delay(1);
             }
             expect_true("cpu after step", wait_cpu(client, &cpu_back, 2.0));
-            if (!(apple2_cycles(&rt->machine) > c0 || runtime_tm_at_live(rt))) {
+            if (!(apple2_cycles(&rt->machine) > c0 || runtime_inspector_at_live(rt))) {
                 fprintf(
                     stderr,
                     "step stuck c0=%llu now=%llu live=%d exec=%d\n",
                     (unsigned long long)c0,
                     (unsigned long long)apple2_cycles(&rt->machine),
-                    runtime_tm_at_live(rt) ? 1 : 0,
+                    runtime_inspector_at_live(rt) ? 1 : 0,
                     (int)rt->exec_state);
             }
             expect_true(
                 "step advanced or live",
-                apple2_cycles(&rt->machine) > c0 || runtime_tm_at_live(rt));
-            expect_true("still forensic after step", runtime_tm_in_forensic(rt));
+                apple2_cycles(&rt->machine) > c0 || runtime_inspector_at_live(rt));
+            expect_true("still inspecting after step", runtime_inspector_inspecting(rt));
         }
 
         /* Land live restores NOW. */
         token = runtime_client_alloc_request_token(client);
-        expect_true("land live", runtime_client_tm_land(client, live, token));
+        expect_true("land live", runtime_client_inspector_land(client, live, token));
         {
             clock_t t0 = clock();
             while (apple2_cycles(&rt->machine) != cycles_now &&
@@ -470,7 +470,7 @@ int main(void)
                 (unsigned long long)apple2_cycles(&rt->machine),
                 (unsigned long long)cycles_now,
                 (unsigned long long)live,
-                runtime_tm_at_live(rt) ? 1 : 0);
+                runtime_inspector_at_live(rt) ? 1 : 0);
         }
         expect_true("live cycle", apple2_cycles(&rt->machine) == cycles_now);
         expect_true("live pc", rt->machine.cpu.cpu.pc == pc_now);
@@ -479,37 +479,37 @@ int main(void)
         expect_true("run at live", runtime_client_run(client));
         SDL_Delay(40);
         drain_ignore_error(client);
-        expect_true("still forensic at live run", runtime_tm_in_forensic(rt));
+        expect_true("still inspecting at live run", runtime_inspector_inspecting(rt));
         expect_true("still paused at live", rt->exec_state != RUNTIME_EXEC_RUNNING);
         expect_true("live cycle after run", apple2_cycles(&rt->machine) == cycles_now);
     }
 
     /* Force land failure, then exit still restores NOW. */
-    runtime_tm_on_history_invalidate(rt);
-    expect_true("cps cleared", runtime_tm_checkpoint_count(rt) == 0u);
+    runtime_inspector_on_history_invalidate(rt);
+    expect_true("cps cleared", runtime_inspector_checkpoint_count(rt) == 0u);
     token = runtime_client_alloc_request_token(client);
     expect_true(
         "land after wipe",
-        runtime_client_tm_land(client, 0u, token));
+        runtime_client_inspector_land(client, 0u, token));
     SDL_Delay(30);
     drain_ignore_error(client);
-    expect_true("still forensic after fail", runtime_tm_in_forensic(rt));
+    expect_true("still inspecting after fail", runtime_inspector_inspecting(rt));
 
     token = runtime_client_alloc_request_token(client);
-    expect_true("exit", runtime_client_tm_exit_forensic(client, token));
+    expect_true("exit", runtime_client_inspector_leave(client, token));
     expect_true(
         "exit event",
-        wait_tm_mode(
+        wait_inspector_mode(
             client,
             token,
             &ev,
             &saw_reason,
-            RUNTIME_STATE_CHANGED_FORENSIC_EXIT,
+            RUNTIME_STATE_CHANGED_INSPECTOR_LEAVE,
             2.0));
-    expect_true("exit ok", ev.data.tm_mode.status == RUNTIME_TM_ENTER_OK);
+    expect_true("exit ok", ev.data.inspector_mode.status == RUNTIME_INSPECTOR_ENTER_OK);
     expect_true("exit inform", saw_reason);
-    expect_true("mode live", ev.data.tm_mode.mode == RUNTIME_TM_MODE_LIVE);
-    expect_true("not forensic", !runtime_tm_in_forensic(rt));
+    expect_true("mode live", ev.data.inspector_mode.mode == RUNTIME_INSPECTOR_MODE_LIVE);
+    expect_true("not inspecting", !runtime_inspector_inspecting(rt));
     expect_true("unsealed", !rt->machine.replay_sealed);
     expect_true("still paused", rt->exec_state != RUNTIME_EXEC_RUNNING);
     expect_true("pc restored", rt->machine.cpu.cpu.pc == pc_now);
@@ -535,7 +535,7 @@ int main(void)
     drain_ignore_error(client);
 
 #ifndef _WIN32
-    /* Control: status reports forensic; exit verb from a socket session. */
+    /* Control: status reports Inspect; leave verb from a socket session. */
     {
         control_server_t *server = NULL;
         control_dispatch_t disp;
@@ -578,43 +578,43 @@ int main(void)
         }
         expect_true("paused2", rt->exec_state != RUNTIME_EXEC_RUNNING);
         token = runtime_client_alloc_request_token(client);
-        expect_true("enter2", runtime_client_tm_enter_forensic(client, token));
+        expect_true("enter2", runtime_client_inspector_enter(client, token));
         {
             clock_t t0 = clock();
-            while (!runtime_tm_in_forensic(rt) &&
+            while (!runtime_inspector_inspecting(rt) &&
                 (double)(clock() - t0) / (double)CLOCKS_PER_SEC < 2.0) {
                 SDL_Delay(1);
             }
         }
-        if (!runtime_tm_in_forensic(rt)) {
+        if (!runtime_inspector_inspecting(rt)) {
             fprintf(stderr, "enter2 did not stick, can=%d\n",
-                (int)runtime_tm_can_enter(rt));
+                (int)runtime_inspector_can_enter(rt));
         }
-        expect_true("enter2 forensic", runtime_tm_in_forensic(rt));
+        expect_true("enter2 inspecting", runtime_inspector_inspecting(rt));
         SDL_Delay(30);
 
         fd = tcp_connect_port(port);
         expect_true("tcp connect", fd >= 0);
         SDL_Delay(50);
         expect_true("hello", tcp_cmd(fd, "1 hello\n", resp, sizeof(resp)));
-        expect_true("hello a2m12", strstr(resp, "A2M/12") != NULL);
+        expect_true("hello a2m13", strstr(resp, "A2M/13") != NULL);
         expect_true(
             "caps", tcp_cmd(fd, "2 capabilities\n", resp, sizeof(resp)));
-        expect_true("caps tm", strstr(resp, "timemachine") != NULL);
+        expect_true("caps tm", strstr(resp, "inspector") != NULL);
         expect_true("get-state", tcp_cmd(fd, "3 get-state\n", resp, sizeof(resp)));
-        if (strstr(resp, "mode=forensic") == NULL) {
+        if (strstr(resp, "mode=inspector") == NULL) {
             fprintf(stderr, "get-state: %s", resp);
         }
-        expect_true("state forensic", strstr(resp, "mode=forensic") != NULL);
+        expect_true("state inspect", strstr(resp, "mode=inspector") != NULL);
         expect_true("focus_cycle field", strstr(resp, "focus_cycle=") != NULL);
         expect_true(
             "set-mem blocked",
             tcp_cmd(fd, "4 set-reg pc $300\n", resp, sizeof(resp)));
         expect_true(
             "readonly code",
-            strstr(resp, "read-only-forensic") != NULL);
+            strstr(resp, "read-only-inspector") != NULL);
         expect_true(
-            "exit wire", tcp_cmd(fd, "5 exit-forensic\n", resp, sizeof(resp)));
+            "exit wire", tcp_cmd(fd, "5 leave-inspector\n", resp, sizeof(resp)));
         expect_true("exit accepted", strstr(resp, "ok") != NULL);
         SDL_Delay(80);
         expect_true(
@@ -626,7 +626,7 @@ int main(void)
         SDL_WaitThread(th, NULL);
         control_dispatch_shutdown(&disp);
         control_server_destroy(server);
-        expect_true("exited via socket", !runtime_tm_in_forensic(rt));
+        expect_true("exited via socket", !runtime_inspector_inspecting(rt));
     }
 #endif
 
@@ -650,22 +650,22 @@ int main(void)
         expect_true("paused-flood", rt->exec_state != RUNTIME_EXEC_RUNNING);
         token = runtime_client_alloc_request_token(client);
         expect_true(
-            "enter-flood", runtime_client_tm_enter_forensic(client, token));
+            "enter-flood", runtime_client_inspector_enter(client, token));
         {
             clock_t t0 = clock();
-            while (!runtime_tm_in_forensic(rt) &&
+            while (!runtime_inspector_inspecting(rt) &&
                 (double)(clock() - t0) / (double)CLOCKS_PER_SEC < 2.0) {
                 SDL_Delay(1);
             }
         }
-        expect_true("forensic-flood", runtime_tm_in_forensic(rt));
-        runtime_tm_timeline_bounds(rt, &old, &live, &n);
+        expect_true("inspect-flood", runtime_inspector_inspecting(rt));
+        runtime_inspector_timeline_bounds(rt, &old, &live, &n);
         expect_true("timeline-flood", n >= 1u && live >= old);
         for (i = 0; i < 64; ++i) {
             uint64_t span = live - old;
             uint64_t cyc = old + (span * (uint64_t)i) / 63u;
             token = runtime_client_alloc_request_token(client);
-            (void)runtime_client_tm_land(client, cyc, token);
+            (void)runtime_client_inspector_land(client, cyc, token);
         }
     }
 

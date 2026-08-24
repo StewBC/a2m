@@ -59,10 +59,10 @@ s6d0 = tests/fixtures/Apple DOS 3.3 January 1983.nib
 ; boot_slot = 5
 
 [debug]
-; TimeMachine forensic recording (default off). On arms HST1 + frame ring.
+; Inspector recording (default off). On arms HST1 + frame ring.
 ; When on, default budgets sum to 512 MB: history 256 + frames 128 + checkpoints 128.
-; timemachine = 0
-; timemachine_memory_mb = 128
+; inspector = 0
+; inspector_memory_mb = 128
 ; history_memory_mb = 256
 ; frame_ring_memory_mb = 128
 

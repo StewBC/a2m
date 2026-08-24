@@ -3,7 +3,7 @@
 #include "memview.h"
 #include "runtime_breakpoint_condition.h"
 #include "runtime_history.h"
-#include "runtime_timemachine.h"
+#include "runtime_inspector.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -85,7 +85,7 @@ typedef enum runtime_event_type {
     RUNTIME_EVENT_SESSION_RESPONSE,
     RUNTIME_EVENT_STATE_CHANGED,
     RUNTIME_EVENT_MEDIA_CHANGED,
-    RUNTIME_EVENT_TM_MODE
+    RUNTIME_EVENT_INSPECTOR_MODE
 } runtime_event_type;
 
 typedef enum runtime_state_changed_reason {
@@ -97,13 +97,13 @@ typedef enum runtime_state_changed_reason {
     RUNTIME_STATE_CHANGED_LOAD_STATE,
     RUNTIME_STATE_CHANGED_HISTORY_CLEAR,
     RUNTIME_STATE_CHANGED_MEDIA,
-    RUNTIME_STATE_CHANGED_FORENSIC_ENTER,
-    RUNTIME_STATE_CHANGED_FORENSIC_SEEK,
-    RUNTIME_STATE_CHANGED_FORENSIC_EXIT,
+    RUNTIME_STATE_CHANGED_INSPECTOR_ENTER,
+    RUNTIME_STATE_CHANGED_INSPECTOR_LAND,
+    RUNTIME_STATE_CHANGED_INSPECTOR_LEAVE,
     RUNTIME_STATE_CHANGED_OTHER
 } runtime_state_changed_reason;
 
-#define RUNTIME_ERROR_READ_ONLY_FORENSIC "read-only-forensic"
+#define RUNTIME_ERROR_READ_ONLY_INSPECTOR "read-only-inspector"
 
 typedef enum runtime_session_kind {
     RUNTIME_SESSION_KIND_NONE = 0,
@@ -277,22 +277,22 @@ typedef struct runtime_machine_snapshot {
     /* Beam position (Φ0 domain; same units as BP line/cycle_in_line). */
     uint16_t video_line;         /* 0..261 */
     uint16_t video_cycle_in_line; /* 0..64 */
-    /* TM3/TM4: forensic mode + tm_window for the Inspector scrubber. */
-    uint8_t tm_mode; /* runtime_tm_mode */
-    uint8_t tm_enabled;
-    uint8_t tm_window_valid;
-    uint8_t tm_history_recording;
-    uint8_t tm_frame_recording;
-    uint8_t tm_recorder_recording;
-    uint8_t tm_stopped_for_max;
-    uint8_t tm_window_start_kind; /* runtime_history_media_change_kind */
-    uint32_t tm_window_start_arg1;
-    uint64_t tm_focus_cycle;
-    uint64_t tm_focus_id;
-    uint64_t tm_oldest_cycle;
-    uint64_t tm_newest_cycle;
-    uint64_t tm_oldest_id;
-    uint64_t tm_newest_id;
+    /* Inspector: mode + oldest-checkpoint-to-live timeline for the scrubber. */
+    uint8_t inspector_mode; /* runtime_inspector_mode */
+    uint8_t inspector_enabled;
+    uint8_t inspector_window_valid;
+    uint8_t inspector_history_recording;
+    uint8_t inspector_frame_recording;
+    uint8_t inspector_recorder_recording;
+    uint8_t inspector_stopped_for_max;
+    uint8_t inspector_window_start_kind; /* runtime_history_media_change_kind */
+    uint32_t inspector_window_start_arg1;
+    uint64_t inspector_focus_cycle;
+    uint64_t inspector_focus_id;
+    uint64_t inspector_oldest_cycle;
+    uint64_t inspector_newest_cycle;
+    uint64_t inspector_oldest_id;
+    uint64_t inspector_newest_id;
 } runtime_machine_snapshot;
 
 typedef struct runtime_memory_snapshot {
@@ -465,11 +465,11 @@ typedef struct runtime_event {
         } state_changed;
         struct {
             uint8_t op; /* 0 enter, 1 exit */
-            uint8_t mode; /* runtime_tm_mode */
-            uint8_t status; /* runtime_tm_enter_status */
-            runtime_tm_focus focus;
+            uint8_t mode; /* runtime_inspector_mode */
+            uint8_t status; /* runtime_inspector_enter_status */
+            runtime_inspector_focus focus;
             uint8_t start_kind;
             uint32_t start_arg1;
-        } tm_mode;
+        } inspector_mode;
     } data;
 } runtime_event;

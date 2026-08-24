@@ -29,7 +29,7 @@ void frontend_format_window_title_ex(
     uint32_t turbo_multiplier,
     frontend_runtime_state state,
     runtime_stop_reason stop_reason,
-    bool tm_forensic,
-    uint64_t tm_focus_cycle,
-    uint64_t tm_oldest_cycle,
-    uint64_t tm_newest_cycle);
+    bool inspecting,
+    uint64_t inspector_focus_cycle,
+    uint64_t inspector_oldest_cycle,
+    uint64_t inspector_newest_cycle);

@@ -328,7 +328,7 @@ static void control_server_handle_connection(
                 "connection introspection execution state softswitches step "
                 "turbo frame frame-ring memory breakpoints wait key disk "
                 "snapshot history assemble symbols sessions state-changed "
-                "timemachine");
+                "inspector");
             (void)control_server_send_response(connection, &response);
             control_request_release(&request);
             continue;

@@ -10,7 +10,7 @@
 #include "runtime_breakpoint_ini.h"
 #include "runtime_assembler.h"
 #include "runtime_history_wire.h"
-#include "runtime_timemachine.h"
+#include "runtime_inspector.h"
 #include "softswitch.h"
 #include "video.h"
 
@@ -48,7 +48,7 @@ static void runtime_publish_event(runtime *rt, const runtime_event *event);
 static void runtime_type_script_tick(runtime *rt, uint32_t cycles_elapsed);
 static void runtime_history_sync_observer(runtime *rt);
 static void runtime_reset_pacer(runtime *rt);
-static void runtime_tm_publish_head(runtime *rt);
+static void runtime_inspector_publish_head(runtime *rt);
 
 static void runtime_history_observer_begin(
     void *user,
@@ -854,7 +854,7 @@ static bool runtime_history_command_invalidates_cursor(runtime_command_type type
     case RUNTIME_COMMAND_WRITE_MEMORY:
     case RUNTIME_COMMAND_SET_CPU_REGISTER:
     case RUNTIME_COMMAND_HISTORY_RECORD:
-    case RUNTIME_COMMAND_TM_SET_ENABLED:
+    case RUNTIME_COMMAND_INSPECTOR_SET_ENABLED:
     case RUNTIME_COMMAND_HISTORY_CLEAR:
     case RUNTIME_COMMAND_SAVE_STATE:
     case RUNTIME_COMMAND_LOAD_STATE:
@@ -1302,7 +1302,7 @@ static void runtime_load_state(runtime *rt, const runtime_command *command)
         (void)runtime_history_clear_for_state_load(
             rt->history, apple2_cycles(&rt->machine));
     }
-    runtime_tm_on_history_invalidate(rt);
+    runtime_inspector_on_history_invalidate(rt);
     runtime_frame_ring_clear(&rt->frame_ring);
     runtime_history_sync_observer(rt);
     apple2_paste_cancel(&rt->machine);
@@ -1607,44 +1607,44 @@ static void runtime_publish_machine(runtime *rt)
         rt->machine.model == APPLE2_MODEL_II_PLUS ? 1u : 0u;
     event.data.machine_state.video_line = rt->machine.video.line;
     event.data.machine_state.video_cycle_in_line = rt->machine.video.cycle_in_line;
-    event.data.machine_state.tm_mode = (uint8_t)runtime_tm_current_mode(rt);
-    event.data.machine_state.tm_enabled = runtime_tm_enabled(rt) ? 1u : 0u;
-    event.data.machine_state.tm_stopped_for_max =
+    event.data.machine_state.inspector_mode = (uint8_t)runtime_inspector_current_mode(rt);
+    event.data.machine_state.inspector_enabled = runtime_inspector_enabled(rt) ? 1u : 0u;
+    event.data.machine_state.inspector_stopped_for_max =
         (rt->history_paused_for_max ||
          (runtime_turbo_is_max_value(rt->active_turbo_multiplier) &&
           rt->history_off_on_max)) ? 1u : 0u;
     if (rt->history != NULL) {
         runtime_history_status st;
         runtime_history_get_status(rt->history, &st);
-        event.data.machine_state.tm_history_recording =
+        event.data.machine_state.inspector_history_recording =
             (st.available && st.recording) ? 1u : 0u;
     }
     {
         runtime_frame_ring_info fi;
         runtime_frame_ring_get_info(&rt->frame_ring, &fi);
-        event.data.machine_state.tm_frame_recording = fi.recording ? 1u : 0u;
+        event.data.machine_state.inspector_frame_recording = fi.recording ? 1u : 0u;
     }
-    event.data.machine_state.tm_recorder_recording =
-        runtime_tm_recorder_is_recording(rt) ? 1u : 0u;
-    event.data.machine_state.tm_focus_cycle =
+    event.data.machine_state.inspector_recorder_recording =
+        runtime_inspector_recorder_is_recording(rt) ? 1u : 0u;
+    event.data.machine_state.inspector_focus_cycle =
         rt->machine_ready ? apple2_cycles(&rt->machine) : 0u;
-    event.data.machine_state.tm_focus_id = 0u;
+    event.data.machine_state.inspector_focus_id = 0u;
     {
         uint64_t oldest = 0u;
         uint64_t live = 0u;
         uint64_t count = 0u;
-        runtime_tm_window extras;
+        runtime_inspector_window extras;
 
-        runtime_tm_timeline_bounds(rt, &oldest, &live, &count);
+        runtime_inspector_timeline_bounds(rt, &oldest, &live, &count);
         memset(&extras, 0, sizeof(extras));
-        runtime_tm_fill_window_extras(rt, &extras);
-        event.data.machine_state.tm_window_valid = count > 0u ? 1u : 0u;
-        event.data.machine_state.tm_window_start_kind = (uint8_t)extras.start_kind;
-        event.data.machine_state.tm_window_start_arg1 = extras.start_arg1;
-        event.data.machine_state.tm_oldest_cycle = oldest;
-        event.data.machine_state.tm_newest_cycle = live;
-        event.data.machine_state.tm_oldest_id = 0u;
-        event.data.machine_state.tm_newest_id = 0u;
+        runtime_inspector_fill_window_extras(rt, &extras);
+        event.data.machine_state.inspector_window_valid = count > 0u ? 1u : 0u;
+        event.data.machine_state.inspector_window_start_kind = (uint8_t)extras.start_kind;
+        event.data.machine_state.inspector_window_start_arg1 = extras.start_arg1;
+        event.data.machine_state.inspector_oldest_cycle = oldest;
+        event.data.machine_state.inspector_newest_cycle = live;
+        event.data.machine_state.inspector_oldest_id = 0u;
+        event.data.machine_state.inspector_newest_id = 0u;
     }
     for (slot = 1; slot <= 7; ++slot) {
         runtime_slot_snapshot *out = &event.data.machine_state.slots[slot];
@@ -2421,7 +2421,7 @@ static void runtime_pause_for_breakpoint(runtime *rt)
     runtime_publish_cpu(rt, 0u);
     runtime_publish_breakpoints(rt);
     runtime_publish_presented_frame(rt);
-    if (rt->tm_forensic) {
+    if (rt->inspecting) {
         rt->machine.video.paint_enabled = true;
     }
 }
@@ -2451,7 +2451,7 @@ static void runtime_pause_for_step(runtime *rt)
     runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
     runtime_publish_cpu(rt, 0u);
     runtime_publish_presented_frame(rt);
-    if (rt->tm_forensic) {
+    if (rt->inspecting) {
         rt->machine.video.paint_enabled = true;
     }
 }
@@ -2482,7 +2482,7 @@ static void runtime_apply_turbo_video_policy(runtime *rt, bool leaving_max)
     }
 }
 
-static void runtime_tm_reattach_live_hooks(runtime *rt);
+static void runtime_inspector_reattach_live_hooks(runtime *rt);
 
 /* Pause/resume flight-recorder around max free-run (history_off_on_max policy).
    TMA3: entering max remembers Record, wipes the TM tape, and turns Record
@@ -2498,11 +2498,11 @@ static void runtime_history_apply_max_policy(runtime *rt, bool entering_max, boo
     cycle = rt->machine_ready ? apple2_cycles(&rt->machine) : 0u;
 
     if (entering_max) {
-        if (rt->tm_forensic) {
-            runtime_tm_exit_forensic(rt);
-            runtime_tm_reattach_live_hooks(rt);
+        if (rt->inspecting) {
+            runtime_inspector_leave(rt);
+            runtime_inspector_reattach_live_hooks(rt);
         }
-        rt->tm_enabled_saved_for_max = rt->timemachine_enabled;
+        rt->inspector_enabled_saved_for_max = rt->inspector_enabled;
         if (rt->history != NULL) {
             runtime_history_get_status(rt->history, &st);
             if (st.available && st.recording) {
@@ -2511,22 +2511,22 @@ static void runtime_history_apply_max_policy(runtime *rt, bool entering_max, boo
                 runtime_history_sync_observer(rt);
             }
         }
-        runtime_tm_recorder_set_enabled(rt, false);
-        runtime_tm_on_history_invalidate(rt);
-        if (rt->tm_enabled_saved_for_max) {
+        runtime_inspector_recorder_set_enabled(rt, false);
+        runtime_inspector_on_history_invalidate(rt);
+        if (rt->inspector_enabled_saved_for_max) {
             runtime_frame_ring_set_recording(&rt->frame_ring, false);
             runtime_frame_ring_clear(&rt->frame_ring);
         }
-        rt->timemachine_enabled = false;
+        rt->inspector_enabled = false;
     } else if (leaving_max) {
         if (rt->history_paused_for_max && rt->history != NULL) {
             (void)runtime_history_resume(rt->history, cycle);
             rt->history_paused_for_max = false;
             runtime_history_sync_observer(rt);
         }
-        if (rt->tm_enabled_saved_for_max) {
-            rt->tm_enabled_saved_for_max = false;
-            runtime_tm_set_enabled(rt, true);
+        if (rt->inspector_enabled_saved_for_max) {
+            rt->inspector_enabled_saved_for_max = false;
+            runtime_inspector_set_enabled(rt, true);
         }
     }
 }
@@ -2606,7 +2606,7 @@ static void runtime_free_run_max_quantum(runtime *rt)
             }
 
             ran = apple2_step_instruction_max(&rt->machine);
-            runtime_tm_after_step(rt);
+            runtime_inspector_after_step(rt);
             if (ran == 0u) {
                 rt->exec_state = RUNTIME_EXEC_PAUSED;
                 rt->last_stop_reason = RUNTIME_STOP_REASON_ERROR;
@@ -2741,7 +2741,7 @@ static void runtime_produce_audio(runtime *rt, uint32_t cpu_cycles)
     if (rt == NULL || cpu_cycles == 0u) {
         return;
     }
-    if (rt->tm_forensic) {
+    if (rt->inspecting) {
         return;
     }
 
@@ -2865,7 +2865,7 @@ static void runtime_pace_after_frame(runtime *rt)
     uint64_t now;
     uint64_t frequency;
 
-    if (runtime_turbo_is_free_run(rt) || (rt != NULL && rt->tm_forensic)) {
+    if (runtime_turbo_is_free_run(rt) || (rt != NULL && rt->inspecting)) {
         return;
     }
     if (!rt->pace_initialized) {
@@ -2927,7 +2927,7 @@ static void runtime_publish_argb_frame(runtime *rt)
 
     /* Rolling screen log (C2). Forensic publishes the live slot only — the
        ring is a recorder and must not grow while standing on the tape. */
-    if (!rt->tm_forensic) {
+    if (!rt->inspecting) {
         (void)runtime_frame_ring_push(
             &rt->frame_ring, frame_number, machine_cycle, w, h, fb);
     }
@@ -3111,12 +3111,12 @@ static void runtime_fill_debug_memory(runtime *rt, bool include_write_history)
 
 enum { RUNTIME_STEP_NESTED_FAST_LIMIT = 100000 };
 
-static bool runtime_tm_pause_at_live(runtime *rt)
+static bool runtime_inspector_pause_at_live(runtime *rt)
 {
-    if (rt == NULL || !rt->tm_forensic || !runtime_tm_at_live(rt)) {
+    if (rt == NULL || !rt->inspecting || !runtime_inspector_at_live(rt)) {
         return false;
     }
-    (void)runtime_tm_restore_live(rt);
+    (void)runtime_inspector_restore_live(rt);
     rt->temp_bp_active = false;
     runtime_publish_presented_frame(rt);
     if (rt->exec_state == RUNTIME_EXEC_RUNNING) {
@@ -3124,7 +3124,7 @@ static bool runtime_tm_pause_at_live(runtime *rt)
         rt->last_stop_reason = RUNTIME_STOP_REASON_RUN_COMPLETE;
         runtime_publish_simple(rt, RUNTIME_EVENT_RUN_COMPLETE);
         runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
-        runtime_tm_publish_head(rt);
+        runtime_inspector_publish_head(rt);
     }
     return true;
 }
@@ -3140,16 +3140,16 @@ static bool runtime_exec_step_instruction(runtime *rt)
     if (!apple2_step_instruction(&rt->machine)) {
         return false;
     }
-    if (rt->tm_forensic) {
-        runtime_tm_apply_logged_inputs(
+    if (rt->inspecting) {
+        runtime_inspector_apply_logged_inputs(
             rt, &rt->machine, c0 + 1u, apple2_cycles(&rt->machine));
-        if (runtime_tm_at_live(rt)) {
-            (void)runtime_tm_restore_live(rt);
+        if (runtime_inspector_at_live(rt)) {
+            (void)runtime_inspector_restore_live(rt);
         } else {
-            runtime_tm_sync_focus(rt);
+            runtime_inspector_sync_focus(rt);
         }
     } else {
-        runtime_tm_after_step(rt);
+        runtime_inspector_after_step(rt);
     }
     return true;
 }
@@ -3165,7 +3165,7 @@ static void runtime_step_over(runtime *rt, bool *alive)
     if (rt->exec_state == RUNTIME_EXEC_RUNNING) {
         return;
     }
-    if (rt->tm_forensic && runtime_tm_at_live(rt)) {
+    if (rt->inspecting && runtime_inspector_at_live(rt)) {
         return;
     }
     runtime_finish_to_instruction_boundary(rt);
@@ -3174,7 +3174,7 @@ static void runtime_step_over(runtime *rt, bool *alive)
         (void)runtime_exec_step_instruction(rt);
         runtime_maybe_frame(rt);
         rt->suppress_execute_bp = false;
-        if (!runtime_tm_pause_at_live(rt)) {
+        if (!runtime_inspector_pause_at_live(rt)) {
             runtime_pause_for_step(rt);
         }
         return;
@@ -3191,7 +3191,7 @@ static void runtime_step_over(runtime *rt, bool *alive)
         opcode = apple2_debug_read(&rt->machine, rt->machine.cpu.cpu.pc);
         (void)runtime_exec_step_instruction(rt);
         runtime_maybe_frame(rt);
-        if (runtime_tm_pause_at_live(rt)) {
+        if (runtime_inspector_pause_at_live(rt)) {
             return;
         }
         if (runtime_pause_if_breakpoint_pending(rt)) {
@@ -3223,7 +3223,7 @@ static void runtime_step_out(runtime *rt, bool *alive)
     if (rt->exec_state == RUNTIME_EXEC_RUNNING) {
         return;
     }
-    if (rt->tm_forensic && runtime_tm_at_live(rt)) {
+    if (rt->inspecting && runtime_inspector_at_live(rt)) {
         return;
     }
     runtime_finish_to_instruction_boundary(rt);
@@ -3238,7 +3238,7 @@ static void runtime_step_out(runtime *rt, bool *alive)
         opcode = apple2_debug_read(&rt->machine, rt->machine.cpu.cpu.pc);
         (void)runtime_exec_step_instruction(rt);
         runtime_maybe_frame(rt);
-        if (runtime_tm_pause_at_live(rt)) {
+        if (runtime_inspector_pause_at_live(rt)) {
             return;
         }
         if (runtime_pause_if_breakpoint_pending(rt)) {
@@ -3264,7 +3264,7 @@ static void runtime_run_to_cursor(runtime *rt, uint16_t address, bool *alive)
 {
     int fast_limit = 0;
     (void)alive;
-    if (rt->tm_forensic && runtime_tm_at_live(rt)) {
+    if (rt->inspecting && runtime_inspector_at_live(rt)) {
         return;
     }
     runtime_finish_to_instruction_boundary(rt);
@@ -3290,7 +3290,7 @@ static void runtime_run_to_cursor(runtime *rt, uint16_t address, bool *alive)
         }
         (void)runtime_exec_step_instruction(rt);
         runtime_maybe_frame(rt);
-        if (runtime_tm_pause_at_live(rt)) {
+        if (runtime_inspector_pause_at_live(rt)) {
             return;
         }
         if (runtime_pause_if_breakpoint_pending(rt)) {
@@ -3557,7 +3557,7 @@ static void runtime_assemble_file_command(
     runtime_publish_machine(rt);
 }
 
-static bool runtime_tm_command_mutates_machine(runtime_command_type type)
+static bool runtime_inspector_command_mutates_machine(runtime_command_type type)
 {
     switch (type) {
     case RUNTIME_COMMAND_RESET:
@@ -3578,42 +3578,42 @@ static bool runtime_tm_command_mutates_machine(runtime_command_type type)
     case RUNTIME_COMMAND_SET_GAMEPORT:
     case RUNTIME_COMMAND_HISTORY_CLEAR:
     case RUNTIME_COMMAND_HISTORY_RECORD:
-    case RUNTIME_COMMAND_TM_SET_ENABLED:
+    case RUNTIME_COMMAND_INSPECTOR_SET_ENABLED:
         return true;
     default:
         return false;
     }
 }
 
-static void runtime_tm_reattach_live_hooks(runtime *rt)
+static void runtime_inspector_reattach_live_hooks(runtime *rt)
 {
     apple2_set_memory_access_callback(&rt->machine, runtime_on_memory_access, rt);
     runtime_history_sync_observer(rt);
 }
 
-static void runtime_publish_tm_mode(
+static void runtime_publish_inspector_mode(
     runtime *rt,
     uint64_t token,
     uint8_t op,
-    runtime_tm_enter_status status)
+    runtime_inspector_enter_status status)
 {
     runtime_event event;
-    runtime_tm_window window;
+    runtime_inspector_window window;
 
     memset(&event, 0, sizeof(event));
-    event.type = RUNTIME_EVENT_TM_MODE;
+    event.type = RUNTIME_EVENT_INSPECTOR_MODE;
     event.request_token = token;
-    event.data.tm_mode.op = op;
-    event.data.tm_mode.mode = (uint8_t)runtime_tm_current_mode(rt);
-    event.data.tm_mode.status = (uint8_t)status;
-    event.data.tm_mode.focus = rt->tm_focus;
-    runtime_tm_window_info(rt, &window);
-    event.data.tm_mode.start_kind = (uint8_t)window.start_kind;
-    event.data.tm_mode.start_arg1 = window.start_arg1;
+    event.data.inspector_mode.op = op;
+    event.data.inspector_mode.mode = (uint8_t)runtime_inspector_current_mode(rt);
+    event.data.inspector_mode.status = (uint8_t)status;
+    event.data.inspector_mode.focus = rt->inspector_focus;
+    runtime_inspector_window_info(rt, &window);
+    event.data.inspector_mode.start_kind = (uint8_t)window.start_kind;
+    event.data.inspector_mode.start_arg1 = window.start_arg1;
     runtime_publish_event(rt, &event);
 }
 
-static void runtime_tm_publish_head(runtime *rt)
+static void runtime_inspector_publish_head(runtime *rt)
 {
     runtime_publish_cpu(rt, 0u);
     runtime_publish_machine(rt);
@@ -3624,11 +3624,11 @@ static void runtime_tm_publish_head(runtime *rt)
 
 static void runtime_process_command(runtime *rt, const runtime_command *cmd, bool *alive)
 {
-    if (rt->tm_forensic && runtime_tm_command_mutates_machine(cmd->type)) {
+    if (rt->inspecting && runtime_inspector_command_mutates_machine(cmd->type)) {
         runtime_publish_error_code(
             rt,
-            RUNTIME_ERROR_READ_ONLY_FORENSIC,
-            "machine is read-only in forensic mode");
+            RUNTIME_ERROR_READ_ONLY_INSPECTOR,
+            "machine is read-only while Inspecting");
         return;
     }
     if (runtime_history_command_invalidates_cursor(cmd->type)) {
@@ -3676,7 +3676,7 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
                     apple2_cycles(&rt->machine));
             }
         }
-        runtime_tm_on_history_invalidate(rt);
+        runtime_inspector_on_history_invalidate(rt);
         rt->suppress_execute_bp = false;
         rt->temp_bp_active = false;
         rt->breakpoint_hit_pending = false;
@@ -3822,7 +3822,7 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         break;
     }
     case RUNTIME_COMMAND_RUN:
-        if (rt->tm_forensic && runtime_tm_at_live(rt)) {
+        if (rt->inspecting && runtime_inspector_at_live(rt)) {
             break;
         }
         rt->exec_state = RUNTIME_EXEC_RUNNING;
@@ -3841,7 +3841,7 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
             runtime_publish_state_changed(
                 rt, RUNTIME_STATE_CHANGED_PAUSE, cmd->session_id);
             runtime_publish_presented_frame(rt);
-            if (rt->tm_forensic) {
+            if (rt->inspecting) {
                 rt->machine.video.paint_enabled = true;
             }
         }
@@ -3881,7 +3881,7 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
         runtime_publish_cpu(rt, 0u);
         runtime_publish_presented_frame(rt);
-        if (rt->tm_forensic) {
+        if (rt->inspecting) {
             rt->machine.video.paint_enabled = true;
         }
         break;
@@ -3906,7 +3906,7 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
             if (!apple2_step_instruction(&rt->machine)) {
                 break;
             }
-            runtime_tm_after_step(rt);
+            runtime_inspector_after_step(rt);
             c1 = rt->machine.cpu.cpu.cycles;
             if (c1 > c0) {
                 runtime_produce_audio(rt, (uint32_t)(c1 - c0));
@@ -3926,20 +3926,20 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
         runtime_publish_cpu(rt, 0u);
         runtime_publish_presented_frame(rt);
-        if (rt->tm_forensic) {
+        if (rt->inspecting) {
             rt->machine.video.paint_enabled = true;
         }
         break;
     }
     case RUNTIME_COMMAND_STEP_INSTRUCTION:
         if (rt->exec_state != RUNTIME_EXEC_RUNNING) {
-            if (rt->tm_forensic && runtime_tm_at_live(rt)) {
+            if (rt->inspecting && runtime_inspector_at_live(rt)) {
                 break;
             }
             (void)runtime_exec_step_instruction(rt);
             runtime_maybe_frame(rt);
             rt->suppress_execute_bp = false;
-            if (runtime_tm_pause_at_live(rt)) {
+            if (runtime_inspector_pause_at_live(rt)) {
                 break;
             }
             if (!runtime_pause_if_breakpoint_pending(rt)) {
@@ -4273,15 +4273,15 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         break;
     }
 
-    case RUNTIME_COMMAND_TM_SET_ENABLED: {
-        runtime_tm_set_enabled(rt, cmd->data.tm_set_enabled.enabled != 0u);
+    case RUNTIME_COMMAND_INSPECTOR_SET_ENABLED: {
+        runtime_inspector_set_enabled(rt, cmd->data.inspector_set_enabled.enabled != 0u);
         runtime_history_sync_observer(rt);
         runtime_publish_history_status(rt, cmd->request_token);
         break;
     }
 
-    case RUNTIME_COMMAND_TM_ENTER_FORENSIC: {
-        runtime_tm_enter_status st;
+    case RUNTIME_COMMAND_INSPECTOR_ENTER: {
+        runtime_inspector_enter_status st;
 
         if (rt->exec_state == RUNTIME_EXEC_RUNNING) {
             runtime_finish_to_instruction_boundary(rt);
@@ -4291,27 +4291,27 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
             runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
             runtime_publish_cpu(rt, 0u);
         }
-        st = runtime_tm_enter_forensic(rt);
-        if (st != RUNTIME_TM_ENTER_OK) {
-            runtime_tm_reattach_live_hooks(rt);
+        st = runtime_inspector_enter(rt);
+        if (st != RUNTIME_INSPECTOR_ENTER_OK) {
+            runtime_inspector_reattach_live_hooks(rt);
             apple2_set_replay_sealed(&rt->machine, false);
         } else {
-            runtime_tm_publish_head(rt);
+            runtime_inspector_publish_head(rt);
             runtime_publish_state_changed(
-                rt, RUNTIME_STATE_CHANGED_FORENSIC_ENTER, cmd->session_id);
+                rt, RUNTIME_STATE_CHANGED_INSPECTOR_ENTER, cmd->session_id);
         }
-        runtime_publish_tm_mode(rt, cmd->request_token, 0u, st);
+        runtime_publish_inspector_mode(rt, cmd->request_token, 0u, st);
         break;
     }
 
-    case RUNTIME_COMMAND_TM_EXIT_FORENSIC: {
-        runtime_tm_exit_forensic(rt);
-        runtime_tm_reattach_live_hooks(rt);
-        runtime_tm_publish_head(rt);
+    case RUNTIME_COMMAND_INSPECTOR_LEAVE: {
+        runtime_inspector_leave(rt);
+        runtime_inspector_reattach_live_hooks(rt);
+        runtime_inspector_publish_head(rt);
         runtime_publish_state_changed(
-            rt, RUNTIME_STATE_CHANGED_FORENSIC_EXIT, cmd->session_id);
-        runtime_publish_tm_mode(
-            rt, cmd->request_token, 1u, RUNTIME_TM_ENTER_OK);
+            rt, RUNTIME_STATE_CHANGED_INSPECTOR_LEAVE, cmd->session_id);
+        runtime_publish_inspector_mode(
+            rt, cmd->request_token, 1u, RUNTIME_INSPECTOR_ENTER_OK);
         break;
     }
 
@@ -4334,7 +4334,7 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         if (rt->history != NULL) {
             runtime_history_prepare_discontinuity(rt);
             (void)runtime_history_clear(rt->history, cycle);
-            runtime_tm_on_history_invalidate(rt);
+            runtime_inspector_on_history_invalidate(rt);
             runtime_history_sync_observer(rt);
         }
         runtime_publish_history_status(rt, cmd->request_token);
@@ -4420,24 +4420,24 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         break;
     }
 
-    case RUNTIME_COMMAND_TM_LAND:
-        if (rt->tm_forensic) {
-            if (runtime_tm_land(rt, cmd->data.tm_land.cycle)) {
-                runtime_tm_publish_head(rt);
+    case RUNTIME_COMMAND_INSPECTOR_LAND:
+        if (rt->inspecting) {
+            if (runtime_inspector_land(rt, cmd->data.inspector_land.cycle)) {
+                runtime_inspector_publish_head(rt);
                 runtime_publish_state_changed(
                     rt,
-                    RUNTIME_STATE_CHANGED_FORENSIC_SEEK,
+                    RUNTIME_STATE_CHANGED_INSPECTOR_LAND,
                     cmd->session_id);
             }
         }
         break;
-    case RUNTIME_COMMAND_TM_FRAME_STEP:
-        if (rt->tm_forensic) {
-            if (runtime_tm_frame_step(rt, (int)cmd->data.tm_frame_step.direction)) {
-                runtime_tm_publish_head(rt);
+    case RUNTIME_COMMAND_INSPECTOR_FRAME_STEP:
+        if (rt->inspecting) {
+            if (runtime_inspector_frame_step(rt, (int)cmd->data.inspector_frame_step.direction)) {
+                runtime_inspector_publish_head(rt);
                 runtime_publish_state_changed(
                     rt,
-                    RUNTIME_STATE_CHANGED_FORENSIC_SEEK,
+                    RUNTIME_STATE_CHANGED_INSPECTOR_LAND,
                     cmd->session_id);
             }
         }
@@ -4471,19 +4471,19 @@ static void runtime_free_run_batch(runtime *rt)
 
     /* Max: instruction quanta + 60 Hz paint (S2). Finite: Φ0 beam path.
        Time travel always uses the cycle path so the input log applies. */
-    if (runtime_turbo_is_free_run(rt) && !rt->tm_forensic) {
+    if (runtime_turbo_is_free_run(rt) && !rt->inspecting) {
         runtime_free_run_max_quantum(rt);
         return;
     }
 
-    if (rt->tm_forensic) {
+    if (rt->inspecting) {
         rt->machine.video.paint_enabled = false;
     }
 
     for (i = 0; i < RUNTIME_RUN_BATCH_CYCLES; i++) {
         uint64_t c0;
 
-        if (rt->tm_forensic && runtime_tm_pause_at_live(rt)) {
+        if (rt->inspecting && runtime_inspector_pause_at_live(rt)) {
             return;
         }
         if (!rt->suppress_execute_bp &&
@@ -4507,15 +4507,15 @@ static void runtime_free_run_batch(runtime *rt)
             runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
             return;
         }
-        if (rt->tm_forensic) {
-            runtime_tm_apply_logged_inputs(
+        if (rt->inspecting) {
+            runtime_inspector_apply_logged_inputs(
                 rt, &rt->machine, c0 + 1u, apple2_cycles(&rt->machine));
-            if (runtime_tm_at_live(rt)) {
-                (void)runtime_tm_restore_live(rt);
-                (void)runtime_tm_pause_at_live(rt);
+            if (runtime_inspector_at_live(rt)) {
+                (void)runtime_inspector_restore_live(rt);
+                (void)runtime_inspector_pause_at_live(rt);
                 return;
             }
-            runtime_tm_sync_focus(rt);
+            runtime_inspector_sync_focus(rt);
         } else {
             /* One cycle at a time so $C030 toggles land on the right samples. */
             runtime_produce_audio(rt, 1u);
@@ -4528,26 +4528,26 @@ static void runtime_free_run_batch(runtime *rt)
         if (rt->suppress_execute_bp && runtime_at_instruction_boundary(rt)) {
             rt->suppress_execute_bp = false;
         }
-        if (!rt->tm_forensic && rt->machine.instruction_complete) {
-            runtime_tm_after_step(rt);
+        if (!rt->inspecting && rt->machine.instruction_complete) {
+            runtime_inspector_after_step(rt);
         }
     }
 }
 
-static bool runtime_command_is_tm_land(const runtime_command *cmd)
+static bool runtime_command_is_inspector_land(const runtime_command *cmd)
 {
-    return cmd != NULL && cmd->type == RUNTIME_COMMAND_TM_LAND;
+    return cmd != NULL && cmd->type == RUNTIME_COMMAND_INSPECTOR_LAND;
 }
 
-static bool runtime_command_preempts_tm_land(const runtime_command *cmd)
+static bool runtime_command_preempts_inspector_land(const runtime_command *cmd)
 {
     return cmd != NULL &&
         (cmd->type == RUNTIME_COMMAND_QUIT ||
-         cmd->type == RUNTIME_COMMAND_TM_EXIT_FORENSIC);
+         cmd->type == RUNTIME_COMMAND_INSPECTOR_LEAVE);
 }
 
-/* Keep only the latest land. Quit / exit-forensic drop the backlog. */
-static void runtime_coalesce_tm_lands(
+/* Keep only the latest land. Quit / leave-inspector drop the backlog. */
+static void runtime_coalesce_inspector_lands(
     runtime *rt,
     runtime_command *cmd,
     runtime_command *deferred,
@@ -4558,18 +4558,18 @@ static void runtime_coalesce_tm_lands(
     if (rt == NULL || cmd == NULL || deferred == NULL || has_deferred == NULL) {
         return;
     }
-    if (!runtime_command_is_tm_land(cmd)) {
+    if (!runtime_command_is_inspector_land(cmd)) {
         return;
     }
     while (message_queue_try_pop(rt->command_queue, &extra)) {
-        if (runtime_command_is_tm_land(&extra)) {
+        if (runtime_command_is_inspector_land(&extra)) {
             *cmd = extra;
             continue;
         }
-        if (runtime_command_preempts_tm_land(&extra)) {
+        if (runtime_command_preempts_inspector_land(&extra)) {
             *cmd = extra;
             while (message_queue_try_pop(rt->command_queue, &extra)) {
-                if (runtime_command_is_tm_land(&extra)) {
+                if (runtime_command_is_inspector_land(&extra)) {
                     continue;
                 }
                 *deferred = extra;
@@ -4691,8 +4691,8 @@ int runtime_thread_main(void *userdata)
     }
     rt->machine_ready = true;
     runtime_apply_turbo_video_policy(rt, false);
-    if (rt->config.timemachine) {
-        runtime_tm_set_enabled(rt, true);
+    if (rt->config.inspector) {
+        runtime_inspector_set_enabled(rt, true);
     }
     if (runtime_turbo_is_free_run(rt)) {
         runtime_history_apply_max_policy(rt, true, false);
@@ -4749,7 +4749,7 @@ int runtime_thread_main(void *userdata)
                 } else if (!message_queue_try_pop(rt->command_queue, &command)) {
                     break;
                 }
-                runtime_coalesce_tm_lands(
+                runtime_coalesce_inspector_lands(
                     rt, &command, &deferred, &has_deferred);
                 runtime_process_command(rt, &command, &alive);
                 if (!alive) {
@@ -4760,7 +4760,7 @@ int runtime_thread_main(void *userdata)
                 break;
             }
             if (rt->exec_state == RUNTIME_EXEC_RUNNING) {
-                if (rt->tm_forensic && runtime_tm_pause_at_live(rt)) {
+                if (rt->inspecting && runtime_inspector_pause_at_live(rt)) {
                     /* already at live */
                 } else {
                     runtime_free_run_batch(rt);
@@ -4775,7 +4775,7 @@ int runtime_thread_main(void *userdata)
                     alive = false;
                     break;
                 }
-                runtime_coalesce_tm_lands(
+                runtime_coalesce_inspector_lands(
                     rt, &command, &deferred, &has_deferred);
                 runtime_process_command(rt, &command, &alive);
             }

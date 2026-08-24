@@ -2,9 +2,9 @@
 
 **Audience:** agents and humans scripting the emulator (headless or windowed).
 
-**Protocol today:** **A2M/12** (`CONTROL_PROTOCOL_VERSION` in
+**Protocol today:** **A2M/13** (`CONTROL_PROTOCOL_VERSION` in
 `src/control/control_protocol.h`). Sessions + unsolicited `state-changed`
-events; forensic mode + `exit-forensic`; see [`sessions.md`](sessions.md) ·
+events; Inspect + `leave-inspector`; see [`sessions.md`](sessions.md) ·
 [`TM3.md`](TM3.md).
 
 ## Source of truth
@@ -34,7 +34,7 @@ python3 -c "
 import sys; sys.path.insert(0, 'tools')
 from a2m_control_client import Ctl
 c = Ctl(port=6510)
-print(c.cmd('hello'))          # name=a2m protocol=A2M/12
+print(c.cmd('hello'))          # name=a2m protocol=A2M/13
 print(c.cmd('get-cpu'))
 c.cmd('run'); c.wait_frame(2, 5000); c.cmd('pause'); c.wait_paused(2000)
 r = c.history_find(limit=8)
@@ -60,7 +60,7 @@ Inbox: append lines to `build/debug/coop_inbox`.
 
 ---
 
-## Wire inventory (A2M/12)
+## Wire inventory (A2M/13)
 
 Framing: `<id> <command> [args]\n` → `ok` / `error` / `data` (+ binary + `\n`).
 Unsolicited: `0 event state-changed reason=… session=… cycles=… frame=… epoch=…\n`
@@ -75,7 +75,7 @@ Unsolicited: `0 event state-changed reason=… session=… cycles=… frame=… 
 | Frame ring | `frame-ring-info` `frame-ring-record` `frame-ring-clear` `get-frame-at frame=\|cycle=` |
 | Breakpoints | `break-create` / `break-update` / `break-list` / `break-enable` / `break-clear` / `break-clear-all` / `rearm-oneshots` / `break-exec`; `when=`; access exec/read/write |
 | History | `history-info` `history-record` `history-clear` `history-find` `history-next` `history-read` `history-close` → `data history` **HST1** (per TCP session cursor). Marker 13 = `MEDIA_CHANGED`; `arg0` is `0 unknown / 1 guest-write / 2 host-directory`, `arg1` is `(slot<<8)\|device`. Additive; no A2M bump. |
-| TimeMachine | Master switch is still INI `[debug] timemachine=0\|1` / CLI `--timemachine` (default **off**). **A2M/12:** `get-state` reports `mode=live\|forensic focus_cycle=N start=… start_arg1=N` (`focus_cycle` = landed `apple2_cycles`; wire `forensic` = time travel). `exit-forensic` (any session) leaves time travel and restores live NOW; mutating verbs fail with `error read-only-forensic`. Tape seek/step **do not exist**. FIND stays (`history-find` / `history-next` / `history-read`). Inspector enter needs checkpoints (film optional). |
+| Inspector | Master switch is still INI `[debug] inspector=0\|1` / CLI `--inspector` (default **off**). **A2M/13:** `get-state` reports `mode=live\|inspector focus_cycle=N start=… start_arg1=N` (`focus_cycle` = landed `apple2_cycles`). `leave-inspector` (any session) leaves Inspect and restores live NOW; mutating verbs fail with `error read-only-inspector`. Tape seek/step **do not exist**. FIND stays (`history-find` / `history-next` / `history-read`). Inspector enter needs checkpoints (film optional). |
 | Waits | `wait-paused` `wait-running` `wait-frame` `wait-event` (incl. `assemble-complete` / `assemble-error`) |
 | Assembler | `assemble [address=] [run-address=] [auto-run=] [mli-launch=] [reset=] [auto-adjust-segments=] <path>` (deferred) |
 | Symbols | `find-symbol <name>` → `ok address=$XXXX name=…` / `not-ready` / `not-found` |
@@ -124,11 +124,11 @@ Aliases for `kind=`: `disk` → diskii; `sp` / `hd` → smartport.
   the next reply for id N. Prefer `Ctl` (`drain_events` / `events` list).
 - History FIND/NEXT cursors are **per session**; a step/poke/reset from any
   asker invalidates all cursors (`CURSOR_STALE` → re-FIND).
-- **TimeMachine vs record verbs:** `--timemachine` / `[debug] timemachine=1` is the
+- **Inspector vs record verbs:** `--inspector` / `[debug] inspector=1` is the
   product master switch (arms history + frame ring). `history-record` /
-  `frame-ring-record` remain the per-recorder controls. While `mode=forensic`,
+  `frame-ring-record` remain the per-recorder controls. While `mode=inspector`,
   `get-memory`/`get-cpu` return THEN; `run`/`set-memory`/`set-reg`/mount/reset
-  fail with `read-only-forensic`. `exit-forensic` restores live NOW and does
+  fail with `read-only-inspector`. `leave-inspector` restores live NOW and does
   **not** auto-resume. There is no enter/land/seek verb on the wire (UI uses
   `runtime_client`). Tape seek/step do not exist. FIND stays.
 

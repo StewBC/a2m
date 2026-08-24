@@ -423,113 +423,143 @@ int main(void)
         }
     }
 
-    /* TimeMachine config: default off, INI/CLI, 0 honoured, garbage → default. */
+    /* Inspector config: default off, INI/CLI, 0 honoured, garbage → default. */
     {
-        char *argv_tm[] = {
+        char *argv_inspector[] = {
             (char *)"a2m",
             (char *)"--noini",
-            (char *)"--timemachine",
-            (char *)"--timemachine-memory",
+            (char *)"--inspector",
+            (char *)"--inspector-memory",
             (char *)"64",
         };
         char *argv_no[] = {
             (char *)"a2m",
             (char *)"--noini",
-            (char *)"--no-timemachine",
+            (char *)"--no-inspector",
         };
         char *argv_zero[] = {
             (char *)"a2m",
             (char *)"--noini",
-            (char *)"--timemachine-memory",
+            (char *)"--inspector-memory",
             (char *)"0",
         };
         char *argv_bad[] = {
             (char *)"a2m",
             (char *)"--noini",
-            (char *)"--timemachine-memory",
+            (char *)"--inspector-memory",
             (char *)"5",
         };
-        const char *path = "/tmp/a2m-test-timemachine.ini";
+        const char *path = "/tmp/a2m-test-inspector.ini";
         FILE *file;
         config *saved;
 
         app_options_init(&options);
-        expect_true("TM default off", !options.timemachine);
-        expect_true("TM budget default 128", options.timemachine_memory_mb == 128);
+        expect_true("inspector default off", !options.inspector);
+        expect_true("inspector budget default 128", options.inspector_memory_mb == 128);
         app_options_destroy(&options);
 
         expect_true(
-            "CLI --timemachine",
+            "CLI --inspector",
             app_options_load_startup(
-                &options, (int)(sizeof(argv_tm) / sizeof(argv_tm[0])), argv_tm));
-        expect_true("CLI TM on", options.timemachine);
-        expect_true("CLI TM budget 64", options.timemachine_memory_mb == 64);
+                &options, (int)(sizeof(argv_inspector) / sizeof(argv_inspector[0])), argv_inspector));
+        expect_true("CLI inspector on", options.inspector);
+        expect_true("CLI inspector budget 64", options.inspector_memory_mb == 64);
         app_options_destroy(&options);
 
         expect_true(
-            "CLI --no-timemachine",
+            "CLI --no-inspector",
             app_options_load_startup(
                 &options, (int)(sizeof(argv_no) / sizeof(argv_no[0])), argv_no));
-        expect_true("CLI TM off", !options.timemachine);
+        expect_true("CLI inspector off", !options.inspector);
         app_options_destroy(&options);
 
         expect_true(
-            "CLI TM budget 0",
+            "CLI inspector budget 0",
             app_options_load_startup(
                 &options,
                 (int)(sizeof(argv_zero) / sizeof(argv_zero[0])),
                 argv_zero));
-        expect_true("CLI 0 honoured", options.timemachine_memory_mb == 0);
+        expect_true("CLI 0 honoured", options.inspector_memory_mb == 0);
         app_options_destroy(&options);
 
         expect_true(
-            "CLI TM budget 5 rejected",
+            "CLI inspector budget 5 rejected",
             !app_options_load_startup(
                 &options, (int)(sizeof(argv_bad) / sizeof(argv_bad[0])), argv_bad));
         app_options_destroy(&options);
 
         file = fopen(path, "w");
-        expect_true("create TM INI", file != NULL);
+        expect_true("create inspector INI", file != NULL);
         fputs(
             "[debug]\n"
-            "timemachine = 1\n"
-            "timemachine_memory_mb = 0\n"
+            "inspector = 1\n"
+            "inspector_memory_mb = 0\n"
             "history_memory_mb = 0\n"
             "frame_ring_memory_mb = 32\n",
             file);
-        expect_true("close TM INI", fclose(file) == 0);
+        expect_true("close inspector INI", fclose(file) == 0);
         app_options_init(&options);
-        expect_true("load TM INI", app_options_apply_ini_file(&options, path));
-        expect_true("INI TM on", options.timemachine);
-        expect_true("INI TM budget 0", options.timemachine_memory_mb == 0);
+        expect_true("load inspector INI", app_options_apply_ini_file(&options, path));
+        expect_true("INI inspector on", options.inspector);
+        expect_true("INI inspector budget 0", options.inspector_memory_mb == 0);
         expect_true("INI history 0", options.history_memory_mb == 0);
         expect_true("INI frame 32", options.frame_ring_memory_mb == 32);
         set_ini_path(&options, path);
-        expect_true("save TM INI", app_options_save_shutdown(&options));
+        expect_true("save inspector INI", app_options_save_shutdown(&options));
         app_options_destroy(&options);
 
         saved = config_load(path);
-        expect_true("reload TM INI", saved != NULL);
+        expect_true("reload inspector INI", saved != NULL);
         expect_true(
-            "saved timemachine",
-            config_get(saved, "debug", "timemachine") != NULL &&
-                strcmp(config_get(saved, "debug", "timemachine"), "true") == 0);
+            "saved inspector",
+            config_get(saved, "debug", "inspector") != NULL &&
+                strcmp(config_get(saved, "debug", "inspector"), "true") == 0);
         expect_true(
-            "saved TM budget 0",
-            config_get(saved, "debug", "timemachine_memory_mb") != NULL &&
-                strcmp(config_get(saved, "debug", "timemachine_memory_mb"), "0") ==
+            "saved inspector budget 0",
+            config_get(saved, "debug", "inspector_memory_mb") != NULL &&
+                strcmp(config_get(saved, "debug", "inspector_memory_mb"), "0") ==
                     0);
         config_destroy(saved);
 
         file = fopen(path, "w");
-        expect_true("create garbage TM INI", file != NULL);
-        fputs("[debug]\ntimemachine_memory_mb = no-thanks\n", file);
-        expect_true("close garbage TM INI", fclose(file) == 0);
+        expect_true("create garbage inspector INI", file != NULL);
+        fputs("[debug]\ninspector_memory_mb = no-thanks\n", file);
+        expect_true("close garbage inspector INI", fclose(file) == 0);
         app_options_init(&options);
-        expect_true("load garbage TM INI", app_options_apply_ini_file(&options, path));
-        expect_true("garbage TM budget → default", options.timemachine_memory_mb == 128);
+        expect_true("load garbage inspector INI", app_options_apply_ini_file(&options, path));
+        expect_true("garbage inspector budget → default", options.inspector_memory_mb == 128);
         app_options_destroy(&options);
-        expect_true("remove TM INI", remove(path) == 0);
+
+        file = fopen(path, "w");
+        expect_true("create legacy TM INI", file != NULL);
+        fputs(
+            "[debug]\n"
+            "timemachine = 1\n"
+            "timemachine_memory_mb = 64\n",
+            file);
+        expect_true("close legacy TM INI", fclose(file) == 0);
+        app_options_init(&options);
+        expect_true("load legacy TM INI", app_options_apply_ini_file(&options, path));
+        expect_true("legacy timemachine ignored", !options.inspector);
+        expect_true("legacy TM budget ignored", options.inspector_memory_mb == 128);
+        set_ini_path(&options, path);
+        options.inspector = true;
+        expect_true("save drops legacy TM keys", app_options_save_shutdown(&options));
+        app_options_destroy(&options);
+        saved = config_load(path);
+        expect_true("reload after drop", saved != NULL);
+        expect_true(
+            "legacy timemachine key gone",
+            config_get(saved, "debug", "timemachine") == NULL);
+        expect_true(
+            "legacy TM budget key gone",
+            config_get(saved, "debug", "timemachine_memory_mb") == NULL);
+        expect_true(
+            "inspector written",
+            config_get(saved, "debug", "inspector") != NULL &&
+                strcmp(config_get(saved, "debug", "inspector"), "true") == 0);
+        config_destroy(saved);
+        expect_true("remove inspector INI", remove(path) == 0);
     }
 
     printf("OK app_options_mounts\n");

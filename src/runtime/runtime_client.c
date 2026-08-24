@@ -958,60 +958,60 @@ bool runtime_client_set_history_off_on_max(runtime_client *client, bool enabled)
     return runtime_client_push(client, &command);
 }
 
-bool runtime_client_tm_set_enabled(
+bool runtime_client_inspector_set_enabled(
     runtime_client *client,
     bool enabled,
     uint64_t request_token) {
     runtime_command command = {
-        .type = RUNTIME_COMMAND_TM_SET_ENABLED,
+        .type = RUNTIME_COMMAND_INSPECTOR_SET_ENABLED,
         .request_token = request_token,
     };
     if (client == NULL) {
         return false;
     }
-    command.data.tm_set_enabled.enabled = enabled ? 1u : 0u;
+    command.data.inspector_set_enabled.enabled = enabled ? 1u : 0u;
     return runtime_client_push(client, &command);
 }
 
-bool runtime_client_tm_enter_forensic(
+bool runtime_client_inspector_enter(
     runtime_client *client,
     uint64_t request_token) {
     return runtime_client_send_command_token(
-        client, RUNTIME_COMMAND_TM_ENTER_FORENSIC, request_token);
+        client, RUNTIME_COMMAND_INSPECTOR_ENTER, request_token);
 }
 
-bool runtime_client_tm_exit_forensic(
+bool runtime_client_inspector_leave(
     runtime_client *client,
     uint64_t request_token) {
     return runtime_client_send_command_token(
-        client, RUNTIME_COMMAND_TM_EXIT_FORENSIC, request_token);
+        client, RUNTIME_COMMAND_INSPECTOR_LEAVE, request_token);
 }
 
-bool runtime_client_tm_land(
+bool runtime_client_inspector_land(
     runtime_client *client, uint64_t cycle, uint64_t request_token)
 {
     runtime_command command = {
-        .type = RUNTIME_COMMAND_TM_LAND,
+        .type = RUNTIME_COMMAND_INSPECTOR_LAND,
         .request_token = request_token,
     };
     if (client == NULL) {
         return false;
     }
-    command.data.tm_land.cycle = cycle;
+    command.data.inspector_land.cycle = cycle;
     return runtime_client_push(client, &command);
 }
 
-bool runtime_client_tm_frame_step(
+bool runtime_client_inspector_frame_step(
     runtime_client *client, int direction, uint64_t request_token)
 {
     runtime_command command = {
-        .type = RUNTIME_COMMAND_TM_FRAME_STEP,
+        .type = RUNTIME_COMMAND_INSPECTOR_FRAME_STEP,
         .request_token = request_token,
     };
     if (client == NULL) {
         return false;
     }
-    command.data.tm_frame_step.direction =
+    command.data.inspector_frame_step.direction =
         direction < 0 ? (int8_t)-1 : (int8_t)1;
     return runtime_client_push(client, &command);
 }

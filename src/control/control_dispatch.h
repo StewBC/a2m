@@ -47,10 +47,10 @@ typedef struct control_dispatch {
     bool has_symbols;
     runtime_symbol_snapshot symbols;
     /* TM3: cached from MACHINE_STATE so get-state / mutation rejects see mode. */
-    bool forensic;
-    uint64_t tm_focus_cycle;
-    uint8_t tm_window_start_kind;
-    uint32_t tm_window_start_arg1;
+    bool inspecting;
+    uint64_t inspector_focus_cycle;
+    uint8_t inspector_window_start_kind;
+    uint32_t inspector_window_start_arg1;
 } control_dispatch_t;
 
 void control_dispatch_init(

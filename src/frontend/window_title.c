@@ -27,10 +27,10 @@ void frontend_format_window_title_ex(
     uint32_t turbo_multiplier,
     frontend_runtime_state state,
     runtime_stop_reason stop_reason,
-    bool tm_forensic,
-    uint64_t tm_focus_cycle,
-    uint64_t tm_oldest_cycle,
-    uint64_t tm_newest_cycle)
+    bool inspecting,
+    uint64_t inspector_focus_cycle,
+    uint64_t inspector_oldest_cycle,
+    uint64_t inspector_newest_cycle)
 {
     const char *label = "Apple II";
     char turbo[32];
@@ -45,14 +45,14 @@ void frontend_format_window_title_ex(
     /* turbo_multiplier is milli-MHz (0 = max). See runtime.h turbo encoding. */
     runtime_turbo_format_label(turbo_multiplier, turbo, sizeof(turbo));
 
-    if (tm_forensic) {
+    if (inspecting) {
         snprintf(
             state_text,
             sizeof(state_text),
-            "TIME MACHINE %llu-%llu @ %llu",
-            (unsigned long long)tm_oldest_cycle,
-            (unsigned long long)tm_newest_cycle,
-            (unsigned long long)tm_focus_cycle);
+            "INSPECT %llu-%llu @ %llu",
+            (unsigned long long)inspector_oldest_cycle,
+            (unsigned long long)inspector_newest_cycle,
+            (unsigned long long)inspector_focus_cycle);
         snprintf(out, out_size, "a2m - %s - %s - %s", label, turbo, state_text);
         return;
     }

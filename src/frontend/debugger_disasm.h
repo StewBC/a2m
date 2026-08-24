@@ -2,11 +2,11 @@
 #define A2M_DEBUGGER_DISASM_H
 
 /*
- * Shared disasm chrome for live (F9) and forensic debugger modes.
+ * Shared disasm chrome for live (F9) and Inspect debugger modes.
  * One view + key router; mode ops supply the per-mode verbs.
  *
- * Salvaged from the retired F7 Inspector spine. Currently unwired: the
- * forensic side lands with TimeMachine TM4 (see agents/timemachine.md D1).
+ * Salvaged from the retired F7 Inspector spine. Mode-aware chrome for
+ * live and Inspect (one debugger skin).
  */
 
 #include <stdbool.h>
@@ -20,7 +20,7 @@ extern "C" {
 
 typedef enum debugger_disasm_mode {
     DEBUGGER_DISASM_MODE_LIVE = 0,
-    DEBUGGER_DISASM_MODE_FORENSIC = 1
+    DEBUGGER_DISASM_MODE_INSPECT = 1
 } debugger_disasm_mode;
 
 /* Chrome / browse state — one instance per shell. */
@@ -30,7 +30,7 @@ typedef struct debugger_disasm_view {
     uint8_t rows;
     uint8_t active_address_digit;
     bool address_entry;
-    bool follow_focus; /* live: follow CPU PC; forensic: follow THEN */
+    bool follow_focus; /* live: follow CPU PC; Inspect: follow THEN */
     bool has_cursor;
 } debugger_disasm_view;
 

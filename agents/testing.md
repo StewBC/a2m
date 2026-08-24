@@ -52,10 +52,10 @@ Expect **61** green. Run from repo root.
 | `runtime_history_query` | FIND/READ/CLOSE + HST1 (C4b) |
 | `runtime_history_sessions` | Dual session FIND/NEXT isolation (S0/S1) |
 | `runtime_state_changed` | state-changed inform + cursor stale (S3) |
-| `runtime_timemachine` | TM0: master enable arms HST1 + frame ring; pin-3 no re-arm; zero-budget empty tape |
-| `runtime_tm_replay` | TM2: checkpoint + sealed materialize; media truncate; max kills window |
-| `runtime_tm_forensic` | TM3/TMA1: enter/exit NOW; land; read-only; sealed step; control mode/exit |
-| `runtime_tm_bp` | TMA2: one BP list; time-travel run-until hits it or live; leave keeps it |
+| `runtime_inspector` | TM0: master enable arms HST1 + frame ring; pin-3 no re-arm; zero-budget empty tape |
+| `runtime_inspector_replay` | TM2: checkpoint + sealed materialize; media truncate; max kills window |
+| `runtime_inspector_mode` | TM3/TMA1: enter/exit NOW; land; read-only; sealed step; control mode/exit |
+| `runtime_inspector_bp` | TMA2: one BP list; time-travel run-until hits it or live; leave keeps it |
 | `control_protocol` | A2M parse + format (`src/control`) |
 | `assembler_*` | expressions/conditionals/loops/macros/scopes/targets/CPU profiles/multifile |
 | `runtime_assembler` | live RAM assembly + runtime event path |

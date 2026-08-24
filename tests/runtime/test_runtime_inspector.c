@@ -5,7 +5,7 @@
 #include "runtime_frame_ring.h"
 #include "runtime_history.h"
 #include "runtime_internal.h"
-#include "runtime_timemachine.h"
+#include "runtime_inspector.h"
 
 #include <SDL.h>
 #include <stdio.h>
@@ -104,22 +104,22 @@ int main(void)
 
     /* TM on at create arms both recorders. */
     init_config(&config);
-    config.timemachine = true;
+    config.inspector = true;
     config.history_memory_mb = 16;
     config.history_memory_mb_configured = true;
     config.frame_ring_memory_mb = 8;
     config.frame_ring_memory_mb_configured = true;
-    config.timemachine_memory_mb = 128;
+    config.inspector_memory_mb = 128;
     rt = start_runtime(&config, &client);
     {
         int waited = 0;
-        while (!runtime_tm_enabled(rt) && waited < 2000) {
+        while (!runtime_inspector_enabled(rt) && waited < 2000) {
             SDL_Delay(1);
             waited++;
         }
     }
-    expect_true("TM enabled at start", runtime_tm_enabled(rt));
-    expect_true("TM budget stored", runtime_tm_memory_mb(rt) == 128u);
+    expect_true("TM enabled at start", runtime_inspector_enabled(rt));
+    expect_true("TM budget stored", runtime_inspector_memory_mb(rt) == 128u);
     history_info(client, &status);
     expect_true("history available", status.available);
     expect_true("history recording (TM on)", status.recording);
@@ -135,7 +135,7 @@ int main(void)
     expect_true("off resp", wait_history_status(client, &status, 2.0));
     expect_true("history not recording", !status.recording);
     records_off = status.record_count;
-    expect_true("TM still enabled after history off", runtime_tm_enabled(rt));
+    expect_true("TM still enabled after history off", runtime_inspector_enabled(rt));
     SDL_Delay(40);
     history_info(client, &status);
     expect_true("history still off (no re-arm)", !status.recording);
@@ -148,20 +148,20 @@ int main(void)
     SDL_Delay(40);
     runtime_client_get_frame_ring_info(client, &frame_info);
     expect_true("frame ring still off (no re-arm)", !frame_info.recording);
-    expect_true("TM still enabled after frame off", runtime_tm_enabled(rt));
+    expect_true("TM still enabled after frame off", runtime_inspector_enabled(rt));
 
     runtime_stop(rt);
     runtime_destroy(rt);
 
     /* Off→on arms recorders that were explicitly turned off. */
     init_config(&config);
-    config.timemachine = false;
+    config.inspector = false;
     config.history_memory_mb = 16;
     config.history_memory_mb_configured = true;
     config.frame_ring_memory_mb = 8;
     config.frame_ring_memory_mb_configured = true;
     rt = start_runtime(&config, &client);
-    expect_true("TM off at start", !runtime_tm_enabled(rt));
+    expect_true("TM off at start", !runtime_inspector_enabled(rt));
     token = runtime_client_alloc_request_token(client);
     expect_true(
         "standalone history off",
@@ -175,9 +175,9 @@ int main(void)
     token = runtime_client_alloc_request_token(client);
     expect_true(
         "TM enable",
-        runtime_client_tm_set_enabled(client, true, token));
+        runtime_client_inspector_set_enabled(client, true, token));
     expect_true("TM enable resp", wait_history_status(client, &status, 2.0));
-    expect_true("TM enabled after set", runtime_tm_enabled(rt));
+    expect_true("TM enabled after set", runtime_inspector_enabled(rt));
     expect_true("history armed on TM on", status.recording);
     runtime_client_get_frame_ring_info(client, &frame_info);
     expect_true("frame armed on TM on", frame_info.recording);
@@ -187,7 +187,7 @@ int main(void)
 
     /* TM off does not block standalone history-record on. */
     init_config(&config);
-    config.timemachine = false;
+    config.inspector = false;
     config.history_memory_mb = 16;
     config.history_memory_mb_configured = true;
     config.frame_ring_memory_mb = 0;
@@ -204,19 +204,19 @@ int main(void)
         runtime_client_history_record(client, true, token));
     expect_true("TM-off on resp", wait_history_status(client, &status, 2.0));
     expect_true("standalone history on while TM off", status.recording);
-    expect_true("TM still off", !runtime_tm_enabled(rt));
+    expect_true("TM still off", !runtime_inspector_enabled(rt));
     runtime_stop(rt);
     runtime_destroy(rt);
 
     /* Zero history budget: honest empty tape, TM still on. */
     init_config(&config);
-    config.timemachine = true;
+    config.inspector = true;
     config.history_memory_mb = 0;
     config.history_memory_mb_configured = true;
     config.frame_ring_memory_mb = 8;
     config.frame_ring_memory_mb_configured = true;
     rt = start_runtime(&config, &client);
-    expect_true("TM on with history 0", runtime_tm_enabled(rt));
+    expect_true("TM on with history 0", runtime_inspector_enabled(rt));
     history_info(client, &status);
     expect_true("history unavailable", !status.available);
     expect_true(
@@ -229,13 +229,13 @@ int main(void)
 
     /* Zero frame-ring budget: empty ring, TM still on, history armed. */
     init_config(&config);
-    config.timemachine = true;
+    config.inspector = true;
     config.history_memory_mb = 16;
     config.history_memory_mb_configured = true;
     config.frame_ring_memory_mb = 0;
     config.frame_ring_memory_mb_configured = true;
     rt = start_runtime(&config, &client);
-    expect_true("TM on with frame 0", runtime_tm_enabled(rt));
+    expect_true("TM on with frame 0", runtime_inspector_enabled(rt));
     history_info(client, &status);
     expect_true("history armed with frame 0", status.recording);
     runtime_client_get_frame_ring_info(client, &frame_info);

@@ -216,11 +216,11 @@ int main(void)
     expect_u32("before", 8, request.args.history_before);
 
     expect_true(
-        "exit-forensic",
-        control_protocol_parse_request("40 exit-forensic", &request, &error));
+        "leave-inspector",
+        control_protocol_parse_request("40 leave-inspector", &request, &error));
     expect_int(
-        "exit-forensic type",
-        CONTROL_COMMAND_EXIT_FORENSIC,
+        "leave-inspector type",
+        CONTROL_COMMAND_LEAVE_INSPECTOR,
         (int)request.type);
 
     expect_true(

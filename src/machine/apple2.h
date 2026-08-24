@@ -161,11 +161,11 @@ typedef struct apple2 {
     /* Sealed replay: drop host media write-through and HostFS refresh. */
     bool replay_sealed;
 
-    /* TimeMachine: guest media write / host-directory change (D10). */
+    /* Inspector: guest media write / host-directory change (D10). */
     void (*media_event)(void *user, uint64_t cycle, int slot, int device, int kind);
     void *media_event_user;
 
-    /* TimeMachine input log (host key / gameport). */
+    /* Inspector input log (host key / gameport). */
     void (*input_event)(
         void *user, uint64_t cycle, int kind, uint32_t a, uint32_t b, uint32_t c);
     void *input_event_user;

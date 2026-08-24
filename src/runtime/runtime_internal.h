@@ -12,7 +12,7 @@
 #include "runtime_event.h"
 #include "runtime_frame_ring.h"
 #include "runtime_history.h"
-#include "runtime_timemachine.h"
+#include "runtime_inspector.h"
 #include "symbol_table.h"
 #include "apple_type_script.h"
 
@@ -200,18 +200,18 @@ struct runtime {
     /* True if we stopped history solely for max (so we may resume on leave). */
     bool history_paused_for_max;
     /* Record checkbox to restore on leave-max (TMA3). */
-    bool tm_enabled_saved_for_max;
+    bool inspector_enabled_saved_for_max;
 
-    /* TimeMachine master enable. Off→on arms HST1 + frame ring once. */
-    bool timemachine_enabled;
-    uint32_t timemachine_memory_mb;
-    runtime_tm_focus tm_focus;
-    struct runtime_tm_recorder *tm_recorder;
+    /* Inspector master enable. Off→on arms HST1 + frame ring once. */
+    bool inspector_enabled;
+    uint32_t inspector_memory_mb;
+    runtime_inspector_focus inspector_focus;
+    struct runtime_inspector_recorder *inspector_recorder;
     /* TM3/TMA1: time-travel mode replaces live apple2_t; NOW blob is live. */
-    bool tm_forensic;
-    uint8_t *tm_now_blob;
-    size_t tm_now_size;
-    uint64_t tm_now_cycle;
+    bool inspecting;
+    uint8_t *inspector_now_blob;
+    size_t inspector_now_size;
+    uint64_t inspector_now_cycle;
 
     /* TRON/TROFF instruction log (C5b) — file open while trace_enabled. */
     bool trace_enabled;

@@ -281,7 +281,8 @@ sensible sub-slices).
 | **A2M/9** | Unified `mount` / `unmount` with `kind=diskii\|smartport` (path infer; slot resolve); `mount-disk` kept as Disk II alias |
 | **A2M/10** | Control-port `assemble` + `find-symbol` (Assembler-tab parity; Apple `mli-launch`); capabilities `assemble symbols` |
 | **A2M/11** | Runtime sessions (N=4) + per-session history cursors; unsolicited `0 event state-changed …`; capabilities `sessions state-changed`. See [`sessions.md`](sessions.md). |
-| **A2M/12** | **Current.** Forensic honesty (D18): `get-state` `mode=`/`focus_cycle=`/`start=`; `exit-forensic`; `error read-only-forensic`; `state-changed` reasons `forensic-enter`/`forensic-seek`/`forensic-exit`; capability `timemachine`. See [`TM3.md`](TM3.md). |
+| **A2M/12** | Inspector honesty under TimeMachine names: `get-state` `mode=live\|forensic`; `exit-forensic`; `error read-only-forensic`; `state-changed` reasons `forensic-enter`/`forensic-seek`/`forensic-exit`; capability `timemachine`. See [`TM3.md`](TM3.md). |
+| **A2M/13** | **Current.** Same actions, Inspector names: `mode=live\|inspector`; `leave-inspector`; `error read-only-inspector`; `state-changed` reasons `inspector-enter`/`inspector-land`/`inspector-leave`; capability `inspector`. |
 
 Bump only when scripts must learn new behaviour; update this table and
 `CONTROL_PROTOCOL_VERSION` in the same change.

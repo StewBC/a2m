@@ -401,33 +401,33 @@ target_compile_features(test_runtime_state_changed PRIVATE c_std_99)
 target_link_libraries(test_runtime_state_changed PRIVATE runtime SDL2::SDL2)
 add_test(NAME runtime_state_changed COMMAND test_runtime_state_changed)
 
-add_executable(test_runtime_timemachine
-    tests/runtime/test_runtime_timemachine.c
+add_executable(test_runtime_inspector
+    tests/runtime/test_runtime_inspector.c
 )
-target_compile_features(test_runtime_timemachine PRIVATE c_std_99)
-target_link_libraries(test_runtime_timemachine PRIVATE runtime SDL2::SDL2)
-add_test(NAME runtime_timemachine COMMAND test_runtime_timemachine)
+target_compile_features(test_runtime_inspector PRIVATE c_std_99)
+target_link_libraries(test_runtime_inspector PRIVATE runtime SDL2::SDL2)
+add_test(NAME runtime_inspector COMMAND test_runtime_inspector)
 
-add_executable(test_runtime_tm_replay
-    tests/runtime/test_runtime_tm_replay.c
+add_executable(test_runtime_inspector_replay
+    tests/runtime/test_runtime_inspector_replay.c
 )
-target_compile_features(test_runtime_tm_replay PRIVATE c_std_99)
-target_link_libraries(test_runtime_tm_replay PRIVATE runtime SDL2::SDL2)
-add_test(NAME runtime_tm_replay COMMAND test_runtime_tm_replay)
+target_compile_features(test_runtime_inspector_replay PRIVATE c_std_99)
+target_link_libraries(test_runtime_inspector_replay PRIVATE runtime SDL2::SDL2)
+add_test(NAME runtime_inspector_replay COMMAND test_runtime_inspector_replay)
 
-add_executable(test_runtime_tm_forensic
-    tests/runtime/test_runtime_tm_forensic.c
+add_executable(test_runtime_inspector_mode
+    tests/runtime/test_runtime_inspector_mode.c
 )
-target_compile_features(test_runtime_tm_forensic PRIVATE c_std_99)
-target_link_libraries(test_runtime_tm_forensic PRIVATE control runtime SDL2::SDL2)
-add_test(NAME runtime_tm_forensic COMMAND test_runtime_tm_forensic)
+target_compile_features(test_runtime_inspector_mode PRIVATE c_std_99)
+target_link_libraries(test_runtime_inspector_mode PRIVATE control runtime SDL2::SDL2)
+add_test(NAME runtime_inspector_mode COMMAND test_runtime_inspector_mode)
 
-add_executable(test_runtime_tm_bp
-    tests/runtime/test_runtime_tm_bp.c
+add_executable(test_runtime_inspector_bp
+    tests/runtime/test_runtime_inspector_bp.c
 )
-target_compile_features(test_runtime_tm_bp PRIVATE c_std_99)
-target_link_libraries(test_runtime_tm_bp PRIVATE runtime SDL2::SDL2)
-add_test(NAME runtime_tm_bp COMMAND test_runtime_tm_bp)
+target_compile_features(test_runtime_inspector_bp PRIVATE c_std_99)
+target_link_libraries(test_runtime_inspector_bp PRIVATE runtime SDL2::SDL2)
+add_test(NAME runtime_inspector_bp COMMAND test_runtime_inspector_bp)
 
 # Control protocol (A2M product wire — src/control).
 add_executable(test_control_protocol

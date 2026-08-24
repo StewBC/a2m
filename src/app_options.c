@@ -33,7 +33,7 @@
 #define A2M_DEFAULT_LAYOUT_SPLIT_MEMORY_MISC 0.55f
 #define A2M_DEFAULT_HISTORY_MEMORY_MB 256
 #define A2M_DEFAULT_FRAME_RING_MEMORY_MB 128
-#define A2M_DEFAULT_TIMEMACHINE_MEMORY_MB 128
+#define A2M_DEFAULT_INSPECTOR_MEMORY_MB 128
 #define A2M_SYSTEM_ROM_SIZE 16384
 #define A2M_BASIC_ROM_SIZE 8192
 #define A2M_KERNAL_ROM_SIZE 8192
@@ -1922,9 +1922,9 @@ static void apply_config(app_options *options, config *cfg)
             options->frame_ring_memory_mb = (int)parsed;
         }
     }
-    options->timemachine = config_get_bool(
-        cfg, "debug", "timemachine", options->timemachine);
-    value = config_get(cfg, "debug", "timemachine_memory_mb");
+    options->inspector = config_get_bool(
+        cfg, "debug", "inspector", options->inspector);
+    value = config_get(cfg, "debug", "inspector_memory_mb");
     if (value != NULL) {
         char *end = NULL;
         unsigned long parsed = strtoul(value, &end, 0);
@@ -1932,12 +1932,12 @@ static void apply_config(app_options *options, config *cfg)
             (parsed != 0u && (parsed < 16u || parsed > 4096u))) {
             fprintf(
                 stderr,
-                "invalid [debug] timemachine_memory_mb `%s`; using %d\n",
+                "invalid [debug] inspector_memory_mb `%s`; using %d\n",
                 value,
-                A2M_DEFAULT_TIMEMACHINE_MEMORY_MB);
-            options->timemachine_memory_mb = A2M_DEFAULT_TIMEMACHINE_MEMORY_MB;
+                A2M_DEFAULT_INSPECTOR_MEMORY_MB);
+            options->inspector_memory_mb = A2M_DEFAULT_INSPECTOR_MEMORY_MB;
         } else {
-            options->timemachine_memory_mb = (int)parsed;
+            options->inspector_memory_mb = (int)parsed;
         }
     }
 
@@ -2062,13 +2062,13 @@ static bool parse_command_line_overrides(app_options *options, int argc, char **
     const char *model_s = NULL;
     const char *symbols_s = NULL;
     const char *history_memory = NULL;
-    const char *timemachine_memory = NULL;
+    const char *inspector_memory = NULL;
     int history_off_on_max_flag = 0; /* argparse counter; presence via argv scan */
     int history_off_on_max_cli = 0;
     int history_off_on_max_seen = 0;
-    int timemachine_flag = 0;
-    int timemachine_cli = 0;
-    int timemachine_seen = 0;
+    int inspector_flag = 0;
+    int inspector_cli = 0;
+    int inspector_seen = 0;
     const char *disk_help = NULL;
     const char *hd_help = NULL;
     const char *kbdjoy_layout = NULL;
@@ -2089,7 +2089,7 @@ static bool parse_command_line_overrides(app_options *options, int argc, char **
         OPT_FLOAT('\0', "audio-record-duration", &audio_record_duration, "recording duration in seconds", NULL, 0, 0),
         OPT_STRING('b', "break", &breakpoint, "install execute breakpoint at hex address", NULL, 0, 0),
         OPT_INTEGER('\0', "control-port", &control_port,
-                    "listen on localhost TCP for A2M/12 remote control (0=off)", NULL, 0, 0),
+                    "listen on localhost TCP for A2M/13 remote control (0=off)", NULL, 0, 0),
         OPT_BOOLEAN('\0', "headless", &headless,
                     "no window; short smoke exit unless --control-port is set (long-lived)",
                     NULL, 0, OPT_NONEG),
@@ -2097,11 +2097,11 @@ static bool parse_command_line_overrides(app_options *options, int argc, char **
         OPT_BOOLEAN('\0', "history-off-on-max", &history_off_on_max_flag,
                     "pause CPU history while turbo is max (default on; --no-history-off-on-max)",
                     NULL, 0, 0),
-        OPT_BOOLEAN('\0', "timemachine", &timemachine_flag,
-                    "enable TimeMachine recording (default off; --no-timemachine)",
+        OPT_BOOLEAN('\0', "inspector", &inspector_flag,
+                    "enable Inspector recording (default off; --no-inspector)",
                     NULL, 0, 0),
-        OPT_STRING('\0', "timemachine-memory", &timemachine_memory,
-                   "TimeMachine checkpoint-ring budget in MiB (0 or 16..4096; default 128)",
+        OPT_STRING('\0', "inspector-memory", &inspector_memory,
+                   "Inspector checkpoint-ring budget in MiB (0 or 16..4096; default 128)",
                    NULL, 0, 0),
         OPT_BOOLEAN('f', "defaults", &defaults, "use default settings", NULL, 0, OPT_NONEG),
         OPT_STRING('d', "disk", &disk_help,
@@ -2276,34 +2276,34 @@ static bool parse_command_line_overrides(app_options *options, int argc, char **
             } else if (strcmp(argv[ai], "--no-history-off-on-max") == 0) {
                 history_off_on_max_seen = 1;
                 history_off_on_max_cli = 0;
-            } else if (strcmp(argv[ai], "--timemachine") == 0) {
-                timemachine_seen = 1;
-                timemachine_cli = 1;
-            } else if (strcmp(argv[ai], "--no-timemachine") == 0) {
-                timemachine_seen = 1;
-                timemachine_cli = 0;
+            } else if (strcmp(argv[ai], "--inspector") == 0) {
+                inspector_seen = 1;
+                inspector_cli = 1;
+            } else if (strcmp(argv[ai], "--no-inspector") == 0) {
+                inspector_seen = 1;
+                inspector_cli = 0;
             }
         }
         if (history_off_on_max_seen) {
             options->history_off_on_max = history_off_on_max_cli != 0;
         }
-        if (timemachine_seen) {
-            options->timemachine = timemachine_cli != 0;
+        if (inspector_seen) {
+            options->inspector = inspector_cli != 0;
         }
     }
     (void)history_off_on_max_flag;
-    (void)timemachine_flag;
-    if (timemachine_memory != NULL) {
+    (void)inspector_flag;
+    if (inspector_memory != NULL) {
         char *end = NULL;
-        unsigned long parsed = strtoul(timemachine_memory, &end, 0);
-        if (end == timemachine_memory || *end != '\0' ||
+        unsigned long parsed = strtoul(inspector_memory, &end, 0);
+        if (end == inspector_memory || *end != '\0' ||
             (parsed != 0u && (parsed < 16u || parsed > 4096u))) {
             fprintf(
                 stderr,
-                "--timemachine-memory expects 0 or a value from 16 through 4096 MiB\n");
+                "--inspector-memory expects 0 or a value from 16 through 4096 MiB\n");
             return false;
         }
-        options->timemachine_memory_mb = (int)parsed;
+        options->inspector_memory_mb = (int)parsed;
     }
 
     return true;
@@ -2342,8 +2342,8 @@ void app_options_init(app_options *options)
     options->history_memory_mb = A2M_DEFAULT_HISTORY_MEMORY_MB;
     options->history_off_on_max = true; /* max free-run boost by default */
     options->frame_ring_memory_mb = A2M_DEFAULT_FRAME_RING_MEMORY_MB;
-    options->timemachine = false;
-    options->timemachine_memory_mb = A2M_DEFAULT_TIMEMACHINE_MEMORY_MB;
+    options->inspector = false;
+    options->inspector_memory_mb = A2M_DEFAULT_INSPECTOR_MEMORY_MB;
     options->apple_model = 0; /* //e Enhanced */
     options->mb_slot = 4;
     options->slot_cards[4] = APP_SLOT_CARD_MOCKINGBOARD;
@@ -2432,8 +2432,8 @@ bool app_options_copy(app_options *dest, const app_options *src)
     dest->keyboard_joystick_swap_buttons = src->keyboard_joystick_swap_buttons;
     dest->history_memory_mb = src->history_memory_mb;
     dest->frame_ring_memory_mb = src->frame_ring_memory_mb;
-    dest->timemachine = src->timemachine;
-    dest->timemachine_memory_mb = src->timemachine_memory_mb;
+    dest->inspector = src->inspector;
+    dest->inspector_memory_mb = src->inspector_memory_mb;
     dest->apple_model = src->apple_model;
     dest->mb_slot = src->mb_slot;
     memcpy(dest->slot_cards, src->slot_cards, sizeof(dest->slot_cards));
@@ -2625,8 +2625,11 @@ bool app_options_save_shutdown(const app_options *options)
     config_set_int(cfg, "debug", "history_memory_mb", options->history_memory_mb);
     config_set_bool(cfg, "config", "history_off_on_max", options->history_off_on_max);
     config_set_int(cfg, "debug", "frame_ring_memory_mb", options->frame_ring_memory_mb);
-    config_set_bool(cfg, "debug", "timemachine", options->timemachine);
-    config_set_int(cfg, "debug", "timemachine_memory_mb", options->timemachine_memory_mb);
+    config_set_bool(cfg, "debug", "inspector", options->inspector);
+    config_set_int(cfg, "debug", "inspector_memory_mb", options->inspector_memory_mb);
+    /* Drop pre-A2M/13 TimeMachine keys. Prefix match also drops
+       timemachine_memory_mb. */
+    config_remove_prefix(cfg, "debug", "timemachine");
     /* Drop legacy C64 VIC-II line-ring budget if present in older INIs. */
     config_remove_prefix(cfg, "debug", "vic_ring_memory_mb");
     /* The snapshot folder is now [browse] snapshot; drop the legacy key. */

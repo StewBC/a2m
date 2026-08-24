@@ -35,8 +35,8 @@ Useful flags:
 | `--break <addr>` / `-b` | Install an execute breakpoint at a hex address |
 | `--symbols <file>` | Load a simple symbol file (`NAME` hex per line) |
 | `--headless` | No window; short smoke exit unless `--control-port` is set |
-| `--control-port N` | Listen on localhost TCP for A2M/12 remote control (`0`=off) |
-| `--timemachine` / `--no-timemachine` | Enable TimeMachine recording (default off) |
+| `--control-port N` | Listen on localhost TCP for A2M/13 remote control (`0`=off) |
+| `--inspector` / `--no-inspector` | Enable Inspector recording (default off) |
 | `--audio-smoke` | Emit a 440 Hz test tone to verify audio output |
 
 By default, a2m loads `a2m.ini` from the current directory. The INI file stores
@@ -272,7 +272,7 @@ peripherals, and Mockingboard stay in lock-step):
 | `max` or `-1` | `max` | Free-run as fast as the host allows, still full live paint |
 
 The first entry is the startup speed. Paste does not change turbo. By default
-entering `max` pauses the CPU flight recorder, turns TimeMachine Record off,
+entering `max` pauses the CPU flight recorder, turns Inspector Record off,
 and discards the tape (Configure -> Emulator, or `--history-off-on-max` /
 `--no-history-off-on-max`). Leaving `max` restores Record if it was on and
 starts a new window.
@@ -1343,7 +1343,7 @@ below the tab body on every tab.
 | Keyboard Joystick | `Off`, `Stick 1`, or `Stick 2`, plus the `Numpad` or `WASD` key layout |
 | Swap fire keys | While the stick is on: Space is button 0 and Option is button 1 (WASD-friendly). Off when the stick is Off |
 | Turbo | Comma-separated ladder, e.g. `1,max` or `1,4,8,max` |
-| History off on max | Pause the CPU flight recorder while turbo is `max` (faster free-run); TimeMachine Record is wiped and restored when you leave `max` |
+| History off on max | Pause the CPU flight recorder while turbo is `max` (faster free-run); Inspector Record is wiped and restored when you leave `max` |
 | Pause on BRK | Auto-pause free-run at the next `BRK` (`$00`); off by default |
 | Show disk LEDs | Draw green (read) and red (write) activity LEDs in the window corner |
 
@@ -1444,7 +1444,7 @@ Default layout: slot 4 Mockingboard, slot 6 Disk II, slot 7 SmartPort, others em
 |-----|-------|
 | `Save` | `yes` -- save INI on quit |
 | `turbo_speeds` | Comma-separated turbo ladder, e.g. `1,max` |
-| `history_off_on_max` | `true`/`false`; pause flight recorder on `max` (default true). With TimeMachine Record on, entering max wipes the tape and turns Record off; leaving max restores Record into a new window. |
+| `history_off_on_max` | `true`/`false`; pause flight recorder on `max` (default true). With Inspector Record on, entering max wipes the tape and turns Record off; leaving max restores Record into a new window. |
 | `scroll_wheel_lines` | Integer; lines scrolled per wheel click |
 | `original_del` | `true`/`false`; Backspace sends `$7F` instead of `$08` |
 | `symbol_files` | Comma-separated list of symbol file paths |
@@ -1540,15 +1540,15 @@ Persists the Assembler tab state. See **Assembler INI persistence**.
 
 | Key | Value |
 |-----|-------|
-| `timemachine` | TimeMachine recording master switch; `0` or `1` (default `0`) |
-| `timemachine_memory_mb` | Checkpoint-ring budget; `0` or `16..4096` (default `128`) |
+| `inspector` | Inspector recording master switch; `0` or `1` (default `0`) |
+| `inspector_memory_mb` | Checkpoint-ring budget; `0` or `16..4096` (default `128`) |
 | `history_memory_mb` | CPU flight-recorder budget; `0` or `16..4096` (default `256`) |
 | `frame_ring_memory_mb` | Frame-ring budget; `0` or `8..4096` (default `128`) |
 
-TimeMachine is opt-in debug recording. Off is the play path. On arms the CPU
+Inspector is opt-in debug recording. Off is the play path. On arms the CPU
 history recorder, the frame ring, and the checkpoint ring
-(`timemachine_memory_mb` or `--timemachine-memory`, default 128 MiB). With
-defaults, TimeMachine on is 256 + 128 + 128 = 512 MB. A budget of `0` disables
+(`inspector_memory_mb` or `--inspector-memory`, default 128 MiB). With
+defaults, Inspector on is 256 + 128 + 128 = 512 MB. A budget of `0` disables
 that recorder and leaves an empty tape; it is not overridden back to the default.
 
 Open F9 debugger, Misc -> Inspector. Enable recording, Pause, then Inspect.
@@ -1727,7 +1727,7 @@ combine headless mode with `--sna`:
 The server always binds to `127.0.0.1`. It accepts one client at a time. The socket
 thread performs network I/O only; runtime commands and snapshot requests are dispatched
 by the main loop, so remote control follows the same thread-ownership rules as the GUI
-debugger. The current protocol name is `A2M/12`.
+debugger. The current protocol name is `A2M/13`.
 
 Python helpers:
 
@@ -1849,8 +1849,8 @@ for low-latency automation; a windowed session is still paced by present/vsync.
 
 | Command | Response |
 |---------|----------|
-| `hello` | `ok name=a2m protocol=A2M/12` |
-| `version` | `ok protocol=A2M/12 app=a2m` |
+| `hello` | `ok name=a2m protocol=A2M/13` |
+| `version` | `ok protocol=A2M/13 app=a2m` |
 | `capabilities` | Space-separated capability names |
 | `ping` | `ok` |
 | `quit-client` | `ok`, then the server closes the client connection |
@@ -1858,7 +1858,7 @@ for low-latency automation; a windowed session is still paced by present/vsync.
 `capabilities` currently includes `connection`, `introspection`, `execution`,
 `state`, `softswitches`, `step`, `turbo`, `frame`, `frame-ring`, `memory`,
 `breakpoints`, `wait`, `key`, `disk`, `snapshot`, `history`, `assemble`,
-`symbols`, `sessions`, `state-changed`, and `timemachine`.
+`symbols`, `sessions`, `state-changed`, and `inspector`.
 
 The TCP client is bound to one runtime **session** (history FIND/NEXT cursor
 state). Disconnect frees that session. Mutations (step, run, poke, reset, …)
@@ -1976,8 +1976,8 @@ flight recorder for the same moment.
 
 | Command | Response |
 |---------|----------|
-| `get-state` | Text state summary: runtime state, CPU availability, frame, cycle, stop reason, turbo, `mode=live\|forensic`, `focus_cycle`, window `start` / `start_arg1` |
-| `exit-forensic` | Leave forensic mode and restore live NOW (does not auto-resume). Any session may call this. |
+| `get-state` | Text state summary: runtime state, CPU availability, frame, cycle, stop reason, turbo, `mode=live\|inspector`, `focus_cycle`, window `start` / `start_arg1` |
+| `leave-inspector` | Leave Inspect and restore live NOW (does not auto-resume). Any session may call this. |
 | `get-cpu` | Text CPU snapshot |
 | `get-softswitches` | Latched soft-switch flags plus beam (not `$C0xx` memory) |
 | `get-frame` | Binary 560 x 192 ARGB frame |
@@ -1988,9 +1988,9 @@ flight recorder for the same moment.
 | `save-state <path>` | Write a `.a2state` snapshot |
 
 `get-state` is answered from the main loop's cached frontend debug state.
-While `mode=forensic` (time travel), `get-cpu` / `get-memory` / `get-frame` show the landed Apple
+While `mode=inspector` (time travel), `get-cpu` / `get-memory` / `get-frame` show the landed Apple
 (THEN). Mutating verbs (`run`, `set-memory`, `set-reg`, mount, reset, ...) fail
-with `error read-only-forensic`. `exit-forensic` restores live NOW and does not
+with `error read-only-inspector`. `leave-inspector` restores live NOW and does not
 resume execution.
 `get-frame` uses the latest completed frame cached by the main loop, or requests one
 if no cached frame exists yet.

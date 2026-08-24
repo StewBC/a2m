@@ -126,10 +126,10 @@ static void update_window_title(
         turbo_multiplier,
         state,
         stop_reason,
-        debug != NULL && debug->tm_forensic,
-        debug != NULL ? debug->tm_focus_cycle : 0u,
-        debug != NULL ? debug->tm_oldest_cycle : 0u,
-        debug != NULL ? debug->tm_newest_cycle : 0u);
+        debug != NULL && debug->inspecting,
+        debug != NULL ? debug->inspector_focus_cycle : 0u,
+        debug != NULL ? debug->inspector_oldest_cycle : 0u,
+        debug != NULL ? debug->inspector_newest_cycle : 0u);
     platform_window_set_title(window, title);
 }
 
@@ -1494,7 +1494,7 @@ static void apply_loaded_host_state(
         host.swap_buttons ? ", swap fire" : "");
 }
 
-static bool intent_mutates_in_forensic(frontend_debugger_intent_type type)
+static bool intent_mutates_in_inspect(frontend_debugger_intent_type type)
 {
     switch (type) {
     case FRONTEND_DEBUGGER_INTENT_REGISTER_SET_PC:
@@ -1518,7 +1518,7 @@ static bool intent_mutates_in_forensic(frontend_debugger_intent_type type)
     case FRONTEND_DEBUGGER_INTENT_DISK_ADD_DIALOG:
     case FRONTEND_DEBUGGER_INTENT_DISK_UNMOUNT:
     case FRONTEND_DEBUGGER_INTENT_CONFIG_APPLY:
-    case FRONTEND_DEBUGGER_INTENT_TM_SET_ENABLED:
+    case FRONTEND_DEBUGGER_INTENT_INSPECTOR_SET_ENABLED:
         return true;
     default:
         return false;
@@ -1532,13 +1532,13 @@ static void dispatch_intent(
     frontend_joystick_input *kbd_joystick,
     sdl_apple_controller_state *controllers,
     bool runtime_running,
-    bool forensic,
+    bool inspecting,
     const frontend_debugger_intent *intent)
 {
     if (client == NULL || intent == NULL) {
         return;
     }
-    if (forensic && intent_mutates_in_forensic(intent->type)) {
+    if (inspecting && intent_mutates_in_inspect(intent->type)) {
         return;
     }
 
@@ -1614,36 +1614,36 @@ static void dispatch_intent(
             frontend_clear_disk_activity_leds(ui);
         }
         break;
-    case FRONTEND_DEBUGGER_INTENT_TM_SET_ENABLED: {
+    case FRONTEND_DEBUGGER_INTENT_INSPECTOR_SET_ENABLED: {
         uint64_t token = runtime_client_alloc_request_token(client);
-        (void)runtime_client_tm_set_enabled(client, intent->enabled, token);
+        (void)runtime_client_inspector_set_enabled(client, intent->enabled, token);
         break;
     }
-    case FRONTEND_DEBUGGER_INTENT_TM_ENTER_FORENSIC: {
+    case FRONTEND_DEBUGGER_INTENT_INSPECTOR_ENTER: {
         uint64_t token = runtime_client_alloc_request_token(client);
-        (void)runtime_client_tm_enter_forensic(client, token);
+        (void)runtime_client_inspector_enter(client, token);
         (void)runtime_client_request_breakpoints(client);
         break;
     }
-    case FRONTEND_DEBUGGER_INTENT_TM_EXIT_FORENSIC: {
+    case FRONTEND_DEBUGGER_INTENT_INSPECTOR_LEAVE: {
         uint64_t token = runtime_client_alloc_request_token(client);
-        (void)runtime_client_tm_exit_forensic(client, token);
+        (void)runtime_client_inspector_leave(client, token);
         break;
     }
-    case FRONTEND_DEBUGGER_INTENT_TM_LAND: {
+    case FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND: {
         uint64_t token = runtime_client_alloc_request_token(client);
-        (void)runtime_client_tm_land(client, intent->tm_cycle, token);
+        (void)runtime_client_inspector_land(client, intent->inspector_cycle, token);
         break;
     }
-    case FRONTEND_DEBUGGER_INTENT_TM_PAUSE:
+    case FRONTEND_DEBUGGER_INTENT_INSPECTOR_PAUSE:
         (void)runtime_client_pause(client);
         break;
     case FRONTEND_DEBUGGER_INTENT_RUN:
         (void)runtime_client_run(client);
         break;
-    case FRONTEND_DEBUGGER_INTENT_TM_FRAME_STEP: {
+    case FRONTEND_DEBUGGER_INTENT_INSPECTOR_FRAME_STEP: {
         uint64_t token = runtime_client_alloc_request_token(client);
-        (void)runtime_client_tm_frame_step(
+        (void)runtime_client_inspector_frame_step(
             client, intent->enabled ? 1 : -1, token);
         break;
     }
@@ -2083,23 +2083,23 @@ static void apply_event_to_debug(
         debug->disk_motor_mask = event->data.machine_state.disk_motor_mask;
         memcpy(debug->slots, event->data.machine_state.slots, sizeof(debug->slots));
         debug->has_apple_flags = true;
-        debug->tm_forensic = event->data.machine_state.tm_mode != 0u;
-        debug->tm_enabled = event->data.machine_state.tm_enabled != 0u;
-        debug->tm_window_valid = event->data.machine_state.tm_window_valid != 0u;
-        debug->tm_history_recording =
-            event->data.machine_state.tm_history_recording != 0u;
-        debug->tm_frame_recording =
-            event->data.machine_state.tm_frame_recording != 0u;
-        debug->tm_recorder_recording =
-            event->data.machine_state.tm_recorder_recording != 0u;
-        debug->tm_stopped_for_max =
-            event->data.machine_state.tm_stopped_for_max != 0u;
-        debug->tm_window_start_kind = event->data.machine_state.tm_window_start_kind;
-        debug->tm_window_start_arg1 = event->data.machine_state.tm_window_start_arg1;
-        debug->tm_focus_cycle = event->data.machine_state.tm_focus_cycle;
-        debug->tm_focus_id = event->data.machine_state.tm_focus_id;
-        debug->tm_oldest_cycle = event->data.machine_state.tm_oldest_cycle;
-        debug->tm_newest_cycle = event->data.machine_state.tm_newest_cycle;
+        debug->inspecting = event->data.machine_state.inspector_mode != 0u;
+        debug->inspector_enabled = event->data.machine_state.inspector_enabled != 0u;
+        debug->inspector_window_valid = event->data.machine_state.inspector_window_valid != 0u;
+        debug->inspector_history_recording =
+            event->data.machine_state.inspector_history_recording != 0u;
+        debug->inspector_frame_recording =
+            event->data.machine_state.inspector_frame_recording != 0u;
+        debug->inspector_recorder_recording =
+            event->data.machine_state.inspector_recorder_recording != 0u;
+        debug->inspector_stopped_for_max =
+            event->data.machine_state.inspector_stopped_for_max != 0u;
+        debug->inspector_window_start_kind = event->data.machine_state.inspector_window_start_kind;
+        debug->inspector_window_start_arg1 = event->data.machine_state.inspector_window_start_arg1;
+        debug->inspector_focus_cycle = event->data.machine_state.inspector_focus_cycle;
+        debug->inspector_focus_id = event->data.machine_state.inspector_focus_id;
+        debug->inspector_oldest_cycle = event->data.machine_state.inspector_oldest_cycle;
+        debug->inspector_newest_cycle = event->data.machine_state.inspector_newest_cycle;
         /* Always refresh the CPU snapshot from machine state (c64m). */
         debug->cpu.pc = event->data.machine_state.pc;
         debug->cpu.a = event->data.machine_state.a;
@@ -2205,13 +2205,13 @@ static bool apply_options_to_runtime_config(const app_options *options, runtime_
         rt_config->history_memory_mb_configured = true;
     }
     rt_config->history_off_on_max = options->history_off_on_max;
-    rt_config->timemachine = options->timemachine;
-    if (options->timemachine_memory_mb > 0) {
-        rt_config->timemachine_memory_mb = (uint32_t)options->timemachine_memory_mb;
-        rt_config->timemachine_memory_mb_configured = true;
+    rt_config->inspector = options->inspector;
+    if (options->inspector_memory_mb > 0) {
+        rt_config->inspector_memory_mb = (uint32_t)options->inspector_memory_mb;
+        rt_config->inspector_memory_mb_configured = true;
     } else {
-        rt_config->timemachine_memory_mb = 0u;
-        rt_config->timemachine_memory_mb_configured = true;
+        rt_config->inspector_memory_mb = 0u;
+        rt_config->inspector_memory_mb_configured = true;
     }
 
     n = options->diskii_count;
@@ -2267,7 +2267,7 @@ int main(int argc, char **argv)
     runtime_stop_reason last_title_stop_reason = RUNTIME_STOP_REASON_NONE;
     uint32_t last_title_turbo = 0u;
     int last_title_model = -1;
-    bool last_title_forensic = false;
+    bool last_title_inspecting = false;
     uint64_t last_title_focus = 0u;
     /* Keep SDL text input off unless a UI field is focused (c64m / macOS). */
     bool text_input_active = false;
@@ -2651,7 +2651,7 @@ int main(int argc, char **argv)
                            frontend_input_has_option_modifier(&event.key)) {
                     /* Opt+Insert (and Opt+Shift+Insert): simple OS clipboard
                        paste into Apple $C000 via KBDSTRB feed (a2m-style). */
-                    if (!debug.tm_forensic) {
+                    if (!debug.inspecting) {
                         char *text = SDL_GetClipboardText();
                         if (text != NULL && text[0] != '\0') {
                             (void)runtime_client_paste_text(
@@ -2664,13 +2664,13 @@ int main(int argc, char **argv)
                     send_event_to_frontend = false;
                 } else if (!frontend_help_is_open(ui) &&
                            key_is_quick_assemble_shortcut(&event.key)) {
-                    if (!debug.tm_forensic) {
+                    if (!debug.inspecting) {
                         if (!frontend_trigger_assembler(ui)) {
                             SDL_Log("quick assemble: not queued (configure an assembler source)");
                         }
                     }
                     send_event_to_frontend = false;
-                } else if (!debug.tm_forensic &&
+                } else if (!debug.inspecting &&
                            frontend_joystick_consumes(&kbd_joystick, sym) &&
                            (!ui_visible || frontend_routes_keyboard_to_machine(ui)) &&
                            !frontend_help_is_open(ui)) {
@@ -2692,7 +2692,7 @@ int main(int argc, char **argv)
                 } else if (sym == SDLK_F8) {
                     /* F8 stands in for CTRL+RESET (macOS eats Control+F*).
                        Option+F8 = CTRL+Open-Apple+RESET (cold). Closed-Apple TBD. */
-                    if (!debug.tm_forensic) {
+                    if (!debug.inspecting) {
                         if (frontend_input_has_option_modifier(&event.key)) {
                             (void)runtime_client_cold_reset(client);
                         } else {
@@ -2731,12 +2731,12 @@ int main(int argc, char **argv)
                 } else if (frontend_help_is_open(ui)) {
                     send_event_to_frontend = true;
                 } else if (key_is_quicksave_shortcut(&event.key)) {
-                    if (!debug.tm_forensic) {
+                    if (!debug.inspecting) {
                         (void)send_quicksave(client, &options, ui);
                     }
                     send_event_to_frontend = false;
                 } else if (key_is_quickload_shortcut(&event.key)) {
-                    if (!debug.tm_forensic) {
+                    if (!debug.inspecting) {
                         (void)send_quickload(client, &options, ui);
                     }
                     send_event_to_frontend = false;
@@ -2762,7 +2762,7 @@ int main(int argc, char **argv)
                 } else if (ui_visible && frontend_handle_view_cycle_key(ui, &event.key)) {
                     send_event_to_frontend = false;
                 } else if (!ui_visible || frontend_routes_keyboard_to_machine(ui)) {
-                    if (!debug.tm_forensic) {
+                    if (!debug.inspecting) {
                         handle_keyboard_input(&input_mapper, client, &event.key);
                     }
                     send_event_to_frontend = false;
@@ -2770,7 +2770,7 @@ int main(int argc, char **argv)
             } else if (event.type == SDL_KEYUP &&
                        !frontend_help_is_open(ui) &&
                        (!ui_visible || frontend_routes_keyboard_to_machine(ui))) {
-                if (!debug.tm_forensic) {
+                if (!debug.inspecting) {
                     if (frontend_joystick_consumes(&kbd_joystick, event.key.keysym.sym)) {
                         joystick_handle_key_and_solid_apple(
                             &kbd_joystick, &controllers, client, &event.key);
@@ -3030,8 +3030,8 @@ int main(int argc, char **argv)
                 debug.stop_reason != last_title_stop_reason ||
                 debug.active_turbo_multiplier != last_title_turbo ||
                 model != last_title_model ||
-                debug.tm_forensic != last_title_forensic ||
-                debug.tm_focus_cycle != last_title_focus) {
+                debug.inspecting != last_title_inspecting ||
+                debug.inspector_focus_cycle != last_title_focus) {
                 update_window_title(
                     window,
                     app_model_label(model),
@@ -3043,8 +3043,8 @@ int main(int argc, char **argv)
                 last_title_stop_reason = debug.stop_reason;
                 last_title_turbo = debug.active_turbo_multiplier;
                 last_title_model = model;
-                last_title_forensic = debug.tm_forensic;
-                last_title_focus = debug.tm_focus_cycle;
+                last_title_inspecting = debug.inspecting;
+                last_title_focus = debug.inspector_focus_cycle;
                 title_set = true;
             }
         }
@@ -3077,7 +3077,7 @@ int main(int argc, char **argv)
                 &kbd_joystick,
                 &controllers,
                 debug.runtime_state == FRONTEND_RUNTIME_STATE_RUNNING,
-                debug.tm_forensic,
+                debug.inspecting,
                 &intent);
             if (intent.type == FRONTEND_DEBUGGER_INTENT_CONFIG_APPLY ||
                 intent.type == FRONTEND_DEBUGGER_INTENT_SAVE_INI_NOW) {

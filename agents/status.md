@@ -4,7 +4,7 @@
 
 **Rules:** [`rules.md`](rules.md)  
 **Closed:** paint; SP `$C800`; BP 0–4e + P4b TRON; remote-debug **C0–C5b**; control tools **T1–T5**; `get-softswitches`; **turbo-zip**; **max free-run S2**; **snapshots** ([`snapshots.md`](snapshots.md) — `.a2state` save/load, drop, `--sna`, Opt+Shift+./,); **sessions foundation** ([`sessions.md`](sessions.md) — multi-asker + `state-changed`; A2M/11).  
-**Active:** **TMA3 Landed** — max turbo remembers Record, wipes the tape, turns Record off; leave max restores Record into an empty window ([`TMA3.md`](TMA3.md)). Inspector is **time travel** ([`TMA0.md`](TMA0.md)): film / land / re-execute to **live**; one breakpoint list; Opt+Left unbound; HST1 FIND stays. TimeMachine V1 (TM0–TM4) accepted; TM4 Inspector UX superseded. F7 stays unbound. **Not going to TM6.** Lessons from retired F7: [`inspector.md`](inspector.md).  
+**Active:** **TMA3 Landed** — max turbo remembers Record, wipes the tape, turns Record off; leave max restores Record into an empty window ([`TMA3.md`](TMA3.md)). Inspector is **time travel** ([`TMA0.md`](TMA0.md)): film / land / re-execute to **live**; one breakpoint list; Opt+Left unbound; HST1 FIND stays. Inspector V1 (TM0–TM4) accepted; TM4 Inspector UX superseded. F7 stays unbound. **Not going to TM6.** Lessons from retired F7: [`inspector.md`](inspector.md).  
 **Look-later:** drop stored film? (TMA0 A11); debug ergonomics (mem workshop, live remount, frame gate / HW snaps). TM6 Promote/Branch is parked, not next.
 
 ---
@@ -19,7 +19,7 @@
 | Display | ARGB **560×192** throughout (`display_frame` / runtime slot / frontend) |
 | Video paint | Beam-stepped **560×192** a2m-class: LORES, DLORES, 40/80 text, HGR colour, DHGR; max uses full-frame block paint |
 | Memory areas | Map · Main · Aux · LC1 · LC2 · ROM |
-| Control port | **A2M/12 product-wired** (A2M/11 + forensic `mode`/`exit-forensic`/`read-only-forensic` + forensic `state-changed` reasons). Epic: [`remote-debug.md`](remote-debug.md) · [`sessions.md`](sessions.md) · [`TM3.md`](TM3.md) |
+| Control port | **A2M/13 product-wired** (A2M/12 + Inspector names: `mode=live\|inspector`, `leave-inspector`, `read-only-inspector`, `inspector-*` `state-changed` reasons, capability `inspector`). Epic: [`remote-debug.md`](remote-debug.md) · [`sessions.md`](sessions.md). |
 | Snapshots | **`.a2state`** path save/load — drop, `--sna`, Opt+Shift+`.`/`,`, control. Epic: [`snapshots.md`](snapshots.md) |
 | Machine files | Misc → Machine unified Load/Save: snapshots, raw/NAPS/AppleSingle/legacy DOS binaries, Applesoft ASCII import/export |
 

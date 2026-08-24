@@ -48,11 +48,11 @@ typedef struct runtime_config {
     bool history_off_on_max;
     uint32_t frame_ring_memory_mb;
     bool frame_ring_memory_mb_configured;
-    /* TimeMachine master enable (default off). Off→on arms HST1 + frame ring. */
-    bool timemachine;
+    /* Inspector master enable (default off). Off→on arms HST1 + frame ring. */
+    bool inspector;
     /* Checkpoint-ring budget in MiB (consumed in TM2). */
-    uint32_t timemachine_memory_mb;
-    bool timemachine_memory_mb_configured;
+    uint32_t inspector_memory_mb;
+    bool inspector_memory_mb_configured;
 
     /* Apple-specific */
     int apple_model; /* 0=//e enh, 1=][+ */

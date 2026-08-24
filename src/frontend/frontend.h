@@ -46,20 +46,20 @@ typedef struct frontend_debug_state {
     uint8_t disk_motor_mask;
     runtime_slot_snapshot slots[RUNTIME_APPLE_SLOT_COUNT];
     bool has_apple_flags;
-    /* TimeMachine (TM3/TM4) — copied from machine_state. */
-    bool tm_forensic;
-    bool tm_enabled;
-    bool tm_window_valid;
-    bool tm_history_recording;
-    bool tm_frame_recording;
-    bool tm_recorder_recording;
-    bool tm_stopped_for_max;
-    uint8_t tm_window_start_kind;
-    uint32_t tm_window_start_arg1;
-    uint64_t tm_focus_cycle;
-    uint64_t tm_focus_id;
-    uint64_t tm_oldest_cycle;
-    uint64_t tm_newest_cycle;
+    /* Inspector — copied from machine_state. */
+    bool inspecting;
+    bool inspector_enabled;
+    bool inspector_window_valid;
+    bool inspector_history_recording;
+    bool inspector_frame_recording;
+    bool inspector_recorder_recording;
+    bool inspector_stopped_for_max;
+    uint8_t inspector_window_start_kind;
+    uint32_t inspector_window_start_arg1;
+    uint64_t inspector_focus_cycle;
+    uint64_t inspector_focus_id;
+    uint64_t inspector_oldest_cycle;
+    uint64_t inspector_newest_cycle;
 } frontend_debug_state;
 
 const char *frontend_runtime_state_name(frontend_runtime_state state);
@@ -127,12 +127,12 @@ typedef enum frontend_debugger_intent_type {
     FRONTEND_DEBUGGER_INTENT_MEDIA_SWAP,
     FRONTEND_DEBUGGER_INTENT_BOOT_SLOT,
     FRONTEND_DEBUGGER_INTENT_SET_DISPLAY_OVERRIDE,
-    FRONTEND_DEBUGGER_INTENT_TM_SET_ENABLED,
-    FRONTEND_DEBUGGER_INTENT_TM_ENTER_FORENSIC,
-    FRONTEND_DEBUGGER_INTENT_TM_EXIT_FORENSIC,
-    FRONTEND_DEBUGGER_INTENT_TM_LAND,
-    FRONTEND_DEBUGGER_INTENT_TM_PAUSE,
-    FRONTEND_DEBUGGER_INTENT_TM_FRAME_STEP,
+    FRONTEND_DEBUGGER_INTENT_INSPECTOR_SET_ENABLED,
+    FRONTEND_DEBUGGER_INTENT_INSPECTOR_ENTER,
+    FRONTEND_DEBUGGER_INTENT_INSPECTOR_LEAVE,
+    FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND,
+    FRONTEND_DEBUGGER_INTENT_INSPECTOR_PAUSE,
+    FRONTEND_DEBUGGER_INTENT_INSPECTOR_FRAME_STEP,
     FRONTEND_DEBUGGER_INTENT_RUN
 } frontend_debugger_intent_type;
 
@@ -199,8 +199,8 @@ typedef struct frontend_debugger_intent {
     /* File browser result */
     frontend_debugger_intent_type file_browser_purpose;
     char file_browser_path[1024];
-    /* TimeMachine Inspector tab */
-    uint64_t tm_cycle;
+    /* Inspector tab */
+    uint64_t inspector_cycle;
 } frontend_debugger_intent;
 
 typedef enum frontend_machine_file_kind {

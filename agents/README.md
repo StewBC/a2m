@@ -24,7 +24,7 @@ Siblings (not submodules): `../a2m` (Apple domain / paint reference),
 | 3 | **[`testing.md`](testing.md)** | Build + ctest gate |
 | 4 | **[`snapshots.md`](snapshots.md)** | Closed: machine save/load (c64m port) |
 | 5 | **[`remote-debug.md`](remote-debug.md)** | Closed epic: control / frame ring / history wire |
-| 6 | **[`control-tools.md`](control-tools.md)** | **Drive a2m over the control port** (A2M/12 ops brief) |
+| 6 | **[`control-tools.md`](control-tools.md)** | **Drive a2m over the control port** (A2M/13 ops brief) |
 | 7 | **[`turbo-zip.md`](turbo-zip.md)** | Closed: Zip MHz + max block paint |
 | 8 | **[`sessions.md`](sessions.md)** | Closed foundation: multi-asker sessions + state-changed |
 | 9 | **[`inspector.md`](inspector.md)** | **Retired F7 spine:** lessons only (join key, unified disasm) — no live code |
@@ -55,7 +55,7 @@ Open the component note only when the task touches that area:
 | `snapshots.md` | Closed: machine save/load — c64m reuse + Apple payload |
 | `turbo-zip.md` | Closed: Zip MHz ladder + max presentation (block) paint |
 | `max-free-run.md` | Closed: instruction-quanta free-run (S2) + 60 Hz block paint |
-| `control-tools.md` | Agent ops: control-port scripting via `Ctl` + coop_watch (A2M/12) |
+| `control-tools.md` | Agent ops: control-port scripting via `Ctl` + coop_watch (A2M/13) |
 | `remote-debug.md` | Closed epic record: control/history/frame-ring wire |
 | `sessions.md` | Closed foundation: runtime sessions + state-changed |
 | `inspector.md` | Retired F7 Inspector: lessons kept, code archived at `archive/f7-inspector` |

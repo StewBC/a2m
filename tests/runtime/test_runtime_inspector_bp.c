@@ -4,7 +4,7 @@
 #include "runtime_client.h"
 #include "runtime_event.h"
 #include "runtime_internal.h"
-#include "runtime_timemachine.h"
+#include "runtime_inspector.h"
 
 #include <SDL.h>
 #include <stdio.h>
@@ -63,9 +63,9 @@ int main(void)
 
     runtime_config_init(&config);
     config.start_running = false;
-    config.timemachine = true;
-    config.timemachine_memory_mb = 16;
-    config.timemachine_memory_mb_configured = true;
+    config.inspector = true;
+    config.inspector_memory_mb = 16;
+    config.inspector_memory_mb_configured = true;
     config.history_memory_mb = 16;
     config.history_memory_mb_configured = true;
     config.frame_ring_memory_mb = 8;
@@ -90,16 +90,16 @@ int main(void)
 
     target_pc = rt->machine.cpu.cpu.pc;
     token = runtime_client_alloc_request_token(client);
-    expect_true("enter", runtime_client_tm_enter_forensic(client, token));
+    expect_true("enter", runtime_client_inspector_enter(client, token));
     {
         clock_t t0 = clock();
-        while (!runtime_tm_in_forensic(rt) &&
+        while (!runtime_inspector_inspecting(rt) &&
             (double)(clock() - t0) / (double)CLOCKS_PER_SEC < 2.0) {
             SDL_Delay(1);
         }
     }
-    expect_true("forensic", runtime_tm_in_forensic(rt));
-    runtime_tm_timeline_bounds(rt, &old, &live, &n);
+    expect_true("inspecting", runtime_inspector_inspecting(rt));
+    runtime_inspector_timeline_bounds(rt, &old, &live, &n);
     expect_true("timeline", n >= 1u);
 
     memset(&def, 0, sizeof(def));
@@ -118,7 +118,7 @@ int main(void)
     if (live > old + 4000u) {
         old = live - 4000u;
     }
-    expect_true("land near live", runtime_client_tm_land(client, old, token));
+    expect_true("land near live", runtime_client_inspector_land(client, old, token));
     {
         clock_t t0 = clock();
         while (apple2_cycles(&rt->machine) > old &&
@@ -128,7 +128,7 @@ int main(void)
     }
     drain(client);
     expect_true("landed before live", apple2_cycles(&rt->machine) <= old);
-    expect_true("not at live after land", !runtime_tm_at_live(rt));
+    expect_true("not at live after land", !runtime_inspector_at_live(rt));
 
     expect_true("run-until", runtime_client_run(client));
     {
@@ -140,21 +140,21 @@ int main(void)
     }
     drain(client);
     expect_true("stopped", rt->exec_state != RUNTIME_EXEC_RUNNING);
-    expect_true("still time travel", runtime_tm_in_forensic(rt));
+    expect_true("still time travel", runtime_inspector_inspecting(rt));
     expect_true("hit pc or live",
-        rt->machine.cpu.cpu.pc == target_pc || runtime_tm_at_live(rt));
+        rt->machine.cpu.cpu.pc == target_pc || runtime_inspector_at_live(rt));
     expect_true("list unchanged", rt->breakpoint_count == live_count);
 
     token = runtime_client_alloc_request_token(client);
-    expect_true("leave", runtime_client_tm_exit_forensic(client, token));
+    expect_true("leave", runtime_client_inspector_leave(client, token));
     {
         clock_t t0 = clock();
-        while (runtime_tm_in_forensic(rt) &&
+        while (runtime_inspector_inspecting(rt) &&
                (double)(clock() - t0) / (double)CLOCKS_PER_SEC < 2.0) {
             SDL_Delay(1);
         }
     }
-    expect_true("left inspect", !runtime_tm_in_forensic(rt));
+    expect_true("left inspect", !runtime_inspector_inspecting(rt));
     expect_true("list survives leave", rt->breakpoint_count == live_count);
 
     runtime_stop(rt);

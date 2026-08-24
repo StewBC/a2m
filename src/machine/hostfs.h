@@ -19,7 +19,7 @@
 typedef struct hostfs_volume hostfs_volume;
 struct apple2;
 
-/* Bind the owning Apple + slot/device so media events can reach TimeMachine. */
+/* Bind the owning Apple + slot/device so media events can reach Inspector. */
 void hostfs_bind_apple(hostfs_volume *vol, struct apple2 *m, int slot, int device);
 
 bool hostfs_path_is_dir(const char *path);

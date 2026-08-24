@@ -11,7 +11,7 @@ enum {
 };
 
 /* Product wire identity. Bump when scripts must learn new behaviour. */
-#define CONTROL_PROTOCOL_VERSION "A2M/12"
+#define CONTROL_PROTOCOL_VERSION "A2M/13"
 #define CONTROL_PROTOCOL_APP_NAME "a2m"
 
 typedef enum control_command_type {
@@ -69,7 +69,7 @@ typedef enum control_command_type {
     CONTROL_COMMAND_HISTORY_CLOSE,
     CONTROL_COMMAND_ASSEMBLE,
     CONTROL_COMMAND_FIND_SYMBOL,
-    CONTROL_COMMAND_EXIT_FORENSIC
+    CONTROL_COMMAND_LEAVE_INSPECTOR
 } control_command_type;
 
 typedef enum control_memory_mode {
