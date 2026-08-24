@@ -4,10 +4,11 @@
 
 | File | Role |
 |------|------|
-| `src/machine/video.h` / `video.c` | Beam, scanner, paint, floating bus |
+| `src/machine/video.h` / `video.c` | Beam, scanner, paint, floating bus; `apple2_video_pixel_address` |
 | `src/machine/display_frame.h` | Host frame contract (static-asserted to `APPLE2_VIDEO_*`) |
 | `tests/machine/test_video_beam.c` | Timing + mode coverage |
 | `tests/machine/test_video_block_paint.c` | Full-frame block paint |
+| `tests/machine/test_video_pixel_address.c` | Soft-switch-locked (flags, px, py) → bank/ofs/adr |
 
 ## Timing (NTSC Φ0)
 
@@ -56,8 +57,17 @@ actual machine state. On debugger stop: Override on dumps that page and
 publishes; Override off publishes the **beam buffer** so a mid-frame mode
 switch stays visible.
 
+## Pixel address probe
+
+`apple2_video_pixel_address(flags, px, py, out)` maps a host pixel (560×192) to
+`bank_base` / `offset` / `host_addr` / `from_aux` using soft switches locked at
+pause (or Override presentation flags). Covers text40/80, LORES, DLORES, HGR,
+DHGR, and MIXED bottom text. Aux uses the video plane convention `+0x10000`.
+Not per-scanline; mid-frame raster mode changes can disagree with the status
+line. Frontend: Machine Display bottom band while paused and hovering.
+
 ## Tests
 
 VBL, floating bus varies by column, mid-frame PAGE2, boot paints pixels —
-`video_beam`. Block path — `video_block_paint`. Stop-path CRT —
-`runtime_display_stop`.
+`video_beam`. Block path — `video_block_paint`. Pixel address decode —
+`video_pixel_address`. Stop-path CRT — `runtime_display_stop`.

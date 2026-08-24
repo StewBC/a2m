@@ -248,6 +248,26 @@ view to make it active, or press **Opt+Tab** to cycle Apple 2 -> Disassembly -> 
 Memory. Press **Shift+Opt+Tab** to cycle in reverse. Modal dialogs keep input to
 themselves, so these view-cycling keys do not work while a dialog is open.
 
+### Machine Display pixel address
+
+While the machine is **paused** (debugger stop or Inspector), hover the Apple picture in
+the Machine Display pane. The unused strip under the picture shows the soft-switch-locked
+RAM address that produced that host pixel, for example:
+
+```text
+bank: $2000 ofs: $0202 adr: $2202
+```
+
+Auxiliary-sourced pixels (80-column, DHGR, DLORES half-columns, and 80STORE+PAGE2 pages)
+are marked with `aux` and a host address above `$10000` (for example `adr: $102202`).
+
+The decode uses soft switches frozen at pause. If Hardware **Override** is on, it uses the
+override display flags (what is painted) instead. MIXED bottom text rows are handled from
+those flags. Mid-frame mode changes elsewhere in the visible frame can disagree with the
+status line; that is accepted. True Aspect Ratio on or off is fine. CRT Curvature is
+accounted for; outside the curved glass shows no address. The probe is blank while the
+machine is running, and blank when the cursor is not over the picture.
+
 ### Layout
 
 Two splitters divide the debug layout:
