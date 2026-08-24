@@ -3201,15 +3201,33 @@ static void frontend_draw_display_placeholder(
     struct nk_rect bounds,
     const frontend_debug_state *debug_state)
 {
+    /* Status band inside content (padding zeroed). Outer bounds.h-52 left the
+       text below the window clip once title + default padding ate the slack. */
+    enum { DISPLAY_STATUS_BAND_H = 24 };
+
     if (nk_begin(ui->ctx, "Machine Display", bounds, pane_flags)) {
+        struct nk_style_window saved_window_style = ui->ctx->style.window;
+        struct nk_rect content;
         struct nk_rect canvas_bounds;
+        struct nk_rect status_bounds;
         struct nk_command_buffer *canvas;
         struct nk_rect image_bounds;
         bool have_image_bounds = false;
         char status[80];
         int status_len = 0;
+        float image_h;
 
-        nk_layout_row_dynamic(ui->ctx, bounds.h - 52.0f, 1);
+        ui->ctx->style.window.padding = nk_vec2(0.0f, 0.0f);
+        ui->ctx->style.window.spacing = nk_vec2(0.0f, 0.0f);
+        ui->ctx->style.window.group_padding = nk_vec2(0.0f, 0.0f);
+
+        content = nk_window_get_content_region(ui->ctx);
+        image_h = content.h - (float)DISPLAY_STATUS_BAND_H;
+        if (image_h < 1.0f) {
+            image_h = 1.0f;
+        }
+
+        nk_layout_row_dynamic(ui->ctx, image_h, 1);
         canvas_bounds = nk_widget_bounds(ui->ctx);
         canvas = nk_window_get_canvas(ui->ctx);
         nk_fill_rect(canvas, canvas_bounds, 0.0f,
@@ -3323,14 +3341,18 @@ static void frontend_draw_display_placeholder(
             }
         }
 
+        nk_layout_row_dynamic(ui->ctx, (float)DISPLAY_STATUS_BAND_H, 1);
+        status_bounds = nk_widget_bounds(ui->ctx);
         if (status_len > 0) {
+            float text_y = status_bounds.y +
+                (status_bounds.h - ui->ctx->style.font->height) * 0.5f;
             nk_draw_text(
                 canvas,
                 nk_rect(
-                    canvas_bounds.x + 8.0f,
-                    canvas_bounds.y + canvas_bounds.h + 10.0f,
-                    canvas_bounds.w - 16.0f,
-                    20.0f),
+                    status_bounds.x + 8.0f,
+                    text_y,
+                    status_bounds.w - 16.0f,
+                    ui->ctx->style.font->height),
                 status,
                 status_len,
                 ui->ctx->style.font,
@@ -3343,6 +3365,7 @@ static void frontend_draw_display_placeholder(
         if (!frontend_any_dialog_open(ui) && ui->active_view == FRONTEND_ACTIVE_VIEW_MACHINE) {
             frontend_draw_active_view_border(ui->ctx);
         }
+        ui->ctx->style.window = saved_window_style;
     }
     nk_end(ui->ctx);
 }

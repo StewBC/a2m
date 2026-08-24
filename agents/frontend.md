@@ -27,11 +27,12 @@ Intents (`FRONTEND_DEBUGGER_INTENT_*`) are dispatched in `main.c` onto
 Panes: Apple display, registers, disassembly, memory (splitable), misc.
 Opt+Tab cycles Apple2 → Disassembly → Misc → Memory (when F9 is up).
 
-Machine Display keeps `bounds.h - 52` for the picture and leaves the bottom band for
-status. While **paused** (or inspecting), hover over the picture shows a soft-switch-locked
-pixel address (`apple2_video_pixel_address`) in that band; blank when running or not
-hovering. Override display flags win when Override is on. CRT curvature uses
-`frontend_crt_mouse_to_pixel` (shared barrel with paint).
+Machine Display zeroes window padding/spacing (like Memory/Disassembly), lays out the
+picture from the content region minus a fixed status band, and draws the probe in that
+band. While **paused** (or inspecting), hover over the picture shows a soft-switch-locked
+pixel address (`apple2_video_pixel_address`); blank when running or not hovering. Override
+display flags win when Override is on. CRT curvature uses `frontend_crt_mouse_to_pixel`
+(shared barrel with paint).
 
 Misc tabs: Machine | Debugger | Breakpoints | Hardware | Assembler | Inspector.
 
