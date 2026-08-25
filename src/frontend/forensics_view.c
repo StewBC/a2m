@@ -55,6 +55,8 @@ void forensics_view_clear_transcript(frontend_forensics_state *state)
     state->selected_cycle = 0u;
     state->selected_id = 0u;
     state->line_truncated = false;
+    state->transcript_scroll_y = 0u;
+    state->pending_scroll_restore = true;
     forensics_view_set_status(state, "transcript cleared");
 }
 
@@ -87,6 +89,7 @@ void forensics_view_open(
     state->request_host_pause = true;
     state->request_submit = false;
     state->query_rewrite_pending = false;
+    state->pending_scroll_restore = true;
     state->land_confirm_open = false;
     state->land_confirm_exact = false;
     state->request_land = false;
@@ -2177,6 +2180,13 @@ void forensics_view_render(
         ctx->style.window.fixed_background = nk_style_item_color(fr_bg);
         nk_layout_row_dynamic(ctx, content_h, 1);
         if (nk_group_begin(ctx, "ForensicsTranscript", 0)) {
+            nk_uint scroll_x = 0u;
+            nk_uint scroll_y = 0u;
+            if (state->pending_scroll_restore) {
+                nk_group_set_scroll(
+                    ctx, "ForensicsTranscript", 0u, state->transcript_scroll_y);
+                state->pending_scroll_restore = false;
+            }
             if (state->display_count == 0u && state->logical_count == 0u) {
                 nk_layout_row_dynamic(ctx, 18.0f, 1);
                 nk_label_colored(
@@ -2247,6 +2257,8 @@ void forensics_view_render(
                     }
                 }
             }
+            nk_group_get_scroll(ctx, "ForensicsTranscript", &scroll_x, &scroll_y);
+            state->transcript_scroll_y = scroll_y;
             nk_group_end(ctx);
         }
 

@@ -68,6 +68,9 @@ typedef struct frontend_forensics_state {
     bool request_submit; /* Query Enter → frontend parses + pushes intent */
     bool line_truncated; /* last format hit FORMAT_CAP */
     bool query_rewrite_pending; /* Tab rewrote query; re-focus + caret to end */
+    /* Transcript group scroll (HelpContent pattern): survive leave/return. */
+    nk_uint transcript_scroll_y;
+    bool pending_scroll_restore;
     /* Land Inspector: quantized (before) and exact (PR6). */
     bool land_confirm_open; /* Inspect & Land popup */
     bool land_confirm_exact; /* confirm is for Land exact */

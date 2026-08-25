@@ -654,7 +654,11 @@ Fuzz find-option strings in shared parse tests.
 - **Title:** `frontend: Forensics full-window mode (shell)`
 - **Files:** `frontend.*` / optional `forensics_view.*`, `main.c` (Opt+R, Help mutual exclusion, Esc)
 - **Dependencies:** none functionally; after PR 1 decision preferred for status copy
-- **Description:** Open/close; layout; Clear view; query edit + history UI-only; **no Help auto-pause**; Opt+R toggle; Inspector button. Copy button can stub until PR 4 has lines.
+- **Checklist:**
+  - [x] Open/close; layout; Clear view; query edit + history UI-only
+  - [x] **no Help auto-pause**; Opt+R toggle; Inspector button
+  - [x] Transcript group scroll survives leave/return *(post-land addendum for c64m)*: Nuklear drops group offset when the window is not drawn. Store `transcript_scroll_y` each frame via `nk_group_get_scroll`; on open set `pending_scroll_restore` and `nk_group_set_scroll` at group begin (same pattern as Help `section_scroll_y`). Clear view resets scroll to 0 and re-arms restore. Do not invent a new PR for this — it belongs with the shell.
+- **Description:** Open/close; layout; Clear view; query edit + history UI-only; **no Help auto-pause**; Opt+R toggle; Inspector button. Copy button can stub until PR 4 has lines. When porting the shell to c64m, include the transcript scroll preserve/restore above or Opt+R will always snap the scrollbar to the top.
 
 ### PR 4 — FIND / NEXT / READ + main.c HISTORY path
 

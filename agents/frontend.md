@@ -102,12 +102,15 @@ on enter. **Opt+R** / **Close** return to the entry surface (CRT restores prior
 run state if it was running; debugger stays paused). **F9** always opens the
 debugger paused. **Esc** does not leave Forensics. Mutually exclusive with Help.
 Query line → `HISTORY_*` intents → `main.c` claim/decode → transcript (session 0;
-`history_close` on exit). The query line is **verb-first** (`find` / `next` /
-`read` / `info`); bare `key=value` is not FIND (status = verb help, same string
-as Tab). Control-port `history-find` still accepts bare keys. Tab is a grammar
-walker: unique-complete the expected terminal or print that hole's ASCII help;
-with the caret at end, unique-expand every token. Find keys/values come from
-`runtime_history_find_option_keys()` / access names (no parallel list, no LCP).
+`history_close` on exit). Transcript group scroll is kept in
+`transcript_scroll_y` and restored on re-open (same idea as Help
+`section_scroll_y`); Clear view resets it. The query line is **verb-first**
+(`find` / `next` / `read` / `info`); bare `key=value` is not FIND (status =
+verb help, same string as Tab). Control-port `history-find` still accepts bare
+keys. Tab is a grammar walker: unique-complete the expected terminal or print
+that hole's ASCII help; with the caret at end, unique-expand every token. Find
+keys/values come from `runtime_history_find_option_keys()` / access names (no
+parallel list, no LCP).
 **Land before** / **Land exact** (selected hit): quantized checkpoint ≤ N vs
 `land_to_cycle`. Live + can enter → **Inspect & Land** confirm then ENTER+land;
 soft-fail without checkpoints. On successful land (any Inspect focus update used

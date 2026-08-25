@@ -620,6 +620,93 @@ static void test_tab_autocomplete_cursor(void)
     nk_free(&ctx);
 }
 
+/* Leave/return must restore the transcript group scrollbar (Help pattern).
+ * nk_group_set/get_scroll need ctx->current, so assert via state.transcript_scroll_y
+ * which render updates from the live group each frame. */
+static void test_transcript_scroll_restore(void)
+{
+    struct nk_context ctx;
+    struct nk_user_font font;
+    frontend_forensics_state state;
+    frontend_forensics_land_context land;
+    runtime_history_record records[1];
+    runtime_history_rpc_meta meta;
+    bool anchors[1] = {true};
+    const nk_uint want_y = 240u;
+    unsigned i;
+
+    memset(&font, 0, sizeof(font));
+    font.userdata = nk_handle_ptr(NULL);
+    font.height = 12.0f;
+    font.width = test_font_width;
+    expect_true("nk init scroll", nk_init_default(&ctx, &font) != 0);
+
+    forensics_view_init(&state);
+    forensics_view_open(&state, FRONTEND_FORENSICS_ENTRY_DEBUGGER, false);
+    memset(&land, 0, sizeof(land));
+    expect_true("open pending scroll", state.pending_scroll_restore);
+
+    for (i = 0u; i < 40u; ++i) {
+        fill_instruction(&records[0], 7u);
+        records[0].id = 1000u + i;
+        records[0].machine_cycle = 2000u + i;
+        memset(&meta, 0, sizeof(meta));
+        meta.status = RUNTIME_HISTORY_RPC_OK;
+        meta.epoch = 7u;
+        meta.count = 1u;
+        meta.cursor = records[0].id;
+        meta.more = 0u;
+        meta.oldest = 1u;
+        meta.newest = records[0].id;
+        forensics_view_apply_result(
+            &state,
+            1,
+            "find address=$C000",
+            &meta,
+            records,
+            1u,
+            anchors);
+    }
+    expect_true("tall transcript", state.display_count > 60u);
+
+    nk_input_begin(&ctx);
+    nk_input_end(&ctx);
+    forensics_view_render(&ctx, &state, 900, 600, &land);
+    expect_true("scroll restore consumed", !state.pending_scroll_restore);
+    expect_true("starts at top", state.transcript_scroll_y == 0u);
+    nk_clear(&ctx);
+
+    /* Simulate a user scroll that was stored before leave. */
+    state.transcript_scroll_y = want_y;
+    forensics_view_close(&state);
+    forensics_view_open(&state, FRONTEND_FORENSICS_ENTRY_DEBUGGER, false);
+    expect_true("reopen pending", state.pending_scroll_restore);
+    expect_true("scroll kept across close", state.transcript_scroll_y == want_y);
+
+    nk_input_begin(&ctx);
+    nk_input_end(&ctx);
+    forensics_view_render(&ctx, &state, 900, 600, &land);
+    expect_true("scroll restored", state.transcript_scroll_y == want_y);
+    expect_true("pending cleared", !state.pending_scroll_restore);
+    nk_clear(&ctx);
+
+    /* Second open without changing scroll must keep the same offset. */
+    forensics_view_close(&state);
+    forensics_view_open(&state, FRONTEND_FORENSICS_ENTRY_DEBUGGER, false);
+    nk_input_begin(&ctx);
+    nk_input_end(&ctx);
+    forensics_view_render(&ctx, &state, 900, 600, &land);
+    expect_true("scroll sticky", state.transcript_scroll_y == want_y);
+    nk_clear(&ctx);
+
+    forensics_view_clear_transcript(&state);
+    expect_true("clear resets scroll", state.transcript_scroll_y == 0u);
+    expect_true("clear pending restore", state.pending_scroll_restore);
+
+    forensics_view_close(&state);
+    nk_free(&ctx);
+}
+
 int main(void)
 {
     test_shell();
@@ -630,6 +717,7 @@ int main(void)
     test_land_focus_status();
     test_query_guide();
     test_tab_autocomplete_cursor();
+    test_transcript_scroll_restore();
     printf("ok\n");
     return 0;
 }
