@@ -21,14 +21,19 @@ This design replaces the **storage, scan, and refresh layers** of
 `src/machine/hostfs.c` so a HostFS folder can represent any volume ProDOS itself can
 represent: 51 entries in the volume directory (the architectural ProDOS limit),
 effectively unbounded entries per subdirectory, and up to the ~65535-block ceiling of
-a 32 MB volume — at a worst case cost of roughly **4.75 MB** rather than the 68 MB the
-current node layout would demand at that scale.
+a 32 MB volume — at a worst-case **node-and-name cost of roughly 4.75 MB** rather
+than the 68 MB the current node layout would demand at that scale. The direct block
+index and initial watcher queue add about 256 KB each; directory blocks, the block
+map, and platform watch state scale with the content actually present.
 
 Refresh is part of the mission, not an optimization on top of it. The once-per-second
 rescan currently walks every file at every depth; at 60,000 nodes that is 60,000
 `stat` calls per second under guest I/O. Lifting the node cap without fixing it yields
-a volume that mounts and then crawls, so the directory-mtime skip is a required phase.
-The target is **usable**, not merely enumerable.
+a volume that mounts and then crawls. Refresh therefore becomes **event-driven**:
+native host filesystem notifications identify the path that changed, HostFS verifies
+that path against the filesystem, and only the affected node or parent directory is
+reconciled. A healthy watcher does no scan at all while the host tree is idle. The
+target is **usable**, not merely enumerable.
 
 The reconciliation layer (guest-side create / rename / delete / cross-directory move
 propagating back to real host files) is **preserved**, not rewritten.
@@ -47,6 +52,7 @@ propagating back to real host files) is **preserved**, not rewritten.
 | Volume struct | measured | `sizeof(hostfs_volume)` = **345200 B (337 KB)**, allocated whether the folder holds 3 files or 256 |
 | Block map | [`hostfs.c:109`](../src/machine/hostfs.c) | `map` / `map_count` / `map_cap` — **already dynamic** |
 | Mount scan | [`hostfs_scan_dir_recursive`](../src/machine/hostfs.c) | Depth-first; `if (vol->file_slots >= HOSTFS_MAX_FILES) break;` — **silent** |
+| Refresh | [`hostfs_maybe_refresh`](../src/machine/hostfs.c) | Once per second under guest I/O, full-tree `readdir` + `stat` walk |
 | Scan buffers | [`hostfs.c:1824`](../src/machine/hostfs.c), [`2937`](../src/machine/hostfs.c) | `calloc(HOSTFS_MAX_FILES, sizeof(hostfs_scan_ent))`, 1320 B/entry, **per recursion level** |
 | Reconcile buffers | [`hostfs.c:2350`](../src/machine/hostfs.c), [`2355`](../src/machine/hostfs.c) | `dent ents[HOSTFS_MAX_FILES]` and `bool seen[…]` — **on the stack** |
 | Other fixed arrays | [`1621`](../src/machine/hostfs.c), [`3021`](../src/machine/hostfs.c), [`123`](../src/machine/hostfs.c) | `used[]`, `matched[]` (stack); `order_basenames[MAX][256]` (64 KB, root-only in practice) |
@@ -103,9 +109,9 @@ There is no 256 anywhere in ProDOS. The current cap is invented.
 1. Mount any folder that can legally be a ProDOS volume: 51 root entries, unbounded
    subdirectory entries, up to the volume block ceiling.
 2. Pay for what is present. A 3-file folder must not allocate for 65535.
-3. Keep the once-per-second refresh proportional to the number of **directories**, not
-   the number of files. A volume that mounts must also stay usable while the guest is
-   doing disk I/O.
+3. Make idle refresh **O(1)**: when the host tree has not changed, do no `readdir` and
+   no `stat`. A host create, modify, rename, or delete must reconcile only the affected
+   path or parent directory, normally before the next guest disk operation completes.
 4. Enforce the ProDOS volume-directory limit (51) rather than inventing an extension.
 5. Never drop an entry silently — every drop, cap, or rename gets a stderr line.
    (Non-NAPS host files are the one deliberate exception; see Decided.)
@@ -224,9 +230,12 @@ and call this first. That is the widest mechanical change in the work.
 | Proposed `hostfs_node` | 56 | 2.8 KB | 0.22 MB | **3.50 MB** |
 | + name arena (~20 B avg) | — | +1 KB | +0.08 MB | **+1.25 MB** |
 
-Worst case for a maximally-full 32 MB volume: **≈ 4.75 MB**, and only when the volume
-actually holds that many files. A three-file folder costs roughly 200 bytes plus the
-initial 16-slot table.
+Worst-case node-and-name storage for a maximally-full 32 MB volume: **≈ 4.75 MB**,
+and only when the volume actually holds that many files. The fixed direct block index
+adds 256 KB, and the initial watcher queue adds roughly another 256 KB; block-map
+entries, synthesized directory blocks, and platform watch state are accounted
+separately because they depend on the actual tree. A three-file folder needs only the
+initial 16-slot node table and a small name arena rather than a maximum-sized table.
 
 ### Volume directory — 51, absolute
 
@@ -248,7 +257,7 @@ stops consulting it. Two consequences to keep in view:
   old floating value.
 - Every directory block is an eager `malloc(HOSTFS_BLOCK_SIZE)` in
   [`hostfs_map_add_ram`](../src/machine/hostfs.c), so the floor costs 512 B of host
-  RAM per non-empty subdirectory. Immaterial per directory; include it in PR 6's
+  RAM per non-empty subdirectory. Immaterial per directory; include it in PR 7's
   memory accounting for a tree with thousands of them.
 
 ### `hostfs.order` while the root is over the limit
@@ -409,13 +418,13 @@ and exact:
 int32_t *block_to_map;   /* HOSTFS_TOTAL_BLOCKS + 1 entries, -1 = unmapped */
 ```
 
-256 KB, allocated once at mount — nothing beside the 4.75 MB node budget — and lookup
+256 KB, allocated once at mount in addition to the node-and-name budget, and lookup
 becomes a single load. The index is maintained wherever `map` is inserted into,
 removed from, or reordered; `hostfs_eject` frees it. Binary search over a sorted map
 is the alternative, but it needs maintenance on every insert for no memory saving
 worth having.
 
-### Refresh cost at scale
+### Event-driven refresh at scale
 
 This and block lookup are the two places where scale changes an algorithm rather than
 an allocation, and neither shows up at 256 nodes.
@@ -427,23 +436,185 @@ READ / WRITE, rate-limited to `HOSTFS_REFRESH_PERIOD_MS` (1000 ms), and calls
 60,000 nodes it is 60,000 `stat` calls per second for as long as the guest touches
 the disk, which would make a large volume unusable.
 
-Fix: descend only into directories whose own mtime changed. A directory's mtime moves
-when an entry is added, removed, or renamed within it, which is exactly the set of
-changes the rescan is looking for. Nodes already carry `host_mtime`; directory nodes
-start using theirs as a skip test.
+The first proposed replacement was a directory-mtime skip. It is rejected after
+tracing the actual semantics:
 
-- `stat` the directory; if `mtime` is unchanged since the last scan, skip its
-  `readdir` **and** its children entirely.
-- Content edits to an existing file do not move the parent's mtime — but they do not
-  need to, because file size and mtime are read through the node when the guest reads
-  blocks, and a rewritten file is caught by the per-file `stat` in its parent's next
-  scan.
-- Steady-state cost becomes one `stat` per **directory**, not per file.
+- Directory mtime is **not recursive**. In `A/B/C`, creating `C/D` changes `C`, not
+  `A` or `B`; finding it still requires a `stat` of every known directory.
+- Modifying or resizing an existing file normally changes no directory mtime at all.
+  The current full rescan catches that. Contrary to the first draft of this design,
+  `hostfs_read_block` opens the host file for bytes but does **not** `stat` it or
+  refresh catalog EOF/storage metadata. A directory-mtime skip would therefore be a
+  silent refresh semantic regression.
+- Coarse timestamp granularity can miss multiple changes within one tick.
 
-Caveat to accept: some filesystems have coarse (1 s) directory mtime granularity, so
-a change made in the same second as a scan can be missed until the next change. That
-is already true of the existing per-file `mtime` comparison, and `hostfs_rescan`
-remains available as an explicit full walk.
+The replacement is a native cross-platform filesystem watcher. Watcher events are
+**invalidation hints, never the source of truth**: they identify a path whose cached
+HostFS state may be stale; HostFS then uses `stat` / `readdir` to verify and reconcile
+the smallest authoritative scope.
+
+#### Utility-layer watcher
+
+The watcher lives in `src/util/fs_watch.*`, preserving the dependency rule
+`machine -> util`. `util` already owns the cross-platform thread, mutex, condition,
+and bounded message-queue wrappers. No callback may hold or mutate a
+`hostfs_volume *`; the watcher thread owns only native watch handles and pushes
+root-relative path events into its queue. The runtime/machine owner drains and
+applies them from `hostfs_maybe_refresh`.
+
+```c
+typedef enum {
+    FS_WATCH_CREATE = 1u << 0,
+    FS_WATCH_REMOVE = 1u << 1,
+    FS_WATCH_MODIFY = 1u << 2,
+    FS_WATCH_RENAME = 1u << 3,
+    FS_WATCH_METADATA = 1u << 4,
+    FS_WATCH_DIRECTORY = 1u << 5
+} fs_watch_flags;
+
+typedef struct {
+    uint32_t flags;
+    char relative_path[FS_WATCH_PATH_MAX];
+} fs_watch_event;
+
+fs_watch *fs_watch_create(const char *root_path);
+bool fs_watch_add_directory(fs_watch *watch, const char *relative_path);
+bool fs_watch_try_pop(fs_watch *watch, fs_watch_event *out);
+bool fs_watch_take_rescan_required(fs_watch *watch);
+void fs_watch_destroy(fs_watch *watch);  /* stop, wake, join, close, free */
+```
+
+The exact API may combine create/start, but the ownership and failure semantics do
+not change. The event queue is bounded (initial target: 256 path events, roughly
+256 KB per mounted volume). If the native queue or the HostFS queue overflows, the
+watcher sets a separate sticky `rescan_required` bit; it must not rely on finding
+space to enqueue an overflow event into the queue that just filled.
+
+| Host | Backend | Scope / special handling |
+|---|---|---|
+| Windows | `ReadDirectoryChangesW` | Recursive root handle plus a filtered non-recursive parent watch, because the recursive call does not report rename/delete of the watched root itself; overlapped waits so stop can cancel and join; zero-byte / `ERROR_NOTIFY_ENUM_DIR` completion means loss |
+| macOS | FSEvents with file-event flags | One recursive root stream with `WatchRoot`, `FileEvents`, and low-latency/no-defer delivery; dropped, must-scan, or root-change flags set `rescan_required` |
+| Linux | `inotify` | One watch per directory; maintain watch-descriptor -> root-relative directory map; add watches before scanning new directories; root self-move/delete/unmount means loss |
+
+Native wrappers are chosen over a new general-purpose dependency. Host watcher
+libraries expose the same backend asymmetry — especially Linux's lack of a recursive
+`inotify` watch — while adding a larger dependency surface to a C project. The native
+surface needed here is deliberately small.
+
+#### Closing setup races
+
+Watching starts before the initial mount scan. On Windows and macOS the recursive
+root watch is live first. On Linux, the root is watched first and every recursive
+scan calls `fs_watch_add_directory` **before** `readdir` on that directory. Thus:
+
+`fs_watch_create` does not report a healthy watcher until the backend has completed a
+readiness handshake proving the root handle/stream/watch is armed. In particular, an
+FSEvents worker thread being created is not sufficient; its stream must be scheduled
+and started before mount scanning begins.
+
+1. A file already present is seen by the scan.
+2. A change after the watch is installed is queued.
+3. A newly created or moved-in directory is watched before its initial subtree scan;
+   content already inside it is found by that scan, and changes during the scan are
+   queued.
+
+Events accumulated during mount are not cleared afterward. Replaying an event whose
+state the mount scan already captured is harmless and closes the scan/watch boundary
+without a fragile generation handshake.
+
+#### Targeted HostFS reconciliation
+
+On every SmartPort touch, `hostfs_maybe_refresh` performs a cheap non-blocking queue
+poll. No event means no `stat`, no `readdir`, and no one-second timer. Current queued
+events are drained and duplicate paths coalesced before work begins.
+
+`hostfs_maybe_refresh` already runs at the SmartPort boundary before the operation is
+served, so an event that has reached the queue is reconciled before the guest command
+observes the catalog or data. Delivery itself remains asynchronous: an event that has
+not yet arrived is applied on a later touch, which is acceptable for the stated
+near-real-time requirement.
+
+Events normalize into two authoritative operations:
+
+| Event shape | Verification / reconciliation |
+|---|---|
+| Pure modify / metadata event for a known regular file | `stat` that one path; update `host_mtime`, `host_size`, EOF, storage/block map, and its catalog entry. Same-size content needs no remap because data blocks already open the real host file on read |
+| Create, remove, directory event, `hostfs.order`, unknown path, or an ambiguous non-rename event | Rescan the affected **immediate parent directory**; local matched marks add/update/remove only its direct children |
+| Rename with incomplete in-root coverage, or any event whose affected parent cannot be identified safely | Set `rescan_required`; the next safe touch performs one full reconciliation |
+
+A rename may dirty two parents and native backends may report its halves separately;
+rescanning both parents is correct and avoids inventing cross-platform rename-cookie
+semantics in HostFS. The backend emits both observable halves as path invalidations.
+If it cannot prove that every in-root half was reported, it sets `rescan_required`
+instead of guessing. In particular, Linux directory moves force watcher recreation
+and a full rescan: the kernel watches follow the moved inodes, but the cached
+watch-descriptor/path map is then stale. File moves with both parents known remain
+targeted. A new directory is watched first, then its initial subtree is materialized
+recursively. Existing child directories are not descended into merely because their
+parent changed.
+
+This requires splitting today's recursive `hostfs_rescan_dir` into an immediate-
+directory reconcile helper plus an explicit recursive driver. Public
+`hostfs_rescan()` keeps its existing unconditional full-walk semantics and remains
+the ground-truth escape hatch.
+
+Guest writes already reconcile synchronously and remain authoritative. Their later
+watcher echoes are expected: targeted verification sees matching state and becomes a
+no-op. Watch events are queued but not applied while `guest_write_depth > 0` or sealed
+replay is active; they are processed afterward. An event storm may collapse into one
+full rescan, but it may never mutate HostFS from the watcher thread.
+
+Watcher events are not the only invalidation source. A failed guest→host operation
+can change the guest catalog while producing **no host filesystem event**. PR 2's
+failed cross-directory rename is the concrete case: `parent_index` must follow the
+guest catalog to avoid deleting the real file, and the next host rescan repairs the
+phantom/re-adopts the old path. With periodic scans removed, every failed host create,
+rename, move, truncate, unlink, or `rmdir` path is audited. Any failure whose recovery
+previously depended on a later rescan explicitly schedules the affected old/new
+parent directory (or full uncertainty when the scope cannot be proven) for processing
+after `guest_write_depth` returns to zero. Internal invalidations use the same dirty
+set and owner-thread reconciliation path as watcher events.
+
+#### Loss and degraded mode
+
+Notifications cannot be treated as an infallible journal. Correctness wins over
+performance whenever their state is uncertain:
+
+- Native overflow, FSEvents dropped/must-scan flags, queue overflow, root-watch loss,
+  a path that cannot be represented without truncation, or a failed Linux
+  subdirectory watch sets `rescan_required`.
+- The next safe SmartPort touch takes the loss bit, destroys/joins the uncertain
+  watcher, arms a replacement root watcher, and performs one unconditional
+  `hostfs_rescan`. The scan re-adds every Linux directory watch before enumerating it;
+  events arriving on the replacement during recovery remain queued.
+- The overflow bit is taken/cleared **before** the full scan. If another loss occurs
+  during that scan it sets the bit again and cannot be accidentally acknowledged.
+- If notifications are unsupported or cannot be made reliable for the mounted
+  filesystem, HostFS warns once and falls back to the existing once-per-second full
+  rescan for the rest of that mount. Remount retries watcher setup. This degraded path
+  is expensive but complete; it never silently weakens host-change detection.
+- If replacement succeeds at the root but rebuilding complete Linux subdirectory
+  coverage fails during the recovery scan, the replacement is destroyed and the
+  mount enters the same periodic fallback. It must not retry and full-scan on every
+  guest touch while the system watch limit remains exhausted.
+
+The mounted root path itself is a boundary, not a catalog entry. If that directory is
+moved, removed, or unmounted, the watcher reports loss, HostFS warns, and refresh uses
+the configured original path in degraded mode. Recreating a directory there can
+recover on a later periodic rescan; following a renamed root outside the configured
+mount path is deliberately out of scope.
+
+Healthy local filesystems therefore do zero scan work while idle, common file edits
+cost one `stat`, structural changes cost one parent `readdir`, and event loss costs a
+single full reconciliation.
+
+Tests use two distinct seams. `tests/util/test_fs_watch.c` exercises each real native
+backend with bounded waits. HostFS unit tests bypass OS scheduling by injecting a
+normalized root-relative event or setting the loss bit, then call the ordinary
+owner-thread refresh path and assert test-visible counters for file stats, immediate-
+directory scans, and full rescans. Production and test events therefore share all
+reconciliation code after queue ingestion without making the machine suite timing-
+dependent.
 
 ### The one realloc hazard
 
@@ -474,8 +645,8 @@ static void hostfs_warn(hostfs_volume *vol, const char *fmt, ...);
 ```
 
 It writes to stderr and bumps a per-volume counter (plus, optionally, the last
-message) that tests can read. Roughly 15 lines, and it serves all five diagnostics
-across PRs 1, 2, 4 and 5.
+message) that tests can read. Roughly 15 lines, and it serves the HostFS diagnostics
+across PRs 1, 2, 5 and 6.
 
 ```text
 a2m: HostFS <root>: volume directory holds 51 entries (ProDOS limit); dropped 9: ZTOOLS, ZZ.TXT, ... (+7 more)
@@ -525,6 +696,10 @@ Internal only:
 | `hostfs_alloc_file_slot()` | Grows instead of returning −1 at 256 |
 | `hostfs_warn()` | New; single seam for every diagnostic, with a test-visible counter |
 | `vol->block_to_map` | New; direct block → map index replacing the `hostfs_map_find` scan |
+| `fs_watch` (`src/util`) | New opaque cross-platform watcher; native thread + bounded event queue + sticky loss flag |
+| `vol->watch` | New watcher handle; created before mount scan, stopped/joined on eject |
+| `hostfs_rescan_directory_at()` | New immediate-directory host→catalog reconcile; does not descend into existing child directories |
+| `hostfs_refresh_file_node()` | New single-file metadata refresh for modify events |
 | `HOSTFS_MAX_FILES` | **Deleted.** Replaced by `HOSTFS_MAX_NODES` (65535) and `HOSTFS_ROOT_MAX_ENTRIES` (51, derived) |
 | `HOSTFS_ENTRY_LENGTH`, `HOSTFS_ENTRIES_PER_BLOCK` | Promoted from the private enum in `hostfs.c` to `hostfs.h`; `HOSTFS_ROOT_DIR_BLOCKS` added |
 
@@ -536,6 +711,11 @@ Internal only:
 - Node identity is still the `int` index; nothing persists node indices across a
   `hostfs_rescan`, which is already true today.
 - `hostfs.order` format is unchanged. Root order still pins the first 51 entries.
+- The watcher queue is bounded rather than proportional to node count. The initial
+  256-event target costs roughly 256 KB per mounted volume; overflow deliberately
+  trades precision for one full rescan.
+- Linux additionally pays one kernel watch plus one small watch-descriptor/path-map
+  entry per directory. PR 7's memory accounting includes this platform-specific cost.
 
 ---
 
@@ -570,7 +750,44 @@ what is broken. Replace the storage layer; keep the semantics.
 
 Deferred. ProDOS can read any block at any time, so avoiding the full scan means
 synthesizing directory blocks on demand and inventing an eviction policy. At 4.75 MB
-worst case there is no problem to solve.
+of worst-case core node-and-name storage there is no problem to solve.
+
+### 6. Directory-mtime skip
+
+Rejected. An ancestor's mtime does not move when a descendant changes, so it still
+requires one `stat` per known directory. Worse, resizing an existing file changes no
+directory mtime; the current full refresh sees it, while the proposed skip would leave
+catalog EOF and storage stale indefinitely. The first draft's claim that block reads
+already refresh file metadata was false in source.
+
+### 7. Bounded incremental polling
+
+Rejected as the healthy-mode algorithm; retained as a possible degraded backend
+implementation. Walking a fixed number of nodes per touch bounds each pause but makes
+detection latency proportional to volume size. To find an assembler output within two
+seconds on a 60,000-node volume still requires roughly 30,000 `stat` calls per second.
+
+### 8. Background full scanner
+
+Rejected as primary. Moving the existing walk off the machine thread hides the stall
+but still pounds local, network, and sleeping filesystems while nothing changes, and
+introduces a thread/queue lifetime problem anyway. A watcher uses that machinery to
+perform actual targeted work. A background or synchronous full scan remains the
+correct fallback when notification reliability is lost.
+
+### 9. Refresh only when the guest reads a catalog
+
+Rejected as incomplete. A program may open a known file without cataloguing its
+directory; newly added files and removed cached directories can remain invisible.
+Catalog-time validation may be useful defense-in-depth later but cannot replace host
+change detection.
+
+### 10. Third-party watcher library
+
+Rejected for now. The required API is small, while the hard platform difference —
+Linux needs one `inotify` watch per directory — remains even behind common wrappers.
+Adding a general event-loop or C++ dependency does not remove HostFS's overflow,
+watch-limit, queue, or owner-thread responsibilities.
 
 ---
 
@@ -583,6 +800,19 @@ worst case there is no problem to solve.
   anywhere and this work does not introduce one.
 - Suppression is **per cause**, not one bool for the volume — otherwise the first
   warning hides every later one.
+- Watcher degradation and event loss also go through `hostfs_warn`:
+
+  ```text
+  a2m: HostFS <root>: filesystem notifications unavailable; using periodic full refresh
+  a2m: HostFS <root>: filesystem events were lost; performing a full refresh
+  ```
+
+  The unavailable warning is once per mount. Event-loss warning suppression is by
+  healthy→uncertain transition, so one storm produces one line but a later independent
+  loss is visible again.
+- Test-visible counters record targeted directory scans, targeted file stats, and
+  overflow-triggered full rescans. Timing assertions are not the proof that unchanged
+  siblings were untouched.
 - No UI surface in this work. If mount warnings should reach the frontend later,
   that is a follow-on.
 
@@ -606,10 +836,11 @@ worst case there is no problem to solve.
    bug in this work, not a feature of it.
 9. **65535 is the node ceiling**, matching the ProDOS 16-bit `file_count` and the
    volume block limit.
-10. **The refresh walk is in scope, not a follow-on.** Lifting the node cap without it
-    produces a volume that mounts and then crawls, so the directory-mtime skip is a
-    required phase (PR 4) rather than an optimization. "Handles any real ProDOS
-    volume" means usable, not merely enumerable.
+10. **Event-driven refresh is in scope, not a follow-on.** Lifting the node cap while
+    retaining the once-per-second full scan produces a volume that mounts and then
+    crawls. PRs 4–5 add a cross-platform watcher and targeted reconciliation; a
+    healthy idle volume performs no scan work. "Handles any real ProDOS volume" means
+    usable, not merely enumerable.
 11. **Non-NAPS host files stay silently invisible.** A regular file whose name does not
     parse as `NAME#ttaaaa` is skipped with no diagnostic. This is the single
     deliberate exception to decision 2 — warning on every `README.md`, `.gitignore`,
@@ -628,12 +859,20 @@ worst case there is no problem to solve.
     The persist function cannot tell a cap-dropped name from a guest-deleted one, and
     merging resurrects deleted names forever. Freezing loses nothing and needs no
     merge semantics.
-16. **Docs are batched in PR 6, as a deliberate exception to `agents/rules.md`.** That
+16. **Docs are batched in PR 7, as a deliberate exception to `agents/rules.md`.** That
     note requires a user-visible change to update `manual/manual.md` in the same
-    change set; the 51-entry root qualifies. Held anyway: PRs 1–5 land as one
+    change set; the 51-entry root qualifies. Held anyway: PRs 1–6 land as one
     behavioral program, and documenting the root cap before the collision aliasing and
-    diagnostics exist would mean writing the manual section three times. PR 6 is part
+    diagnostics exist would mean writing the manual section three times. PR 7 is part
     of the same program of work, not a follow-on.
+17. **Watcher events invalidate; they do not dictate state.** Every event is verified
+    against the host filesystem on the machine-owner thread. Ambiguity widens the
+    verification scope from one file to its parent, never to guessed mutation logic.
+18. **Notification loss degrades performance, never correctness.** Overflow, watch
+    failure, or unsupported filesystems force a full reconciliation and, if necessary,
+    the legacy periodic full-refresh mode with a warning.
+19. **No watcher callback mutates HostFS.** Native watcher threads own native handles
+    and a bounded queue only. `hostfs_maybe_refresh` is the sole event consumer.
 
 ---
 
@@ -650,14 +889,19 @@ worst case there is no problem to solve.
 | Node ceiling | 65535 |
 | Growth policy | Start 16, double |
 | mtime width | `int64_t` (4 bytes over `uint32_t`, no 2038 question) |
-| Refresh walk | **In scope as PR 4**, not a follow-on. Directory-mtime skip; steady state is one `stat` per directory |
+| Refresh | **Event-driven in PRs 4–5.** Healthy idle volumes do no scan work; file modify = one `stat`; structural change = one parent scan |
+| Watch backends | Native: `ReadDirectoryChangesW` (Windows), file-event FSEvents (macOS), per-directory `inotify` (Linux) |
+| Watcher ownership | Utility thread queues root-relative invalidations only; machine owner verifies and mutates HostFS |
+| Event loss | Sticky out-of-band loss flag → one full rescan; unsupported/unreliable watch → warned periodic-full fallback |
+| Mount/new-dir race | Watch before scan; Linux adds each directory watch before its `readdir` |
+| Refresh latency | Drain queued events on the next SmartPort touch; no one-second delay in healthy watcher mode |
 | Non-NAPS host files | **Stay silently skipped** — the one deliberate exception to "never drop silently" |
 | Block lookup | **In scope as PR 3.** Direct `int32_t block_to_map[]` index, 256 KB, O(1) |
 | Existing "directory full" warning | **Reworded and split** into root (permanent, ProDOS limit) vs subdirectory (growth failed), with separate suppression flags |
 | Subdirectory spare-block floor | **Unchanged.** Root stops consulting it; `bitmap_block` becomes a constant 6 |
 | Diagnostic testing | **`hostfs_warn` seam + counter**, not stderr capture. No `freopen` in the suite |
 | Constant location | **`hostfs.h`**, with `HOSTFS_ENTRY_LENGTH` / `HOSTFS_ENTRIES_PER_BLOCK` promoted from the private enum so 51 is derived |
-| Manual updates | **PR 6**, an explicit exception to `agents/rules.md` same-change-set docs |
+| Manual updates | **PR 7**, an explicit exception to `agents/rules.md` same-change-set docs |
 | `HOSTFS_MAX_FILES` in PR 2 | **Split.** Node-indexed arrays moved immediately (they overflow once the table grows); per-directory buffers keep an interim `HOSTFS_SCAN_MAX 256` that PR 3 deletes, and warn while it exists |
 | Failed host `rename` in reconcile | **`parent_index` moves anyway**, and the failure warns. Holding the node at its old parent makes that parent's next reconcile delete the real host file |
 | `hostfs.order` when root is truncated | **Frozen, not merged.** Root persist returns early; subdirectories unaffected |
@@ -694,7 +938,16 @@ worst case there is no problem to solve.
 | Arena offsets confused with pointers | Medium | `uint32_t name_off` only; no `char *` stored in a node |
 | Collision ordinals renumber when a file is inserted | Medium | Deterministic scan order; `hostfs.order` pins root; stderr line every time an alias is used |
 | Aliased names surprise on copy to `.po` | Medium | Warning text says so explicitly |
-| Full rescan once per second becomes O(volume) | **High** | Directory-mtime skip (PR 4). Without it a 60k-node volume issues 60k `stat` calls/second under guest I/O |
+| Full rescan once per second becomes O(volume) | **High** | Event-driven refresh (PRs 4–5). A healthy idle watcher performs no scan; targeted changes verify one file or parent directory |
+| Watcher event queue or native queue overflows | **High** | Sticky out-of-band `rescan_required`; take it before one full rescan so a second loss during recovery remains pending |
+| Mount or new-directory scan misses a change before watching starts | **High** | Root watch before mount scan; Linux adds each directory watch before `readdir`; never clear events accumulated during the scan |
+| Watcher thread races eject / mutates freed HostFS state | **High** | Watcher owns no `hostfs_volume *`; eject stops, wakes, joins, closes, then frees |
+| Existing host file resize is missed | **High** | Native modify event directly `stat`s the file and updates EOF/storage/catalog; explicit regression crosses seedling→sapling |
+| Failed guest→host mutation emits no event, so state never converges | **High** | Audit every failure path; explicitly dirty proven old/new parents or request full reconciliation after guest-write depth unwinds |
+| Linux watch limit or unsupported/network filesystem | Medium | Warn and fall back to complete periodic full refresh; never silently run with partial watch coverage |
+| Rename events are split, reordered, or ambiguous | Medium | Treat them as invalidations and rescan old/new parent scopes; filesystem state, not event pairing, is authoritative |
+| Guest write produces watcher echo | Low | Apply on machine owner after guest write; verification is idempotent and duplicate paths are coalesced |
+| Event storm performs too many targeted scans | Medium | Bounded queue + coalescing; overflow deliberately collapses to one full reconciliation |
 | `hostfs_map_find` linear scan on every block access | **High** | Direct `block_to_map` index (PR 3). Otherwise guest disk I/O degrades with volume size, not with transfer size |
 | `block_to_map` drifts out of sync with `map` | Medium | Maintain it in the same helpers that insert/remove map entries; assert index/`map` agreement in a debug build |
 | Reconcile deletes a host file after a failed rename | **High** | Traced and fixed in PR 2: `parent_index` follows the catalog even when the host rename fails, so the old parent never sees the node as an orphan. Covered by `test_failed_move_keeps_host_file`, which fails if the behavior is reintroduced |
@@ -704,19 +957,22 @@ worst case there is no problem to solve.
 | Root reordering silently fails to persist while over the limit | Low | Second warning line states it explicitly; clears on next mount under 51 |
 | Root fills up *after* mount and misses the freeze | Medium | `root_truncated` also set in `hostfs_add_node_from_scan`; `hostfs_rescan` uses the incremental path, not the mount scan |
 | `hostfs_find_by_host_path` searches a deleted field | Medium | PR 2 converts it to parent + basename; a naive path-rebuild comparison would be quadratic |
-| Directory-mtime skip misses a same-second change | Low | Coarse-granularity filesystems only; already true of the per-file comparison; `hostfs_rescan` stays as an explicit full walk |
 | 51-entry cap breaks an existing sample folder | Low | Single user; `samples/hostfs/` root currently holds 5 entries |
-| Memory at a maximally-full volume | Low | 4.75 MB measured, allocated only if the files exist |
-| Depth-8 limit still silent | Low | Add the diagnostic in PR 4 alongside the others |
+| Memory at a maximally-full volume | Low | Core nodes + names are 4.75 MB; fixed block index and initial watcher queue add about 256 KB each; PR 7 measures block-map, directory-block, and platform-watch costs separately |
+| Depth-8 limit still silent | Low | Add the diagnostic in PR 6 alongside the collision diagnostics |
 
 ---
 
 ## References
 
 - `src/machine/hostfs.c`, `src/machine/hostfs.h`, `src/machine/hostfs_boot.h`
+- `src/util/fs_watch.*` — proposed native watcher portability boundary
 - `src/util/apple2_file.c` — NAPS parse/compose (`apple2_naps_parse_path`)
 - `tests/machine/test_hostfs.c` — 10 existing cases
 - `manual/manual.md` — HostFS section (volume layout, `hostfs.order`)
+- [Microsoft `ReadDirectoryChangesW`](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-readdirectorychangesw)
+- [Apple File System Events Programming Guide](https://developer.apple.com/library/archive/documentation/Darwin/Conceptual/FSEvents_ProgGuide/UsingtheFSEventsFramework/UsingtheFSEventsFramework.html)
+- [Linux `inotify(7)`](https://man7.org/linux/man-pages/man7/inotify.7.html)
 - *ProDOS 8 Technical Reference Manual* — directory format, 4-block volume directory,
   16-bit `file_count`
 - Observed failure: `samples/hostfs/pt3plr/` (256 tunes + `PRODOS` + `PT3/`)
@@ -850,7 +1106,7 @@ a2m: HostFS rename failed: <old> -> <new> (catalog renamed, host file did not)
 ```
 
   Unsuppressed, unlike the directory-full warnings: reconcile runs only on a guest
-  directory write, not on the once-per-second refresh, so these cannot flood.
+  directory write, not on automatic host refresh, so these cannot flood.
 
 ### PR 3 — Buffers sized from actual counts + O(1) block lookup
 
@@ -858,48 +1114,121 @@ a2m: HostFS rename failed: <old> -> <new> (catalog renamed, host file did not)
 - **Files:** `src/machine/hostfs.c`, `tests/machine/test_hostfs.c`
 - **Dependencies:** PR 2
 - **Checklist:**
-  - [ ] Scan buffers sized from the `readdir` count for that directory
-  - [ ] **Delete `HOSTFS_SCAN_MAX`** (PR 2's interim per-directory bound) and with it
+  - [x] Scan buffers sized from the `readdir` count for that directory
+  - [x] **Delete `HOSTFS_SCAN_MAX`** (PR 2's interim per-directory bound) and with it
         the `truncated` out-parameter on `hostfs_collect_scans_in`, its two warning
         sites, and `test_directory_scan_truncation_warns`, which asserts the interim
         behavior and must be replaced by the 1000-entry cases below
-  - [ ] `dent ents[]` off the stack, sized from the directory's block chain
-  - [ ] `used` off the stack, sized from the scan count — `seen` / `matched` already
+  - [x] `dent ents[]` off the stack, sized from the directory's block chain
+  - [x] `used` off the stack, sized from the scan count — `seen` / `matched` already
         moved in PR 2 (they are indexed by node index, so a fixed array overflowed
         as soon as the table grew)
   - [x] `order_basenames` bounded by `HOSTFS_ROOT_MAX_ENTRIES` — done in PR 2
-  - [ ] `int32_t *block_to_map` direct index replacing the `hostfs_map_find` linear
+  - [x] `int32_t *block_to_map` direct index replacing the `hostfs_map_find` linear
         scan; maintained wherever `map` is inserted into or removed from; freed in
         `hostfs_eject`
-  - [ ] Debug-build assertion that `block_to_map` and `map` agree
-  - [ ] Test: subdirectory with 1000 entries mounts, enumerates, and reads correctly
-  - [ ] Test: `hostfs_rescan` over a 1000-entry subdirectory
-  - [ ] Test: block read/write still correct after create + delete churn (index sync)
+  - [x] Debug-build assertion that `block_to_map` and `map` agree
+  - [x] Test: subdirectory with 1000 entries mounts, enumerates, and reads correctly
+  - [x] Test: `hostfs_rescan` over a 1000-entry subdirectory
+  - [x] Test: block read/write still correct after create + delete churn (index sync)
 - **Description:** Removes the hidden per-directory 256 cap, the ~403 KB-per-level
   transient, and the O(map) cost of every block access. Without this, PR 2's raised
   ceiling is unreachable in practice and guest disk I/O degrades with volume size.
 
-### PR 4 — Refresh skips unchanged directories
+**Landed** as `a0d8c59`. The direct index is checked in both directions in Debug
+builds; swap-delete updates the removed block and the block moved into its map slot.
 
-- **Title:** `hostfs: rescan only directories whose mtime moved`
-- **Files:** `src/machine/hostfs.c`, `tests/machine/test_hostfs.c`
-- **Dependencies:** PR 2
+### PR 4 — Cross-platform filesystem watcher
+
+- **Title:** `util: add cross-platform filesystem watcher`
+- **Files:** `src/util/fs_watch*.c`, `src/util/fs_watch.h`,
+  `src/util/CMakeLists.txt`, `CMakeLists.txt`, `tests/util/test_fs_watch.c`
+- **Dependencies:** none
 - **Checklist:**
-  - [ ] Directory nodes record `host_mtime` at scan
-  - [ ] `hostfs_rescan_dir` `stat`s the directory and skips `readdir` + descent when unchanged
-  - [ ] `hostfs_rescan` remains a full unconditional walk when called directly
-  - [ ] Test: add a file in a deep subdirectory → picked up within one refresh period
-  - [ ] Test: delete a file in a deep subdirectory → node deactivated
-  - [ ] Test: untouched sibling subtrees are not re-walked (count `stat`s via a seam or a large fixture timing assertion)
-- **Description:** Without this, PR 2 and PR 3 make large volumes *mountable* but not
-  *usable* — the once-per-second rescan is O(total files). Steady state becomes one
-  `stat` per directory.
+  - [ ] Opaque `fs_watch` API with root-relative paths, flags, non-blocking pop,
+        Linux add-directory hook, and stop/join destruction
+  - [ ] Bounded queue; queue-full and native-overflow use a separate sticky
+        `rescan_required` bit
+  - [ ] Watcher thread owns native handles only; no callback into callers
+  - [ ] Backend readiness handshake: create/start succeeds only after the root watch
+        is actually armed
+  - [ ] Windows: recursive `ReadDirectoryChangesW`, cancellable overlapped wait,
+        create/remove/modify/rename flags, zero-byte/notify-enum loss detection, and
+        a filtered parent watch for rename/removal of the watched root itself
+  - [ ] macOS: recursive FSEvents stream with file-event flags; dropped,
+        must-scan, root-change flags force rescan; link the required system framework
+  - [ ] Linux: nonblocking `inotify`; watch-descriptor/path map; create/delete/
+        close-write/attrib/move/self/unmount masks; failed watch coverage and directory
+        moves force rescan so descriptor paths cannot drift
+  - [ ] `fs_watch_add_directory` is idempotent and safe against the watcher thread;
+        no-op success on recursive Windows/macOS backends
+  - [ ] Stop is safe while the backend is blocked: signal/cancel, wake, join,
+        close native resources, destroy queue
+  - [ ] Unit: create, modify, rename, and delete under a temp root produce a path
+        invalidation or an explicit rescan-required state within a bounded wait
+  - [ ] Unit: deterministic queue overflow sets the loss bit even though no queue
+        slot is available
+  - [ ] Unit: taking the loss bit before recovery does not clear a second loss
+  - [ ] Build/test on macOS, Linux, and Windows before landing
+- **Description:** Establishes a small independently testable portability boundary.
+  It does not know HostFS and cannot mutate machine state.
 
-### PR 5 — Collision-safe ProDOS names + remaining diagnostics
+### PR 5 — Event-driven targeted HostFS reconciliation
+
+- **Title:** `hostfs: reconcile native filesystem events`
+- **Files:** `src/machine/hostfs.c`, `src/machine/hostfs.h`,
+  `tests/machine/test_hostfs.c`
+- **Dependencies:** PR 3, PR 4
+- **Checklist:**
+  - [ ] `hostfs_volume` owns `fs_watch *`; eject/failure paths stop and destroy it
+  - [ ] Watch root before the initial mount scan; Linux adds each directory watch
+        before `readdir`; queued mount events are retained
+  - [ ] Replace healthy-mode one-second full polling with non-blocking event drain on
+        every SmartPort touch; no event performs no `stat` or `readdir`
+  - [ ] Coalesce duplicate root-relative paths within one drain
+  - [ ] Pure known-file modify → one-file `stat` and metadata reconcile, including
+        EOF/storage transitions and block-map/catalog patching
+  - [ ] Structural/ambiguous/order event → immediate-parent rescan with local matched
+        marks; do not descend into existing child directories
+  - [ ] New directory: establish watch first, then recursively materialize its initial
+        subtree; depth/node/root limits and warnings remain unchanged
+  - [ ] Rename invalidates both reported parents; if complete in-root coverage cannot
+        be proven, widen to full rescan rather than leaving a stale old parent; no
+        HostFS dependency on native rename pairing or cookies
+  - [ ] Public `hostfs_rescan()` remains an unconditional full recursive walk and
+        ensures complete Linux watch coverage
+  - [ ] Loss bit → destroy uncertain watcher, arm replacement, then one full rescan;
+        take bit before recovery and retain events queued by the replacement
+  - [ ] Watch unavailable/unreliable → one warning and legacy periodic-full fallback
+  - [ ] Guest-write echoes are idempotent; defer event application during
+        `guest_write_depth` and sealed replay
+  - [ ] Audit failed guest→host create/rename/move/truncate/unlink/rmdir paths; schedule
+        old/new parent invalidation or full uncertainty when no watcher event will
+        exist
+  - [ ] Test-visible counters/seam prove targeted file stats, targeted parent scans,
+        and overflow-triggered full scans without timing assertions
+  - [ ] Test: deep host add and delete update the correct ProDOS directory while an
+        untouched sibling has zero scans
+  - [ ] Test: host resize crosses seedling→sapling, updates catalog EOF/storage, and
+        the new block reads correctly — regression for the rejected mtime design
+  - [ ] Test: external rename/move dirties the correct old/new parents
+  - [ ] Test: `hostfs.order` host edit reorders only its directory
+  - [ ] Test: synthetic overflow finds an otherwise-unannounced change via exactly
+        one full rescan
+  - [ ] Test: guest create/write plus its watcher echo does not duplicate, deactivate,
+        or rename the node
+  - [ ] Test: failed cross-directory move converges on the next safe touch without an
+        explicit `hostfs_rescan`, preserves the real file, removes the phantom, and
+        re-adopts the old path
+- **Description:** A healthy idle volume does no scan work. Common modifications cost
+  one `stat`; structural changes cost one parent scan; uncertainty widens once to a
+  full authoritative reconciliation.
+
+### PR 6 — Collision-safe ProDOS names + remaining diagnostics
 
 - **Title:** `hostfs: alias colliding names instead of dropping them`
 - **Files:** `src/machine/hostfs.c`, `tests/machine/test_hostfs.c`
-- **Dependencies:** PR 2
+- **Dependencies:** PR 2, PR 5
 - **Checklist:**
   - [ ] Extension-preserving 3-digit ordinal alias, `001`–`999`
   - [ ] Fails past `999` with a stderr line rather than looping
@@ -911,19 +1240,21 @@ a2m: HostFS rename failed: <old> -> <new> (catalog renamed, host file did not)
   - [ ] Test: alias stability across remount with unchanged contents
 - **Description:** Closes the last silent-drop path.
 
-### PR 6 — Stress, samples, and docs
+### PR 7 — Stress, samples, and docs
 
 - **Title:** `hostfs: full-volume stress tests and documentation`
 - **Files:** `tests/machine/test_hostfs.c`, `manual/manual.md`, `agents/disk.md`, `design/README.md`
-- **Dependencies:** PR 1–5
+- **Dependencies:** PR 1–6
 - **Checklist:**
   - [ ] Stress: deep tree at `HOSTFS_MAX_DEPTH`, several thousand nodes, mount → read → rescan
   - [ ] Stress: node ceiling reached cleanly, with the diagnostic, no crash
   - [ ] Memory accounting for a thousands-of-directories tree: node table + name
-        arena + `block_to_map` + 512 B per directory block
+        arena + `block_to_map` + watcher queue/Linux watch map + 512 B per directory
+        block
   - [ ] Regression: `samples/hostfs/pt3plr/` (256 tunes) boots and the player launches — assert the catalog, not the player's own tune count (see Open question 3)
   - [ ] `manual/manual.md`: 51-entry root, unbounded subdirectories, alias behavior, diagnostics
-  - [ ] `agents/disk.md`: the durable invariants (51 root, indices-not-pointers, arena offsets)
+  - [ ] `agents/disk.md`: durable invariants (51 root, indices-not-pointers, arena
+        offsets, watcher events invalidate but never mutate off-owner)
   - [ ] `design/README.md`: this doc **Draft → Landed**
 - **Description:** Proves the mission statement and folds the lasting rules into the
   agent handoff surface.
