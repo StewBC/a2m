@@ -1483,6 +1483,160 @@ static void test_order_manifest_frozen_after_mount(void)
     wipe_tree(dir);
 }
 
+/* A directory holding more entries than the per-directory scan buffer must say
+   so. Delete this case when that buffer is sized from the real entry count. */
+static void test_directory_scan_truncation_warns(void)
+{
+    const char *dir = "test_hostfs_scan_trunc";
+    hostfs_volume *vol;
+    uint8_t blk[512];
+    uint16_t key;
+    uint8_t st = 0;
+    uint8_t type = 0;
+    int i;
+
+    wipe_tree(dir);
+    HOSTFS_MKDIR(dir);
+    HOSTFS_MKDIR("test_hostfs_scan_trunc/BIG");
+    for (i = 0; i < 300; ++i) {
+        char path[512];
+        snprintf(path, sizeof(path), "%s/BIG/F%03d#060000", dir, i);
+        write_file(path, "x", 1);
+    }
+
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL) {
+        fail("scan truncation mount");
+    }
+    if (hostfs_warning_count(vol) != 1 ||
+        strstr(hostfs_last_warning(vol), "more than 256 entries") == NULL) {
+        fprintf(stderr, "warn_count=%d last=%s\n",
+                hostfs_warning_count(vol), hostfs_last_warning(vol));
+        fail("over-full directory must warn, not drop silently");
+    }
+    if (hostfs_read_block(vol, 2, blk) != 0 ||
+        !find_entry_in_dir_block(blk, "BIG", &st, &key, &type)) {
+        fail("BIG missing from root");
+    }
+    hostfs_eject(vol);
+    wipe_tree(dir);
+}
+
+#if !defined(_WIN32)
+/* A guest-side cross-directory move whose host rename fails must not cost the
+   user the file. The node's parent has to follow the catalog even so: leaving
+   it behind makes the old parent's next reconcile see an entry that vanished
+   from its own catalog and unlink the real host file. */
+static void test_failed_move_keeps_host_file(void)
+{
+    const char *dir = "test_hostfs_failed_move";
+    hostfs_volume *vol;
+    uint8_t rootblk[512];
+    uint8_t srcblk[512];
+    uint8_t dstblk[512];
+    uint8_t *entry;
+    uint8_t *slot = NULL;
+    uint16_t src_key = 0;
+    uint16_t dst_key = 0;
+    uint8_t stype = 0;
+    uint8_t ftype = 0;
+    struct stat st;
+    int i;
+
+    wipe_tree(dir);
+    HOSTFS_MKDIR(dir);
+    HOSTFS_MKDIR("test_hostfs_failed_move/SRC");
+    HOSTFS_MKDIR("test_hostfs_failed_move/DST");
+    write_file("test_hostfs_failed_move/SRC/DATA#060000", "precious", 8);
+
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL) {
+        fail("failed move mount");
+    }
+    if (hostfs_read_block(vol, 2, rootblk) != 0 ||
+        !find_entry_in_dir_block(rootblk, "SRC", &stype, &src_key, &ftype) ||
+        !find_entry_in_dir_block(rootblk, "DST", &stype, &dst_key, &ftype)) {
+        fail("SRC and DST must be in the catalog");
+    }
+
+    /* Copy DATA's entry from SRC's block into DST's, as a guest move would. */
+    if (hostfs_read_block(vol, src_key, srcblk) != 0 ||
+        hostfs_read_block(vol, dst_key, dstblk) != 0) {
+        fail("read subdirectory blocks");
+    }
+    entry = NULL;
+    for (i = 1; i < HOSTFS_ENTRIES_PER_BLOCK; ++i) {
+        uint8_t *e = srcblk + 4 + i * HOSTFS_ENTRY_LENGTH;
+        uint8_t nl = (uint8_t)(e[0] & 0x0Fu);
+        char nm[HOSTFS_NAME_MAX];
+        if (e[0] == 0) {
+            continue;
+        }
+        memcpy(nm, e + 1, nl);
+        nm[nl] = '\0';
+        if (strcmp(nm, "DATA") == 0) {
+            entry = e;
+            break;
+        }
+    }
+    if (entry == NULL) {
+        fail("DATA missing from SRC");
+    }
+    for (i = 1; i < HOSTFS_ENTRIES_PER_BLOCK; ++i) {
+        slot = dstblk + 4 + i * HOSTFS_ENTRY_LENGTH;
+        if (slot[0] == 0) {
+            break;
+        }
+    }
+    memcpy(slot, entry, HOSTFS_ENTRY_LENGTH);
+    slot[0x25] = (uint8_t)(dst_key & 0xFFu);
+    slot[0x26] = (uint8_t)((dst_key >> 8) & 0xFFu);
+    dstblk[4 + 0x21] = 1;
+    memset(entry, 0, HOSTFS_ENTRY_LENGTH);
+    srcblk[4 + 0x21] = 0;
+
+    /* Make the host rename fail: DST is not writable. */
+    if (chmod("test_hostfs_failed_move/DST", 0500) != 0) {
+        fail("chmod DST");
+    }
+    if (hostfs_write_block(vol, dst_key, dstblk) != 0) {
+        fail("publish DST entry");
+    }
+    if (hostfs_warning_count(vol) < 1 ||
+        strstr(hostfs_last_warning(vol), "move failed") == NULL) {
+        fprintf(stderr, "warn_count=%d last=%s\n",
+                hostfs_warning_count(vol), hostfs_last_warning(vol));
+        fail("a failed host move must warn");
+    }
+    /* The old parent's reconcile is what used to delete the file. */
+    if (hostfs_write_block(vol, src_key, srcblk) != 0) {
+        fail("publish SRC removal");
+    }
+    if (stat("test_hostfs_failed_move/SRC/DATA#060000", &st) != 0) {
+        fail("failed move must not destroy the host file");
+    }
+
+    /* With the obstruction gone, a rescan converges: the phantom entry under
+       DST goes away and the file is adopted back into SRC. */
+    if (chmod("test_hostfs_failed_move/DST", 0700) != 0) {
+        fail("restore DST mode");
+    }
+    if (hostfs_rescan(vol) != 0) {
+        fail("rescan after failed move");
+    }
+    if (hostfs_read_block(vol, dst_key, dstblk) != 0 ||
+        find_entry_in_dir_block(dstblk, "DATA", &stype, &src_key, &ftype)) {
+        fail("phantom DATA should be gone from DST");
+    }
+    if (stat("test_hostfs_failed_move/SRC/DATA#060000", &st) != 0) {
+        fail("host file must survive the rescan");
+    }
+
+    hostfs_eject(vol);
+    wipe_tree(dir);
+}
+#endif
+
 int main(void)
 {
     test_naps_and_mangle();
@@ -1498,6 +1652,10 @@ int main(void)
     test_root_entry_limit();
     test_order_manifest_frozen_when_truncated();
     test_order_manifest_frozen_after_mount();
+    test_directory_scan_truncation_warns();
+#if !defined(_WIN32)
+    test_failed_move_keeps_host_file();
+#endif
     printf("hostfs tests ok\n");
     return 0;
 }

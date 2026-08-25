@@ -658,6 +658,8 @@ worst case there is no problem to solve.
 | Diagnostic testing | **`hostfs_warn` seam + counter**, not stderr capture. No `freopen` in the suite |
 | Constant location | **`hostfs.h`**, with `HOSTFS_ENTRY_LENGTH` / `HOSTFS_ENTRIES_PER_BLOCK` promoted from the private enum so 51 is derived |
 | Manual updates | **PR 6**, an explicit exception to `agents/rules.md` same-change-set docs |
+| `HOSTFS_MAX_FILES` in PR 2 | **Split.** Node-indexed arrays moved immediately (they overflow once the table grows); per-directory buffers keep an interim `HOSTFS_SCAN_MAX 256` that PR 3 deletes, and warn while it exists |
+| Failed host `rename` in reconcile | **`parent_index` moves anyway**, and the failure warns. Holding the node at its old parent makes that parent's next reconcile delete the real host file |
 | `hostfs.order` when root is truncated | **Frozen, not merged.** Root persist returns early; subdirectories unaffected |
 | `root_truncated` set sites | **Two** — the mount scan and `hostfs_add_node_from_scan`'s root full path. `hostfs_rescan` never re-runs the mount scan |
 | `root_truncated` lifetime | **Sticky for the session.** Clears on next mount, never live — a wrong clear costs the user's file, a stale flag costs a reorder |
@@ -695,6 +697,8 @@ worst case there is no problem to solve.
 | Full rescan once per second becomes O(volume) | **High** | Directory-mtime skip (PR 4). Without it a 60k-node volume issues 60k `stat` calls/second under guest I/O |
 | `hostfs_map_find` linear scan on every block access | **High** | Direct `block_to_map` index (PR 3). Otherwise guest disk I/O degrades with volume size, not with transfer size |
 | `block_to_map` drifts out of sync with `map` | Medium | Maintain it in the same helpers that insert/remove map entries; assert index/`map` agreement in a debug build |
+| Reconcile deletes a host file after a failed rename | **High** | Traced and fixed in PR 2: `parent_index` follows the catalog even when the host rename fails, so the old parent never sees the node as an orphan. Covered by `test_failed_move_keeps_host_file`, which fails if the behavior is reintroduced |
+| A directory over 256 entries drops the rest while `HOSTFS_SCAN_MAX` exists | Medium | Warned via the `truncated` out-parameter until PR 3 removes the bound |
 | Reworded root warning fires on an existing sample folder | Low | `samples/hostfs/` root holds 5 entries; the message names the fix (move it into a folder) |
 | `hostfs.order` rewritten with only the 51 survivors, losing the user's ordering for the rest | Medium | Root persist frozen while `root_truncated` (PR 1). Only bites an already-over-limit folder, and freezing means the file is never touched |
 | Root reordering silently fails to persist while over the limit | Low | Second warning line states it explicitly; clears on next mount under 51 |
@@ -781,12 +785,72 @@ worst case there is no problem to solve.
         call sites are in `hostfs_rescan_dir` (2959, 2965)
   - [ ] Fix the `file->host_path` argument passed across the recursive scan
   - [ ] **Audit every `hostfs_node *` capture for an intervening growth point** — list them in the PR body
-  - [ ] `hostfs_alloc_file_slot` grows; ceiling hit emits stderr, not a silent break
-  - [ ] `HOSTFS_MAX_FILES` deleted
-  - [ ] All 10 existing tests pass **unmodified**
+  - [x] `hostfs_alloc_file_slot` grows; ceiling hit emits stderr, not a silent break
+  - [x] `HOSTFS_MAX_FILES` deleted — **partly deferred, see below**
+  - [x] All existing tests pass **unmodified**
 - **Description:** The load-bearing change, and the one that unblocks `pt3plr`. No
   behavior change is intended beyond the raised ceiling — the existing suite is the
   referee.
+
+**Landed** as `b5c402b`, plus the follow-up below. `sizeof(hostfs_node)` is 56 as
+designed; `hostfs_volume` drops from 345200 to 14488 bytes; `samples/hostfs/pt3plr`
+mounts all 259 nodes with the player present.
+
+Two things PR 3 inherits rather than rediscovers:
+
+#### `HOSTFS_MAX_FILES` split, not deleted outright
+
+Deleting the constant outright would have pulled all of PR 3's buffer work into PR 2.
+The split that was taken instead:
+
+| Buffer kind | Sized by | PR 2 |
+|---|---|---|
+| `seen` (reconcile), `matched` (rescan) | **node index** | **Moved now.** A fixed 256 array overflows the moment the table grows past it, so these became a small grown bitmap (`hostfs_marks`). Not optional |
+| `scans`, `order_names`, `dent ents[]` | entries in **one directory** | Interim `HOSTFS_SCAN_MAX 256`, private to `hostfs.c` |
+| `order_basenames` | root entries | Pulled forward: bounded by `HOSTFS_ROOT_MAX_ENTRIES`, which is what takes 64 KB out of the struct |
+
+`HOSTFS_SCAN_MAX` is a **documented per-directory bound, not a volume node budget**,
+and PR 3 deletes it. While it exists a directory holding more than 256 mountable
+entries would silently drop the rest — the exact bug this work exists to kill — so
+`hostfs_collect_scans_in` gained a `bool *truncated` out-parameter and both callers
+warn:
+
+```text
+a2m: HostFS <dir>: more than 256 entries in one directory; the rest are not in the catalog
+```
+
+`hostfs_load_order_file` shares the cap. It was left alone because truncating there
+only means later names are not pinned in the catalog order; nothing is dropped.
+
+#### The failed-rename path, traced
+
+PR 2 first made a cross-directory move commit `parent_index` only when the host
+`rename` succeeded, on the reasoning that a node should not derive a path that does
+not exist. Tracing it to its conclusion showed that is wrong, and destructively so:
+
+> The node keeps `parent_index = SRC`. The guest has already removed its entry from
+> SRC's catalog. SRC's next reconcile walks its children, finds a node claiming SRC as
+> its parent with no matching directory entry, reads that as a guest-side delete, and
+> calls `hostfs_destroy_reconciled_node` — which **unlinks the real host file**.
+
+Measured against the PR 1 build on a forced rename failure (target directory chmod
+`0500`): PR 1 keeps `SRC/DATA`, the first PR 2 draft deleted it. So:
+
+- **`parent_index` moves unconditionally**, as it did before PR 2. The node then
+  derives a path that does not exist, which the next `hostfs_rescan` resolves — the
+  phantom entry is deactivated under the new parent and the real file is re-adopted
+  under the old one. Verified end to end.
+- **Every failed `rename` now warns.** All three sites were silent, and the file
+  rename/retype site discarded the return value outright. A failed host rename is
+  precisely the event a user needs to see:
+
+```text
+a2m: HostFS move failed: <old> -> <new> (catalog moved, host file did not)
+a2m: HostFS rename failed: <old> -> <new> (catalog renamed, host file did not)
+```
+
+  Unsuppressed, unlike the directory-full warnings: reconcile runs only on a guest
+  directory write, not on the once-per-second refresh, so these cannot flood.
 
 ### PR 3 — Buffers sized from actual counts + O(1) block lookup
 
@@ -795,9 +859,15 @@ worst case there is no problem to solve.
 - **Dependencies:** PR 2
 - **Checklist:**
   - [ ] Scan buffers sized from the `readdir` count for that directory
+  - [ ] **Delete `HOSTFS_SCAN_MAX`** (PR 2's interim per-directory bound) and with it
+        the `truncated` out-parameter on `hostfs_collect_scans_in`, its two warning
+        sites, and `test_directory_scan_truncation_warns`, which asserts the interim
+        behavior and must be replaced by the 1000-entry cases below
   - [ ] `dent ents[]` off the stack, sized from the directory's block chain
-  - [ ] `used` / `seen` / `matched` off the stack, sized `node_count`
-  - [ ] `order_basenames` bounded by `HOSTFS_ROOT_MAX_ENTRIES`
+  - [ ] `used` off the stack, sized from the scan count — `seen` / `matched` already
+        moved in PR 2 (they are indexed by node index, so a fixed array overflowed
+        as soon as the table grew)
+  - [x] `order_basenames` bounded by `HOSTFS_ROOT_MAX_ENTRIES` — done in PR 2
   - [ ] `int32_t *block_to_map` direct index replacing the `hostfs_map_find` linear
         scan; maintained wherever `map` is inserted into or removed from; freed in
         `hostfs_eject`

@@ -1730,11 +1730,16 @@ static bool hostfs_should_skip_basename(const char *name)
     return false;
 }
 
-/* Collect immediate children of host_dir_path into out[]. Returns count or -1. */
+/* Collect immediate children into out[]. Sets *truncated when the directory
+   holds more mountable entries than the buffer can take, so the caller can say
+   so rather than dropping them silently. */
 static int hostfs_collect_scans_in(
-    const char *host_dir_path, hostfs_scan_ent *out, int max_out)
+    const char *host_dir_path, hostfs_scan_ent *out, int max_out, bool *truncated)
 {
     int count = 0;
+    if (truncated != NULL) {
+        *truncated = false;
+    }
 #if defined(_WIN32)
     WIN32_FIND_DATAA data;
     HANDLE handle;
@@ -1751,6 +1756,9 @@ static int hostfs_collect_scans_in(
             continue;
         }
         if (count >= max_out) {
+            if (truncated != NULL) {
+                *truncated = true;
+            }
             break;
         }
         hostfs_path_join(full, sizeof(full), host_dir_path, data.cFileName);
@@ -1799,6 +1807,9 @@ static int hostfs_collect_scans_in(
             continue;
         }
         if (count >= max_out) {
+            if (truncated != NULL) {
+                *truncated = true;
+            }
             break;
         }
         hostfs_path_join(full, sizeof(full), host_dir_path, entry->d_name);
@@ -2105,6 +2116,7 @@ static int hostfs_scan_dir_recursive(
     int n;
     int i;
     int rc = A2_OK;
+    bool truncated = false;
     int accepted = 0;
     int dropped = 0;
     int named = 0;
@@ -2124,10 +2136,15 @@ static int hostfs_scan_dir_recursive(
         return A2_ERR;
     }
 
-    n = hostfs_collect_scans_in(host_dir_path, scans, HOSTFS_SCAN_MAX);
+    n = hostfs_collect_scans_in(host_dir_path, scans, HOSTFS_SCAN_MAX, &truncated);
     if (n < 0) {
         rc = A2_ERR;
         goto done;
+    }
+    if (truncated) {
+        hostfs_warn(
+            vol, "%s: more than %d entries in one directory; the rest are not in the catalog",
+            host_dir_path, HOSTFS_SCAN_MAX);
     }
     order_count = hostfs_load_order_file(host_dir_path, order_names, HOSTFS_SCAN_MAX);
     if (order_count > 0) {
@@ -2808,8 +2825,17 @@ static int hostfs_reconcile_directory_at(hostfs_volume *vol, int parent_index)
                 }
                 if (strcmp(old_path, dest) == 0 || rename(old_path, dest) == 0) {
                     hostfs_node_set_basename(vol, fi, hostfs_path_basename(dest));
-                    file->parent_index = parent_index;
+                } else {
+                    hostfs_warn(
+                        vol, "move failed: %s -> %s (catalog moved, host file did not)",
+                        old_path, dest);
                 }
+                /* The parent moves whether or not the host rename worked. If it
+                   did not, the node points at a path that does not exist and the
+                   next rescan cleans it up - but leaving parent_index behind
+                   would make the old parent's next reconcile see an entry that
+                   vanished from its catalog and delete the real host file. */
+                file->parent_index = parent_index;
             }
 
             if (file->kind == HOSTFS_KIND_DIR || de->storage_type == HOSTFS_STOR_SUBDIR) {
@@ -2818,8 +2844,15 @@ static int hostfs_reconcile_directory_at(hostfs_volume *vol, int parent_index)
                     char old_path[HOSTFS_PATH_MAX];
                     if (hostfs_node_host_path(vol, fi, old_path, sizeof(old_path)) == A2_OK) {
                         hostfs_path_join(dest, sizeof(dest), parent_path, de->name);
-                        if (strcmp(old_path, dest) != 0 && rename(old_path, dest) == 0) {
+                        if (strcmp(old_path, dest) == 0) {
+                            /* Already there. */
+                        } else if (rename(old_path, dest) == 0) {
                             hostfs_node_set_basename(vol, fi, hostfs_path_basename(dest));
+                        } else {
+                            hostfs_warn(
+                                vol, "rename failed: %s -> %s (catalog renamed, host "
+                                     "directory did not)",
+                                old_path, dest);
                         }
                     }
                     snprintf(file->prodos_name, sizeof(file->prodos_name), "%s", de->name);
@@ -2844,8 +2877,15 @@ static int hostfs_reconcile_directory_at(hostfs_volume *vol, int parent_index)
                         hostfs_node_host_path(vol, fi, old_path, sizeof(old_path)) == A2_OK) {
                         hostfs_path_join(dest, sizeof(dest), parent_path, naps);
                         if (strcmp(old_path, dest) != 0) {
-                            (void)rename(old_path, dest);
-                            hostfs_node_set_basename(vol, fi, hostfs_path_basename(dest));
+                            if (rename(old_path, dest) == 0) {
+                                hostfs_node_set_basename(
+                                    vol, fi, hostfs_path_basename(dest));
+                            } else {
+                                hostfs_warn(
+                                    vol, "rename failed: %s -> %s (catalog renamed, host "
+                                         "file did not)",
+                                    old_path, dest);
+                            }
                         }
                     }
                     snprintf(file->prodos_name, sizeof(file->prodos_name), "%s", de->name);
@@ -3265,6 +3305,7 @@ static int hostfs_rescan_dir(
     int n;
     int i;
     int rc = A2_OK;
+    bool truncated = false;
 
     scans = (hostfs_scan_ent *)calloc((size_t)HOSTFS_SCAN_MAX, sizeof(hostfs_scan_ent));
     order_names =
@@ -3275,10 +3316,15 @@ static int hostfs_rescan_dir(
         return A2_ERR;
     }
 
-    n = hostfs_collect_scans_in(host_dir_path, scans, HOSTFS_SCAN_MAX);
+    n = hostfs_collect_scans_in(host_dir_path, scans, HOSTFS_SCAN_MAX, &truncated);
     if (n < 0) {
         rc = A2_ERR;
         goto done;
+    }
+    if (truncated) {
+        hostfs_warn(
+            vol, "%s: more than %d entries in one directory; the rest are not in the catalog",
+            host_dir_path, HOSTFS_SCAN_MAX);
     }
     order_count = hostfs_load_order_file(host_dir_path, order_names, HOSTFS_SCAN_MAX);
     if (order_count > 0) {
