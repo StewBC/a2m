@@ -1195,6 +1195,305 @@ static void test_touch_refresh(void)
     wipe_tree(dir);
 }
 
+/* ---- ProDOS 51-entry volume directory ---- */
+
+/* Walk the whole four-block volume directory (2-5), not just block 2. Counts
+   live entries and optionally looks for one by ProDOS name. */
+static int root_catalog(hostfs_volume *vol, const char *want, int *out_count)
+{
+    int found = 0;
+    int count = 0;
+    uint16_t b;
+
+    for (b = 2u; b < 2u + HOSTFS_ROOT_DIR_BLOCKS; ++b) {
+        uint8_t blk[512];
+        int slot;
+        /* Slot 0 of the first block is the volume header, not a file. */
+        int start = (b == 2u) ? 1 : 0;
+
+        if (hostfs_read_block(vol, b, blk) != 0) {
+            fail("read volume directory block");
+        }
+        for (slot = start; slot < HOSTFS_ENTRIES_PER_BLOCK; ++slot) {
+            const uint8_t *e = blk + 4 + slot * HOSTFS_ENTRY_LENGTH;
+            uint8_t nl = (uint8_t)(e[0] & 0x0Fu);
+            char nm[HOSTFS_NAME_MAX];
+
+            if (e[0] == 0) {
+                continue;
+            }
+            memcpy(nm, e + 1, nl);
+            nm[nl] = '\0';
+            count++;
+            if (want != NULL && strcmp(nm, want) == 0) {
+                found = 1;
+            }
+        }
+    }
+    if (out_count != NULL) {
+        *out_count = count;
+    }
+    return found;
+}
+
+/* F00#060000 .. FNN#060000 — two digits so the case-insensitive scan order and
+   the manifest order agree, and the 52nd entry is unambiguous. */
+static void make_numbered_files(const char *dir, int first, int last)
+{
+    int i;
+    for (i = first; i <= last; ++i) {
+        char path[512];
+        snprintf(path, sizeof(path), "%s/F%02d#060000", dir, i);
+        write_file(path, "x", 1);
+    }
+}
+
+static void write_numbered_order_file(const char *dir, int first, int last)
+{
+    char path[512];
+    FILE *fp;
+    int i;
+
+    snprintf(path, sizeof(path), "%s/%s", dir, HOSTFS_ORDER_FILENAME);
+    fp = fopen(path, "w");
+    if (fp == NULL) {
+        fail("write order file");
+    }
+    fprintf(fp, "# a2m HostFS catalog order (NAPS files and directory basenames)\n");
+    for (i = first; i <= last; ++i) {
+        fprintf(fp, "F%02d#060000\n", i);
+    }
+    fclose(fp);
+}
+
+static long slurp(const char *path, char *out, size_t out_size)
+{
+    FILE *fp = fopen(path, "rb");
+    size_t n;
+    if (fp == NULL) {
+        return -1;
+    }
+    n = fread(out, 1, out_size, fp);
+    fclose(fp);
+    return (long)n;
+}
+
+/* Swap the first two live entries of the volume directory, CAT.DOCTOR-style,
+   and write the block back so the guest-side reconcile runs. */
+static void swap_first_two_root_entries(hostfs_volume *vol)
+{
+    uint8_t dirblk[512];
+    uint8_t tmp[HOSTFS_ENTRY_LENGTH];
+    uint8_t *first = NULL;
+    uint8_t *second = NULL;
+    int slot;
+
+    if (hostfs_read_block(vol, 2, dirblk) != 0) {
+        fail("read volume directory for swap");
+    }
+    for (slot = 1; slot < HOSTFS_ENTRIES_PER_BLOCK; ++slot) {
+        uint8_t *e = dirblk + 4 + slot * HOSTFS_ENTRY_LENGTH;
+        if (e[0] == 0) {
+            continue;
+        }
+        if (first == NULL) {
+            first = e;
+        } else {
+            second = e;
+            break;
+        }
+    }
+    if (first == NULL || second == NULL) {
+        fail("need two root entries to swap");
+    }
+    memcpy(tmp, first, HOSTFS_ENTRY_LENGTH);
+    memcpy(first, second, HOSTFS_ENTRY_LENGTH);
+    memcpy(second, tmp, HOSTFS_ENTRY_LENGTH);
+    if (hostfs_write_block(vol, 2, dirblk) != 0) {
+        fail("write swapped volume directory");
+    }
+}
+
+static void test_root_entry_limit(void)
+{
+    const char *dir = "test_hostfs_root_limit";
+    hostfs_volume *vol;
+    uint8_t blk[512];
+    int count = 0;
+
+    wipe_tree(dir);
+    HOSTFS_MKDIR(dir);
+    make_numbered_files(dir, 0, 59);
+
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL) {
+        fail("root limit mount");
+    }
+
+    /* One accumulated line for all nine drops, not one line each. */
+    if (hostfs_warning_count(vol) != 1) {
+        fprintf(stderr, "warn_count=%d last=%s\n",
+                hostfs_warning_count(vol), hostfs_last_warning(vol));
+        fail("expected exactly one root-overflow warning");
+    }
+    if (strstr(hostfs_last_warning(vol), "dropped 9") == NULL) {
+        fprintf(stderr, "warning: %s\n", hostfs_last_warning(vol));
+        fail("warning should name the drop count");
+    }
+    /* Host basenames, not ProDOS names: a dropped entry is only findable on the
+       host, so "F51" alone would name a string that exists nowhere. */
+    if (strstr(hostfs_last_warning(vol), "F51#060000") == NULL) {
+        fprintf(stderr, "warning: %s\n", hostfs_last_warning(vol));
+        fail("warning should name dropped host basenames");
+    }
+
+    (void)root_catalog(vol, NULL, &count);
+    if (count != HOSTFS_ROOT_MAX_ENTRIES) {
+        fprintf(stderr, "root entries=%d\n", count);
+        fail("volume directory must hold exactly 51 entries");
+    }
+    if (hostfs_file_count(vol) != HOSTFS_ROOT_MAX_ENTRIES) {
+        fprintf(stderr, "file_count=%d\n", hostfs_file_count(vol));
+        fail("file_count must match the catalog");
+    }
+    if (!root_catalog(vol, "F50", NULL)) {
+        fail("F50 is the 51st entry and must be present");
+    }
+    if (root_catalog(vol, "F51", NULL)) {
+        fail("F51 is the 52nd entry and must be dropped");
+    }
+
+    /* The chain is exactly blocks 2-5, closed at both ends. */
+    if (hostfs_read_block(vol, 2, blk) != 0) {
+        fail("read block 2");
+    }
+    if (blk[0] != 0 || blk[1] != 0) {
+        fail("block 2 prev must be 0");
+    }
+    if (blk[2] != 3 || blk[3] != 0) {
+        fail("block 2 next must be 3");
+    }
+    if (hostfs_read_block(vol, 5, blk) != 0) {
+        fail("read block 5");
+    }
+    if (blk[0] != 4 || blk[1] != 0) {
+        fail("block 5 prev must be 4");
+    }
+    if (blk[2] != 0 || blk[3] != 0) {
+        fail("block 5 next must be 0");
+    }
+
+    hostfs_eject(vol);
+    wipe_tree(dir);
+}
+
+/* Over the limit at mount: the catalog is a 51-entry view of a 60-entry folder,
+   so a guest-side reorder must not rewrite the user's manifest with the 51. */
+static void test_order_manifest_frozen_when_truncated(void)
+{
+    const char *dir = "test_hostfs_order_freeze";
+    char path[512];
+    char before[8192];
+    char after[8192];
+    long n_before;
+    long n_after;
+    hostfs_volume *vol;
+
+    wipe_tree(dir);
+    HOSTFS_MKDIR(dir);
+    make_numbered_files(dir, 0, 59);
+    write_numbered_order_file(dir, 0, 59);
+    snprintf(path, sizeof(path), "%s/%s", dir, HOSTFS_ORDER_FILENAME);
+    n_before = slurp(path, before, sizeof(before));
+    if (n_before <= 0) {
+        fail("seed order file");
+    }
+
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL) {
+        fail("freeze mount");
+    }
+    if (hostfs_warning_count(vol) != 1) {
+        fail("expected the root-overflow warning at mount");
+    }
+
+    swap_first_two_root_entries(vol);
+
+    /* The freeze fired, rather than the "nothing changed" early return. */
+    if (hostfs_warning_count(vol) != 2 ||
+        strstr(hostfs_last_warning(vol), "left unchanged") == NULL) {
+        fprintf(stderr, "warn_count=%d last=%s\n",
+                hostfs_warning_count(vol), hostfs_last_warning(vol));
+        fail("expected the manifest-frozen warning after a root reorder");
+    }
+
+    hostfs_eject(vol);
+
+    n_after = slurp(path, after, sizeof(after));
+    if (n_after != n_before || memcmp(before, after, (size_t)n_before) != 0) {
+        fail("hostfs.order rewritten while the root was truncated");
+    }
+    wipe_tree(dir);
+}
+
+/* Under the limit at mount, filled past it while mounted. hostfs_rescan never
+   re-runs the mount scan, so this reaches the freeze through the add path. */
+static void test_order_manifest_frozen_after_mount(void)
+{
+    const char *dir = "test_hostfs_order_fill";
+    char path[512];
+    char before[8192];
+    char after[8192];
+    long n_before;
+    long n_after;
+    hostfs_volume *vol;
+    int count = 0;
+
+    wipe_tree(dir);
+    HOSTFS_MKDIR(dir);
+    make_numbered_files(dir, 0, 44);
+    write_numbered_order_file(dir, 0, 59);
+    snprintf(path, sizeof(path), "%s/%s", dir, HOSTFS_ORDER_FILENAME);
+    n_before = slurp(path, before, sizeof(before));
+    if (n_before <= 0) {
+        fail("seed order file");
+    }
+
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL) {
+        fail("fill mount");
+    }
+    if (hostfs_warning_count(vol) != 0) {
+        fprintf(stderr, "last=%s\n", hostfs_last_warning(vol));
+        fail("a root under the limit must mount clean");
+    }
+
+    make_numbered_files(dir, 45, 59);
+    if (hostfs_rescan(vol) != 0) {
+        fail("rescan after filling the root");
+    }
+
+    (void)root_catalog(vol, NULL, &count);
+    if (count != HOSTFS_ROOT_MAX_ENTRIES) {
+        fprintf(stderr, "root entries=%d\n", count);
+        fail("rescan must stop at 51 entries");
+    }
+    if (hostfs_warning_count(vol) != 2 ||
+        strstr(hostfs_last_warning(vol), "left unchanged") == NULL) {
+        fprintf(stderr, "warn_count=%d last=%s\n",
+                hostfs_warning_count(vol), hostfs_last_warning(vol));
+        fail("expected root-full then manifest-frozen warnings");
+    }
+
+    hostfs_eject(vol);
+
+    n_after = slurp(path, after, sizeof(after));
+    if (n_after != n_before || memcmp(before, after, (size_t)n_before) != 0) {
+        fail("hostfs.order rewritten after the root filled up post-mount");
+    }
+    wipe_tree(dir);
+}
+
 int main(void)
 {
     test_naps_and_mangle();
@@ -1207,6 +1506,9 @@ int main(void)
     test_dir_write_through();
     test_order_manifest();
     test_touch_refresh();
+    test_root_entry_limit();
+    test_order_manifest_frozen_when_truncated();
+    test_order_manifest_frozen_after_mount();
     printf("hostfs tests ok\n");
     return 0;
 }

@@ -8,6 +8,7 @@
 #include "apple2.h"
 #include "apple2_file.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,9 +36,8 @@
 #endif
 
 enum {
-    HOSTFS_ENTRY_LENGTH = 39,
-    HOSTFS_ENTRIES_PER_BLOCK = 13,
     HOSTFS_BITMAP_BLOCKS = 16,
+    HOSTFS_WARN_MAX = 256, /* longest diagnostic line retained for tests */
     HOSTFS_ACCESS_FILE = 0xC3u,
     HOSTFS_ACCESS_VOL = 0xC3u,
     HOSTFS_ACCESS_DIR = 0xC3u,
@@ -118,7 +118,17 @@ struct hostfs_volume {
     int device;
     int host_directory_changed;
     bool dirty;
-    bool dir_full_warned;
+    /* Warning suppression is per cause: one shared flag would let whichever fired
+       first silence the others for the life of the mount. */
+    bool root_full_warned;
+    bool subdir_full_warned;
+    bool order_frozen_warned;
+    /* Host root holds more than HOSTFS_ROOT_MAX_ENTRIES entries, so the catalog is
+       a truncated view of it. Sticky: set by the mount scan or by a post-mount add
+       that found the root full, and never cleared while mounted. */
+    bool root_truncated;
+    int warn_count;
+    char last_warning[HOSTFS_WARN_MAX];
     /* Last persisted catalog order (host basenames); used to avoid needless rewrites. */
     char order_basenames[HOSTFS_MAX_FILES][256];
     int order_count;
@@ -128,6 +138,35 @@ struct hostfs_volume {
 
 static bool hostfs_should_skip_basename(const char *name);
 static const char *hostfs_path_basename(const char *path);
+
+/* Single seam for every HostFS diagnostic. Writes one "a2m: HostFS ..." line to
+   stderr and records it on the volume so tests can assert a warning fired without
+   capturing stderr. Callers own suppression; this always reports. */
+static void hostfs_warn(hostfs_volume *vol, const char *fmt, ...)
+{
+    char msg[HOSTFS_WARN_MAX];
+    va_list ap;
+
+    va_start(ap, fmt);
+    vsnprintf(msg, sizeof(msg), fmt, ap);
+    va_end(ap);
+
+    fprintf(stderr, "a2m: HostFS %s\n", msg);
+    if (vol != NULL) {
+        snprintf(vol->last_warning, sizeof(vol->last_warning), "%s", msg);
+        vol->warn_count++;
+    }
+}
+
+int hostfs_warning_count(const hostfs_volume *vol)
+{
+    return vol == NULL ? 0 : vol->warn_count;
+}
+
+const char *hostfs_last_warning(const hostfs_volume *vol)
+{
+    return vol == NULL ? "" : vol->last_warning;
+}
 
 static uint64_t hostfs_now_ms(void)
 {
@@ -1771,6 +1810,23 @@ static int hostfs_persist_order_manifest_in(hostfs_volume *vol, int parent_index
             free(previous);
             return A2_OK;
         }
+        /* The catalog is a truncated view of the host root, so rewriting the
+           manifest from it would drop the user's ordering for everything past
+           the cap - from their own file, permanently. Freeze instead: the
+           equality check above ran first, so this only fires when a write really
+           would have happened. Clears on the next mount, not live. */
+        if (vol->root_truncated) {
+            if (!vol->order_frozen_warned) {
+                hostfs_warn(
+                    vol, "%s: " HOSTFS_ORDER_FILENAME
+                         " left unchanged while the root is over the limit",
+                    vol->root_path);
+                vol->order_frozen_warned = true;
+            }
+            free(current);
+            free(previous);
+            return A2_OK;
+        }
     } else if (hostfs_order_lists_equal(current, count, previous, prev_count)) {
         free(current);
         free(previous);
@@ -1816,10 +1872,15 @@ static int hostfs_scan_dir_recursive(
     int n;
     int i;
     int rc = A2_OK;
+    int accepted = 0;
+    int dropped = 0;
+    int named = 0;
+    char drop_list[160];
 
     if (depth > HOSTFS_MAX_DEPTH) {
         return A2_OK;
     }
+    drop_list[0] = '\0';
 
     scans = (hostfs_scan_ent *)calloc((size_t)HOSTFS_MAX_FILES, sizeof(hostfs_scan_ent));
     order_names =
@@ -1846,6 +1907,20 @@ static int hostfs_scan_dir_recursive(
         hostfs_file *file;
         int fi;
         if (hostfs_active_name_exists(vol, parent_index, scans[i].prodos, -1)) {
+            continue;
+        }
+        /* The volume directory cannot grow past its four blocks. Name the host
+           basenames, not the ProDOS names: a dropped entry never enters the
+           catalog, so its ProDOS name exists nowhere the user can look. */
+        if (parent_index < 0 && accepted >= HOSTFS_ROOT_MAX_ENTRIES) {
+            dropped++;
+            if (named < 5) {
+                size_t used = strlen(drop_list);
+                snprintf(
+                    drop_list + used, sizeof(drop_list) - used, "%s%s",
+                    named > 0 ? ", " : "", scans[i].basename);
+                named++;
+            }
             continue;
         }
         if (vol->file_slots >= HOSTFS_MAX_FILES) {
@@ -1881,12 +1956,26 @@ static int hostfs_scan_dir_recursive(
             file->host_size = scans[i].size;
         }
 
+        accepted++;
         if (parent_index < 0 && vol->order_count < HOSTFS_MAX_FILES) {
             snprintf(
                 vol->order_basenames[vol->order_count], HOSTFS_BASENAME_MAX, "%s",
                 scans[i].basename);
             vol->order_count++;
         }
+    }
+
+    if (dropped > 0) {
+        char tail[32];
+        tail[0] = '\0';
+        if (dropped > named) {
+            snprintf(tail, sizeof(tail), " (+%d more)", dropped - named);
+        }
+        vol->root_truncated = true;
+        /* One accumulated line per scan, so a badly shaped folder cannot flood. */
+        hostfs_warn(
+            vol, "%s: volume directory holds %d entries (ProDOS limit); dropped %d: %s%s",
+            vol->root_path, HOSTFS_ROOT_MAX_ENTRIES, dropped, drop_list, tail);
     }
 
 done:
@@ -1958,14 +2047,10 @@ hostfs_volume *hostfs_mount(const char *root_path, const char *volume_name)
         return NULL;
     }
 
-    {
-        int root_children = hostfs_child_count(vol, -1);
-        vol->dir_block_count = hostfs_dir_blocks_for_files(root_children);
-        /* Leave spare directory capacity for Phase 2 adds when possible. */
-        if (vol->dir_block_count < 2u && root_children > 0) {
-            vol->dir_block_count = 2u;
-        }
-    }
+    /* The ProDOS volume directory is always blocks 2-5 and cannot be extended, so
+       the root never consults hostfs_dir_blocks_for_files. That puts the volume
+       bitmap at a constant block 6, as on a real volume. */
+    vol->dir_block_count = (uint16_t)HOSTFS_ROOT_DIR_BLOCKS;
     for (i = 0; i < vol->file_slots; ++i) {
         int children;
         uint16_t blocks;
@@ -2845,10 +2930,26 @@ static int hostfs_add_node_from_scan(
         }
     }
     if (entry == NULL) {
-        if (!vol->dir_full_warned) {
-            fprintf(stderr,
-                    "a2m: HostFS directory full; remount to pick up new files\n");
-            vol->dir_full_warned = true;
+        if (parent_index < 0) {
+            /* The root is out of entries and cannot grow, so a remount will not
+               help - the folder itself has to change. Mark the catalog truncated
+               so the order manifest is not rewritten short: hostfs_rescan never
+               re-runs the mount scan, so this is the only place a root that fills
+               up after mount can be caught. */
+            vol->root_truncated = true;
+            if (!vol->root_full_warned) {
+                hostfs_warn(
+                    vol,
+                    "%s: volume directory is full (%d entries, ProDOS limit); "
+                    "'%s' not added - move it into a folder",
+                    vol->root_path, HOSTFS_ROOT_MAX_ENTRIES, sc->basename);
+                vol->root_full_warned = true;
+            }
+        } else if (!vol->subdir_full_warned) {
+            hostfs_warn(
+                vol, "%s: directory full; remount to pick up new files",
+                hostfs_parent_host_path(vol, parent_index));
+            vol->subdir_full_warned = true;
         }
         return A2_ERR;
     }

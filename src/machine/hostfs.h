@@ -13,6 +13,15 @@
 #define HOSTFS_MAX_DEPTH 8
 #define HOSTFS_PATH_MAX 1024
 #define HOSTFS_NAME_MAX 16 /* ProDOS name + NUL */
+
+/* ProDOS directory format. A 512-byte block is 4 bytes of prev/next plus
+   13 entries of 39. The volume directory is always blocks 2-5 and cannot be
+   extended, and its first entry is the volume header, so a HostFS root holds
+   51 files. Subdirectories grow by linking blocks and have no such limit. */
+#define HOSTFS_ENTRY_LENGTH 39
+#define HOSTFS_ENTRIES_PER_BLOCK 13
+#define HOSTFS_ROOT_DIR_BLOCKS 4
+#define HOSTFS_ROOT_MAX_ENTRIES (HOSTFS_ROOT_DIR_BLOCKS * HOSTFS_ENTRIES_PER_BLOCK - 1)
 /* Optional catalog-order manifest in a HostFS directory (not mounted as a file). */
 #define HOSTFS_ORDER_FILENAME "hostfs.order"
 
@@ -71,3 +80,6 @@ bool hostfs_naps_parse_name(
     uint8_t *file_type,
     uint16_t *aux_type);
 bool hostfs_mangle_prodos_name(const char *stem, char *out, size_t out_size);
+/* Diagnostics fired on this volume since mount (see hostfs_warn). */
+int hostfs_warning_count(const hostfs_volume *vol);
+const char *hostfs_last_warning(const hostfs_volume *vol);
