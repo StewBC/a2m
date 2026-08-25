@@ -264,10 +264,41 @@ Mount and eject are already safe: `current` (51) equals `vol->order_basenames` (
 populated only from accepted children), so the early return fires. It is the first
 guest-side mutation that does the damage.
 
-**Resolution: do not rewrite the root manifest while the root is truncated.** Set a
-`root_truncated` flag during the root scan; when it is set,
-`hostfs_persist_order_manifest_in(vol, -1)` returns early without writing.
-Subdirectory manifests are unaffected. Roughly three lines.
+**Resolution: do not rewrite the root manifest while the root is truncated.** When
+`vol->root_truncated` is set, `hostfs_persist_order_manifest_in(vol, -1)` returns
+early without writing. Putting the check inside `_in`, gated on `parent_index < 0`,
+covers all three call sites — flush [`1927`](../src/machine/hostfs.c), reconcile
+[`2564`](../src/machine/hostfs.c), rescan [`3055`](../src/machine/hostfs.c) — with
+subdirectories unaffected.
+
+**The flag has two set sites, not one.** The mount scan is the obvious one, but the
+root can also *become* truncated after mount, and `hostfs_rescan` never re-runs
+`hostfs_scan_into_files` — it uses the incremental `hostfs_rescan_dir` path, then
+persists the root manifest at [`3055`](../src/machine/hostfs.c). So:
+
+> Root holds 45 entries and a 60-line `hostfs.order` (the user pre-declared an order
+> for files not yet copied in). While mounted they copy in 20 more. The rescan adds 6,
+> the rest fail on `entry == NULL` and fire the root-full warning — the catalog is now
+> 51, `root_truncated` was never set, and the manifest is rewritten with 51 names.
+
+Same loss through the other door. Set the flag in the root branch of the
+`entry == NULL` path in [`hostfs_add_node_from_scan`](../src/machine/hostfs.c) as
+well. That is complete: `hostfs_add_node_from_scan` has exactly one call site
+([`2964`](../src/machine/hostfs.c), inside `hostfs_rescan_dir`) and is the only
+post-mount path that adds a node from a host scan.
+
+**The flag is sticky for the session.** It is never cleared live. Clearing is
+*possible* — `hostfs_rescan_dir` re-`readdir`s the root every pass, so it could clear
+when nothing was rejected and the count is under 51 — but the failure modes are not
+symmetric:
+
+| Wrong choice | Consequence |
+|---|---|
+| Sticky when it could have cleared | Reordering does not persist until remount. Visible, no data lost |
+| Cleared when it should not have | Manifest rewritten short. Silent, permanent — the bug this exists to prevent |
+
+Take the safe one. A new state transition guarding against a cosmetic annoyance is a
+bad trade when getting it wrong costs the user's file.
 
 Rejected alternative — "append any `previous` name not in `current`" — because the
 persist function cannot distinguish the two reasons a name is missing:
@@ -288,12 +319,28 @@ instead of where the user had it.
 
 Accepted cost: guest-side **root** reordering does not persist while the folder is
 over the limit. A 51-entry catalog cannot faithfully express a 60-entry ordering
-anyway, the folder is already warned about, and the behavior self-heals as soon as the
-root is under 51. Surfaced in the warning:
+anyway, and the folder is already warned about. Because the flag is sticky, this
+clears **on the next mount** once the root is under 51 — not live in the same session.
+
+Surfaced in the warning:
 
 ```text
 a2m: HostFS <root>: hostfs.order left unchanged while the root is over the limit
 ```
+
+**Ordering inside the function matters.** Run the existing "lists are equal" early
+return *first*, the freeze check *second*, and give the freeze line its own
+suppression flag like the two dir-full messages. Otherwise every mount+eject of an
+over-limit folder emits the line even though no write was ever going to happen —
+`hostfs_eject` → `hostfs_flush` → root persist runs unconditionally.
+
+With that ordering the line fires only when a write genuinely would have occurred, and
+the PR 1 assertion stays stable: `hostfs_mount` never persists at all (the only call
+sites are flush, reconcile, and rescan), so `warn_count == 1` holds from the drop line
+at mount and survives a no-change eject, where the equality check returns first. The
+two `calloc`s still run ahead of the equality check; that is 128 KB today and sized to
+reality after PR 3, which is nothing against warning about a write that never
+happened.
 
 ### Collision-safe ProDOS names
 
@@ -612,6 +659,9 @@ worst case there is no problem to solve.
 | Constant location | **`hostfs.h`**, with `HOSTFS_ENTRY_LENGTH` / `HOSTFS_ENTRIES_PER_BLOCK` promoted from the private enum so 51 is derived |
 | Manual updates | **PR 6**, an explicit exception to `agents/rules.md` same-change-set docs |
 | `hostfs.order` when root is truncated | **Frozen, not merged.** Root persist returns early; subdirectories unaffected |
+| `root_truncated` set sites | **Two** — the mount scan and `hostfs_add_node_from_scan`'s root full path. `hostfs_rescan` never re-runs the mount scan |
+| `root_truncated` lifetime | **Sticky for the session.** Clears on next mount, never live — a wrong clear costs the user's file, a stale flag costs a reorder |
+| Freeze check position | **After** the equality early return, own suppression flag. Otherwise every mount+eject of an over-limit folder warns about a write that never happens |
 | Test-visible additions to `hostfs.h` | **Allowed** in the `/* Test helpers. */` block. Goal 7 forbids changing existing signatures, not adding |
 | Constant suffix | **No `u`.** Pure move of the enum members; they are compared against `int` in ~10 places |
 | Where the root pin lives | **`hostfs_mount`** (`hostfs.c:1963`), not `hostfs_build_volume_directory` |
@@ -647,7 +697,9 @@ worst case there is no problem to solve.
 | `block_to_map` drifts out of sync with `map` | Medium | Maintain it in the same helpers that insert/remove map entries; assert index/`map` agreement in a debug build |
 | Reworded root warning fires on an existing sample folder | Low | `samples/hostfs/` root holds 5 entries; the message names the fix (move it into a folder) |
 | `hostfs.order` rewritten with only the 51 survivors, losing the user's ordering for the rest | Medium | Root persist frozen while `root_truncated` (PR 1). Only bites an already-over-limit folder, and freezing means the file is never touched |
-| Root reordering silently fails to persist while over the limit | Low | Second warning line states it explicitly; self-heals under 51 |
+| Root reordering silently fails to persist while over the limit | Low | Second warning line states it explicitly; clears on next mount under 51 |
+| Root fills up *after* mount and misses the freeze | Medium | `root_truncated` also set in `hostfs_add_node_from_scan`; `hostfs_rescan` uses the incremental path, not the mount scan |
+| `hostfs_find_by_host_path` searches a deleted field | Medium | PR 2 converts it to parent + basename; a naive path-rebuild comparison would be quadratic |
 | Directory-mtime skip misses a same-second change | Low | Coarse-granularity filesystems only; already true of the per-file comparison; `hostfs_rescan` stays as an explicit full walk |
 | 51-entry cap breaks an existing sample folder | Low | Single user; `samples/hostfs/` root currently holds 5 entries |
 | Memory at a maximally-full volume | Low | 4.75 MB measured, allocated only if the files exist |
@@ -682,9 +734,15 @@ worst case there is no problem to solve.
   - [ ] Pin `dir_block_count` to `HOSTFS_ROOT_DIR_BLOCKS` in `hostfs_mount`
         (`hostfs.c:1963`, where the field is actually assigned);
         `hostfs_build_volume_directory` keeps consuming it
-  - [ ] `vol->root_truncated` set during the root scan; root
-        `hostfs_persist_order_manifest_in` returns early when set, so `hostfs.order`
-        is never rewritten short. Subdirectory manifests unaffected
+  - [ ] `vol->root_truncated` set in **both** places: the mount root scan, and the
+        root branch of the `entry == NULL` path in `hostfs_add_node_from_scan`
+        (`hostfs.c:2846`) so a root that fills up after mount is also caught
+  - [ ] Freeze check inside `hostfs_persist_order_manifest_in` gated on
+        `parent_index < 0`, so all three call sites (1927 / 2564 / 3055) are covered
+        and subdirectory manifests are unaffected
+  - [ ] Freeze check runs **after** the existing equality early return, with its own
+        suppression flag, so the line fires only when a write would have happened
+  - [ ] Flag is sticky for the session — never cleared live
   - [ ] Second warning line when the manifest is frozen
   - [ ] Root scan stops accepting children at `HOSTFS_ROOT_MAX_ENTRIES`
   - [ ] Root-overflow warning naming up to 5 dropped entries plus `(+N more)`
@@ -699,6 +757,8 @@ worst case there is no problem to solve.
         `next == 0`; `warn_count == 1` for the drop line
   - [ ] Test: with a 60-line `hostfs.order` present in an over-limit root, a guest-side
         root mutation leaves the file byte-identical
+  - [ ] Test: root under the limit at mount, files added to the host until it fills,
+        rescan → manifest still byte-identical (the post-mount set site)
   - [ ] `hostfs_warning_count()` / `hostfs_last_warning()` added to the
         `/* Test helpers. */` block
 - **Description:** Small, self-contained, and independent of the node-table work.
@@ -715,6 +775,10 @@ worst case there is no problem to solve.
   - [ ] `vol->nodes` / `node_count` / `node_cap`; start 16, double, ceiling `HOSTFS_MAX_NODES 65535`
   - [ ] `vol->names` arena; `uint32_t name_off`; no `char *` in a node
   - [ ] `hostfs_node_host_path()` and conversion of every `file->host_path` read
+  - [ ] `hostfs_find_by_host_path` (`hostfs.c:586`) searches **over the field being
+        deleted**. Reconstructing a path per node to compare would be quadratic;
+        convert it to a `parent_index` + host-basename lookup against the arena. Both
+        call sites are in `hostfs_rescan_dir` (2959, 2965)
   - [ ] Fix the `file->host_path` argument passed across the recursive scan
   - [ ] **Audit every `hostfs_node *` capture for an intervening growth point** — list them in the PR body
   - [ ] `hostfs_alloc_file_slot` grows; ceiling hit emits stderr, not a silent break
