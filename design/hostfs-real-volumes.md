@@ -130,6 +130,22 @@ There is no 256 anywhere in ProDOS. The current cap is invented.
 
 ## Proposed Design
 
+### Constants
+
+`HOSTFS_MAX_FILES` is deleted. The ProDOS format constants move out of the private
+enum at [`hostfs.c:38`](../src/machine/hostfs.c) and into
+[`hostfs.h`](../src/machine/hostfs.h) beside the other `HOSTFS_*` limits — they
+describe the on-disk ProDOS format, not an implementation choice, and the tests need
+them. The 51 is then **derived, not asserted in a comment**:
+
+```c
+#define HOSTFS_ENTRY_LENGTH      39u   /* ProDOS directory entry */
+#define HOSTFS_ENTRIES_PER_BLOCK 13u   /* (512 - 4) / 39 */
+#define HOSTFS_ROOT_DIR_BLOCKS   4u    /* ProDOS volume directory is always 4 */
+#define HOSTFS_ROOT_MAX_ENTRIES  (HOSTFS_ROOT_DIR_BLOCKS * HOSTFS_ENTRIES_PER_BLOCK - 1u)  /* 51 */
+#define HOSTFS_MAX_NODES         65535 /* ProDOS 16-bit file_count / block ceiling */
+```
+
 ### Node table
 
 Replace the in-struct fixed array with a grown array, mirroring the `map` /
@@ -210,17 +226,26 @@ initial 16-slot table.
 
 ### Volume directory — 51, absolute
 
-The volume directory becomes exactly 4 blocks (2–5), per spec.
-`hostfs_dir_blocks_for_files` is no longer consulted for the root; subdirectories keep
-using it.
+The volume directory becomes exactly `HOSTFS_ROOT_DIR_BLOCKS` (4) blocks, 2–5, per
+spec. `hostfs_dir_blocks_for_files` is no longer consulted for the root;
+subdirectories keep using it.
 
-```c
-#define HOSTFS_ROOT_MAX_ENTRIES 51   /* 4 blocks * 13 entries - 1 volume header */
-```
+Root children beyond `HOSTFS_ROOT_MAX_ENTRIES` are **dropped in scan order**
+(`hostfs.order` first, then case-insensitive sort), with one stderr line.
+Subdirectories are unaffected — put the overflow in a folder.
 
-Root children beyond 51 are **dropped in scan order** (`hostfs.order` first, then
-case-insensitive sort), with one stderr line. Subdirectories are unaffected — put the
-overflow in a folder.
+**Subdirectory spare capacity is unchanged.** The `blocks < 2 → 2` floor at
+[`hostfs.c:1976`](../src/machine/hostfs.c) stays for subdirectories; only the root
+stops consulting it. Two consequences to keep in view:
+
+- `vol->bitmap_block = 2 + vol->dir_block_count` at
+  [`hostfs.c:1985`](../src/machine/hostfs.c) becomes a constant **6** rather than
+  floating with root size. Useful determinism — but confirm no existing test pins the
+  old floating value.
+- Every directory block is an eager `malloc(HOSTFS_BLOCK_SIZE)` in
+  [`hostfs_map_add_ram`](../src/machine/hostfs.c), so the floor costs 512 B of host
+  RAM per non-empty subdirectory. Immaterial per directory; include it in PR 6's
+  memory accounting for a tree with thousands of them.
 
 ### Collision-safe ProDOS names
 
@@ -267,10 +292,38 @@ No buffer is sized by the node ceiling any more.
 | `used` / `seen` / `matched` | `bool[MAX_FILES]` on the **stack** | Heap, sized `node_count` |
 | `order_basenames[MAX][256]` | 64 KB in-struct | Root-only (written under `parent_index < 0`), so `HOSTFS_ROOT_MAX_ENTRIES` → 13 KB, no longer scales |
 
+### Block lookup at scale
+
+[`hostfs_map_find`](../src/machine/hostfs.c) is a linear scan over `map_count`:
+
+```c
+for (i = 0; i < vol->map_count; ++i)
+    if (vol->map[i].block == block) return i;
+```
+
+It runs on **every** `hostfs_read_block` and `hostfs_write_block`. At 256 nodes the
+map is tiny. At 60,000 files it holds tens of thousands of entries, so every 512-byte
+block the guest reads costs a scan of the whole map — this becomes the dominant cost
+of guest disk I/O the moment the node cap is lifted.
+
+Fix: the block space is small (`HOSTFS_TOTAL_BLOCKS` 65535) and densely bump-allocated
+by [`hostfs_alloc_block`](../src/machine/hostfs.c), so a direct index is both trivial
+and exact:
+
+```c
+int32_t *block_to_map;   /* HOSTFS_TOTAL_BLOCKS + 1 entries, -1 = unmapped */
+```
+
+256 KB, allocated once at mount — nothing beside the 4.75 MB node budget — and lookup
+becomes a single load. The index is maintained wherever `map` is inserted into,
+removed from, or reordered; `hostfs_eject` frees it. Binary search over a sorted map
+is the alternative, but it needs maintenance on every insert for no memory saving
+worth having.
+
 ### Refresh cost at scale
 
-This is the one place where scale changes an algorithm rather than an allocation, and
-it does not show up at 256 nodes.
+This and block lookup are the two places where scale changes an algorithm rather than
+an allocation, and neither shows up at 256 nodes.
 
 [`hostfs_maybe_refresh`](../src/machine/hostfs.c) fires on any SmartPort STATUS /
 READ / WRITE, rate-limited to `HOSTFS_REFRESH_PERIOD_MS` (1000 ms), and calls
@@ -318,6 +371,17 @@ assumed.
 
 ### Diagnostics (stderr, one line each)
 
+All diagnostics route through one internal seam introduced in PR 1, so every message
+is uniform and testable without a `freopen` pipe dance:
+
+```c
+static void hostfs_warn(hostfs_volume *vol, const char *fmt, ...);
+```
+
+It writes to stderr and bumps a per-volume counter (plus, optionally, the last
+message) that tests can read. Roughly 15 lines, and it serves all five diagnostics
+across PRs 1, 2, 4 and 5.
+
 ```text
 a2m: HostFS <root>: volume directory holds 51 entries (ProDOS limit); dropped 9: ZTOOLS, ZZ.TXT, ... (+7 more)
 a2m: HostFS <root>/PT3: 'academy!.pt3#000000' -> ACADEMY001.PT3 (renamed for ProDOS; host name unchanged, will not survive copy to .po)
@@ -327,6 +391,26 @@ a2m: HostFS <root>/DEEP: depth limit 8 reached; subtree ignored
 
 Name lists cap at 5 plus a `(+N more)` tail so a badly-shaped folder cannot flood the
 terminal.
+
+**The existing "directory full" warning is reworded and split.** Today
+[`hostfs.c:2848`](../src/machine/hostfs.c) prints one message for both causes, gated
+by a single `vol->dir_full_warned` bool. That does not survive the 51 cap:
+
+- [`hostfs.c:2842`](../src/machine/hostfs.c) only attempts `hostfs_grow_subdir_capacity`
+  when `parent_index >= 0`, so the **root** always falls straight through to the bare
+  `entry == NULL` path.
+- After PR 1 the root physically cannot grow, so "remount to pick up new files" is
+  false for the root — a remount will never help. The subdirectory case is a genuinely
+  different cause (growth failed, out of blocks).
+- One shared `dir_full_warned` means whichever cause fires first permanently silences
+  the other.
+
+So: two messages, two suppression flags, both via `hostfs_warn`.
+
+```text
+a2m: HostFS <root>: volume directory is full (51 entries, ProDOS limit); '<name>' not added - move it into a folder
+a2m: HostFS <root>/SUB: directory full; remount to pick up new files
+```
 
 ---
 
@@ -344,7 +428,10 @@ Internal only:
 | `vol->names` arena | New; `uint32_t` offsets, never pointers |
 | `hostfs_node_host_path()` | New; replaces `file->host_path` reads |
 | `hostfs_alloc_file_slot()` | Grows instead of returning −1 at 256 |
-| `HOSTFS_MAX_FILES` | **Deleted.** Replaced by `HOSTFS_MAX_NODES` (65535) and `HOSTFS_ROOT_MAX_ENTRIES` (51) |
+| `hostfs_warn()` | New; single seam for every diagnostic, with a test-visible counter |
+| `vol->block_to_map` | New; direct block → map index replacing the `hostfs_map_find` scan |
+| `HOSTFS_MAX_FILES` | **Deleted.** Replaced by `HOSTFS_MAX_NODES` (65535) and `HOSTFS_ROOT_MAX_ENTRIES` (51, derived) |
+| `HOSTFS_ENTRY_LENGTH`, `HOSTFS_ENTRIES_PER_BLOCK` | Promoted from the private enum in `hostfs.c` to `hostfs.h`; `HOSTFS_ROOT_DIR_BLOCKS` added |
 
 ---
 
@@ -394,9 +481,13 @@ worst case there is no problem to solve.
 
 ## Observability
 
-- All diagnostics to **stderr**, matching the existing
-  `"a2m: HostFS directory full; remount to pick up new files"` line.
+- All diagnostics to **stderr**, through the single `hostfs_warn` seam added in PR 1.
 - Every diagnostic names the volume root and the affected directory.
+- `hostfs_warn` keeps a per-volume counter (and optionally the last message) so tests
+  assert that a warning fired without capturing stderr. The suite does no `freopen`
+  anywhere and this work does not introduce one.
+- Suppression is **per cause**, not one bool for the volume — otherwise the first
+  warning hides every later one.
 - No UI surface in this work. If mount warnings should reach the frontend later,
   that is a follow-on.
 
@@ -429,6 +520,21 @@ worst case there is no problem to solve.
     deliberate exception to decision 2 — warning on every `README.md`, `.gitignore`,
     and `hostfs.order` would drown the signal from real drops. It also usefully keeps
     stray host files from consuming root slots.
+12. **Block lookup gets a direct index, in scope as PR 3.** `hostfs_map_find` is a
+    linear scan on every block read and write. Same class of problem as the refresh
+    walk: invisible at 256 nodes, dominant at 60,000. 256 KB buys O(1).
+13. **All diagnostics go through one `hostfs_warn` seam** with a test-visible counter.
+    Warnings that no test asserts regress to silence, which is the bug this work
+    exists to fix.
+14. **ProDOS format constants live in `hostfs.h`, and 51 is derived** from
+    `HOSTFS_ROOT_DIR_BLOCKS * HOSTFS_ENTRIES_PER_BLOCK - 1` rather than written as a
+    literal with an explanatory comment.
+15. **Docs are batched in PR 6, as a deliberate exception to `agents/rules.md`.** That
+    note requires a user-visible change to update `manual/manual.md` in the same
+    change set; the 51-entry root qualifies. Held anyway: PRs 1–5 land as one
+    behavioral program, and documenting the root cap before the collision aliasing and
+    diagnostics exist would mean writing the manual section three times. PR 6 is part
+    of the same program of work, not a follow-on.
 
 ---
 
@@ -447,6 +553,12 @@ worst case there is no problem to solve.
 | mtime width | `int64_t` (4 bytes over `uint32_t`, no 2038 question) |
 | Refresh walk | **In scope as PR 4**, not a follow-on. Directory-mtime skip; steady state is one `stat` per directory |
 | Non-NAPS host files | **Stay silently skipped** — the one deliberate exception to "never drop silently" |
+| Block lookup | **In scope as PR 3.** Direct `int32_t block_to_map[]` index, 256 KB, O(1) |
+| Existing "directory full" warning | **Reworded and split** into root (permanent, ProDOS limit) vs subdirectory (growth failed), with separate suppression flags |
+| Subdirectory spare-block floor | **Unchanged.** Root stops consulting it; `bitmap_block` becomes a constant 6 |
+| Diagnostic testing | **`hostfs_warn` seam + counter**, not stderr capture. No `freopen` in the suite |
+| Constant location | **`hostfs.h`**, with `HOSTFS_ENTRY_LENGTH` / `HOSTFS_ENTRIES_PER_BLOCK` promoted from the private enum so 51 is derived |
+| Manual updates | **PR 6**, an explicit exception to `agents/rules.md` same-change-set docs |
 
 ---
 
@@ -474,6 +586,9 @@ worst case there is no problem to solve.
 | Collision ordinals renumber when a file is inserted | Medium | Deterministic scan order; `hostfs.order` pins root; stderr line every time an alias is used |
 | Aliased names surprise on copy to `.po` | Medium | Warning text says so explicitly |
 | Full rescan once per second becomes O(volume) | **High** | Directory-mtime skip (PR 4). Without it a 60k-node volume issues 60k `stat` calls/second under guest I/O |
+| `hostfs_map_find` linear scan on every block access | **High** | Direct `block_to_map` index (PR 3). Otherwise guest disk I/O degrades with volume size, not with transfer size |
+| `block_to_map` drifts out of sync with `map` | Medium | Maintain it in the same helpers that insert/remove map entries; assert index/`map` agreement in a debug build |
+| Reworded root warning fires on an existing sample folder | Low | `samples/hostfs/` root holds 5 entries; the message names the fix (move it into a folder) |
 | Directory-mtime skip misses a same-second change | Low | Coarse-granularity filesystems only; already true of the per-file comparison; `hostfs_rescan` stays as an explicit full walk |
 | 51-entry cap breaks an existing sample folder | Low | Single user; `samples/hostfs/` root currently holds 5 entries |
 | Memory at a maximally-full volume | Low | 4.75 MB measured, allocated only if the files exist |
@@ -501,14 +616,25 @@ worst case there is no problem to solve.
 - **Files:** `src/machine/hostfs.c`, `src/machine/hostfs.h`, `tests/machine/test_hostfs.c`
 - **Dependencies:** none
 - **Checklist:**
-  - [ ] `HOSTFS_ROOT_MAX_ENTRIES 51`
-  - [ ] `hostfs_build_volume_directory` pins `dir_block_count` to 4 (blocks 2–5)
-  - [ ] Root scan stops accepting children at 51
-  - [ ] stderr line naming up to 5 dropped entries plus `(+N more)`
-  - [ ] `hostfs_dir_blocks_for_files` still used for subdirectories only
-  - [ ] Test: 60-entry root mounts with exactly 51, warning emitted, 52nd absent
+  - [ ] Promote `HOSTFS_ENTRY_LENGTH` / `HOSTFS_ENTRIES_PER_BLOCK` from the private
+        enum to `hostfs.h`; add `HOSTFS_ROOT_DIR_BLOCKS` and derive
+        `HOSTFS_ROOT_MAX_ENTRIES`
+  - [ ] `hostfs_warn(vol, fmt, ...)` seam: stderr + per-volume counter (+ last message)
+  - [ ] `hostfs_build_volume_directory` pins `dir_block_count` to `HOSTFS_ROOT_DIR_BLOCKS`
+  - [ ] Root scan stops accepting children at `HOSTFS_ROOT_MAX_ENTRIES`
+  - [ ] Root-overflow warning naming up to 5 dropped entries plus `(+N more)`
+  - [ ] Split the existing `hostfs.c:2848` warning into root vs subdirectory text,
+        with separate suppression flags; route both through `hostfs_warn`
+  - [ ] `hostfs_dir_blocks_for_files` and the `blocks < 2 → 2` floor still apply to
+        subdirectories only
+  - [ ] Confirm no existing test pins `bitmap_block` to a value other than 6
+  - [ ] Test: temp root of 60 NAPS files named `F00`…`F59` (unambiguous
+        case-insensitive sort) mounts with exactly 51 active root entries across
+        blocks 2–5; `F50` present, `F51` absent; block 2 `prev == 0` and block 5
+        `next == 0`; `warn_count == 1`
 - **Description:** Small, self-contained, and independent of the node-table work.
-  Lands the spec compliance decision first so later PRs build on the correct shape.
+  Lands the spec compliance decision and the diagnostic seam first, so later PRs build
+  on the correct shape and have somewhere uniform to report.
 
 ### PR 2 — Dynamic node table + name arena
 
@@ -529,9 +655,9 @@ worst case there is no problem to solve.
   behavior change is intended beyond the raised ceiling — the existing suite is the
   referee.
 
-### PR 3 — Buffers sized from actual counts
+### PR 3 — Buffers sized from actual counts + O(1) block lookup
 
-- **Title:** `hostfs: size scan and reconcile buffers from real entry counts`
+- **Title:** `hostfs: size buffers from real counts, index the block map`
 - **Files:** `src/machine/hostfs.c`, `tests/machine/test_hostfs.c`
 - **Dependencies:** PR 2
 - **Checklist:**
@@ -539,10 +665,16 @@ worst case there is no problem to solve.
   - [ ] `dent ents[]` off the stack, sized from the directory's block chain
   - [ ] `used` / `seen` / `matched` off the stack, sized `node_count`
   - [ ] `order_basenames` bounded by `HOSTFS_ROOT_MAX_ENTRIES`
+  - [ ] `int32_t *block_to_map` direct index replacing the `hostfs_map_find` linear
+        scan; maintained wherever `map` is inserted into or removed from; freed in
+        `hostfs_eject`
+  - [ ] Debug-build assertion that `block_to_map` and `map` agree
   - [ ] Test: subdirectory with 1000 entries mounts, enumerates, and reads correctly
   - [ ] Test: `hostfs_rescan` over a 1000-entry subdirectory
-- **Description:** Removes the hidden per-directory 256 cap and the ~403 KB-per-level
-  transient. Without this, PR 2's raised ceiling is unreachable in practice.
+  - [ ] Test: block read/write still correct after create + delete churn (index sync)
+- **Description:** Removes the hidden per-directory 256 cap, the ~403 KB-per-level
+  transient, and the O(map) cost of every block access. Without this, PR 2's raised
+  ceiling is unreachable in practice and guest disk I/O degrades with volume size.
 
 ### PR 4 — Refresh skips unchanged directories
 
@@ -584,6 +716,8 @@ worst case there is no problem to solve.
 - **Checklist:**
   - [ ] Stress: deep tree at `HOSTFS_MAX_DEPTH`, several thousand nodes, mount → read → rescan
   - [ ] Stress: node ceiling reached cleanly, with the diagnostic, no crash
+  - [ ] Memory accounting for a thousands-of-directories tree: node table + name
+        arena + `block_to_map` + 512 B per directory block
   - [ ] Regression: `samples/hostfs/pt3plr/` (256 tunes) boots and the player launches — assert the catalog, not the player's own tune count (see Open question 3)
   - [ ] `manual/manual.md`: 51-entry root, unbounded subdirectories, alias behavior, diagnostics
   - [ ] `agents/disk.md`: the durable invariants (51 root, indices-not-pointers, arena offsets)
