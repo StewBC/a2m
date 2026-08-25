@@ -346,6 +346,13 @@ static void write_file(const char *path, const void *data, size_t len)
     fclose(fp);
 }
 
+static void wipe_tree(const char *path)
+{
+    char cmd[512];
+    snprintf(cmd, sizeof(cmd), "rm -rf '%s'", path);
+    (void)system(cmd);
+}
+
 static void test_write_through_and_rescan(void)
 {
     const char *dir = "test_hostfs_rw_dir";
@@ -358,6 +365,7 @@ static void test_write_through_and_rescan(void)
     FILE *fp;
     uint8_t got[8];
 
+    wipe_tree(dir);
     HOSTFS_MKDIR(dir);
     snprintf(path, sizeof(path), "%s/HELLO#060800", dir);
     write_file(path, hello_key_payload, sizeof(hello_key_payload));
@@ -470,10 +478,7 @@ static void test_write_through_and_rescan(void)
     }
 
     hostfs_eject(vol);
-    remove("test_hostfs_rw_dir/HELLO#060800");
-    remove("test_hostfs_rw_dir/NEW#040000");
-    remove("test_hostfs_rw_dir/" HOSTFS_ORDER_FILENAME);
-    rmdir(dir);
+    wipe_tree(dir);
 }
 
 static void test_create_reconcile(void)
@@ -487,6 +492,7 @@ static void test_create_reconcile(void)
     struct stat st;
     int i;
 
+    wipe_tree(dir);
     HOSTFS_MKDIR(dir);
     /* Seed with one file so mount builds a writable volume with spare dir slots. */
     snprintf(path, sizeof(path), "%s/SEED#060000", dir);
@@ -537,10 +543,7 @@ static void test_create_reconcile(void)
     }
 
     hostfs_eject(vol);
-    remove("test_hostfs_create_dir/SEED#060000");
-    remove("test_hostfs_create_dir/GAME#060800");
-    remove("test_hostfs_create_dir/" HOSTFS_ORDER_FILENAME);
-    rmdir(dir);
+    wipe_tree(dir);
 }
 
 static void read_catalog_names(hostfs_volume *vol, char names[][16], int *count, int max)
@@ -578,6 +581,7 @@ static void test_order_manifest(void)
     uint8_t *slot_c = NULL;
     uint8_t tmp[39];
 
+    wipe_tree(dir);
     HOSTFS_MKDIR(dir);
     write_file("test_hostfs_order_dir/ALPHA#060000", "a", 1);
     write_file("test_hostfs_order_dir/BETA#060000", "b", 1);
@@ -680,11 +684,7 @@ static void test_order_manifest(void)
     }
     hostfs_eject(vol);
 
-    remove("test_hostfs_order_dir/ALPHA#060000");
-    remove("test_hostfs_order_dir/BETA#060000");
-    remove("test_hostfs_order_dir/GAMMA#060000");
-    remove("test_hostfs_order_dir/" HOSTFS_ORDER_FILENAME);
-    rmdir(dir);
+    wipe_tree(dir);
 }
 
 static int find_entry_in_dir_block(
@@ -832,6 +832,7 @@ static void test_nested_rescan(void)
     uint16_t sub_key = 0;
     char path[512];
 
+    wipe_tree(dir);
     HOSTFS_MKDIR(dir);
     write_file("test_hostfs_nested_rescan/ROOT#060000", "r", 1);
     HOSTFS_MKDIR("test_hostfs_nested_rescan/SUB");
@@ -879,12 +880,7 @@ static void test_nested_rescan(void)
     }
 
     hostfs_eject(vol);
-    remove("test_hostfs_nested_rescan/ROOT#060000");
-    remove("test_hostfs_nested_rescan/SUB/IN#040000");
-    rmdir("test_hostfs_nested_rescan/SUB");
-    rmdir("test_hostfs_nested_rescan/ADDED");
-    remove("test_hostfs_nested_rescan/" HOSTFS_ORDER_FILENAME);
-    rmdir(dir);
+    wipe_tree(dir);
     (void)path;
 }
 
@@ -916,13 +912,6 @@ static void fill_dir_entry(
     e[0x20] = (uint8_t)((aux >> 8) & 0xFFu);
     e[0x25] = (uint8_t)(header_ptr & 0xFFu);
     e[0x26] = (uint8_t)((header_ptr >> 8) & 0xFFu);
-}
-
-static void wipe_tree(const char *path)
-{
-    char cmd[512];
-    snprintf(cmd, sizeof(cmd), "rm -rf '%s'", path);
-    (void)system(cmd);
 }
 
 static void test_dir_write_through(void)
