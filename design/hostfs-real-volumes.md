@@ -111,9 +111,13 @@ There is no 256 anywhere in ProDOS. The current cap is invented.
    (Non-NAPS host files are the one deliberate exception; see Decided.)
 6. Give colliding host names a deterministic, extension-preserving ProDOS alias
    rather than dropping them.
-7. Keep the public API in [`hostfs.h`](../src/machine/hostfs.h) unchanged.
+7. Change no existing signature or semantic in
+   [`hostfs.h`](../src/machine/hostfs.h). *Additions* are fine — the
+   `/* Test helpers. */` block at the bottom of the header is the right home for
+   anything the suite needs to observe.
 8. Keep all 10 existing tests passing unmodified, and add the cases that would have
    caught this.
+9. Never rewrite a user's `hostfs.order` with less than it already holds.
 
 ### Non-Goals
 
@@ -246,6 +250,50 @@ stops consulting it. Two consequences to keep in view:
   [`hostfs_map_add_ram`](../src/machine/hostfs.c), so the floor costs 512 B of host
   RAM per non-empty subdirectory. Immaterial per directory; include it in PR 6's
   memory accounting for a tree with thousands of them.
+
+### `hostfs.order` while the root is over the limit
+
+[`hostfs_persist_order_manifest_in(vol, -1)`](../src/machine/hostfs.c) rebuilds the
+manifest from the catalog and rewrites `hostfs.order` wholesale. After PR 1 the root
+catalog is 51 names, so a user's 60-line file would be rewritten with only the 51
+survivors the first time the guest reorders or deletes a root entry — their ordering
+intent for the other 9 gone from their own file, unrecoverable by moving files into a
+folder later.
+
+Mount and eject are already safe: `current` (51) equals `vol->order_basenames` (51,
+populated only from accepted children), so the early return fires. It is the first
+guest-side mutation that does the damage.
+
+**Resolution: do not rewrite the root manifest while the root is truncated.** Set a
+`root_truncated` flag during the root scan; when it is set,
+`hostfs_persist_order_manifest_in(vol, -1)` returns early without writing.
+Subdirectory manifests are unaffected. Roughly three lines.
+
+Rejected alternative — "append any `previous` name not in `current`" — because the
+persist function cannot distinguish the two reasons a name is missing:
+
+| Reason absent from `current` | Correct action |
+|---|---|
+| Dropped by the 51 cap — file still on disk | Preserve |
+| Deleted by the guest — file is gone | Prune |
+
+Appending both makes deleted names accumulate forever. They are inert on load —
+[`hostfs_apply_order_to_scans`](../src/machine/hostfs.c) matches order names against
+actual scans and ignores unmatched ones — but a file that only ever grows is a new
+silent wrongness in a change whose thesis is the opposite. Distinguishing the cases
+needs a `stat` per orphan name or the dropped list plumbed from scan to persist, and
+then raises a second question: names appended at the end lose their position relative
+to the kept 51, so a file recovered later by getting under the cap comes back last
+instead of where the user had it.
+
+Accepted cost: guest-side **root** reordering does not persist while the folder is
+over the limit. A 51-entry catalog cannot faithfully express a 60-entry ordering
+anyway, the folder is already warned about, and the behavior self-heals as soon as the
+root is under 51. Surfaced in the warning:
+
+```text
+a2m: HostFS <root>: hostfs.order left unchanged while the root is over the limit
+```
 
 ### Collision-safe ProDOS names
 
@@ -529,7 +577,11 @@ worst case there is no problem to solve.
 14. **ProDOS format constants live in `hostfs.h`, and 51 is derived** from
     `HOSTFS_ROOT_DIR_BLOCKS * HOSTFS_ENTRIES_PER_BLOCK - 1` rather than written as a
     literal with an explanatory comment.
-15. **Docs are batched in PR 6, as a deliberate exception to `agents/rules.md`.** That
+15. **`hostfs.order` is frozen for the root while the root is truncated**, not merged.
+    The persist function cannot tell a cap-dropped name from a guest-deleted one, and
+    merging resurrects deleted names forever. Freezing loses nothing and needs no
+    merge semantics.
+16. **Docs are batched in PR 6, as a deliberate exception to `agents/rules.md`.** That
     note requires a user-visible change to update `manual/manual.md` in the same
     change set; the 51-entry root qualifies. Held anyway: PRs 1–5 land as one
     behavioral program, and documenting the root cap before the collision aliasing and
@@ -559,6 +611,11 @@ worst case there is no problem to solve.
 | Diagnostic testing | **`hostfs_warn` seam + counter**, not stderr capture. No `freopen` in the suite |
 | Constant location | **`hostfs.h`**, with `HOSTFS_ENTRY_LENGTH` / `HOSTFS_ENTRIES_PER_BLOCK` promoted from the private enum so 51 is derived |
 | Manual updates | **PR 6**, an explicit exception to `agents/rules.md` same-change-set docs |
+| `hostfs.order` when root is truncated | **Frozen, not merged.** Root persist returns early; subdirectories unaffected |
+| Test-visible additions to `hostfs.h` | **Allowed** in the `/* Test helpers. */` block. Goal 7 forbids changing existing signatures, not adding |
+| Constant suffix | **No `u`.** Pure move of the enum members; they are compared against `int` in ~10 places |
+| Where the root pin lives | **`hostfs_mount`** (`hostfs.c:1963`), not `hostfs_build_volume_directory` |
+| Root-overflow warning cadence | **One accumulated line per root scan**, not one per dropped entry |
 
 ---
 
@@ -589,6 +646,8 @@ worst case there is no problem to solve.
 | `hostfs_map_find` linear scan on every block access | **High** | Direct `block_to_map` index (PR 3). Otherwise guest disk I/O degrades with volume size, not with transfer size |
 | `block_to_map` drifts out of sync with `map` | Medium | Maintain it in the same helpers that insert/remove map entries; assert index/`map` agreement in a debug build |
 | Reworded root warning fires on an existing sample folder | Low | `samples/hostfs/` root holds 5 entries; the message names the fix (move it into a folder) |
+| `hostfs.order` rewritten with only the 51 survivors, losing the user's ordering for the rest | Medium | Root persist frozen while `root_truncated` (PR 1). Only bites an already-over-limit folder, and freezing means the file is never touched |
+| Root reordering silently fails to persist while over the limit | Low | Second warning line states it explicitly; self-heals under 51 |
 | Directory-mtime skip misses a same-second change | Low | Coarse-granularity filesystems only; already true of the per-file comparison; `hostfs_rescan` stays as an explicit full walk |
 | 51-entry cap breaks an existing sample folder | Low | Single user; `samples/hostfs/` root currently holds 5 entries |
 | Memory at a maximally-full volume | Low | 4.75 MB measured, allocated only if the files exist |
@@ -620,7 +679,13 @@ worst case there is no problem to solve.
         enum to `hostfs.h`; add `HOSTFS_ROOT_DIR_BLOCKS` and derive
         `HOSTFS_ROOT_MAX_ENTRIES`
   - [ ] `hostfs_warn(vol, fmt, ...)` seam: stderr + per-volume counter (+ last message)
-  - [ ] `hostfs_build_volume_directory` pins `dir_block_count` to `HOSTFS_ROOT_DIR_BLOCKS`
+  - [ ] Pin `dir_block_count` to `HOSTFS_ROOT_DIR_BLOCKS` in `hostfs_mount`
+        (`hostfs.c:1963`, where the field is actually assigned);
+        `hostfs_build_volume_directory` keeps consuming it
+  - [ ] `vol->root_truncated` set during the root scan; root
+        `hostfs_persist_order_manifest_in` returns early when set, so `hostfs.order`
+        is never rewritten short. Subdirectory manifests unaffected
+  - [ ] Second warning line when the manifest is frozen
   - [ ] Root scan stops accepting children at `HOSTFS_ROOT_MAX_ENTRIES`
   - [ ] Root-overflow warning naming up to 5 dropped entries plus `(+N more)`
   - [ ] Split the existing `hostfs.c:2848` warning into root vs subdirectory text,
@@ -631,7 +696,11 @@ worst case there is no problem to solve.
   - [ ] Test: temp root of 60 NAPS files named `F00`…`F59` (unambiguous
         case-insensitive sort) mounts with exactly 51 active root entries across
         blocks 2–5; `F50` present, `F51` absent; block 2 `prev == 0` and block 5
-        `next == 0`; `warn_count == 1`
+        `next == 0`; `warn_count == 1` for the drop line
+  - [ ] Test: with a 60-line `hostfs.order` present in an over-limit root, a guest-side
+        root mutation leaves the file byte-identical
+  - [ ] `hostfs_warning_count()` / `hostfs_last_warning()` added to the
+        `/* Test helpers. */` block
 - **Description:** Small, self-contained, and independent of the node-table work.
   Lands the spec compliance decision and the diagnostic seam first, so later PRs build
   on the correct shape and have somewhere uniform to report.
