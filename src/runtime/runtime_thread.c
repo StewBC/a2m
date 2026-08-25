@@ -3028,6 +3028,17 @@ static void runtime_write_byte(runtime *rt, uint16_t addr, uint8_t value, runtim
     apple2_write_in_view(&rt->machine, runtime_mode_to_view_flags(mode), addr, value);
 }
 
+/* Paused memory edits always dump video RAM so the CRT tracks typed bytes.
+ * This replaces any mid-frame beam image (accepted debugger tradeoff). */
+static void runtime_refresh_display_after_memory_edit(runtime *rt)
+{
+    if (rt == NULL || !rt->machine_ready || rt->machine.video.fb == NULL) {
+        return;
+    }
+    apple2_video_paint_full_frame(&rt->machine);
+    runtime_publish_argb_frame(rt);
+}
+
 static void runtime_handle_request_memory(runtime *rt, const runtime_command *cmd)
 {
     runtime_memory_mode mode = (runtime_memory_mode)cmd->data.request_memory.mode;
@@ -4050,6 +4061,7 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
                 cmd->data.write_memory_byte.address,
                 cmd->data.write_memory_byte.value,
                 (runtime_memory_mode)cmd->data.write_memory_byte.mode);
+            runtime_refresh_display_after_memory_edit(rt);
         }
         break;
     case RUNTIME_COMMAND_WRITE_MEMORY:
@@ -4062,6 +4074,7 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
                     cmd->data.write_memory.bytes[i],
                     (runtime_memory_mode)cmd->data.write_memory.mode);
             }
+            runtime_refresh_display_after_memory_edit(rt);
         }
         break;
     case RUNTIME_COMMAND_SET_EXECUTE_BREAKPOINT:

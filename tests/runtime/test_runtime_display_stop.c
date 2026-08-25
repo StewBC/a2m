@@ -125,7 +125,12 @@ static void settle(runtime_client *client)
     }
 }
 
-static void fill_main(runtime_client *client, uint16_t address, uint16_t length, uint8_t value)
+static void fill_main(
+    runtime_client *client,
+    uint32_t *pixels,
+    uint16_t address,
+    uint16_t length,
+    uint8_t value)
 {
     uint8_t chunk[RUNTIME_MEMORY_SNAPSHOT_MAX];
     uint16_t off = 0;
@@ -145,6 +150,9 @@ static void fill_main(runtime_client *client, uint16_t address, uint16_t length,
                 chunk));
         off = (uint16_t)(off + n);
     }
+    /* Each paused write publishes a CRT frame; drop them before the next assert. */
+    settle(client);
+    drain_frames(client, pixels);
 }
 
 static void step_nop(runtime_client *client)
@@ -200,8 +208,7 @@ int main(void)
     drain_frames(client, pixels);
 
     /* --- Override on: stop dumps RAM (hidden page), not the beam buffer. --- */
-    fill_main(client, 0x4000, HGR_PAGE_SIZE, 0x7Fu);
-    settle(client);
+    fill_main(client, pixels, 0x4000, HGR_PAGE_SIZE, 0x7Fu);
     expect_true(
         "override page2 hgr",
         runtime_client_set_display_override(client, true, A2S_HIRES | A2S_PAGE2));
@@ -212,9 +219,7 @@ int main(void)
         exit(1);
     }
 
-    fill_main(client, 0x4000, HGR_PAGE_SIZE, 0x00u);
-    settle(client);
-    drain_frames(client, pixels);
+    fill_main(client, pixels, 0x4000, HGR_PAGE_SIZE, 0x00u);
     step_nop(client);
     expect_true("override stop frame", wait_frame(client, pixels, 2000u));
     nonblack = count_nonblack(pixels, FRAME_PIXELS);
@@ -232,13 +237,14 @@ int main(void)
         runtime_client_set_display_override(client, false, 0u));
     expect_true("override-off frame", wait_frame(client, pixels, 2000u));
 
-    fill_main(client, 0x2000, HGR_PAGE_SIZE, 0x7Fu);
+    fill_main(client, pixels, 0x2000, HGR_PAGE_SIZE, 0x7Fu);
     expect_true(
         "write hgr switches",
         runtime_client_write_memory(
             client, 0x0300, (uint16_t)sizeof(hgr_on), RUNTIME_MEMORY_MODE_MAP, hgr_on));
     expect_true("set pc hgr", runtime_client_set_pc(client, 0x0300));
     settle(client);
+    drain_frames(client, pixels);
     expect_true("step TEXT off", runtime_client_step_instruction(client));
     expect_true(
         "STEP TEXT off",
@@ -264,8 +270,7 @@ int main(void)
         exit(1);
     }
 
-    fill_main(client, 0x2000, HGR_PAGE_SIZE, 0x00u);
-    settle(client);
+    /* Stop with Override off keeps the beam when video RAM is not rewritten. */
     drain_frames(client, pixels);
     step_nop(client);
     expect_true("beam stop frame", wait_frame(client, pixels, 2000u));
@@ -276,6 +281,47 @@ int main(void)
             "FAIL: beam stop should keep raster, nonblack=%d\n",
             nonblack);
         exit(1);
+    }
+
+    /* Paused memory writes always dump video RAM onto the CRT. */
+    {
+        uint8_t chunk[RUNTIME_MEMORY_SNAPSHOT_MAX];
+        uint16_t off = 0;
+        memset(chunk, 0, sizeof(chunk));
+        drain_frames(client, pixels);
+        while (off < HGR_PAGE_SIZE) {
+            uint16_t n = (uint16_t)(HGR_PAGE_SIZE - off);
+            if (n > RUNTIME_MEMORY_SNAPSHOT_MAX) {
+                n = RUNTIME_MEMORY_SNAPSHOT_MAX;
+            }
+            expect_true(
+                "clear hgr chunk",
+                runtime_client_write_memory(
+                    client,
+                    (uint16_t)(0x2000u + off),
+                    n,
+                    RUNTIME_MEMORY_MODE_MAIN,
+                    chunk));
+            off = (uint16_t)(off + n);
+        }
+        expect_true("memory-edit refresh frame", wait_frame(client, pixels, 2000u));
+        /* Consume any earlier chunk frames; keep the latest. */
+        {
+            uint32_t w;
+            uint32_t h;
+            uint64_t fn;
+            while (runtime_client_poll_argb_frame(
+                       client, pixels, FRAME_PIXELS, &w, &h, &fn)) {
+            }
+        }
+        nonblack = count_nonblack(pixels, FRAME_PIXELS);
+        if (nonblack != 0) {
+            fprintf(
+                stderr,
+                "FAIL: paused HGR clear should refresh CRT, nonblack=%d\n",
+                nonblack);
+            exit(1);
+        }
     }
 
     expect_true("quit", runtime_client_quit(client));

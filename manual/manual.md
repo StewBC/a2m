@@ -567,7 +567,7 @@ C123: 48 65 6C 6C 6F 20 57 6F 72 6C 64 21 00 00 00 00  Hello World!....
 |--------|---------|
 | `C123` | Hex address of the first byte in the row |
 | `48 65 ...` | Byte values in hex |
-| `Hello ...` | ASCII representation (`.` for non-print) |
+| `Hello ...` | ASCII representation (`.` for non-print; with **hi-bit on**, bit 7 is stripped first) |
 
 ### Display Modes
 
@@ -597,12 +597,28 @@ auxiliary RAM in the memory view while the disassembler follows the CPU map.
 
 The bottom of the Memory view shows the active edit field (`Hex`, `ASCII`, or
 `Address`), the current cursor address as `Address: XXXX`, and whether memory editing
-is currently `editable` or `read-only`.
+is currently `editable` or `read-only`, plus the ASCII hi-bit mode
+(`hi-bit on` or `hi-bit off`). Click the status word to toggle hi-bit mode for the
+active virtual view.
+
+### ASCII column and hi-bit mode
+
+The ASCII column can treat bytes as Apple text (high bit set) or as host 7-bit ASCII.
+Default is **hi-bit on** (per virtual view, session only):
+
+| Mode | `$EA` shows as | typing `j` writes |
+|------|----------------|-------------------|
+| `hi-bit on` | `j` | `$EA` |
+| `hi-bit off` | `.` | `$6A` |
+
+Hex editing always writes the literal nibble. Toggle hi-bit from the status row or
+from the memory-view right-click **ASCII** group.
 
 ### Virtual Views
 
 The memory panel can be split into up to 16 independent virtual views stacked vertically.
-Each virtual view maintains its own cursor, scroll position, source mode, and edit state.
+Each virtual view maintains its own cursor, scroll position, source mode, ASCII hi-bit
+mode, and edit state.
 A thin separator line marks the boundary between adjacent views.
 
 **Splitting** inserts a new view directly below the active view. The new view inherits the
@@ -628,7 +644,8 @@ The scrollbar on the right represents the active view's position in the 64 K spa
 Switching the active view moves the thumb without scrolling the memory itself.
 
 Right-clicking a memory view opens a popup for the view under the pointer. The
-**Source** group changes that view's source mode. The **View** group can **Split** the
+**Source** group changes that view's source mode. The **ASCII** group selects
+`hi-bit on` or `hi-bit off` for that view. The **View** group can **Split** the
 clicked view at the clicked address; when more than one virtual view exists it also
 offers **Join** to dissolve the clicked view.
 
@@ -683,7 +700,9 @@ reference.
 
 Memory editing is only possible while the CPU is paused. In hex mode, typing hex digits
 overwrites the nibble at the cursor. In ASCII mode, printable characters overwrite the
-byte at the cursor.
+byte at the cursor (with high bit set when **hi-bit on**). While paused, each memory
+write also regenerates the Apple display from video RAM so typed bytes appear on the
+CRT.
 
 ## Machine
 

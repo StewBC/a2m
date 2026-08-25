@@ -49,6 +49,11 @@ Configure dialog (not F2): Machine | Emulator | Paths.
 Memory pane Opt+M: **Map → Main → Aux → LC1 → LC2 → ROM**.
 Disasm Opt+M: **Map → ROM → Main** only. Do not unify those cycles.
 
+Memory ASCII column: per-view **hi-bit on** (default) strips/sets bit 7 for
+show/type; **hi-bit off** is host `$20–$7E` only. Toggle via status-row click or
+the memory context-menu **ASCII** group. Session-only; splits inherit the parent
+flag.
+
 Opt+Left sets PC from the disasm cursor **in live mode**. In time travel it is
 unbound.
 

@@ -111,6 +111,8 @@ typedef struct frontend_memory_view_state {
     bool request_pending;
     bool scrollbar_dragging;
     float scrollbar_grab_offset;
+    /* true: strip/set bit7 for ASCII column + typing (Apple text). Default on. */
+    bool apple_ascii;
 } frontend_memory_view_state;
 
 typedef struct frontend_memory_search_state {
@@ -5267,13 +5269,23 @@ static bool frontend_memory_view_byte_available(
     return valid == NULL || valid[address] != 0;
 }
 
-static char frontend_memory_ascii(uint8_t value)
+static char frontend_memory_ascii(uint8_t value, bool apple_ascii)
 {
-    if (value >= 32 && value <= 126) {
-        return (char)value;
+    uint8_t shown = apple_ascii ? (uint8_t)(value & 0x7fu) : value;
+
+    if (shown >= 32u && shown <= 126u) {
+        return (char)shown;
     }
 
     return '.';
+}
+
+static uint8_t frontend_memory_ascii_store_byte(uint8_t value, bool apple_ascii)
+{
+    if (apple_ascii) {
+        return (uint8_t)(value | 0x80u);
+    }
+    return value;
 }
 
 static void frontend_memory_request_if_needed(frontend *ui, const frontend_debug_state *debug_state)
@@ -5617,10 +5629,11 @@ static void frontend_memory_draw_status_footer(
     struct nk_rect address_rect;
     struct nk_rect edit_rect;
     const char *field;
-    const char *editable;
+    const char *status_text;
     char address[32];
-
-    const frontend_memory_view_state *memory = &ui->memory_views[ui->memory_active_view_index];
+    char edit_status[48];
+    frontend_memory_view_state *memory = &ui->memory_views[ui->memory_active_view_index];
+    bool can_edit;
 
     if (ui == NULL || ui->ctx == NULL || content.w <= 8.0f || content.h <= footer_h) {
         return;
@@ -5628,18 +5641,29 @@ static void frontend_memory_draw_status_footer(
 
     field = memory->edit_field == FRONTEND_MEMORY_EDIT_ASCII ? "ASCII" :
         (memory->edit_field == FRONTEND_MEMORY_EDIT_ADDRESS ? "Address" : "Hex");
-    editable = debug_state != NULL &&
+    can_edit = debug_state != NULL &&
         debug_state->runtime_state == FRONTEND_RUNTIME_STATE_PAUSED &&
         !debug_state->inspecting &&
-        frontend_memory_mode_is_editable(memory->mode) ?
-        "editable" : "read-only";
+        frontend_memory_mode_is_editable(memory->mode);
+    snprintf(
+        edit_status,
+        sizeof(edit_status),
+        "%s / %s",
+        can_edit ? "editable" : "read-only",
+        memory->apple_ascii ? "hi-bit on" : "hi-bit off");
+    status_text = ui->memory_search.status[0] != '\0' ? ui->memory_search.status : edit_status;
     snprintf(address, sizeof(address), "Address: %04X", memory->cursor_address);
 
     canvas = nk_window_get_canvas(ui->ctx);
     footer = nk_rect(content.x + 4.0f, content.y + content.h - footer_h, content.w - 8.0f, footer_h);
     field_rect = nk_rect(footer.x, footer.y + 2.0f, footer.w * 0.25f, footer.h - 4.0f);
-    address_rect = nk_rect(footer.x + footer.w * 0.25f, footer.y + 2.0f, footer.w * 0.45f, footer.h - 4.0f);
-    edit_rect = nk_rect(footer.x + footer.w * 0.70f, footer.y + 2.0f, footer.w * 0.30f, footer.h - 4.0f);
+    address_rect = nk_rect(footer.x + footer.w * 0.25f, footer.y + 2.0f, footer.w * 0.40f, footer.h - 4.0f);
+    edit_rect = nk_rect(footer.x + footer.w * 0.65f, footer.y + 2.0f, footer.w * 0.35f, footer.h - 4.0f);
+
+    if (ui->memory_search.status[0] == '\0' &&
+        nk_input_is_mouse_click_in_rect(&ui->ctx->input, NK_BUTTON_LEFT, edit_rect)) {
+        memory->apple_ascii = !memory->apple_ascii;
+    }
 
     nk_draw_text(
         canvas,
@@ -5660,8 +5684,8 @@ static void frontend_memory_draw_status_footer(
     nk_draw_text(
         canvas,
         edit_rect,
-        ui->memory_search.status[0] != '\0' ? ui->memory_search.status : editable,
-        (int)strlen(ui->memory_search.status[0] != '\0' ? ui->memory_search.status : editable),
+        status_text,
+        (int)strlen(status_text),
         ui->ctx->style.font,
         nk_rgb(30, 34, 38),
         nk_rgb(196, 214, 228));
@@ -5951,6 +5975,7 @@ static void frontend_memory_split_view(frontend *ui, int view_index, bool aligne
     nv->rows = (uint8_t)(new_view_rows > 255 ? 255 : new_view_rows);
     nv->color_slot = (uint8_t)slot;
     nv->edit_field = FRONTEND_MEMORY_EDIT_HEX;
+    nv->apple_ascii = av->apple_ascii;
     nv->initialized = true;
 
     ui->memory_view_count = new_count;
@@ -6241,7 +6266,11 @@ static void frontend_memory_handle_key(
                 !frontend_memory_view_byte_available(debug_state, memory, memory->cursor_address)) {
                 return;
             }
-            frontend_memory_write_byte(ui, debug_state, memory->cursor_address, 0x0d);
+            frontend_memory_write_byte(
+                ui,
+                debug_state,
+                memory->cursor_address,
+                frontend_memory_ascii_store_byte(0x0du, memory->apple_ascii));
             frontend_memory_move_cursor(ui, 1);
             return;
         }
@@ -6250,7 +6279,11 @@ static void frontend_memory_handle_key(
                 !frontend_memory_view_byte_available(debug_state, memory, memory->cursor_address)) {
                 return;
             }
-            frontend_memory_write_byte(ui, debug_state, memory->cursor_address, 0x08);
+            frontend_memory_write_byte(
+                ui,
+                debug_state,
+                memory->cursor_address,
+                frontend_memory_ascii_store_byte(0x08u, memory->apple_ascii));
             frontend_memory_move_cursor(ui, 1);
             return;
         }
@@ -6266,7 +6299,11 @@ static void frontend_memory_handle_key(
                     byte = (uint8_t)(sym - ('a' - 'A'));
                 }
             }
-            frontend_memory_write_byte(ui, debug_state, memory->cursor_address, byte);
+            frontend_memory_write_byte(
+                ui,
+                debug_state,
+                memory->cursor_address,
+                frontend_memory_ascii_store_byte(byte, memory->apple_ascii));
             frontend_memory_move_cursor(ui, 1);
             return;
         }
@@ -6300,6 +6337,7 @@ static void frontend_draw_memory(frontend *ui, struct nk_rect bounds, const fron
         ui->memory_views[0].edit_field = FRONTEND_MEMORY_EDIT_HEX;
         ui->memory_views[0].columns = 16;
         ui->memory_views[0].color_slot = 0;
+        ui->memory_views[0].apple_ascii = true;
         ui->memory_views[0].initialized = true;
         ui->memory_view_count = 1;
         ui->memory_active_view_index = 0;
@@ -6408,7 +6446,11 @@ static void frontend_draw_memory(frontend *ui, struct nk_rect bounds, const fron
                         uint16_t addr = (uint16_t)(row_addr + col);
                         if (frontend_memory_view_byte_available(debug_state, mv, addr)) {
                             uint8_t val = frontend_memory_view_byte_at(debug_state, mv, addr);
-                            written = snprintf(lp, remaining, "%c", frontend_memory_ascii(val));
+                            written = snprintf(
+                                lp,
+                                remaining,
+                                "%c",
+                                frontend_memory_ascii(val, mv->apple_ascii));
                         } else {
                             written = snprintf(lp, remaining, " ");
                         }
@@ -6512,8 +6554,8 @@ static void frontend_draw_memory(frontend *ui, struct nk_rect bounds, const fron
                 &ui->memory_context_popup,
                 120.0f,
                 stopped ?
-                    (can_join ? 341.0f : 319.0f) :
-                    (can_join ? 221.0f : 199.0f));
+                    (can_join ? 417.0f : 395.0f) :
+                    (can_join ? 297.0f : 275.0f));
         }
 
         /* Context menu applies to the virtual view that was right-clicked */
@@ -6533,6 +6575,16 @@ static void frontend_draw_memory(frontend *ui, struct nk_rect bounds, const fron
 
             if (frontend_context_menu_source_modes(ui, &ctx_view->mode, &close_popup)) {
                 ctx_view->request_pending = false;
+            }
+            frontend_context_menu_separator(ui->ctx);
+            frontend_context_menu_heading(ui->ctx, "ASCII");
+            if (frontend_context_menu_mode_item(ui->ctx, ctx_view->apple_ascii, "hi-bit on")) {
+                ctx_view->apple_ascii = true;
+                close_popup = true;
+            }
+            if (frontend_context_menu_mode_item(ui->ctx, !ctx_view->apple_ascii, "hi-bit off")) {
+                ctx_view->apple_ascii = false;
+                close_popup = true;
             }
             frontend_context_menu_separator(ui->ctx);
             frontend_context_menu_heading(ui->ctx, "View");

@@ -57,6 +57,10 @@ actual machine state. On debugger stop: Override on dumps that page and
 publishes; Override off publishes the **beam buffer** so a mid-frame mode
 switch stays visible.
 
+Paused **memory writes** (Memory view / control `write-memory`) always
+`paint_full_frame` + publish so the CRT tracks edited bytes. That replaces any
+mid-frame beam image — intentional for interactive poking.
+
 ## Pixel address probe
 
 `apple2_video_pixel_address(flags, px, py, out)` maps a host pixel (560×192) to
