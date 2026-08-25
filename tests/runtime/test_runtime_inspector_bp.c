@@ -10,7 +10,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 static void expect_true(const char *name, int v)
 {
@@ -28,13 +27,49 @@ static void drain(runtime_client *client)
 }
 
 static int wait_event_type(
-    runtime_client *client, runtime_event_type type, double timeout_s)
+    runtime_client *client, runtime_event_type type, Uint32 timeout_ms)
 {
-    clock_t start = clock();
+    Uint32 start = SDL_GetTicks();
     runtime_event event;
-    while ((double)(clock() - start) / (double)CLOCKS_PER_SEC < timeout_s) {
+    while ((SDL_GetTicks() - start) < timeout_ms) {
         while (runtime_client_poll_event(client, &event)) {
             if (event.type == type) {
+                return 1;
+            }
+        }
+        SDL_Delay(1);
+    }
+    return 0;
+}
+
+static int wait_inspector_mode(
+    runtime_client *client, uint64_t token, Uint32 timeout_ms)
+{
+    Uint32 start = SDL_GetTicks();
+    runtime_event event;
+    while ((SDL_GetTicks() - start) < timeout_ms) {
+        while (runtime_client_poll_event(client, &event)) {
+            if (event.type == RUNTIME_EVENT_INSPECTOR_MODE &&
+                event.request_token == token) {
+                return 1;
+            }
+        }
+        SDL_Delay(1);
+    }
+    return 0;
+}
+
+static int wait_state_changed(
+    runtime_client *client,
+    runtime_state_changed_reason reason,
+    Uint32 timeout_ms)
+{
+    Uint32 start = SDL_GetTicks();
+    runtime_event event;
+    while ((SDL_GetTicks() - start) < timeout_ms) {
+        while (runtime_client_poll_event(client, &event)) {
+            if (event.type == RUNTIME_EVENT_STATE_CHANGED &&
+                event.data.state_changed.reason == reason) {
                 return 1;
             }
         }
@@ -77,27 +112,21 @@ int main(void)
     expect_true("start", runtime_start(rt));
     client = runtime_get_client(rt);
     expect_true("client", client != NULL);
-    expect_true("started", wait_event_type(client, RUNTIME_EVENT_STARTED, 2.0));
-    expect_true("paused0", wait_event_type(client, RUNTIME_EVENT_PAUSED, 2.0));
+    expect_true("started", wait_event_type(client, RUNTIME_EVENT_STARTED, 2000u));
+    expect_true("paused0", wait_event_type(client, RUNTIME_EVENT_PAUSED, 2000u));
     drain(client);
 
     expect_true("run", runtime_client_run(client));
-    expect_true("running", wait_event_type(client, RUNTIME_EVENT_RUNNING, 2.0));
+    expect_true("running", wait_event_type(client, RUNTIME_EVENT_RUNNING, 2000u));
     SDL_Delay(150);
     expect_true("pause", runtime_client_pause(client));
-    expect_true("paused", wait_event_type(client, RUNTIME_EVENT_PAUSED, 2.0));
+    expect_true("paused", wait_event_type(client, RUNTIME_EVENT_PAUSED, 2000u));
     drain(client);
 
     target_pc = rt->machine.cpu.cpu.pc;
     token = runtime_client_alloc_request_token(client);
     expect_true("enter", runtime_client_inspector_enter(client, token));
-    {
-        clock_t t0 = clock();
-        while (!runtime_inspector_inspecting(rt) &&
-            (double)(clock() - t0) / (double)CLOCKS_PER_SEC < 2.0) {
-            SDL_Delay(1);
-        }
-    }
+    expect_true("enter mode", wait_inspector_mode(client, token, 2000u));
     expect_true("inspecting", runtime_inspector_inspecting(rt));
     runtime_inspector_timeline_bounds(rt, &old, &live, &n);
     expect_true("timeline", n >= 1u);
@@ -109,8 +138,9 @@ int main(void)
     def.access = RUNTIME_BREAKPOINT_ACCESS_EXECUTE;
     def.actions = RUNTIME_BREAKPOINT_ACTION_BREAK;
     expect_true("bp create", runtime_client_create_breakpoint(client, &def));
-    SDL_Delay(20);
-    drain(client);
+    expect_true(
+        "bp list",
+        wait_event_type(client, RUNTIME_EVENT_BREAKPOINTS_RESPONSE, 2000u));
     live_count = rt->breakpoint_count;
     expect_true("one list has bp", live_count >= 1u);
 
@@ -119,26 +149,21 @@ int main(void)
         old = live - 4000u;
     }
     expect_true("land near live", runtime_client_inspector_land(client, old, token));
-    {
-        clock_t t0 = clock();
-        while (apple2_cycles(&rt->machine) > old &&
-               (double)(clock() - t0) / (double)CLOCKS_PER_SEC < 2.0) {
-            SDL_Delay(1);
-        }
-    }
-    drain(client);
+    expect_true(
+        "landed",
+        wait_state_changed(client, RUNTIME_STATE_CHANGED_INSPECTOR_LAND, 2000u));
     expect_true("landed before live", apple2_cycles(&rt->machine) <= old);
     expect_true("not at live after land", !runtime_inspector_at_live(rt));
 
+    /* RUN is async: wait for RUNNING first. Polling exec_state alone races —
+     * the wait can exit while still paused from before the command lands. */
     expect_true("run-until", runtime_client_run(client));
-    {
-        clock_t t0 = clock();
-        while (rt->exec_state == RUNTIME_EXEC_RUNNING &&
-               (double)(clock() - t0) / (double)CLOCKS_PER_SEC < 2.0) {
-            SDL_Delay(1);
-        }
-    }
-    drain(client);
+    expect_true(
+        "run-until running",
+        wait_event_type(client, RUNTIME_EVENT_RUNNING, 2000u));
+    expect_true(
+        "run-until stopped",
+        wait_event_type(client, RUNTIME_EVENT_PAUSED, 2000u));
     expect_true("stopped", rt->exec_state != RUNTIME_EXEC_RUNNING);
     expect_true("still time travel", runtime_inspector_inspecting(rt));
     expect_true("hit pc or live",
@@ -147,13 +172,7 @@ int main(void)
 
     token = runtime_client_alloc_request_token(client);
     expect_true("leave", runtime_client_inspector_leave(client, token));
-    {
-        clock_t t0 = clock();
-        while (runtime_inspector_inspecting(rt) &&
-               (double)(clock() - t0) / (double)CLOCKS_PER_SEC < 2.0) {
-            SDL_Delay(1);
-        }
-    }
+    expect_true("leave mode", wait_inspector_mode(client, token, 2000u));
     expect_true("left inspect", !runtime_inspector_inspecting(rt));
     expect_true("list survives leave", rt->breakpoint_count == live_count);
 
