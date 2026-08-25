@@ -9,7 +9,10 @@
 
 #define HOSTFS_BLOCK_SIZE 512u
 #define HOSTFS_TOTAL_BLOCKS 65535u
-#define HOSTFS_MAX_FILES 256 /* total nodes: files + directories */
+/* Ceiling on nodes (files + directories) in a volume. Architectural, not a
+   budget: ProDOS file_count is 16-bit and a 32 MB volume is 65535 blocks, so no
+   legal volume can hold more. The table is grown on demand. */
+#define HOSTFS_MAX_NODES 65535
 #define HOSTFS_MAX_DEPTH 8
 #define HOSTFS_PATH_MAX 1024
 #define HOSTFS_NAME_MAX 16 /* ProDOS name + NUL */

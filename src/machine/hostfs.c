@@ -38,6 +38,10 @@
 enum {
     HOSTFS_BITMAP_BLOCKS = 16,
     HOSTFS_WARN_MAX = 256, /* longest diagnostic line retained for tests */
+    /* Interim bound on the per-directory scan and catalog scratch buffers. This
+       is not a volume node budget - see HOSTFS_MAX_NODES - and it goes away when
+       those buffers are sized from the actual entry count. */
+    HOSTFS_SCAN_MAX = 256,
     HOSTFS_ACCESS_FILE = 0xC3u,
     HOSTFS_ACCESS_VOL = 0xC3u,
     HOSTFS_ACCESS_DIR = 0xC3u,
@@ -74,25 +78,34 @@ typedef struct {
     } u;
 } hostfs_block_ref;
 
+/* One catalog entry. The host path is NOT stored: it is rebuilt on demand by
+   walking parent_index (bounded by HOSTFS_MAX_DEPTH) and joining each ancestor's
+   host basename, which lives in the volume's string arena at name_off. Storing
+   it cost 1024 of the old 1088 bytes per node and capped the practical volume
+   size at a few thousand entries.
+
+   Nodes are referenced by int index everywhere - parent_index, the block map's
+   file_index, dir_index - and never by stored pointer, so the table survives
+   realloc. Keep it that way. */
 typedef struct {
-    bool active;
-    hostfs_kind kind;
-    int parent_index; /* -1 = volume root */
-    char prodos_name[HOSTFS_NAME_MAX];
-    uint8_t name_len;
-    uint8_t file_type;
-    uint16_t aux_type;
+    int64_t host_mtime;
+    uint32_t name_off; /* host basename, offset into vol->names */
+    int32_t parent_index; /* -1 = volume root */
     uint32_t eof;
-    uint8_t storage_type;
+    uint32_t host_size;
+    uint16_t aux_type;
     uint16_t key_block;
     uint16_t blocks_used;
     uint16_t dir_block_count; /* directories only */
     uint16_t parent_entry_block; /* block in parent that holds our entry */
+    uint8_t active;
+    uint8_t kind; /* hostfs_kind */
+    uint8_t name_len;
+    uint8_t file_type;
+    uint8_t storage_type;
     uint8_t parent_entry_number; /* 1-based entry index within that block */
-    char host_path[HOSTFS_PATH_MAX];
-    time_t host_mtime;
-    uint64_t host_size;
-} hostfs_file;
+    char prodos_name[HOSTFS_NAME_MAX];
+} hostfs_node;
 
 struct hostfs_volume {
     char root_path[HOSTFS_PATH_MAX];
@@ -103,8 +116,16 @@ struct hostfs_volume {
     uint16_t dir_block_count;
     uint16_t next_block;
 
-    hostfs_file files[HOSTFS_MAX_FILES];
-    int file_slots; /* high-water of used slots (active or not) */
+    hostfs_node *nodes;
+    int node_count; /* high-water of used slots (active or not) */
+    int node_cap;
+
+    /* Append-only arena of host basenames. Offset 0 is the empty string, so a
+       zeroed node reads as "". Rename appends and abandons the old text; the
+       waste is bounded because a remount rebuilds the arena from scratch. */
+    char *names;
+    size_t names_len;
+    size_t names_cap;
 
     hostfs_block_ref *map;
     int map_count;
@@ -127,10 +148,12 @@ struct hostfs_volume {
        a truncated view of it. Sticky: set by the mount scan or by a post-mount add
        that found the root full, and never cleared while mounted. */
     bool root_truncated;
+    bool node_limit_warned;
     int warn_count;
     char last_warning[HOSTFS_WARN_MAX];
-    /* Last persisted catalog order (host basenames); used to avoid needless rewrites. */
-    char order_basenames[HOSTFS_MAX_FILES][256];
+    /* Last persisted catalog order (host basenames); used to avoid needless
+       rewrites. Root-only, so it is bounded by the ProDOS volume directory. */
+    char order_basenames[HOSTFS_ROOT_MAX_ENTRIES][HOSTFS_BASENAME_MAX];
     int order_count;
 };
 
@@ -166,6 +189,153 @@ int hostfs_warning_count(const hostfs_volume *vol)
 const char *hostfs_last_warning(const hostfs_volume *vol)
 {
     return vol == NULL ? "" : vol->last_warning;
+}
+
+/* ---- node table, name arena, node-indexed marks ---- */
+
+/* Grow the node table on demand: 16 slots, then doubling, capped at the
+   architectural HOSTFS_MAX_NODES. Returns A2_OK if slot `need` exists after. */
+static int hostfs_nodes_reserve(hostfs_volume *vol, int need)
+{
+    int cap = vol->node_cap;
+    hostfs_node *grown;
+
+    if (need <= cap) {
+        return A2_OK;
+    }
+    if (need > HOSTFS_MAX_NODES) {
+        return A2_ERR;
+    }
+    if (cap < 16) {
+        cap = 16;
+    }
+    while (cap < need) {
+        cap *= 2;
+    }
+    if (cap > HOSTFS_MAX_NODES) {
+        cap = HOSTFS_MAX_NODES;
+    }
+    grown = (hostfs_node *)realloc(vol->nodes, (size_t)cap * sizeof(*grown));
+    if (grown == NULL) {
+        return A2_ERR;
+    }
+    memset(grown + vol->node_cap, 0, (size_t)(cap - vol->node_cap) * sizeof(*grown));
+    vol->nodes = grown;
+    vol->node_cap = cap;
+    return A2_OK;
+}
+
+/* Append a host basename and return its arena offset. Offset 0 is the empty
+   string, which is also what a zeroed node reads as, so 0 doubles as "unset". */
+static uint32_t hostfs_names_add(hostfs_volume *vol, const char *name)
+{
+    size_t len;
+    uint32_t off;
+
+    if (name == NULL || name[0] == '\0') {
+        return 0u;
+    }
+    len = strlen(name) + 1u;
+    if (vol->names_len + len > vol->names_cap) {
+        size_t cap = vol->names_cap < 1024u ? 1024u : vol->names_cap;
+        char *grown;
+        while (cap < vol->names_len + len) {
+            cap *= 2u;
+        }
+        grown = (char *)realloc(vol->names, cap);
+        if (grown == NULL) {
+            return 0u;
+        }
+        vol->names = grown;
+        vol->names_cap = cap;
+    }
+    if (vol->names_len == 0u) {
+        /* Reserve offset 0 for the empty string. */
+        vol->names[0] = '\0';
+        vol->names_len = 1u;
+        if (vol->names_len + len > vol->names_cap) {
+            return 0u;
+        }
+    }
+    off = (uint32_t)vol->names_len;
+    memcpy(vol->names + vol->names_len, name, len);
+    vol->names_len += len;
+    return off;
+}
+
+static const char *hostfs_names_get(const hostfs_volume *vol, uint32_t off)
+{
+    if (vol->names == NULL || off >= vol->names_len) {
+        return "";
+    }
+    return vol->names + off;
+}
+
+static const char *hostfs_node_basename(const hostfs_volume *vol, int index)
+{
+    if (index < 0 || index >= vol->node_count) {
+        return "";
+    }
+    return hostfs_names_get(vol, vol->nodes[index].name_off);
+}
+
+static void hostfs_node_set_basename(hostfs_volume *vol, int index, const char *name)
+{
+    if (index < 0 || index >= vol->node_count) {
+        return;
+    }
+    vol->nodes[index].name_off = hostfs_names_add(vol, name);
+}
+
+/* A bitmap indexed by node index. The node table can grow while one of these is
+   live (the reconcile and rescan walks both add nodes as they go), so it grows
+   with it rather than being sized once from the stack. */
+typedef struct {
+    uint8_t *bits;
+    int cap;
+} hostfs_marks;
+
+static void hostfs_marks_init(hostfs_marks *m)
+{
+    m->bits = NULL;
+    m->cap = 0;
+}
+
+static void hostfs_marks_free(hostfs_marks *m)
+{
+    free(m->bits);
+    m->bits = NULL;
+    m->cap = 0;
+}
+
+static void hostfs_marks_set(hostfs_marks *m, int index)
+{
+    if (index < 0) {
+        return;
+    }
+    if (index >= m->cap) {
+        int cap = m->cap < 64 ? 64 : m->cap;
+        uint8_t *grown;
+        while (cap <= index) {
+            cap *= 2;
+        }
+        grown = (uint8_t *)realloc(m->bits, (size_t)cap);
+        if (grown == NULL) {
+            return;
+        }
+        memset(grown + m->cap, 0, (size_t)(cap - m->cap));
+        m->bits = grown;
+        m->cap = cap;
+    }
+    m->bits[index] = 1u;
+}
+
+static bool hostfs_marks_get(const hostfs_marks *m, int index)
+{
+    if (index < 0 || index >= m->cap) {
+        return false;
+    }
+    return m->bits[index] != 0u;
 }
 
 static uint64_t hostfs_now_ms(void)
@@ -210,8 +380,8 @@ static int hostfs_child_count(const hostfs_volume *vol, int parent_index)
     if (vol == NULL) {
         return 0;
     }
-    for (i = 0; i < vol->file_slots; ++i) {
-        if (vol->files[i].active && vol->files[i].parent_index == parent_index) {
+    for (i = 0; i < vol->node_count; ++i) {
+        if (vol->nodes[i].active && vol->nodes[i].parent_index == parent_index) {
             n++;
         }
     }
@@ -225,8 +395,8 @@ int hostfs_file_count(const hostfs_volume *vol)
     if (vol == NULL) {
         return 0;
     }
-    for (i = 0; i < vol->file_slots; ++i) {
-        if (vol->files[i].active) {
+    for (i = 0; i < vol->node_count; ++i) {
+        if (vol->nodes[i].active) {
             n++;
         }
     }
@@ -356,6 +526,58 @@ static void hostfs_path_join(char *out, size_t out_size, const char *dir, const 
 #else
         snprintf(out, out_size, "%s/%s", dir, name != NULL ? name : "");
 #endif
+    }
+}
+
+/* Rebuild "<root>/<a>/<b>/<basename>" for a node by walking parent_index. The
+   walk is bounded by HOSTFS_MAX_DEPTH and always runs immediately before an
+   fopen/rename/stat that costs orders of magnitude more. */
+static int hostfs_node_host_path(
+    const hostfs_volume *vol, int index, char *out, size_t out_size)
+{
+    int chain[HOSTFS_MAX_DEPTH + 2];
+    int depth = 0;
+    int i;
+
+    if (out == NULL || out_size == 0) {
+        return A2_ERR;
+    }
+    out[0] = '\0';
+    if (vol == NULL || index < 0 || index >= vol->node_count) {
+        return A2_ERR;
+    }
+    while (index >= 0) {
+        if (depth >= (int)(sizeof(chain) / sizeof(chain[0]))) {
+            return A2_ERR; /* deeper than the scan can produce: cycle or corruption */
+        }
+        if (index >= vol->node_count) {
+            return A2_ERR;
+        }
+        chain[depth++] = index;
+        index = vol->nodes[index].parent_index;
+    }
+    snprintf(out, out_size, "%s", vol->root_path);
+    for (i = depth - 1; i >= 0; --i) {
+        char joined[HOSTFS_PATH_MAX];
+        hostfs_path_join(joined, sizeof(joined), out, hostfs_node_basename(vol, chain[i]));
+        snprintf(out, out_size, "%s", joined);
+    }
+    return A2_OK;
+}
+
+/* Host path of the directory that holds children of parent_index; the volume
+   root for -1. Fills a caller buffer rather than returning a pointer, because
+   the node table moves when it grows. */
+static void hostfs_parent_host_path(
+    const hostfs_volume *vol, int parent_index, char *out, size_t out_size)
+{
+    if (out == NULL || out_size == 0) {
+        return;
+    }
+    if (parent_index < 0 || parent_index >= vol->node_count ||
+        !vol->nodes[parent_index].active ||
+        hostfs_node_host_path(vol, parent_index, out, out_size) != A2_OK) {
+        snprintf(out, out_size, "%s", vol->root_path);
     }
 }
 
@@ -548,11 +770,11 @@ static void hostfs_map_remove_dir_blocks(hostfs_volume *vol, int dir_index)
 {
     uint16_t block;
     uint16_t guard = 0;
-    if (dir_index < 0 || dir_index >= vol->file_slots ||
-        vol->files[dir_index].kind != HOSTFS_KIND_DIR) {
+    if (dir_index < 0 || dir_index >= vol->node_count ||
+        vol->nodes[dir_index].kind != HOSTFS_KIND_DIR) {
         return;
     }
-    block = vol->files[dir_index].key_block;
+    block = vol->nodes[dir_index].key_block;
     while (block != 0u && guard++ < 1024u) {
         uint8_t *dir = hostfs_map_ram_ptr(vol, block);
         uint16_t next = 0;
@@ -587,12 +809,12 @@ static int hostfs_active_name_exists(
     const hostfs_volume *vol, int parent_index, const char *name, int skip)
 {
     int i;
-    for (i = 0; i < vol->file_slots; ++i) {
-        if (i == skip || !vol->files[i].active) {
+    for (i = 0; i < vol->node_count; ++i) {
+        if (i == skip || !vol->nodes[i].active) {
             continue;
         }
-        if (vol->files[i].parent_index == parent_index &&
-            strcmp(vol->files[i].prodos_name, name) == 0) {
+        if (vol->nodes[i].parent_index == parent_index &&
+            strcmp(vol->nodes[i].prodos_name, name) == 0) {
             return 1;
         }
     }
@@ -602,8 +824,8 @@ static int hostfs_active_name_exists(
 static int hostfs_find_by_key(const hostfs_volume *vol, uint16_t key)
 {
     int i;
-    for (i = 0; i < vol->file_slots; ++i) {
-        if (vol->files[i].active && vol->files[i].key_block == key) {
+    for (i = 0; i < vol->node_count; ++i) {
+        if (vol->nodes[i].active && vol->nodes[i].key_block == key) {
             return i;
         }
     }
@@ -613,23 +835,28 @@ static int hostfs_find_by_key(const hostfs_volume *vol, uint16_t key)
 static int hostfs_find_by_name(const hostfs_volume *vol, int parent_index, const char *name)
 {
     int i;
-    for (i = 0; i < vol->file_slots; ++i) {
-        if (vol->files[i].active && vol->files[i].parent_index == parent_index &&
-            strcmp(vol->files[i].prodos_name, name) == 0) {
+    for (i = 0; i < vol->node_count; ++i) {
+        if (vol->nodes[i].active && vol->nodes[i].parent_index == parent_index &&
+            strcmp(vol->nodes[i].prodos_name, name) == 0) {
             return i;
         }
     }
     return -1;
 }
 
-static int hostfs_find_by_host_path(const hostfs_volume *vol, const char *host_path)
+/* Identify a node by where it lives on the host: parent plus host basename.
+   Comparing full paths would mean rebuilding one per candidate, which is
+   quadratic; the basename is one arena lookup. */
+static int hostfs_find_by_basename(
+    const hostfs_volume *vol, int parent_index, const char *basename)
 {
     int i;
-    if (host_path == NULL) {
+    if (basename == NULL || basename[0] == '\0') {
         return -1;
     }
-    for (i = 0; i < vol->file_slots; ++i) {
-        if (vol->files[i].active && strcmp(vol->files[i].host_path, host_path) == 0) {
+    for (i = 0; i < vol->node_count; ++i) {
+        if (vol->nodes[i].active && vol->nodes[i].parent_index == parent_index &&
+            strcmp(hostfs_node_basename(vol, i), basename) == 0) {
             return i;
         }
     }
@@ -641,25 +868,32 @@ static uint16_t hostfs_parent_key(const hostfs_volume *vol, int parent_index)
     if (parent_index < 0) {
         return 2u;
     }
-    if (parent_index >= vol->file_slots || !vol->files[parent_index].active ||
-        vol->files[parent_index].kind != HOSTFS_KIND_DIR) {
+    if (parent_index >= vol->node_count || !vol->nodes[parent_index].active ||
+        vol->nodes[parent_index].kind != HOSTFS_KIND_DIR) {
         return 2u;
     }
-    return vol->files[parent_index].key_block;
+    return vol->nodes[parent_index].key_block;
 }
 
 static int hostfs_alloc_file_slot(hostfs_volume *vol)
 {
     int i;
-    for (i = 0; i < vol->file_slots; ++i) {
-        if (!vol->files[i].active) {
+    for (i = 0; i < vol->node_count; ++i) {
+        if (!vol->nodes[i].active) {
             return i;
         }
     }
-    if (vol->file_slots >= HOSTFS_MAX_FILES) {
+    if (vol->node_count >= HOSTFS_MAX_NODES ||
+        hostfs_nodes_reserve(vol, vol->node_count + 1) != A2_OK) {
+        if (!vol->node_limit_warned) {
+            hostfs_warn(
+                vol, "%s: node limit %d reached; remaining entries ignored",
+                vol->root_path, HOSTFS_MAX_NODES);
+            vol->node_limit_warned = true;
+        }
         return -1;
     }
-    return vol->file_slots++;
+    return vol->node_count++;
 }
 
 /* ---- host file I/O ---- */
@@ -668,16 +902,20 @@ static int hostfs_host_write(
     hostfs_volume *vol, int file_index, uint32_t offset, const uint8_t *data, size_t len)
 {
     FILE *fp;
-    hostfs_file *file;
+    hostfs_node *file;
     long want_end;
+    char path[HOSTFS_PATH_MAX];
 
-    if (file_index < 0 || file_index >= vol->file_slots || !vol->files[file_index].active) {
+    if (file_index < 0 || file_index >= vol->node_count || !vol->nodes[file_index].active) {
         return A2_ERR;
     }
-    file = &vol->files[file_index];
-    fp = fopen(file->host_path, "rb+");
+    if (hostfs_node_host_path(vol, file_index, path, sizeof(path)) != A2_OK) {
+        return A2_ERR;
+    }
+    file = &vol->nodes[file_index];
+    fp = fopen(path, "rb+");
     if (fp == NULL) {
-        fp = fopen(file->host_path, "wb+");
+        fp = fopen(path, "wb+");
         if (fp == NULL) {
             return A2_ERR;
         }
@@ -709,7 +947,7 @@ static int hostfs_host_write(
     fclose(fp);
     if ((uint32_t)want_end > file->eof) {
         /* Directory EOF is authoritative; grow tracking for host_size. */
-        file->host_size = (uint64_t)want_end;
+        file->host_size = (uint32_t)want_end;
     }
     vol->dirty = true;
     return A2_OK;
@@ -718,12 +956,16 @@ static int hostfs_host_write(
 static int hostfs_host_truncate(hostfs_volume *vol, int file_index, uint32_t eof)
 {
     FILE *fp;
-    hostfs_file *file;
-    if (file_index < 0 || file_index >= vol->file_slots || !vol->files[file_index].active) {
+    hostfs_node *file;
+    char path[HOSTFS_PATH_MAX];
+    if (file_index < 0 || file_index >= vol->node_count || !vol->nodes[file_index].active) {
         return A2_ERR;
     }
-    file = &vol->files[file_index];
-    fp = fopen(file->host_path, "rb+");
+    if (hostfs_node_host_path(vol, file_index, path, sizeof(path)) != A2_OK) {
+        return A2_ERR;
+    }
+    file = &vol->nodes[file_index];
+    fp = fopen(path, "rb+");
     if (fp == NULL) {
         return A2_ERR;
     }
@@ -736,17 +978,6 @@ static int hostfs_host_truncate(hostfs_volume *vol, int file_index, uint32_t eof
     file->host_size = eof;
     vol->dirty = true;
     return A2_OK;
-}
-
-static const char *hostfs_parent_host_path(const hostfs_volume *vol, int parent_index)
-{
-    if (parent_index < 0) {
-        return vol->root_path;
-    }
-    if (parent_index >= vol->file_slots || !vol->files[parent_index].active) {
-        return vol->root_path;
-    }
-    return vol->files[parent_index].host_path;
 }
 
 static int hostfs_find_host_by_stem_in(
@@ -876,9 +1107,9 @@ static int hostfs_create_or_reuse_host_file(
 {
     char naps[HOSTFS_PATH_MAX];
     char existing[HOSTFS_PATH_MAX];
-    const char *parent_path = hostfs_parent_host_path(vol, parent_index);
+    char parent_path[HOSTFS_PATH_MAX];
 
-    (void)vol;
+    hostfs_parent_host_path(vol, parent_index, parent_path, sizeof(parent_path));
     if (!hostfs_compose_naps_filename(prodos_name, file_type, aux_type, naps, sizeof(naps))) {
         return A2_ERR;
     }
@@ -916,10 +1147,10 @@ static int hostfs_create_or_reuse_host_dir(
     char *out_path,
     size_t out_size)
 {
-    const char *parent_path = hostfs_parent_host_path(vol, parent_index);
+    char parent_path[HOSTFS_PATH_MAX];
     char existing[HOSTFS_PATH_MAX];
 
-    (void)vol;
+    hostfs_parent_host_path(vol, parent_index, parent_path, sizeof(parent_path));
     if (hostfs_find_host_dir_by_name(parent_path, prodos_name, existing, sizeof(existing)) ==
         A2_OK) {
         snprintf(out_path, out_size, "%s", existing);
@@ -937,8 +1168,9 @@ static int hostfs_create_or_reuse_host_dir(
 
 /* ---- storage allocation ---- */
 
-static int hostfs_alloc_file_storage(hostfs_volume *vol, hostfs_file *file, int file_index)
+static int hostfs_alloc_file_storage(hostfs_volume *vol, int file_index)
 {
+    hostfs_node *file = &vol->nodes[file_index];
     uint32_t data_blocks;
     uint16_t blocks_used = 0;
     uint32_t i;
@@ -1043,7 +1275,7 @@ static int hostfs_alloc_file_storage(hostfs_volume *vol, hostfs_file *file, int 
     return A2_OK;
 }
 
-static void hostfs_fill_file_entry(uint8_t *entry, const hostfs_file *file, uint16_t header_ptr)
+static void hostfs_fill_file_entry(uint8_t *entry, const hostfs_node *file, uint16_t header_ptr)
 {
     memset(entry, 0, HOSTFS_ENTRY_LENGTH);
     entry[0] = (uint8_t)((file->storage_type << 4) | (file->name_len & 0x0Fu));
@@ -1085,14 +1317,14 @@ static uint16_t hostfs_dir_block_at(const hostfs_volume *vol, int dir_index, uin
         }
         return (uint16_t)(2u + which);
     }
-    if (dir_index >= vol->file_slots || !vol->files[dir_index].active ||
-        vol->files[dir_index].kind != HOSTFS_KIND_DIR) {
+    if (dir_index >= vol->node_count || !vol->nodes[dir_index].active ||
+        vol->nodes[dir_index].kind != HOSTFS_KIND_DIR) {
         return 0;
     }
-    if (which >= vol->files[dir_index].dir_block_count) {
+    if (which >= vol->nodes[dir_index].dir_block_count) {
         return 0;
     }
-    block = vol->files[dir_index].key_block;
+    block = vol->nodes[dir_index].key_block;
     for (i = 0; i < which; ++i) {
         const uint8_t *dir = NULL;
         int idx = hostfs_map_find(vol, block);
@@ -1113,11 +1345,11 @@ static uint16_t hostfs_dir_block_count_of(const hostfs_volume *vol, int dir_inde
     if (dir_index < 0) {
         return vol->dir_block_count;
     }
-    if (dir_index >= vol->file_slots || !vol->files[dir_index].active ||
-        vol->files[dir_index].kind != HOSTFS_KIND_DIR) {
+    if (dir_index >= vol->node_count || !vol->nodes[dir_index].active ||
+        vol->nodes[dir_index].kind != HOSTFS_KIND_DIR) {
         return 0;
     }
-    return vol->files[dir_index].dir_block_count;
+    return vol->nodes[dir_index].dir_block_count;
 }
 
 static uint8_t *hostfs_find_dir_entry_slot(
@@ -1180,7 +1412,7 @@ static uint8_t *hostfs_first_free_dir_entry(hostfs_volume *vol, int parent_index
 
 static void hostfs_fill_subdir_header(
     uint8_t *hdr,
-    const hostfs_file *dir_node,
+    const hostfs_node *dir_node,
     uint16_t parent_entry_block,
     uint8_t parent_entry_number,
     uint16_t active_count)
@@ -1202,11 +1434,11 @@ static void hostfs_fill_subdir_header(
 static void hostfs_note_parent_entry(
     hostfs_volume *vol, int child_index, uint16_t block, int slot)
 {
-    if (child_index < 0 || child_index >= vol->file_slots) {
+    if (child_index < 0 || child_index >= vol->node_count) {
         return;
     }
-    vol->files[child_index].parent_entry_block = block;
-    vol->files[child_index].parent_entry_number = (uint8_t)(slot + 1); /* 1-based */
+    vol->nodes[child_index].parent_entry_block = block;
+    vol->nodes[child_index].parent_entry_number = (uint8_t)(slot + 1); /* 1-based */
 }
 
 static int hostfs_fill_dir_children(
@@ -1224,15 +1456,15 @@ static int hostfs_fill_dir_children(
             return A2_ERR;
         }
         for (slot = start; slot < HOSTFS_ENTRIES_PER_BLOCK; ++slot) {
-            while (child < vol->file_slots &&
-                   !(vol->files[child].active && vol->files[child].parent_index == parent_index)) {
+            while (child < vol->node_count &&
+                   !(vol->nodes[child].active && vol->nodes[child].parent_index == parent_index)) {
                 child++;
             }
-            if (child >= vol->file_slots) {
+            if (child >= vol->node_count) {
                 return A2_OK;
             }
             hostfs_fill_file_entry(
-                dir + 4 + slot * HOSTFS_ENTRY_LENGTH, &vol->files[child], header_ptr);
+                dir + 4 + slot * HOSTFS_ENTRY_LENGTH, &vol->nodes[child], header_ptr);
             hostfs_note_parent_entry(vol, child, block, slot);
             child++;
         }
@@ -1277,15 +1509,15 @@ static int hostfs_build_volume_directory(hostfs_volume *vol)
 
 static int hostfs_alloc_dir_storage(hostfs_volume *vol, int dir_index)
 {
-    hostfs_file *dir_node;
+    hostfs_node *dir_node;
     uint16_t n;
     uint16_t i;
     uint16_t key;
 
-    if (dir_index < 0 || dir_index >= vol->file_slots) {
+    if (dir_index < 0 || dir_index >= vol->node_count) {
         return A2_ERR;
     }
-    dir_node = &vol->files[dir_index];
+    dir_node = &vol->nodes[dir_index];
     n = dir_node->dir_block_count;
     if (n == 0u) {
         n = 1u;
@@ -1320,17 +1552,17 @@ static int hostfs_alloc_dir_storage(hostfs_volume *vol, int dir_index)
 
 static int hostfs_build_subdirectory(hostfs_volume *vol, int dir_index)
 {
-    hostfs_file *dir_node;
+    hostfs_node *dir_node;
     uint16_t d;
     uint16_t n;
     uint16_t active;
     uint16_t *blocks;
 
-    if (dir_index < 0 || dir_index >= vol->file_slots || !vol->files[dir_index].active ||
-        vol->files[dir_index].kind != HOSTFS_KIND_DIR) {
+    if (dir_index < 0 || dir_index >= vol->node_count || !vol->nodes[dir_index].active ||
+        vol->nodes[dir_index].kind != HOSTFS_KIND_DIR) {
         return A2_ERR;
     }
-    dir_node = &vol->files[dir_index];
+    dir_node = &vol->nodes[dir_index];
     n = dir_node->dir_block_count;
     active = (uint16_t)hostfs_child_count(vol, dir_index);
     blocks = (uint16_t *)calloc(n, sizeof(uint16_t));
@@ -1378,8 +1610,8 @@ static int hostfs_build_all_directories(hostfs_volume *vol)
         return A2_ERR;
     }
     /* First pass notes parent_entry_* for every root child including dirs. */
-    for (i = 0; i < vol->file_slots; ++i) {
-        if (!vol->files[i].active || vol->files[i].kind != HOSTFS_KIND_DIR) {
+    for (i = 0; i < vol->node_count; ++i) {
+        if (!vol->nodes[i].active || vol->nodes[i].kind != HOSTFS_KIND_DIR) {
             continue;
         }
         if (hostfs_build_subdirectory(vol, i) != A2_OK) {
@@ -1387,13 +1619,13 @@ static int hostfs_build_all_directories(hostfs_volume *vol)
         }
     }
     /* Second pass: subdir headers now have correct parent_entry from volume/parent fill. */
-    for (i = 0; i < vol->file_slots; ++i) {
-        hostfs_file *dir_node;
+    for (i = 0; i < vol->node_count; ++i) {
+        hostfs_node *dir_node;
         uint8_t *dir;
-        if (!vol->files[i].active || vol->files[i].kind != HOSTFS_KIND_DIR) {
+        if (!vol->nodes[i].active || vol->nodes[i].kind != HOSTFS_KIND_DIR) {
             continue;
         }
-        dir_node = &vol->files[i];
+        dir_node = &vol->nodes[i];
         dir = hostfs_map_ram_ptr(vol, dir_node->key_block);
         if (dir == NULL) {
             return A2_ERR;
@@ -1657,7 +1889,7 @@ static void hostfs_apply_order_to_scans(
 {
     hostfs_scan_ent *ordered;
     hostfs_scan_ent *rest;
-    bool used[HOSTFS_MAX_FILES];
+    bool used[HOSTFS_SCAN_MAX];
     int out = 0;
     int rest_n = 0;
     int i;
@@ -1742,12 +1974,11 @@ static int hostfs_catalog_basenames_in(
                 uint16_t key = hostfs_read_u16(e + 0x11);
                 fi = hostfs_find_by_key(vol, key);
             }
-            if (fi < 0 || !vol->files[fi].active) {
+            if (fi < 0 || !vol->nodes[fi].active) {
                 continue;
             }
             snprintf(
-                names[count], HOSTFS_BASENAME_MAX, "%s",
-                hostfs_path_basename(vol->files[fi].host_path));
+                names[count], HOSTFS_BASENAME_MAX, "%s", hostfs_node_basename(vol, fi));
             count++;
         }
     }
@@ -1785,25 +2016,25 @@ static int hostfs_persist_order_manifest_in(hostfs_volume *vol, int parent_index
     int count;
     int prev_count;
     char path[HOSTFS_PATH_MAX];
-    const char *parent_path;
+    char parent_path[HOSTFS_PATH_MAX];
     FILE *fp;
     int i;
 
     if (vol == NULL) {
         return A2_ERR;
     }
-    parent_path = hostfs_parent_host_path(vol, parent_index);
+    hostfs_parent_host_path(vol, parent_index, parent_path, sizeof(parent_path));
     current = (char (*)[HOSTFS_BASENAME_MAX])calloc(
-        (size_t)HOSTFS_MAX_FILES, HOSTFS_BASENAME_MAX);
+        (size_t)HOSTFS_SCAN_MAX, HOSTFS_BASENAME_MAX);
     previous = (char (*)[HOSTFS_BASENAME_MAX])calloc(
-        (size_t)HOSTFS_MAX_FILES, HOSTFS_BASENAME_MAX);
+        (size_t)HOSTFS_SCAN_MAX, HOSTFS_BASENAME_MAX);
     if (current == NULL || previous == NULL) {
         free(current);
         free(previous);
         return A2_ERR;
     }
-    count = hostfs_catalog_basenames_in(vol, parent_index, current, HOSTFS_MAX_FILES);
-    prev_count = hostfs_load_order_file(parent_path, previous, HOSTFS_MAX_FILES);
+    count = hostfs_catalog_basenames_in(vol, parent_index, current, HOSTFS_SCAN_MAX);
+    prev_count = hostfs_load_order_file(parent_path, previous, HOSTFS_SCAN_MAX);
     if (parent_index < 0) {
         if (hostfs_order_lists_equal(current, count, vol->order_basenames, vol->order_count)) {
             free(current);
@@ -1848,8 +2079,10 @@ static int hostfs_persist_order_manifest_in(hostfs_volume *vol, int parent_index
     vol->host_directory_changed = 1;
 
     if (parent_index < 0) {
-        vol->order_count = count;
-        for (i = 0; i < count; ++i) {
+        /* The volume directory cannot hold more than this, but the catalog walk
+           is bounded by the scratch buffer, not by the root limit. */
+        vol->order_count = count < HOSTFS_ROOT_MAX_ENTRIES ? count : HOSTFS_ROOT_MAX_ENTRIES;
+        for (i = 0; i < vol->order_count; ++i) {
             snprintf(vol->order_basenames[i], HOSTFS_BASENAME_MAX, "%s", current[i]);
         }
     }
@@ -1882,21 +2115,21 @@ static int hostfs_scan_dir_recursive(
     }
     drop_list[0] = '\0';
 
-    scans = (hostfs_scan_ent *)calloc((size_t)HOSTFS_MAX_FILES, sizeof(hostfs_scan_ent));
+    scans = (hostfs_scan_ent *)calloc((size_t)HOSTFS_SCAN_MAX, sizeof(hostfs_scan_ent));
     order_names =
-        (char (*)[HOSTFS_BASENAME_MAX])calloc((size_t)HOSTFS_MAX_FILES, HOSTFS_BASENAME_MAX);
+        (char (*)[HOSTFS_BASENAME_MAX])calloc((size_t)HOSTFS_SCAN_MAX, HOSTFS_BASENAME_MAX);
     if (scans == NULL || order_names == NULL) {
         free(scans);
         free(order_names);
         return A2_ERR;
     }
 
-    n = hostfs_collect_scans_in(host_dir_path, scans, HOSTFS_MAX_FILES);
+    n = hostfs_collect_scans_in(host_dir_path, scans, HOSTFS_SCAN_MAX);
     if (n < 0) {
         rc = A2_ERR;
         goto done;
     }
-    order_count = hostfs_load_order_file(host_dir_path, order_names, HOSTFS_MAX_FILES);
+    order_count = hostfs_load_order_file(host_dir_path, order_names, HOSTFS_SCAN_MAX);
     if (order_count > 0) {
         hostfs_apply_order_to_scans(scans, n, order_names, order_count);
     } else if (n > 1) {
@@ -1904,7 +2137,6 @@ static int hostfs_scan_dir_recursive(
     }
 
     for (i = 0; i < n; ++i) {
-        hostfs_file *file;
         int fi;
         if (hostfs_active_name_exists(vol, parent_index, scans[i].prodos, -1)) {
             continue;
@@ -1923,41 +2155,52 @@ static int hostfs_scan_dir_recursive(
             }
             continue;
         }
-        if (vol->file_slots >= HOSTFS_MAX_FILES) {
+        fi = hostfs_alloc_file_slot(vol);
+        if (fi < 0) {
             break;
         }
-        fi = vol->file_slots++;
-        file = &vol->files[fi];
-        memset(file, 0, sizeof(*file));
-        file->active = true;
-        file->kind = scans[i].kind;
-        file->parent_index = parent_index;
-        snprintf(file->prodos_name, sizeof(file->prodos_name), "%s", scans[i].prodos);
-        file->name_len = (uint8_t)strlen(file->prodos_name);
-        file->file_type = scans[i].type;
-        file->aux_type = scans[i].aux;
-        file->host_mtime = scans[i].mtime;
-        snprintf(file->host_path, sizeof(file->host_path), "%s", scans[i].host_path);
+        {
+            /* Scoped so no pointer into the node table is live when the
+               recursive descent below grows and reallocates it. */
+            hostfs_node *file = &vol->nodes[fi];
+            memset(file, 0, sizeof(*file));
+            file->active = true;
+            file->kind = (uint8_t)scans[i].kind;
+            file->parent_index = parent_index;
+            snprintf(file->prodos_name, sizeof(file->prodos_name), "%s", scans[i].prodos);
+            file->name_len = (uint8_t)strlen(file->prodos_name);
+            file->file_type = scans[i].type;
+            file->aux_type = scans[i].aux;
+            file->host_mtime = (int64_t)scans[i].mtime;
+            /* Grows vol->names, never vol->nodes, so `file` stays valid. */
+            file->name_off = hostfs_names_add(vol, scans[i].basename);
 
-        if (scans[i].kind == HOSTFS_KIND_DIR) {
-            file->storage_type = HOSTFS_STOR_SUBDIR;
-            file->file_type = HOSTFS_FILE_TYPE_DIR;
-            file->eof = 0;
-            file->host_size = 0;
-            if (depth < HOSTFS_MAX_DEPTH) {
-                if (hostfs_scan_dir_recursive(vol, file->host_path, fi, depth + 1) != A2_OK) {
-                    rc = A2_ERR;
-                    goto done;
-                }
+            if (scans[i].kind == HOSTFS_KIND_DIR) {
+                file->storage_type = HOSTFS_STOR_SUBDIR;
+                file->file_type = HOSTFS_FILE_TYPE_DIR;
+                file->eof = 0;
+                file->host_size = 0;
+            } else {
+                file->eof =
+                    scans[i].size > 0x00FFFFFFu ? 0x00FFFFFFu : (uint32_t)scans[i].size;
+                file->host_size =
+                    scans[i].size > 0xFFFFFFFFu ? 0xFFFFFFFFu : (uint32_t)scans[i].size;
             }
-        } else {
-            file->eof =
-                scans[i].size > 0x00FFFFFFu ? 0x00FFFFFFu : (uint32_t)scans[i].size;
-            file->host_size = scans[i].size;
+        }
+
+        if (scans[i].kind == HOSTFS_KIND_DIR && depth < HOSTFS_MAX_DEPTH) {
+            /* Derive into a local: the callee grows the node table, so the old
+               file->host_path argument dangled for the whole subtree scan. */
+            char child_path[HOSTFS_PATH_MAX];
+            if (hostfs_node_host_path(vol, fi, child_path, sizeof(child_path)) != A2_OK ||
+                hostfs_scan_dir_recursive(vol, child_path, fi, depth + 1) != A2_OK) {
+                rc = A2_ERR;
+                goto done;
+            }
         }
 
         accepted++;
-        if (parent_index < 0 && vol->order_count < HOSTFS_MAX_FILES) {
+        if (parent_index < 0 && vol->order_count < HOSTFS_ROOT_MAX_ENTRIES) {
             snprintf(
                 vol->order_basenames[vol->order_count], HOSTFS_BASENAME_MAX, "%s",
                 scans[i].basename);
@@ -1986,8 +2229,11 @@ done:
 
 static int hostfs_scan_into_files(hostfs_volume *vol)
 {
-    vol->file_slots = 0;
+    /* A full rescan rebuilds the arena from scratch, which is what keeps the
+       append-on-rename waste bounded. */
+    vol->node_count = 0;
     vol->order_count = 0;
+    vol->names_len = 0;
     return hostfs_scan_dir_recursive(vol, vol->root_path, -1, 0);
 }
 
@@ -2005,6 +2251,8 @@ void hostfs_eject(hostfs_volume *vol)
     }
     free(vol->map);
     free(vol->bitmap);
+    free(vol->nodes);
+    free(vol->names);
     free(vol);
 }
 
@@ -2051,10 +2299,10 @@ hostfs_volume *hostfs_mount(const char *root_path, const char *volume_name)
        the root never consults hostfs_dir_blocks_for_files. That puts the volume
        bitmap at a constant block 6, as on a real volume. */
     vol->dir_block_count = (uint16_t)HOSTFS_ROOT_DIR_BLOCKS;
-    for (i = 0; i < vol->file_slots; ++i) {
+    for (i = 0; i < vol->node_count; ++i) {
         int children;
         uint16_t blocks;
-        if (!vol->files[i].active || vol->files[i].kind != HOSTFS_KIND_DIR) {
+        if (!vol->nodes[i].active || vol->nodes[i].kind != HOSTFS_KIND_DIR) {
             continue;
         }
         children = hostfs_child_count(vol, i);
@@ -2065,7 +2313,7 @@ hostfs_volume *hostfs_mount(const char *root_path, const char *volume_name)
         if (blocks < 1u) {
             blocks = 1u;
         }
-        vol->files[i].dir_block_count = blocks;
+        vol->nodes[i].dir_block_count = blocks;
     }
     vol->bitmap_block = (uint16_t)(2u + vol->dir_block_count);
 
@@ -2100,8 +2348,8 @@ hostfs_volume *hostfs_mount(const char *root_path, const char *volume_name)
     }
 
     /* Directories first so their key blocks exist before file storage. */
-    for (i = 0; i < vol->file_slots; ++i) {
-        if (!vol->files[i].active || vol->files[i].kind != HOSTFS_KIND_DIR) {
+    for (i = 0; i < vol->node_count; ++i) {
+        if (!vol->nodes[i].active || vol->nodes[i].kind != HOSTFS_KIND_DIR) {
             continue;
         }
         if (hostfs_alloc_dir_storage(vol, i) != A2_OK) {
@@ -2109,11 +2357,11 @@ hostfs_volume *hostfs_mount(const char *root_path, const char *volume_name)
             return NULL;
         }
     }
-    for (i = 0; i < vol->file_slots; ++i) {
-        if (!vol->files[i].active || vol->files[i].kind != HOSTFS_KIND_FILE) {
+    for (i = 0; i < vol->node_count; ++i) {
+        if (!vol->nodes[i].active || vol->nodes[i].kind != HOSTFS_KIND_FILE) {
             continue;
         }
-        if (hostfs_alloc_file_storage(vol, &vol->files[i], i) != A2_OK) {
+        if (hostfs_alloc_file_storage(vol, i) != A2_OK) {
             hostfs_eject(vol);
             return NULL;
         }
@@ -2149,10 +2397,14 @@ int hostfs_read_block(hostfs_volume *vol, uint32_t block, uint8_t *out)
     memset(out, 0, HOSTFS_BLOCK_SIZE);
     {
         int fi = vol->map[idx].u.host.file_index;
-        if (fi < 0 || fi >= vol->file_slots || !vol->files[fi].active) {
+        if (fi < 0 || fi >= vol->node_count || !vol->nodes[fi].active) {
             return A2_ERR;
         }
-        fp = fopen(vol->files[fi].host_path, "rb");
+        char path[HOSTFS_PATH_MAX];
+        if (hostfs_node_host_path(vol, fi, path, sizeof(path)) != A2_OK) {
+            return A2_ERR;
+        }
+        fp = fopen(path, "rb");
         if (fp == NULL) {
             return A2_ERR;
         }
@@ -2190,7 +2442,7 @@ static int hostfs_flush_ram_block_to_host(
 
 static int hostfs_bind_storage_to_host(hostfs_volume *vol, int file_index)
 {
-    hostfs_file *file = &vol->files[file_index];
+    hostfs_node *file = &vol->nodes[file_index];
     uint8_t st = file->storage_type;
 
     if (st == 1u) {
@@ -2268,33 +2520,6 @@ static int hostfs_bind_storage_to_host(hostfs_volume *vol, int file_index)
 
 /* ---- directory reconcile (Phase 3 + 5b) ---- */
 
-static void hostfs_reprefix_paths(
-    hostfs_volume *vol, const char *old_prefix, const char *new_prefix)
-{
-    size_t old_len;
-    int i;
-    if (old_prefix == NULL || new_prefix == NULL || strcmp(old_prefix, new_prefix) == 0) {
-        return;
-    }
-    old_len = strlen(old_prefix);
-    for (i = 0; i < vol->file_slots; ++i) {
-        char rebuilt[HOSTFS_PATH_MAX];
-        const char *rest;
-        if (!vol->files[i].active) {
-            continue;
-        }
-        if (strncmp(vol->files[i].host_path, old_prefix, old_len) != 0) {
-            continue;
-        }
-        rest = vol->files[i].host_path + old_len;
-        if (rest[0] != '\0' && rest[0] != '/' && rest[0] != '\\') {
-            continue;
-        }
-        snprintf(rebuilt, sizeof(rebuilt), "%s%s", new_prefix, rest);
-        snprintf(vol->files[i].host_path, sizeof(vol->files[i].host_path), "%s", rebuilt);
-    }
-}
-
 static int hostfs_count_dir_chain(hostfs_volume *vol, uint16_t key_block)
 {
     uint16_t block = key_block;
@@ -2313,15 +2538,15 @@ static int hostfs_count_dir_chain(hostfs_volume *vol, uint16_t key_block)
 
 static int hostfs_adopt_dir_storage(hostfs_volume *vol, int dir_index)
 {
-    hostfs_file *dir_node;
+    hostfs_node *dir_node;
     uint16_t block;
     uint16_t guard = 0;
     uint16_t count = 0;
 
-    if (dir_index < 0 || dir_index >= vol->file_slots) {
+    if (dir_index < 0 || dir_index >= vol->node_count) {
         return A2_ERR;
     }
-    dir_node = &vol->files[dir_index];
+    dir_node = &vol->nodes[dir_index];
     block = dir_node->key_block;
     if (block == 0u) {
         return A2_ERR;
@@ -2355,13 +2580,13 @@ static int hostfs_adopt_dir_storage(hostfs_volume *vol, int dir_index)
 
 static void hostfs_ensure_subdir_header(hostfs_volume *vol, int dir_index)
 {
-    hostfs_file *dir_node;
+    hostfs_node *dir_node;
     uint8_t *dir;
     uint8_t st;
-    if (dir_index < 0 || dir_index >= vol->file_slots) {
+    if (dir_index < 0 || dir_index >= vol->node_count) {
         return;
     }
-    dir_node = &vol->files[dir_index];
+    dir_node = &vol->nodes[dir_index];
     dir = hostfs_map_ram_ptr(vol, dir_node->key_block);
     if (dir == NULL) {
         if (hostfs_map_add_ram(vol, dir_node->key_block, NULL) != A2_OK) {
@@ -2389,31 +2614,34 @@ static void hostfs_ensure_subdir_header(hostfs_volume *vol, int dir_index)
 
 static void hostfs_destroy_reconciled_node(hostfs_volume *vol, int index)
 {
+    char path[HOSTFS_PATH_MAX];
     int i;
-    if (index < 0 || index >= vol->file_slots || !vol->files[index].active) {
+    if (index < 0 || index >= vol->node_count || !vol->nodes[index].active) {
         return;
     }
-    if (vol->files[index].kind == HOSTFS_KIND_DIR) {
+    if (hostfs_node_host_path(vol, index, path, sizeof(path)) != A2_OK) {
+        vol->nodes[index].active = false;
+        return;
+    }
+    if (vol->nodes[index].kind == HOSTFS_KIND_DIR) {
         char order_path[HOSTFS_PATH_MAX];
-        for (i = 0; i < vol->file_slots; ++i) {
-            if (vol->files[i].active && vol->files[i].parent_index == index) {
+        for (i = 0; i < vol->node_count; ++i) {
+            if (vol->nodes[i].active && vol->nodes[i].parent_index == index) {
                 hostfs_destroy_reconciled_node(vol, i);
             }
         }
-        /* Order manifest is HostFS metadata, not a ProDOS file — drop it so rmdir can succeed. */
-        hostfs_path_join(
-            order_path, sizeof(order_path), vol->files[index].host_path, HOSTFS_ORDER_FILENAME);
+        /* Order manifest is HostFS metadata, not a ProDOS file - drop it so rmdir can succeed. */
+        hostfs_path_join(order_path, sizeof(order_path), path, HOSTFS_ORDER_FILENAME);
         (void)remove(order_path);
-        if (hostfs_rmdir(vol->files[index].host_path) != 0) {
-            fprintf(stderr, "a2m: HostFS rmdir failed: %s\n", vol->files[index].host_path);
+        if (hostfs_rmdir(path) != 0) {
+            hostfs_warn(vol, "rmdir failed: %s", path);
         }
         hostfs_map_remove_dir_blocks(vol, index);
     } else {
-        (void)remove(vol->files[index].host_path);
+        (void)remove(path);
         hostfs_map_remove_file(vol, index);
     }
-    vol->files[index].active = false;
-    vol->files[index].host_path[0] = '\0';
+    vol->nodes[index].active = false;
 }
 
 static int hostfs_reconcile_directory_at(hostfs_volume *vol, int parent_index)
@@ -2432,30 +2660,30 @@ static int hostfs_reconcile_directory_at(hostfs_volume *vol, int parent_index)
         uint8_t entry_number;
     } dent;
 
-    dent ents[HOSTFS_MAX_FILES];
+    dent ents[HOSTFS_SCAN_MAX];
     int ent_count = 0;
     uint16_t d;
     uint16_t blocks;
     int i;
-    bool seen[HOSTFS_MAX_FILES];
-    const char *parent_path;
+    hostfs_marks seen;
+    char parent_path[HOSTFS_PATH_MAX];
 
     memset(ents, 0, sizeof(ents));
-    memset(seen, 0, sizeof(seen));
+    hostfs_marks_init(&seen);
 
     /* Refresh dir_block_count for subdirs in case ProDOS grew the chain. */
-    if (parent_index >= 0 && parent_index < vol->file_slots &&
-        vol->files[parent_index].active && vol->files[parent_index].kind == HOSTFS_KIND_DIR) {
-        int chain = hostfs_count_dir_chain(vol, vol->files[parent_index].key_block);
+    if (parent_index >= 0 && parent_index < vol->node_count &&
+        vol->nodes[parent_index].active && vol->nodes[parent_index].kind == HOSTFS_KIND_DIR) {
+        int chain = hostfs_count_dir_chain(vol, vol->nodes[parent_index].key_block);
         if (chain > 0) {
-            vol->files[parent_index].dir_block_count = (uint16_t)chain;
-            vol->files[parent_index].blocks_used = (uint16_t)chain;
-            vol->files[parent_index].eof = (uint32_t)chain * HOSTFS_BLOCK_SIZE;
+            vol->nodes[parent_index].dir_block_count = (uint16_t)chain;
+            vol->nodes[parent_index].blocks_used = (uint16_t)chain;
+            vol->nodes[parent_index].eof = (uint32_t)chain * HOSTFS_BLOCK_SIZE;
         }
     }
 
     blocks = hostfs_dir_block_count_of(vol, parent_index);
-    parent_path = hostfs_parent_host_path(vol, parent_index);
+    hostfs_parent_host_path(vol, parent_index, parent_path, sizeof(parent_path));
 
     for (d = 0; d < blocks; ++d) {
         uint16_t block = hostfs_dir_block_at(vol, parent_index, d);
@@ -2469,7 +2697,7 @@ static int hostfs_reconcile_directory_at(hostfs_volume *vol, int parent_index)
             uint8_t *e = dir + 4 + slot * HOSTFS_ENTRY_LENGTH;
             uint8_t st;
             dent *de;
-            if (e[0] == 0 || ent_count >= HOSTFS_MAX_FILES) {
+            if (e[0] == 0 || ent_count >= HOSTFS_SCAN_MAX) {
                 continue;
             }
             st = (uint8_t)(e[0] >> 4);
@@ -2503,12 +2731,13 @@ static int hostfs_reconcile_directory_at(hostfs_volume *vol, int parent_index)
             fi = hostfs_find_by_name(vol, parent_index, de->name);
         }
         if (fi < 0) {
-            hostfs_file *file;
+            hostfs_node *file;
+            char made[HOSTFS_PATH_MAX];
             fi = hostfs_alloc_file_slot(vol);
             if (fi < 0) {
                 continue;
             }
-            file = &vol->files[fi];
+            file = &vol->nodes[fi];
             memset(file, 0, sizeof(*file));
             file->active = true;
             file->parent_index = parent_index;
@@ -2527,11 +2756,11 @@ static int hostfs_reconcile_directory_at(hostfs_volume *vol, int parent_index)
                 file->kind = HOSTFS_KIND_DIR;
                 file->file_type = HOSTFS_FILE_TYPE_DIR;
                 if (hostfs_create_or_reuse_host_dir(
-                        vol, parent_index, de->name, file->host_path,
-                        sizeof(file->host_path)) != A2_OK) {
+                        vol, parent_index, de->name, made, sizeof(made)) != A2_OK) {
                     file->active = false;
                     continue;
                 }
+                hostfs_node_set_basename(vol, fi, hostfs_path_basename(made));
                 if (hostfs_adopt_dir_storage(vol, fi) != A2_OK) {
                     file->active = false;
                     continue;
@@ -2540,28 +2769,33 @@ static int hostfs_reconcile_directory_at(hostfs_volume *vol, int parent_index)
             } else {
                 file->kind = HOSTFS_KIND_FILE;
                 if (hostfs_create_or_reuse_host_file(
-                        vol, parent_index, de->name, de->file_type, de->aux_type,
-                        file->host_path, sizeof(file->host_path)) != A2_OK) {
+                        vol, parent_index, de->name, de->file_type, de->aux_type, made,
+                        sizeof(made)) != A2_OK) {
                     file->active = false;
                     continue;
                 }
+                hostfs_node_set_basename(vol, fi, hostfs_path_basename(made));
                 (void)hostfs_bind_storage_to_host(vol, fi);
                 if (de->eof > 0u) {
                     (void)hostfs_host_truncate(vol, fi, de->eof);
                 }
             }
-            seen[fi] = true;
+            hostfs_marks_set(&seen, fi);
         } else {
-            hostfs_file *file = &vol->files[fi];
-            seen[fi] = true;
+            hostfs_node *file = &vol->nodes[fi];
+            hostfs_marks_set(&seen, fi);
             file->parent_entry_block = de->entry_block;
             file->parent_entry_number = de->entry_number;
 
             if (file->parent_index != parent_index) {
-                /* Cross-directory move: relocate host path under new parent. */
+                /* Cross-directory move: relocate the host file under the new
+                   parent. Descendants of a moved directory need no fixup - they
+                   derive their paths through this node. */
                 char dest[HOSTFS_PATH_MAX];
                 char old_path[HOSTFS_PATH_MAX];
-                snprintf(old_path, sizeof(old_path), "%s", file->host_path);
+                if (hostfs_node_host_path(vol, fi, old_path, sizeof(old_path)) != A2_OK) {
+                    continue;
+                }
                 if (file->kind == HOSTFS_KIND_DIR) {
                     hostfs_path_join(dest, sizeof(dest), parent_path, de->name);
                 } else {
@@ -2572,26 +2806,21 @@ static int hostfs_reconcile_directory_at(hostfs_volume *vol, int parent_index)
                     }
                     hostfs_path_join(dest, sizeof(dest), parent_path, naps);
                 }
-                if (strcmp(old_path, dest) != 0) {
-                    if (rename(old_path, dest) == 0) {
-                        if (file->kind == HOSTFS_KIND_DIR) {
-                            hostfs_reprefix_paths(vol, old_path, dest);
-                        }
-                        snprintf(file->host_path, sizeof(file->host_path), "%s", dest);
-                    }
+                if (strcmp(old_path, dest) == 0 || rename(old_path, dest) == 0) {
+                    hostfs_node_set_basename(vol, fi, hostfs_path_basename(dest));
+                    file->parent_index = parent_index;
                 }
-                file->parent_index = parent_index;
             }
 
             if (file->kind == HOSTFS_KIND_DIR || de->storage_type == HOSTFS_STOR_SUBDIR) {
                 if (strcmp(file->prodos_name, de->name) != 0) {
                     char dest[HOSTFS_PATH_MAX];
                     char old_path[HOSTFS_PATH_MAX];
-                    snprintf(old_path, sizeof(old_path), "%s", file->host_path);
-                    hostfs_path_join(dest, sizeof(dest), parent_path, de->name);
-                    if (strcmp(old_path, dest) != 0 && rename(old_path, dest) == 0) {
-                        hostfs_reprefix_paths(vol, old_path, dest);
-                        snprintf(file->host_path, sizeof(file->host_path), "%s", dest);
+                    if (hostfs_node_host_path(vol, fi, old_path, sizeof(old_path)) == A2_OK) {
+                        hostfs_path_join(dest, sizeof(dest), parent_path, de->name);
+                        if (strcmp(old_path, dest) != 0 && rename(old_path, dest) == 0) {
+                            hostfs_node_set_basename(vol, fi, hostfs_path_basename(dest));
+                        }
                     }
                     snprintf(file->prodos_name, sizeof(file->prodos_name), "%s", de->name);
                     file->name_len = de->name_len;
@@ -2609,12 +2838,14 @@ static int hostfs_reconcile_directory_at(hostfs_volume *vol, int parent_index)
                     file->file_type != de->file_type || file->aux_type != de->aux_type) {
                     char naps[HOSTFS_PATH_MAX];
                     char dest[HOSTFS_PATH_MAX];
+                    char old_path[HOSTFS_PATH_MAX];
                     if (hostfs_compose_naps_filename(
-                            de->name, de->file_type, de->aux_type, naps, sizeof(naps))) {
+                            de->name, de->file_type, de->aux_type, naps, sizeof(naps)) &&
+                        hostfs_node_host_path(vol, fi, old_path, sizeof(old_path)) == A2_OK) {
                         hostfs_path_join(dest, sizeof(dest), parent_path, naps);
-                        if (strcmp(file->host_path, dest) != 0) {
-                            (void)rename(file->host_path, dest);
-                            snprintf(file->host_path, sizeof(file->host_path), "%s", dest);
+                        if (strcmp(old_path, dest) != 0) {
+                            (void)rename(old_path, dest);
+                            hostfs_node_set_basename(vol, fi, hostfs_path_basename(dest));
                         }
                     }
                     snprintf(file->prodos_name, sizeof(file->prodos_name), "%s", de->name);
@@ -2634,15 +2865,16 @@ static int hostfs_reconcile_directory_at(hostfs_volume *vol, int parent_index)
         }
     }
 
-    for (i = 0; i < vol->file_slots; ++i) {
-        if (!vol->files[i].active || seen[i]) {
+    for (i = 0; i < vol->node_count; ++i) {
+        if (!vol->nodes[i].active || hostfs_marks_get(&seen, i)) {
             continue;
         }
-        if (vol->files[i].parent_index != parent_index) {
+        if (vol->nodes[i].parent_index != parent_index) {
             continue;
         }
         hostfs_destroy_reconciled_node(vol, i);
     }
+    hostfs_marks_free(&seen);
 
     (void)hostfs_patch_dir_file_count(vol, parent_index);
     (void)hostfs_sync_bitmap_to_map(vol);
@@ -2661,21 +2893,21 @@ static bool hostfs_find_dir_owner(hostfs_volume *vol, uint16_t block, int *out_p
         return true;
     }
 
-    for (i = 0; i < vol->file_slots; ++i) {
+    for (i = 0; i < vol->node_count; ++i) {
         uint16_t b;
         uint16_t guard = 0;
         uint16_t count = 0;
-        if (!vol->files[i].active || vol->files[i].kind != HOSTFS_KIND_DIR) {
+        if (!vol->nodes[i].active || vol->nodes[i].kind != HOSTFS_KIND_DIR) {
             continue;
         }
-        b = vol->files[i].key_block;
+        b = vol->nodes[i].key_block;
         while (b != 0u && guard++ < 1024u) {
             count++;
             if (b == block) {
-                if (count > vol->files[i].dir_block_count) {
-                    vol->files[i].dir_block_count = count;
-                    vol->files[i].blocks_used = count;
-                    vol->files[i].eof = (uint32_t)count * HOSTFS_BLOCK_SIZE;
+                if (count > vol->nodes[i].dir_block_count) {
+                    vol->nodes[i].dir_block_count = count;
+                    vol->nodes[i].blocks_used = count;
+                    vol->nodes[i].eof = (uint32_t)count * HOSTFS_BLOCK_SIZE;
                 }
                 *out_parent = i;
                 return true;
@@ -2694,12 +2926,12 @@ static bool hostfs_find_dir_owner(hostfs_volume *vol, uint16_t block, int *out_p
     if (blk != NULL) {
         prev = hostfs_read_u16(blk + 0);
         if (prev != 0u && hostfs_find_dir_owner(vol, prev, out_parent)) {
-            if (*out_parent >= 0 && *out_parent < vol->file_slots) {
-                uint16_t n = vol->files[*out_parent].dir_block_count;
-                vol->files[*out_parent].dir_block_count = (uint16_t)(n + 1u);
-                vol->files[*out_parent].blocks_used = vol->files[*out_parent].dir_block_count;
-                vol->files[*out_parent].eof =
-                    (uint32_t)vol->files[*out_parent].dir_block_count * HOSTFS_BLOCK_SIZE;
+            if (*out_parent >= 0 && *out_parent < vol->node_count) {
+                uint16_t n = vol->nodes[*out_parent].dir_block_count;
+                vol->nodes[*out_parent].dir_block_count = (uint16_t)(n + 1u);
+                vol->nodes[*out_parent].blocks_used = vol->nodes[*out_parent].dir_block_count;
+                vol->nodes[*out_parent].eof =
+                    (uint32_t)vol->nodes[*out_parent].dir_block_count * HOSTFS_BLOCK_SIZE;
             }
             return true;
         }
@@ -2764,7 +2996,7 @@ int hostfs_write_block(hostfs_volume *vol, uint32_t block, const uint8_t *data)
 
 static int hostfs_grow_file_storage(hostfs_volume *vol, int file_index, uint32_t new_eof)
 {
-    hostfs_file *file = &vol->files[file_index];
+    hostfs_node *file = &vol->nodes[file_index];
     uint32_t old_blocks =
         (file->eof + HOSTFS_BLOCK_SIZE - 1u) / HOSTFS_BLOCK_SIZE;
     uint32_t new_blocks = (new_eof + HOSTFS_BLOCK_SIZE - 1u) / HOSTFS_BLOCK_SIZE;
@@ -2791,7 +3023,7 @@ static int hostfs_grow_file_storage(hostfs_volume *vol, int file_index, uint32_t
     if (need_st != file->storage_type || new_blocks < old_blocks) {
         hostfs_map_remove_file(vol, file_index);
         file->eof = new_eof;
-        if (hostfs_alloc_file_storage(vol, file, file_index) != A2_OK) {
+        if (hostfs_alloc_file_storage(vol, file_index) != A2_OK) {
             return A2_ERR;
         }
     } else if (new_blocks > old_blocks && file->storage_type == HOSTFS_STOR_SAPLING) {
@@ -2835,7 +3067,7 @@ static int hostfs_grow_file_storage(hostfs_volume *vol, int file_index, uint32_t
 
 static int hostfs_grow_subdir_capacity(hostfs_volume *vol, int dir_index)
 {
-    hostfs_file *dir_node;
+    hostfs_node *dir_node;
     uint16_t new_block;
     uint16_t last_block;
     uint8_t *prev_dir;
@@ -2845,7 +3077,7 @@ static int hostfs_grow_subdir_capacity(hostfs_volume *vol, int dir_index)
     if (dir_index < 0) {
         return A2_ERR; /* volume directory is fixed size */
     }
-    dir_node = &vol->files[dir_index];
+    dir_node = &vol->nodes[dir_index];
     old_n = dir_node->dir_block_count;
     if (old_n == 0u) {
         return A2_ERR;
@@ -2887,12 +3119,12 @@ static int hostfs_grow_subdir_capacity(hostfs_volume *vol, int dir_index)
 static void hostfs_deactivate_node(hostfs_volume *vol, int index)
 {
     int i;
-    if (index < 0 || index >= vol->file_slots || !vol->files[index].active) {
+    if (index < 0 || index >= vol->node_count || !vol->nodes[index].active) {
         return;
     }
-    if (vol->files[index].kind == HOSTFS_KIND_DIR) {
-        for (i = 0; i < vol->file_slots; ++i) {
-            if (vol->files[i].active && vol->files[i].parent_index == index) {
+    if (vol->nodes[index].kind == HOSTFS_KIND_DIR) {
+        for (i = 0; i < vol->node_count; ++i) {
+            if (vol->nodes[i].active && vol->nodes[i].parent_index == index) {
                 hostfs_deactivate_node(vol, i);
             }
         }
@@ -2902,21 +3134,20 @@ static void hostfs_deactivate_node(hostfs_volume *vol, int index)
     }
     {
         uint8_t *entry = hostfs_find_dir_entry_slot(
-            vol, vol->files[index].parent_index, vol->files[index].prodos_name, NULL);
+            vol, vol->nodes[index].parent_index, vol->nodes[index].prodos_name, NULL);
         if (entry != NULL) {
             memset(entry, 0, HOSTFS_ENTRY_LENGTH);
         }
     }
-    (void)hostfs_patch_dir_file_count(vol, vol->files[index].parent_index);
-    vol->files[index].active = false;
-    vol->files[index].host_path[0] = '\0';
+    (void)hostfs_patch_dir_file_count(vol, vol->nodes[index].parent_index);
+    vol->nodes[index].active = false;
 }
 
 static int hostfs_add_node_from_scan(
     hostfs_volume *vol, int parent_index, const hostfs_scan_ent *sc)
 {
     int fi;
-    hostfs_file *file;
+    hostfs_node *file;
     uint8_t *entry;
     uint16_t parent_key = hostfs_parent_key(vol, parent_index);
 
@@ -2946,9 +3177,9 @@ static int hostfs_add_node_from_scan(
                 vol->root_full_warned = true;
             }
         } else if (!vol->subdir_full_warned) {
-            hostfs_warn(
-                vol, "%s: directory full; remount to pick up new files",
-                hostfs_parent_host_path(vol, parent_index));
+            char dir_path[HOSTFS_PATH_MAX];
+            hostfs_parent_host_path(vol, parent_index, dir_path, sizeof(dir_path));
+            hostfs_warn(vol, "%s: directory full; remount to pick up new files", dir_path);
             vol->subdir_full_warned = true;
         }
         return A2_ERR;
@@ -2957,7 +3188,7 @@ static int hostfs_add_node_from_scan(
     if (fi < 0) {
         return A2_ERR;
     }
-    file = &vol->files[fi];
+    file = &vol->nodes[fi];
     memset(file, 0, sizeof(*file));
     file->active = true;
     file->kind = sc->kind;
@@ -2966,8 +3197,8 @@ static int hostfs_add_node_from_scan(
     file->name_len = (uint8_t)strlen(file->prodos_name);
     file->file_type = sc->type;
     file->aux_type = sc->aux;
-    file->host_mtime = sc->mtime;
-    snprintf(file->host_path, sizeof(file->host_path), "%s", sc->host_path);
+    file->host_mtime = (int64_t)sc->mtime;
+    hostfs_node_set_basename(vol, fi, sc->basename);
 
     if (sc->kind == HOSTFS_KIND_DIR) {
         file->storage_type = HOSTFS_STOR_SUBDIR;
@@ -2984,8 +3215,8 @@ static int hostfs_add_node_from_scan(
         }
     } else {
         file->eof = sc->size > 0x00FFFFFFu ? 0x00FFFFFFu : (uint32_t)sc->size;
-        file->host_size = sc->size;
-        if (hostfs_alloc_file_storage(vol, file, fi) != A2_OK) {
+        file->host_size = sc->size > 0xFFFFFFFFu ? 0xFFFFFFFFu : (uint32_t)sc->size;
+        if (hostfs_alloc_file_storage(vol, fi) != A2_OK) {
             file->active = false;
             return A2_ERR;
         }
@@ -3026,7 +3257,7 @@ static int hostfs_add_node_from_scan(
 }
 
 static int hostfs_rescan_dir(
-    hostfs_volume *vol, const char *host_dir_path, int parent_index, bool *matched)
+    hostfs_volume *vol, const char *host_dir_path, int parent_index, hostfs_marks *matched)
 {
     hostfs_scan_ent *scans;
     char (*order_names)[HOSTFS_BASENAME_MAX];
@@ -3035,21 +3266,21 @@ static int hostfs_rescan_dir(
     int i;
     int rc = A2_OK;
 
-    scans = (hostfs_scan_ent *)calloc((size_t)HOSTFS_MAX_FILES, sizeof(hostfs_scan_ent));
+    scans = (hostfs_scan_ent *)calloc((size_t)HOSTFS_SCAN_MAX, sizeof(hostfs_scan_ent));
     order_names =
-        (char (*)[HOSTFS_BASENAME_MAX])calloc((size_t)HOSTFS_MAX_FILES, HOSTFS_BASENAME_MAX);
+        (char (*)[HOSTFS_BASENAME_MAX])calloc((size_t)HOSTFS_SCAN_MAX, HOSTFS_BASENAME_MAX);
     if (scans == NULL || order_names == NULL) {
         free(scans);
         free(order_names);
         return A2_ERR;
     }
 
-    n = hostfs_collect_scans_in(host_dir_path, scans, HOSTFS_MAX_FILES);
+    n = hostfs_collect_scans_in(host_dir_path, scans, HOSTFS_SCAN_MAX);
     if (n < 0) {
         rc = A2_ERR;
         goto done;
     }
-    order_count = hostfs_load_order_file(host_dir_path, order_names, HOSTFS_MAX_FILES);
+    order_count = hostfs_load_order_file(host_dir_path, order_names, HOSTFS_SCAN_MAX);
     if (order_count > 0) {
         hostfs_apply_order_to_scans(scans, n, order_names, order_count);
     } else if (n > 1) {
@@ -3057,47 +3288,49 @@ static int hostfs_rescan_dir(
     }
 
     for (i = 0; i < n; ++i) {
-        int fi = hostfs_find_by_host_path(vol, scans[i].host_path);
+        char child_path[HOSTFS_PATH_MAX];
+        int fi = hostfs_find_by_basename(vol, parent_index, scans[i].basename);
         if (fi < 0) {
             fi = hostfs_find_by_name(vol, parent_index, scans[i].prodos);
         }
         if (fi < 0) {
             if (hostfs_add_node_from_scan(vol, parent_index, &scans[i]) == A2_OK) {
-                fi = hostfs_find_by_host_path(vol, scans[i].host_path);
+                fi = hostfs_find_by_basename(vol, parent_index, scans[i].basename);
                 if (fi < 0) {
                     fi = hostfs_find_by_name(vol, parent_index, scans[i].prodos);
                 }
                 if (fi >= 0) {
-                    matched[fi] = true;
-                    if (vol->files[fi].kind == HOSTFS_KIND_DIR) {
-                        (void)hostfs_rescan_dir(
-                            vol, vol->files[fi].host_path, fi, matched);
+                    hostfs_marks_set(matched, fi);
+                    if (vol->nodes[fi].kind == HOSTFS_KIND_DIR &&
+                        hostfs_node_host_path(vol, fi, child_path, sizeof(child_path)) ==
+                            A2_OK) {
+                        /* Derive into a local: the callee grows the node table. */
+                        (void)hostfs_rescan_dir(vol, child_path, fi, matched);
                     }
                 }
             }
             continue;
         }
-        matched[fi] = true;
-        if (vol->files[fi].parent_index != parent_index) {
-            vol->files[fi].parent_index = parent_index;
+        hostfs_marks_set(matched, fi);
+        if (vol->nodes[fi].parent_index != parent_index) {
+            vol->nodes[fi].parent_index = parent_index;
         }
-        if (strcmp(vol->files[fi].host_path, scans[i].host_path) != 0) {
-            snprintf(
-                vol->files[fi].host_path, sizeof(vol->files[fi].host_path), "%s",
-                scans[i].host_path);
-        }
-        if (scans[i].kind == HOSTFS_KIND_DIR || vol->files[fi].kind == HOSTFS_KIND_DIR) {
-            (void)hostfs_rescan_dir(vol, vol->files[fi].host_path, fi, matched);
+        hostfs_node_set_basename(vol, fi, scans[i].basename);
+        if (scans[i].kind == HOSTFS_KIND_DIR || vol->nodes[fi].kind == HOSTFS_KIND_DIR) {
+            if (hostfs_node_host_path(vol, fi, child_path, sizeof(child_path)) == A2_OK) {
+                (void)hostfs_rescan_dir(vol, child_path, fi, matched);
+            }
             continue;
         }
         {
-            hostfs_file *file = &vol->files[fi];
+            hostfs_node *file = &vol->nodes[fi];
             uint32_t new_eof =
                 scans[i].size > 0x00FFFFFFu ? 0x00FFFFFFu : (uint32_t)scans[i].size;
             file->file_type = scans[i].type;
             file->aux_type = scans[i].aux;
-            file->host_mtime = scans[i].mtime;
-            file->host_size = scans[i].size;
+            file->host_mtime = (int64_t)scans[i].mtime;
+            file->host_size =
+                scans[i].size > 0xFFFFFFFFu ? 0xFFFFFFFFu : (uint32_t)scans[i].size;
             if (new_eof != file->eof) {
                 (void)hostfs_grow_file_storage(vol, fi, new_eof);
             } else {
@@ -3119,7 +3352,7 @@ done:
 
 int hostfs_rescan(hostfs_volume *vol)
 {
-    bool matched[HOSTFS_MAX_FILES];
+    hostfs_marks matched;
     int i;
 
     if (vol == NULL) {
@@ -3132,25 +3365,27 @@ int hostfs_rescan(hostfs_volume *vol)
     /* Stamp before the walk so a slow/failing rescan still rate-limits touches. */
     vol->last_refresh_ms = hostfs_now_ms();
 
-    memset(matched, 0, sizeof(matched));
-    if (hostfs_rescan_dir(vol, vol->root_path, -1, matched) != A2_OK) {
+    hostfs_marks_init(&matched);
+    if (hostfs_rescan_dir(vol, vol->root_path, -1, &matched) != A2_OK) {
+        hostfs_marks_free(&matched);
         return A2_ERR;
     }
 
     /* Remove nodes no longer present on the host (deepest first via cascade). */
-    for (i = 0; i < vol->file_slots; ++i) {
-        if (!vol->files[i].active || matched[i]) {
+    for (i = 0; i < vol->node_count; ++i) {
+        if (!vol->nodes[i].active || hostfs_marks_get(&matched, i)) {
             continue;
         }
-        if (vol->files[i].parent_index != -1 &&
-            vol->files[i].parent_index < vol->file_slots &&
-            vol->files[vol->files[i].parent_index].active &&
-            !matched[vol->files[i].parent_index]) {
+        if (vol->nodes[i].parent_index != -1 &&
+            vol->nodes[i].parent_index < vol->node_count &&
+            vol->nodes[vol->nodes[i].parent_index].active &&
+            !hostfs_marks_get(&matched, vol->nodes[i].parent_index)) {
             /* Parent will cascade-deactivate this child. */
             continue;
         }
         hostfs_deactivate_node(vol, i);
     }
+    hostfs_marks_free(&matched);
     (void)hostfs_patch_volume_file_count(vol);
     (void)hostfs_sync_bitmap_to_map(vol);
     (void)hostfs_persist_order_manifest(vol);
