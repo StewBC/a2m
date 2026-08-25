@@ -4,7 +4,7 @@
 |-------|-------|
 | **Author** | swessels |
 | **Date** | 2026-08-24 |
-| **Status** | Draft |
+| **Status** | Landed |
 | **Canonical path** | [`design/hostfs-real-volumes.md`](hostfs-real-volumes.md) |
 
 ---
@@ -816,6 +816,36 @@ watch-limit, queue, or owner-thread responsibilities.
 - No UI surface in this work. If mount warnings should reach the frontend later,
   that is a follow-on.
 
+## Landed stress and memory result
+
+The PR 7 stress fixture mounts a depth-8 tree with 2,048 leaf directories and one
+file per leaf: 4,103 active nodes in all. It reads the final leaf, performs a full
+rescan, reads it again, and asserts that an unchanged rescan does not grow the node
+table, basename arena, block index, or directory-block allocation.
+
+The measured allocations for that fixture are:
+
+| Allocation | Accounting |
+|------------|------------|
+| Node table | 8,192 slots x 56 B = 458,752 B |
+| Basename arena | 65,536 B capacity |
+| `block_to_map` | 65,536 entries x 4 B = 262,144 B |
+| Watcher queue payload | 256 events x 1,028 B = 263,168 B |
+| Directory block RAM | 4,270 blocks x 512 B = 2,186,240 B |
+| Linux watch map | 4,096-entry capacity x 16 B + 55,381 B path strings = 120,917 B |
+
+Those listed allocations total 3,356,757 B (3.201 MiB) on 64-bit Linux. Queue
+bookkeeping, synchronization/native watcher objects, the allocation bitmap, and
+the ordinary block-map records are separate small allocations. macOS and Windows
+use recursive native watching and therefore do not carry Linux's per-directory
+watch map.
+
+When the untracked `samples/hostfs/pt3plr/` developer sample is present, the HostFS
+test additionally asserts 256 entries in `PT3`, both `PRODOS` and `PT3PLR.SYSTEM`
+in the root, and 259 active nodes overall. A manual headless boot reached the
+player's loaded entry point and welcome screen. The sample content is deliberately
+not part of this change set.
+
 ---
 
 ## Key Decisions
@@ -1250,19 +1280,21 @@ half, the backend deliberately raises `rescan_required` for that ambiguity.
 ### PR 7 — Stress, samples, and docs
 
 - **Title:** `hostfs: full-volume stress tests and documentation`
-- **Files:** `tests/machine/test_hostfs.c`, `manual/manual.md`, `agents/disk.md`, `design/README.md`
+- **Files:** `src/machine/hostfs.c`, `src/machine/hostfs.h`,
+  `tests/machine/test_hostfs.c`, `CMakeLists.txt`, `manual/manual.md`,
+  `agents/disk.md`, `design/README.md`, `design/hostfs-real-volumes.md`
 - **Dependencies:** PR 1–6
 - **Checklist:**
-  - [ ] Stress: deep tree at `HOSTFS_MAX_DEPTH`, several thousand nodes, mount → read → rescan
-  - [ ] Stress: node ceiling reached cleanly, with the diagnostic, no crash
-  - [ ] Memory accounting for a thousands-of-directories tree: node table + name
+  - [x] Stress: deep tree at `HOSTFS_MAX_DEPTH`, several thousand nodes, mount → read → rescan
+  - [x] Stress: node ceiling reached cleanly, with the diagnostic, no crash
+  - [x] Memory accounting for a thousands-of-directories tree: node table + name
         arena + `block_to_map` + watcher queue/Linux watch map + 512 B per directory
         block
-  - [ ] Regression: `samples/hostfs/pt3plr/` (256 tunes) boots and the player launches — assert the catalog, not the player's own tune count (see Open question 3)
-  - [ ] `manual/manual.md`: 51-entry root, unbounded subdirectories, alias behavior, diagnostics
-  - [ ] `agents/disk.md`: durable invariants (51 root, indices-not-pointers, arena
+  - [x] Regression: `samples/hostfs/pt3plr/` (256 tunes) boots and the player launches — assert the catalog, not the player's own tune count (see Open question 3)
+  - [x] `manual/manual.md`: 51-entry root, unbounded subdirectories, alias behavior, diagnostics
+  - [x] `agents/disk.md`: durable invariants (51 root, indices-not-pointers, arena
         offsets, watcher events invalidate but never mutate off-owner)
-  - [ ] `design/README.md`: this doc **Draft → Landed**
+  - [x] `design/README.md`: this doc **Draft → Landed**
 - **Description:** Proves the mission statement and folds the lasting rules into the
   agent handoff surface.
 

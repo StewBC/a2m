@@ -69,9 +69,28 @@ not own media mounts (Misc → Machine does).
 
 A host **directory** mounted on a SmartPort unit becomes a ProDOS volume
 (~32 MB, `HOSTFS_TOTAL_BLOCKS=65535`): NAPS `NAME#ttxxxx`, nested host dirs as
-ProDOS folders, access-triggered host refresh (~1s wall-clock, skipped during
-guest write-through and sealed replay), file + directory write-through,
-optional `hostfs.order`.
+ProDOS folders, event-driven refresh on the next SmartPort touch, file + directory
+write-through, optional per-directory `hostfs.order`.
+
+Durable invariants:
+
+- The volume directory is exactly four blocks (2-5), with at most 51 entries.
+  Subdirectories grow as needed within the 65535-block volume ceiling.
+- Nodes live in a growable flat table capped at 65535. Cross-references are node
+  indices, never pointers. Basenames live in an arena and nodes retain offsets, so
+  table or arena growth cannot invalidate references. Rebuild host paths by walking
+  parents, with `HOSTFS_MAX_DEPTH` as the hard bound.
+- Colliding mangled ProDOS names receive deterministic `001`-`999` aliases while
+  preserving the final extension when possible. Host basenames never change merely
+  to match an alias. Root, node, depth, and alias drops always warn on stderr.
+- Arm filesystem watching before scanning. Watcher threads only enqueue path
+  invalidations and never mutate HostFS state. The machine owner verifies a file or
+  reconciles the affected parent on the next unit touch.
+- Event loss requests a full rescan; unavailable or incomplete watch coverage uses
+  the periodic fallback. Guest write-through and sealed replay defer reconciliation.
+- `hostfs.order` contains host basenames. Never rewrite the root manifest while the
+  root catalog is truncated, because doing so would discard ordering for hidden
+  entries.
 
 SmartPort Insert can **Open** an image or **Use This Folder**. CLI/INI: path
 kind selects HostFS vs image.
@@ -85,5 +104,6 @@ Operator details: `manual/manual.md` HostFS section.
 ## Tests
 
 `diskii` (incl. multi-image swap), `app_options_mounts` (queue append),
-`peripherals` (SmartPort ports + `$C800` trap), `hostfs`,
+`peripherals` (SmartPort ports + `$C800` trap), `hostfs` (large directories,
+deep-tree/node-ceiling stress, watcher targeting, aliases),
 `runtime_smartport_boot`, `runtime_slot_resolve`.

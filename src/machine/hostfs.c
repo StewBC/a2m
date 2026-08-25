@@ -123,6 +123,7 @@ struct hostfs_volume {
     hostfs_node *nodes;
     int node_count; /* high-water of used slots (active or not) */
     int node_cap;
+    int node_limit; /* HOSTFS_MAX_NODES except in the reduced-limit test seam */
 
     /* Append-only arena of host basenames. Offset 0 is the empty string, so a
        zeroed node reads as "". Rename appends and abandons the old text; the
@@ -341,7 +342,7 @@ bool hostfs_test_using_periodic_refresh(const hostfs_volume *vol)
 /* ---- node table, name arena, node-indexed marks ---- */
 
 /* Grow the node table on demand: 16 slots, then doubling, capped at the
-   architectural HOSTFS_MAX_NODES. Returns A2_OK if slot `need` exists after. */
+   volume's architectural/test ceiling. Returns A2_OK if slot `need` exists. */
 static int hostfs_nodes_reserve(hostfs_volume *vol, int need)
 {
     int cap = vol->node_cap;
@@ -350,7 +351,7 @@ static int hostfs_nodes_reserve(hostfs_volume *vol, int need)
     if (need <= cap) {
         return A2_OK;
     }
-    if (need > HOSTFS_MAX_NODES) {
+    if (need > vol->node_limit) {
         return A2_ERR;
     }
     if (cap < 16) {
@@ -359,8 +360,8 @@ static int hostfs_nodes_reserve(hostfs_volume *vol, int need)
     while (cap < need) {
         cap *= 2;
     }
-    if (cap > HOSTFS_MAX_NODES) {
-        cap = HOSTFS_MAX_NODES;
+    if (cap > vol->node_limit) {
+        cap = vol->node_limit;
     }
     grown = (hostfs_node *)realloc(vol->nodes, (size_t)cap * sizeof(*grown));
     if (grown == NULL) {
@@ -429,6 +430,9 @@ static const char *hostfs_node_basename(const hostfs_volume *vol, int index)
 static void hostfs_node_set_basename(hostfs_volume *vol, int index, const char *name)
 {
     if (index < 0 || index >= vol->node_count) {
+        return;
+    }
+    if (strcmp(hostfs_node_basename(vol, index), name) == 0) {
         return;
     }
     vol->nodes[index].name_off = hostfs_names_add(vol, name);
@@ -1253,12 +1257,12 @@ static int hostfs_alloc_file_slot(hostfs_volume *vol)
             return i;
         }
     }
-    if (vol->node_count >= HOSTFS_MAX_NODES ||
+    if (vol->node_count >= vol->node_limit ||
         hostfs_nodes_reserve(vol, vol->node_count + 1) != A2_OK) {
         if (!vol->node_limit_warned) {
             hostfs_warn(
                 vol, "%s: node limit %d reached; remaining entries ignored",
-                vol->root_path, HOSTFS_MAX_NODES);
+                vol->root_path, vol->node_limit);
             vol->node_limit_warned = true;
         }
         return -1;
@@ -2909,7 +2913,8 @@ int hostfs_flush(hostfs_volume *vol)
     return A2_OK;
 }
 
-hostfs_volume *hostfs_mount(const char *root_path, const char *volume_name)
+static hostfs_volume *hostfs_mount_with_node_limit(
+    const char *root_path, const char *volume_name, int node_limit)
 {
     hostfs_volume *vol;
     uint16_t b;
@@ -2926,6 +2931,7 @@ hostfs_volume *hostfs_mount(const char *root_path, const char *volume_name)
     if (vol == NULL) {
         return NULL;
     }
+    vol->node_limit = node_limit;
     vol->block_to_map = (int32_t *)malloc(
         ((size_t)HOSTFS_TOTAL_BLOCKS + 1u) * sizeof(*vol->block_to_map));
     if (vol->block_to_map == NULL) {
@@ -3036,6 +3042,48 @@ hostfs_volume *hostfs_mount(const char *root_path, const char *volume_name)
     /* Mount scan counts as a successful refresh; first touch within delta is free. */
     vol->last_refresh_ms = hostfs_now_ms();
     return vol;
+}
+
+hostfs_volume *hostfs_mount(const char *root_path, const char *volume_name)
+{
+    return hostfs_mount_with_node_limit(
+        root_path, volume_name, HOSTFS_MAX_NODES);
+}
+
+hostfs_volume *hostfs_test_mount_with_node_limit(
+    const char *root_path, const char *volume_name, int node_limit)
+{
+    if (node_limit < 1 || node_limit > HOSTFS_MAX_NODES) {
+        return NULL;
+    }
+    return hostfs_mount_with_node_limit(root_path, volume_name, node_limit);
+}
+
+void hostfs_test_memory_stats(
+    const hostfs_volume *vol, hostfs_memory_stats *out_stats)
+{
+    int i;
+    size_t directory_blocks;
+
+    if (out_stats == NULL) {
+        return;
+    }
+    memset(out_stats, 0, sizeof(*out_stats));
+    if (vol == NULL) {
+        return;
+    }
+    out_stats->node_table_bytes =
+        (size_t)vol->node_cap * sizeof(*vol->nodes);
+    out_stats->name_arena_bytes = vol->names_cap;
+    out_stats->block_index_bytes =
+        ((size_t)HOSTFS_TOTAL_BLOCKS + 1u) * sizeof(*vol->block_to_map);
+    directory_blocks = vol->dir_block_count;
+    for (i = 0; i < vol->node_count; ++i) {
+        if (vol->nodes[i].active && vol->nodes[i].kind == HOSTFS_KIND_DIR) {
+            directory_blocks += vol->nodes[i].dir_block_count;
+        }
+    }
+    out_stats->directory_block_bytes = directory_blocks * HOSTFS_BLOCK_SIZE;
 }
 
 int hostfs_read_block(hostfs_volume *vol, uint32_t block, uint8_t *out)

@@ -91,9 +91,10 @@ NAME#ttxxxx
 
 `tt` is the ProDOS file type (two hex digits) and `xxxx` is the aux type (four hex
 digits). The ProDOS name is the stem, uppercased and limited to 15 legal characters
-(`A-Z`, `0-9`, `.`). Non-NAPS names and subdirectories are skipped. If a tool (for
-example the built-in assembler) already supplies a NAPS name, HostFS observes the
-stem and does not append a second `#ttxxxx`.
+(`A-Z`, `0-9`, `.`). Non-NAPS regular files are skipped. Host directories are
+mounted recursively as ProDOS subdirectories. If a tool (for example the built-in
+assembler) already supplies a NAPS name, HostFS observes the stem and does not
+append a second `#ttxxxx`.
 
 A bootable volume needs at least a ProDOS system file:
 
@@ -111,11 +112,25 @@ The emulated volume is advertised as about 32 MB (`65535` blocks). Its ProDOS vo
 name is `HOSTFS.SNdM` (slot and unit), so `/PREFIX` stays unique when more than one
 HostFS unit is mounted.
 
+The volume directory is the ProDOS-standard four blocks (blocks 2 through 5) and
+holds exactly 51 entries. Put additional files in subdirectories, which grow as
+needed up to the volume's 65535-block and 65535-node ceilings. If an entry cannot
+be represented because the root, node, alias, or nesting limit is reached, a2m
+writes a diagnostic to stderr instead of silently dropping it.
+
+Different host names can reduce to the same 15-character ProDOS name. HostFS keeps
+the first name and gives later collisions deterministic aliases ending in `001`
+through `999`. The final extension is preserved when possible, so colliding tune
+names still end in `.PT3`. The alias exists only in the ProDOS catalog; the host
+basename is unchanged. Each alias is reported on stderr.
+
 HostFS is read/write: ProDOS data writes update the host files, and create / delete /
 rename in the catalog create, remove, or rename NAPS files in the folder. External
-edits to files already on the volume are picked up on the next SmartPort access to
-that unit (STATUS / READ / WRITE), rate-limited to about once per second of host
-time (remount if the directory was full when new files appeared).
+edits are picked up on the next SmartPort access to that unit (STATUS / READ /
+WRITE). While filesystem notifications are healthy, idle accesses do no scan: a
+file change verifies that file and a structural change rescans its parent. If
+notifications are unavailable or events are lost, a2m reports the condition on
+stderr and falls back to a rate-limited full refresh.
 
 ProDOS catalog **order** (which `.SYSTEM` file comes first, and so on) is remembered in
 an optional `hostfs.order` text file in the folder - one basename per line (NAPS files
@@ -123,6 +138,9 @@ and directory names), `#` comments allowed. If the file is present at mount, tho
 names are added in that order and any other entries are appended. Reordering the
 catalog in ProDOS (for example with CAT.DOCTOR) rewrites `hostfs.order` automatically
 so the next launch keeps that order. The file is not itself a ProDOS volume entry.
+Subdirectories may have their own `hostfs.order`. If the volume root is over its
+51-entry limit, the root manifest is left unchanged so entries outside the visible
+catalog are not erased from the saved order.
 
 HostFS is selected by path kind only (directory vs file). Mount it from the command
 line, `[SmartPort]` in the INI, or Machine **[Insert]** on a SmartPort unit:

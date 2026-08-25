@@ -31,6 +31,13 @@
 typedef struct hostfs_volume hostfs_volume;
 struct apple2;
 
+typedef struct hostfs_memory_stats {
+    size_t node_table_bytes;
+    size_t name_arena_bytes;
+    size_t block_index_bytes;
+    size_t directory_block_bytes;
+} hostfs_memory_stats;
+
 /* Bind the owning Apple + slot/device so media events can reach Inspector. */
 void hostfs_bind_apple(hostfs_volume *vol, struct apple2 *m, int slot, int device);
 
@@ -97,3 +104,8 @@ int hostfs_test_targeted_file_stats(const hostfs_volume *vol);
 int hostfs_test_targeted_directory_scans(const hostfs_volume *vol);
 int hostfs_test_full_rescans(const hostfs_volume *vol);
 bool hostfs_test_using_periodic_refresh(const hostfs_volume *vol);
+/* Exercise the production node-ceiling path without constructing 65536 files. */
+hostfs_volume *hostfs_test_mount_with_node_limit(
+    const char *root_path, const char *volume_name, int node_limit);
+void hostfs_test_memory_stats(
+    const hostfs_volume *vol, hostfs_memory_stats *out_stats);

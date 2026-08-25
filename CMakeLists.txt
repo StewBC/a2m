@@ -256,6 +256,7 @@ add_executable(test_hostfs
 target_compile_features(test_hostfs PRIVATE c_std_99)
 target_compile_definitions(test_hostfs PRIVATE
     A2M_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
+    A2M_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )
 target_link_libraries(test_hostfs PRIVATE machine)
 add_test(NAME hostfs COMMAND test_hostfs)

@@ -22,6 +22,10 @@
 #define A2M_FIXTURE_DIR "tests/fixtures"
 #endif
 
+#ifndef A2M_SOURCE_DIR
+#define A2M_SOURCE_DIR "."
+#endif
+
 static void fail(const char *msg)
 {
     fprintf(stderr, "FAIL: %s\n", msg);
@@ -1918,6 +1922,156 @@ static void test_large_subdirectory_rescan(void)
     wipe_tree(dir);
 }
 
+static void test_full_volume_stress(void)
+{
+    const char *dir = "test_hostfs_full_stress";
+    char deep[HOSTFS_PATH_MAX];
+    hostfs_memory_stats before;
+    hostfs_memory_stats after;
+    hostfs_volume *vol;
+    uint8_t block[HOSTFS_BLOCK_SIZE];
+    uint16_t key = 0;
+    uint16_t leaf_key = 0;
+    uint16_t file_key = 0;
+    int count = 0;
+    int i;
+
+    wipe_tree(dir);
+    HOSTFS_MKDIR(dir);
+    snprintf(deep, sizeof(deep), "%s", dir);
+    for (i = 0; i < HOSTFS_MAX_DEPTH - 1; ++i) {
+        size_t used = strlen(deep);
+        snprintf(deep + used, sizeof(deep) - used, "/D%d", i);
+        HOSTFS_MKDIR(deep);
+    }
+    for (i = 0; i < 2048; ++i) {
+        char leaf[HOSTFS_PATH_MAX];
+        char file[HOSTFS_PATH_MAX];
+        uint8_t payload[2];
+        snprintf(leaf, sizeof(leaf), "%s/B%04d", deep, i);
+        HOSTFS_MKDIR(leaf);
+        snprintf(file, sizeof(file), "%s/PAYLOAD#060000", leaf);
+        payload[0] = (uint8_t)(i & 0xFF);
+        payload[1] = (uint8_t)((i >> 8) & 0xFF);
+        write_file(file, payload, sizeof(payload));
+    }
+
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL || hostfs_read_block(vol, 2, block) != 0 ||
+        !find_entry_in_dir_block(block, "D0", NULL, &key, NULL)) {
+        fail("full-volume stress mount");
+    }
+    for (i = 1; i < HOSTFS_MAX_DEPTH - 1; ++i) {
+        char name[HOSTFS_NAME_MAX];
+        uint16_t next = 0;
+        snprintf(name, sizeof(name), "D%d", i);
+        if (!subdir_catalog(vol, key, name, NULL, &next) || next == 0u) {
+            fail("full-volume stress depth walk");
+        }
+        key = next;
+    }
+    if (!subdir_catalog(vol, key, "B2047", &count, &leaf_key) || count != 2048 ||
+        !subdir_catalog(vol, leaf_key, "PAYLOAD", NULL, &file_key) ||
+        hostfs_read_block(vol, file_key, block) != 0 ||
+        block[0] != 0xFFu || block[1] != 0x07u ||
+        hostfs_file_count(vol) != 4103) {
+        fprintf(stderr, "stress children=%d nodes=%d\n",
+                count, hostfs_file_count(vol));
+        fail("full-volume stress catalog/read");
+    }
+
+    hostfs_test_memory_stats(vol, &before);
+    if (before.node_table_bytes != 458752u ||
+        before.name_arena_bytes != 65536u ||
+        before.block_index_bytes != 262144u ||
+        before.directory_block_bytes != 2186240u) {
+        fprintf(
+            stderr,
+            "stress memory nodes=%zu names=%zu index=%zu dirs=%zu\n",
+            before.node_table_bytes, before.name_arena_bytes,
+            before.block_index_bytes, before.directory_block_bytes);
+        fail("full-volume stress memory accounting");
+    }
+
+    if (hostfs_rescan(vol) != 0 ||
+        !subdir_catalog(vol, key, "B2047", &count, &leaf_key) || count != 2048 ||
+        !subdir_catalog(vol, leaf_key, "PAYLOAD", NULL, &file_key) ||
+        hostfs_read_block(vol, file_key, block) != 0 ||
+        block[0] != 0xFFu || block[1] != 0x07u) {
+        fail("full-volume stress rescan/read");
+    }
+    hostfs_test_memory_stats(vol, &after);
+    if (after.node_table_bytes != before.node_table_bytes ||
+        after.name_arena_bytes != before.name_arena_bytes ||
+        after.block_index_bytes != before.block_index_bytes ||
+        after.directory_block_bytes != before.directory_block_bytes) {
+        fail("unchanged stress rescan grew core storage");
+    }
+
+    hostfs_eject(vol);
+    wipe_tree(dir);
+}
+
+static void test_node_ceiling_diagnostic(void)
+{
+    const char *dir = "test_hostfs_node_ceiling";
+    hostfs_volume *vol;
+    uint8_t root[HOSTFS_BLOCK_SIZE];
+    uint16_t dir_key = 0;
+    int count = 0;
+    int mount_warnings;
+
+    wipe_tree(dir);
+    HOSTFS_MKDIR(dir);
+    HOSTFS_MKDIR("test_hostfs_node_ceiling/LIMIT");
+    make_large_numbered_files("test_hostfs_node_ceiling/LIMIT", 'F', 0, 127);
+
+    vol = hostfs_test_mount_with_node_limit(dir, "HOSTFS.S7D0", 64);
+    if (vol == NULL || hostfs_read_block(vol, 2, root) != 0 ||
+        !find_entry_in_dir_block(root, "LIMIT", NULL, &dir_key, NULL)) {
+        fail("reduced node-ceiling mount");
+    }
+    mount_warnings = hostfs_test_using_periodic_refresh(vol) ? 1 : 0;
+    if (hostfs_file_count(vol) != 64 ||
+        !subdir_catalog(vol, dir_key, "F0062", &count, NULL) || count != 63 ||
+        hostfs_warning_count(vol) != mount_warnings + 1 ||
+        strstr(hostfs_last_warning(vol),
+               "node limit 64 reached; remaining entries ignored") == NULL) {
+        fprintf(stderr, "ceiling nodes=%d children=%d warnings=%d last=%s\n",
+                hostfs_file_count(vol), count, hostfs_warning_count(vol),
+                hostfs_last_warning(vol));
+        fail("node ceiling must truncate once with a diagnostic");
+    }
+    hostfs_eject(vol);
+    wipe_tree(dir);
+}
+
+static void test_pt3plr_sample_catalog(void)
+{
+    char dir[HOSTFS_PATH_MAX];
+    hostfs_volume *vol;
+    uint16_t pt3_key = 0;
+    int tune_count = 0;
+
+    snprintf(dir, sizeof(dir), "%s/samples/hostfs/pt3plr", A2M_SOURCE_DIR);
+    if (!hostfs_path_is_dir(dir)) {
+        return;
+    }
+
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL ||
+        !root_catalog_key(vol, "PRODOS", NULL) ||
+        !root_catalog_key(vol, "PT3PLR.SYSTEM", NULL) ||
+        !root_catalog_key(vol, "PT3", &pt3_key) ||
+        !subdir_catalog(vol, pt3_key, "ECHO.PT3", &tune_count, NULL) ||
+        tune_count != 256 || hostfs_file_count(vol) != 259) {
+        fprintf(stderr, "pt3plr tunes=%d nodes=%d\n", tune_count,
+                vol != NULL ? hostfs_file_count(vol) : -1);
+        fail("pt3plr sample catalog");
+    }
+    hostfs_eject(vol);
+}
+
 static void test_block_index_create_delete_churn(void)
 {
     const char *dir = "test_hostfs_block_index";
@@ -2388,6 +2542,9 @@ int main(void)
     test_order_manifest_frozen_after_mount();
     test_large_subdirectory_mount();
     test_large_subdirectory_rescan();
+    test_full_volume_stress();
+    test_node_ceiling_diagnostic();
+    test_pt3plr_sample_catalog();
     test_block_index_create_delete_churn();
     test_targeted_deep_add_delete();
     test_targeted_file_resize();
