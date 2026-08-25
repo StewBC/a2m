@@ -8,7 +8,7 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-Expect **66** green. Run from repo root.
+Expect **67** green. Run from repo root.
 
 ## Registered tests
 
@@ -16,6 +16,7 @@ Expect **66** green. Run from repo root.
 |------|------|
 | `audio_buffer` | util SPSC audio |
 | `message_queue` | util queues |
+| `fs_watch` | native filesystem notifications + bounded loss handling |
 | `apple_type_script` | BP TYPE script parser (OA/sticks/RESET) |
 | `apple2_file` | NAPS/AppleSingle/legacy detection + Applesoft codec |
 | `apple2_stub` | machine init/maps |

@@ -1,5 +1,15 @@
 # src/util/CMakeLists.txt
 
+if(WIN32)
+    set(FS_WATCH_PLATFORM_SOURCE fs_watch_windows.c)
+elseif(APPLE)
+    set(FS_WATCH_PLATFORM_SOURCE fs_watch_macos.c)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(FS_WATCH_PLATFORM_SOURCE fs_watch_linux.c)
+else()
+    set(FS_WATCH_PLATFORM_SOURCE fs_watch_unsupported.c)
+endif()
+
 add_library(util STATIC
     apple2_file.c
     apple_type_script.c
@@ -7,6 +17,8 @@ add_library(util STATIC
     config.c
     cond.c
     dynarray.c
+    fs_watch.c
+    ${FS_WATCH_PLATFORM_SOURCE}
     message_queue.c
     mutex.c
     thread.c
@@ -32,3 +44,8 @@ target_link_libraries(util
         a2m_inih
         a2m_stb_ds
 )
+
+if(APPLE)
+    find_library(CORESERVICES_FRAMEWORK CoreServices REQUIRED)
+    target_link_libraries(util PRIVATE ${CORESERVICES_FRAMEWORK})
+endif()

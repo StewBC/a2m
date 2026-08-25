@@ -91,6 +91,14 @@ target_compile_features(test_message_queue PRIVATE c_std_99)
 target_link_libraries(test_message_queue PRIVATE util SDL2::SDL2)
 add_test(NAME message_queue COMMAND test_message_queue)
 
+add_executable(test_fs_watch
+    tests/util/test_fs_watch.c
+)
+target_compile_features(test_fs_watch PRIVATE c_std_99)
+target_compile_definitions(test_fs_watch PRIVATE FS_WATCH_TESTING)
+target_link_libraries(test_fs_watch PRIVATE util SDL2::SDL2)
+add_test(NAME fs_watch COMMAND test_fs_watch)
+
 add_executable(test_memory_search
     tests/frontend/test_memory_search.c
     src/frontend/memory_search.c
