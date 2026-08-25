@@ -1145,33 +1145,40 @@ builds; swap-delete updates the removed block and the block moved into its map s
   `src/util/CMakeLists.txt`, `CMakeLists.txt`, `tests/util/test_fs_watch.c`
 - **Dependencies:** none
 - **Checklist:**
-  - [ ] Opaque `fs_watch` API with root-relative paths, flags, non-blocking pop,
+  - [x] Opaque `fs_watch` API with root-relative paths, flags, non-blocking pop,
         Linux add-directory hook, and stop/join destruction
-  - [ ] Bounded queue; queue-full and native-overflow use a separate sticky
+  - [x] Bounded queue; queue-full and native-overflow use a separate sticky
         `rescan_required` bit
-  - [ ] Watcher thread owns native handles only; no callback into callers
-  - [ ] Backend readiness handshake: create/start succeeds only after the root watch
+  - [x] Watcher thread owns native handles only; no callback into callers
+  - [x] Backend readiness handshake: create/start succeeds only after the root watch
         is actually armed
-  - [ ] Windows: recursive `ReadDirectoryChangesW`, cancellable overlapped wait,
+  - [x] Windows: recursive `ReadDirectoryChangesW`, cancellable overlapped wait,
         create/remove/modify/rename flags, zero-byte/notify-enum loss detection, and
         a filtered parent watch for rename/removal of the watched root itself
-  - [ ] macOS: recursive FSEvents stream with file-event flags; dropped,
+  - [x] macOS: recursive FSEvents stream with file-event flags; dropped,
         must-scan, root-change flags force rescan; link the required system framework
-  - [ ] Linux: nonblocking `inotify`; watch-descriptor/path map; create/delete/
+  - [x] Linux: nonblocking `inotify`; watch-descriptor/path map; create/delete/
         close-write/attrib/move/self/unmount masks; failed watch coverage and directory
         moves force rescan so descriptor paths cannot drift
-  - [ ] `fs_watch_add_directory` is idempotent and safe against the watcher thread;
+  - [x] `fs_watch_add_directory` is idempotent and safe against the watcher thread;
         no-op success on recursive Windows/macOS backends
-  - [ ] Stop is safe while the backend is blocked: signal/cancel, wake, join,
+  - [x] Stop is safe while the backend is blocked: signal/cancel, wake, join,
         close native resources, destroy queue
-  - [ ] Unit: create, modify, rename, and delete under a temp root produce a path
+  - [x] Unit: create, modify, rename, and delete under a temp root produce a path
         invalidation or an explicit rescan-required state within a bounded wait
-  - [ ] Unit: deterministic queue overflow sets the loss bit even though no queue
+  - [x] Unit: deterministic queue overflow sets the loss bit even though no queue
         slot is available
-  - [ ] Unit: taking the loss bit before recovery does not clear a second loss
-  - [ ] Build/test on macOS, Linux, and Windows before landing
+  - [x] Unit: taking the loss bit before recovery does not clear a second loss
+  - [x] Build/test on macOS: 67/67 gate, 10 repeated native runs, targeted TSAN
+  - [ ] Build and run the native test on Linux and Windows before merge
 - **Description:** Establishes a small independently testable portability boundary.
   It does not know HostFS and cannot mutate machine state.
+
+**Implemented** as `f01abe1`. The current macOS host has no Linux/Windows
+cross-compiler or container runtime, so those two platform validations remain open
+rather than being inferred from source review. APFS reports some unlinks with both
+removed and renamed flags; because FSEvents does not guarantee the unseen rename
+half, the backend deliberately raises `rescan_required` for that ambiguity.
 
 ### PR 5 — Event-driven targeted HostFS reconciliation
 
