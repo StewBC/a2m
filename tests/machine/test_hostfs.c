@@ -13,9 +13,13 @@
 #include <direct.h>
 #include <windows.h>
 #define HOSTFS_MKDIR(path) _mkdir(path)
+#define A2M_STAT_ISDIR(mode) (((mode) & _S_IFDIR) != 0)
+#define A2M_STAT_ISREG(mode) (((mode) & _S_IFREG) != 0)
 #else
 #include <unistd.h>
 #define HOSTFS_MKDIR(path) mkdir(path, 0755)
+#define A2M_STAT_ISDIR(mode) S_ISDIR(mode)
+#define A2M_STAT_ISREG(mode) S_ISREG(mode)
 #endif
 
 #ifndef A2M_FIXTURE_DIR
@@ -1102,7 +1106,7 @@ static void test_dir_write_through(void)
     }
 
     snprintf(path, sizeof(path), "%s/GAMES", dir);
-    if (stat(path, &st) != 0 || !S_ISDIR(st.st_mode)) {
+    if (stat(path, &st) != 0 || !A2M_STAT_ISDIR(st.st_mode)) {
         fail("CREATE DIR did not mkdir GAMES");
     }
 
@@ -1131,7 +1135,7 @@ static void test_dir_write_through(void)
         fail("publish HI in GAMES");
     }
     snprintf(path, sizeof(path), "%s/GAMES/HI#060800", dir);
-    if (stat(path, &st) != 0 || !S_ISREG(st.st_mode)) {
+    if (stat(path, &st) != 0 || !A2M_STAT_ISREG(st.st_mode)) {
         fail("nested CREATE did not make NAPS file");
     }
 
@@ -1161,7 +1165,8 @@ static void test_dir_write_through(void)
     if (hostfs_write_block(vol, 2, dirblk) != 0) {
         fail("rename GAMES->FUN");
     }
-    if (stat("test_hostfs_dir_wt/FUN", &st) != 0 || !S_ISDIR(st.st_mode)) {
+    if (stat("test_hostfs_dir_wt/FUN", &st) != 0 ||
+        !A2M_STAT_ISDIR(st.st_mode)) {
         fail("RENAME DIR did not rename host folder");
     }
     if (stat("test_hostfs_dir_wt/FUN/HI#060800", &st) != 0) {

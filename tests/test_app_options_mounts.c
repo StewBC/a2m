@@ -6,7 +6,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#if defined(_WIN32)
+#include <direct.h>
+#define mkdir(path, mode) _mkdir(path)
+#define rmdir _rmdir
+#define A2M_TEST_TMP "a2m-test-tmp"
+#else
 #include <unistd.h>
+#define A2M_TEST_TMP "/tmp"
+#endif
 
 static void expect_true(const char *name, int v)
 {
@@ -40,9 +48,9 @@ int main(void)
         (char *)"--disk",
         (char *)"s6d1=tests/fixtures/Apple DOS 3.3 January 1983.nib",
         (char *)"--hd",
-        (char *)"s7d0=/tmp/does-not-need-to-exist.po",
+        (char *)"s7d0=" A2M_TEST_TMP "/does-not-need-to-exist.po",
         (char *)"--hd",
-        (char *)"s5d0=/tmp/other.po",
+        (char *)"s5d0=" A2M_TEST_TMP "/other.po",
         (char *)"--model",
         (char *)"plus",
         (char *)"--mb-slot",
@@ -50,6 +58,8 @@ int main(void)
         (char *)"--turbo",
         (char *)"1,4,max",
     };
+
+    expect_true("mkdir test tmp", mkdir(A2M_TEST_TMP, 0755) == 0 || errno == EEXIST);
     char *argv2[] = {
         (char *)"a2m",
         (char *)"--noini",
@@ -139,7 +149,7 @@ int main(void)
     /* Mockingboard has no standalone INI section: only [Slots] selects it,
        and saving removes obsolete section entries from an existing file. */
     {
-        const char *path = "/tmp/a2m-test-mockingboard-section.ini";
+        const char *path = A2M_TEST_TMP "/a2m-test-mockingboard-section.ini";
         FILE *file = fopen(path, "w");
         config *saved;
         expect_true("create obsolete Mockingboard INI", file != NULL);
@@ -245,7 +255,7 @@ int main(void)
         expect_true("live eject reflected", app_options_diskii_queue(
             &options, 1, 0)->count == 1);
         expect_true("SmartPort live set", app_options_smartport_set_path(
-            &options, 2, 1, "/tmp/live.po"));
+            &options, 2, 1, A2M_TEST_TMP "/live.po"));
         app_options_smartport_clear_path(&options, 2, 1);
         app_options_destroy(&options);
     }
@@ -254,22 +264,22 @@ int main(void)
        Relative paths resolve against the INI file's directory, not cwd.
        apply_convenience_paths must not collapse that queue to the first path. */
     {
-        const char *dir = "/tmp/a2m-test-ini-rel";
-        const char *media_dir = "/tmp/media";
-        const char *path = "/tmp/a2m-test-ini-rel/game.ini";
+        const char *dir = A2M_TEST_TMP "/a2m-test-ini-rel";
+        const char *media_dir = A2M_TEST_TMP "/media";
+        const char *path = A2M_TEST_TMP "/a2m-test-ini-rel/game.ini";
         FILE *file;
         expect_true("mkdir INI-relative dir", mkdir(dir, 0755) == 0 || errno == EEXIST);
         expect_true("mkdir media dir", mkdir(media_dir, 0755) == 0 || errno == EEXIST);
-        file = fopen("/tmp/media/side A.nib", "wb");
+        file = fopen(A2M_TEST_TMP "/media/side A.nib", "wb");
         expect_true("touch side A", file != NULL && fclose(file) == 0);
-        file = fopen("/tmp/media/side B.nib", "wb");
+        file = fopen(A2M_TEST_TMP "/media/side B.nib", "wb");
         expect_true("touch side B", file != NULL && fclose(file) == 0);
         file = fopen(path, "w");
         expect_true("create DiskII queue INI", file != NULL);
         fputs(
             "[DiskII]\n"
             "s6d0 = \"../media/side A.nib\",\"../media/side B.nib\"\n"
-            "s6d1 = /tmp/util.dsk\n",
+            "s6d1 = " A2M_TEST_TMP "/util.dsk\n",
             file);
         expect_true("close DiskII queue INI", fclose(file) == 0);
 
@@ -287,7 +297,7 @@ int main(void)
                 strstr(options.diskii[1].path, "/media/side B.nib") != NULL);
         expect_true("queue INI d1 stays absolute",
             options.diskii[2].path != NULL &&
-                strstr(options.diskii[2].path, "/tmp/util.dsk") != NULL);
+                strstr(options.diskii[2].path, A2M_TEST_TMP "/util.dsk") != NULL);
 
         app_options_sync_convenience_paths(&options);
         expect_true(
@@ -317,8 +327,8 @@ int main(void)
                 strstr(options.diskii[1].path, "side B.nib") != NULL);
         app_options_destroy(&options);
         expect_true("remove DiskII queue INI", remove(path) == 0);
-        (void)remove("/tmp/media/side A.nib");
-        (void)remove("/tmp/media/side B.nib");
+        (void)remove(A2M_TEST_TMP "/media/side A.nib");
+        (void)remove(A2M_TEST_TMP "/media/side B.nib");
         (void)rmdir(media_dir);
         (void)rmdir(dir);
     }
@@ -326,7 +336,7 @@ int main(void)
     /* Configure Apply/Save must keep live media mounts: eject clears live options
        while the dialog snapshot can still hold the old SmartPort paths. */
     {
-        const char *path = "/tmp/a2m-test-sp-eject-save.ini";
+        const char *path = A2M_TEST_TMP "/a2m-test-sp-eject-save.ini";
         app_options live;
         app_options dialog;
         config *saved;
@@ -337,8 +347,8 @@ int main(void)
             "slot6=diskii\n"
             "slot7=smartport\n"
             "[SmartPort]\n"
-            "s7d0=/tmp/a.po\n"
-            "s7d1=/tmp/b.po\n",
+            "s7d0=" A2M_TEST_TMP "/a.po\n"
+            "s7d1=" A2M_TEST_TMP "/b.po\n",
             file);
         expect_true("close SP eject INI", fclose(file) == 0);
 
@@ -406,12 +416,12 @@ int main(void)
             expect_true("golf side A resolved",
                 options.diskii[0].path != NULL &&
                     strstr(options.diskii[0].path,
-                           "World Class Leader Board (1987)(Access)(Side A).do") != NULL &&
+                           "World Class Leaderboard side A program disk.nib") != NULL &&
                     strstr(options.diskii[0].path, "../disks/") == NULL);
             expect_true("golf side B resolved",
                 options.diskii[1].path != NULL &&
                     strstr(options.diskii[1].path,
-                           "World Class Leader Board (1987)(Access)(Side B).do") != NULL);
+                           "World Class Leaderboard side B course disk.nib") != NULL);
             {
                 FILE *media = fopen(options.diskii[0].path, "rb");
                 expect_true("golf side A exists after resolve", media != NULL);
@@ -449,7 +459,7 @@ int main(void)
             (char *)"--inspector-memory",
             (char *)"5",
         };
-        const char *path = "/tmp/a2m-test-inspector.ini";
+        const char *path = A2M_TEST_TMP "/a2m-test-inspector.ini";
         FILE *file;
         config *saved;
 

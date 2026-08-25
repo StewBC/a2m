@@ -5,7 +5,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(_WIN32)
+#include <fcntl.h>
+#include <io.h>
+#include <windows.h>
+#define close _close
+#define fdopen _fdopen
+#else
 #include <unistd.h>
+#endif
 
 #ifndef A2M_SOURCE_DIR
 #define A2M_SOURCE_DIR "."
@@ -202,7 +210,7 @@ static void test_python_golden(void)
     uint32_t length = 0u;
     size_t encoded = 0u;
     bool clipped = false;
-    char path[] = "/tmp/a2m_hst1_goldenXXXXXX";
+    char path[260];
     int fd;
     FILE *fp;
     char cmd[512];
@@ -216,7 +224,20 @@ static void test_python_golden(void)
             epoch, src, 2u, false, src[0].id, &bytes, &length, &encoded,
             &clipped) == RUNTIME_HISTORY_WIRE_OK);
 
+#if defined(_WIN32)
+    {
+        char temp_dir[MAX_PATH];
+        if (GetTempPathA((DWORD)sizeof(temp_dir), temp_dir) == 0 ||
+            GetTempFileNameA(temp_dir, "hst", 0, path) == 0) {
+            fd = -1;
+        } else {
+            fd = _open(path, _O_BINARY | _O_RDWR);
+        }
+    }
+#else
+    snprintf(path, sizeof(path), "/tmp/a2m_hst1_goldenXXXXXX");
     fd = mkstemp(path);
+#endif
     expect_true("mkstemp", fd >= 0);
     fp = fdopen(fd, "wb");
     expect_true("fdopen", fp != NULL);

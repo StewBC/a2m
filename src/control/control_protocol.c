@@ -8,6 +8,12 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#if defined(_WIN32)
+#define A2M_STAT_ISDIR(mode) (((mode) & _S_IFDIR) != 0)
+#else
+#define A2M_STAT_ISDIR(mode) S_ISDIR(mode)
+#endif
+
 void control_request_release(control_request *request)
 {
     if (request == NULL) {
@@ -299,7 +305,7 @@ static bool infer_media_kind_from_path(
         }
         return false;
     }
-    if (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) {
+    if (stat(path, &st) == 0 && A2M_STAT_ISDIR(st.st_mode)) {
         *out_kind = (uint8_t)CONTROL_MEDIA_KIND_SMARTPORT;
         return true;
     }
