@@ -1723,8 +1723,14 @@ void forensics_view_render(
                 state->query_focus_pending = true;
             }
             if (state->query_focus_pending) {
+                int end;
                 nk_edit_focus(ctx, NK_EDIT_GOTO_END_ON_ACTIVATE);
                 state->query_focus_pending = false;
+                /* nk_edit_focus ignores GOTO_END; place caret after rewrite. */
+                end = (int)strlen(state->query);
+                ctx->current->edit.cursor = end;
+                ctx->current->edit.sel_start = end;
+                ctx->current->edit.sel_end = end;
             }
             result = nk_edit_string_zero_terminated(
                 ctx,

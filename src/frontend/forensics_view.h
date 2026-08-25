@@ -67,7 +67,7 @@ typedef struct frontend_forensics_state {
     bool request_host_pause; /* set on open; main pauses if still running */
     bool request_submit; /* Query Enter → frontend parses + pushes intent */
     bool line_truncated; /* last format hit FORMAT_CAP */
-    bool query_rewrite_pending; /* Tab autocomplete rewrote query; re-focus edit */
+    bool query_rewrite_pending; /* Tab rewrote query; re-focus + caret to end */
     /* Land Inspector: quantized (before) and exact (PR6). */
     bool land_confirm_open; /* Inspect & Land popup */
     bool land_confirm_exact; /* confirm is for Land exact */

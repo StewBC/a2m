@@ -4,7 +4,7 @@
 |-------|-------|
 | **Author** | swessels |
 | **Date** | 2026-08-24 |
-| **Status** | Landed (PR 8 addendum applied) |
+| **Status** | Landed (PR 9 addendum applied) |
 | **Canonical path** | [`design/forensics-ui.md`](forensics-ui.md) |
 
 ---
@@ -244,7 +244,7 @@ Verbs (user-facing prefixes, thin over `runtime_client_history_*`):
 Ergonomics:
 
 - **Up/Down**: query history (last 64 strings).
-- **Tab**: autocomplete from `runtime_history_find_option_keys()` / access-name table / `from=` / `direction=`.
+- **Tab**: autocomplete from `runtime_history_find_option_keys()` / access-name table / `from=` / `direction=`. After a successful rewrite, the query caret must sit at the **end of the new buffer** (e.g. `ad`<Tab> → `address=` with caret after `=`). See PR 9 — Nuklear `NK_EDIT_GOTO_END_ON_ACTIVATE` via `nk_edit_focus` alone does **not** move the caret.
 - Parse in the frontend with the shared module **before** pushing an intent. On parse failure, set status strip (`bad-args`) and do not dispatch.
 
 ### Data path (UI → worker)
@@ -533,7 +533,7 @@ Fuzz find-option strings in shared parse tests.
 
 - Status strip for RPC codes (same mapping as `control_dispatch` HISTORY deferred errors).
 - Quiet `logc` debug on FIND submit/error (token, status).
-- Tests: shared parse table; HST1 decode golden; existing `test_runtime_history_*` remain recorder oracle; inspector exact-land tests in PR 6.
+- Tests: shared parse table; HST1 decode golden; existing `test_runtime_history_*` remain recorder oracle; inspector exact-land tests in PR 6; Forensics headless Tab-caret test in PR 9.
 
 ---
 
@@ -546,7 +546,9 @@ Fuzz find-option strings in shared parse tests.
 5. Quantized Land — PR 5.  
 6. Exact `land_to_cycle` worker helper — PR 6.  
 7. Manual/help + **token-aware copy** — PR 7.  
-8. Rollback: revert UI; parser expansions are additive.
+8. Land success → debugger + Inspector tab — PR 8.  
+9. Tab autocomplete caret-to-end — PR 9.  
+10. Rollback: revert UI; parser expansions are additive.
 
 ---
 
@@ -566,6 +568,7 @@ Fuzz find-option strings in shared parse tests.
 12. **Shortcut Opt+R**; mutually exclusive with Help; button also required.
 13. **v1 copy = click line/block + Copy button**, not drag-select; **PR 7 includes token-aware copy** (`id=` / `cyc=` / `pc=$…`).
 14. **History intents carry structured `runtime_history_query` (parse in frontend).**
+15. **Tab autocomplete places the query caret at the end of the rewritten buffer** (PR 9). Do not rely on Nuklear `nk_edit_focus(..., NK_EDIT_GOTO_END_ON_ACTIVATE)` alone — that flag only applies on inactive→active inside `nk_do_edit`; after an external buffer rewrite, set `edit.cursor` / selection to the new length explicitly.
 
 ---
 
@@ -583,6 +586,7 @@ Fuzz find-option strings in shared parse tests.
 | Token-aware copy | **In PR 7** — double-click / token hit on `id=` / `cyc=` / `pc=$…` |
 | After successful land | **Leave Forensics → debugger paused + Misc → Inspector** (PR 8). Cancel / fail stay in Forensics. Opt+R/Close unchanged. |
 | “Landed” for UI switch | Any successful Inspect focus update (clamp / live / quantized / partial exact), same cases that set the land status strip |
+| Tab autocomplete caret | **End of rewritten query** (PR 9). Explicit `edit.cursor` after rewrite; `GOTO_END_ON_ACTIVATE` via `nk_edit_focus` is insufficient |
 
 ---
 
@@ -653,6 +657,7 @@ Fuzz find-option strings in shared parse tests.
   - [x] Structured history fields on `frontend_debugger_intent`
   - [x] Parse in frontend via `runtime_history_parse_find_options`
   - [x] Autocomplete from `runtime_history_find_option_keys()` only
+  - [x] Tab caret at end after rewrite *(initially missed; fixed in PR 9)*
   - [x] `main.c` pending-token RPC state; one in-flight Forensics history request
   - [x] Handle `RUNTIME_EVENT_HISTORY_RESULT_RESPONSE` / `HISTORY_STATUS_RESPONSE` when token matches
   - [x] `claim_history_rpc` → decode → append transcript; free payload
@@ -713,3 +718,16 @@ Fuzz find-option strings in shared parse tests.
   - [x] “Landed” = any Inspect focus update used for land status (clamp / live / quantized / partial exact)
   - [x] Design + agents + manual reflect leave-on-land (c64m reuse)
 - **Description:** Tail on **Land before** / **Land exact**: after a successful land, switch to the Debug UI and select the Inspector Misc tab. Do not switch on cancel or failed/incomplete land. Keep Opt+R/Close entry-surface behavior as-is.
+
+### PR 9 — Tab autocomplete caret → end of rewritten query
+
+- **Title:** `frontend: Forensics Tab autocomplete moves caret to end`
+- **Files:** `forensics_view.*`, `tests/frontend/test_forensics_view.c` (headless Nuklear caret assert), `design/forensics-ui.md`, `design/README.md`
+- **Dependencies:** PR 4 (Tab autocomplete already landed)
+- **Checklist:**
+  - [x] After Tab rewrites `query` (unique key → `key=`, LCP growth, or value complete), next draw places caret at `strlen(query)`
+  - [x] Do **not** rely on `nk_edit_focus(ctx, NK_EDIT_GOTO_END_ON_ACTIVATE)` alone — that flag is ignored by `nk_edit_focus` and only applied in `nk_do_edit` on inactive→active
+  - [x] a2m approach: `query_rewrite_pending` → `nk_edit_unfocus` + re-focus, then explicitly set `ctx->current->edit.cursor` / `sel_start` / `sel_end` to the new length
+  - [x] Headless test: type prefix (`ad`), Tab → `address=`, assert window edit cursor == end (reproduces pre-fix caret-on-`r` failure)
+  - [x] Design notes for c64m reuse
+- **Description:** Post-ship fix for PR 4 Tab complete. Symptom: `find add`<Tab> produced `find address=` but left the caret over the `r` in `address` instead of after `=`. Root cause is Nuklear edit state retaining the pre-rewrite cursor offset when the buffer is mutated externally. c64m (or any Nuklear query line) must move the caret explicitly after autocomplete rewrites the buffer.

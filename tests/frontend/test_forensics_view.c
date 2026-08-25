@@ -391,6 +391,68 @@ static void test_land_focus_status(void)
     expect_true("close clears leave", !state.request_leave_debugger);
 }
 
+static float test_font_width(
+    nk_handle handle,
+    float height,
+    const char *text,
+    int len)
+{
+    (void)handle;
+    (void)height;
+    (void)text;
+    return (float)len * 7.0f;
+}
+
+/* Headless: Tab autocomplete must move the query caret to the new end. */
+static void test_tab_autocomplete_cursor(void)
+{
+    struct nk_context ctx;
+    struct nk_user_font font;
+    frontend_forensics_state state;
+    frontend_forensics_land_context land;
+    struct nk_window *win;
+
+    memset(&font, 0, sizeof(font));
+    font.userdata = nk_handle_ptr(NULL);
+    font.height = 12.0f;
+    font.width = test_font_width;
+    expect_true("nk init", nk_init_default(&ctx, &font) != 0);
+
+    forensics_view_init(&state);
+    forensics_view_open(&state, FRONTEND_FORENSICS_ENTRY_DEBUGGER, false);
+    memset(&land, 0, sizeof(land));
+
+    nk_input_begin(&ctx);
+    nk_input_end(&ctx);
+    forensics_view_render(&ctx, &state, 900, 600, &land);
+    win = nk_window_find(&ctx, "Forensics");
+    expect_true("forensics win", win != NULL);
+    /* Simulate caret after typing a key prefix. */
+    snprintf(state.query, sizeof(state.query), "ad");
+    win->edit.cursor = 2;
+    win->edit.sel_start = 2;
+    win->edit.sel_end = 2;
+    nk_clear(&ctx);
+
+    expect_true("tab complete", forensics_view_autocomplete(&state));
+    expect_streq("tab address", state.query, "address=");
+    expect_true("tab rewrite pending", state.query_rewrite_pending);
+
+    nk_input_begin(&ctx);
+    nk_input_end(&ctx);
+    forensics_view_render(&ctx, &state, 900, 600, &land);
+    win = nk_window_find(&ctx, "Forensics");
+    expect_true("forensics win after tab", win != NULL);
+    expect_true(
+        "caret after address=",
+        win->edit.cursor == (int)strlen("address="));
+    expect_true("rewrite consumed", !state.query_rewrite_pending);
+    nk_clear(&ctx);
+
+    forensics_view_close(&state);
+    nk_free(&ctx);
+}
+
 int main(void)
 {
     test_shell();
@@ -399,6 +461,7 @@ int main(void)
     test_apply_and_select();
     test_token_at_offset();
     test_land_focus_status();
+    test_tab_autocomplete_cursor();
     printf("ok\n");
     return 0;
 }
