@@ -141,10 +141,10 @@ bool forensics_view_query_history_prev(frontend_forensics_state *state);
 bool forensics_view_query_history_next(frontend_forensics_state *state);
 void forensics_view_query_history_push(frontend_forensics_state *state, const char *text);
 
-/* Tab autocomplete from shared find key/access tables. */
+/* Tab query guide: verb-first unique-complete / slot help. True iff rewrote. */
 bool forensics_view_autocomplete(frontend_forensics_state *state);
 
-/* Parse query line (find/next/read/info). Uses shared find-option parser. */
+/* Parse query line (find/next/read/info). First token must be an exact verb. */
 bool forensics_view_parse_query(
     const char *text,
     uint64_t last_cursor,

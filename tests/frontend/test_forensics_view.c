@@ -28,6 +28,30 @@ static void expect_streq(const char *name, const char *got, const char *want)
     }
 }
 
+static void expect_contains(const char *name, const char *got, const char *needle)
+{
+    if (got == NULL || needle == NULL || strstr(got, needle) == NULL) {
+        fprintf(
+            stderr,
+            "FAIL: %s\n  got:  [%s]\n  need: [%s]\n",
+            name,
+            got != NULL ? got : "(null)",
+            needle != NULL ? needle : "(null)");
+        exit(1);
+    }
+}
+
+static const char k_help_verbs[] = "verbs: find | next | read | info";
+static const char k_help_pc_addr[] = "pc/address: u16 or lo-hi ($hex ok)";
+static const char k_help_read[] =
+    "read <id> [before=N] [after=N] [epoch=N]";
+static const char k_help_info[] = "info takes no args";
+static const char k_help_next[] = "next [limit=1..256]";
+static const char k_help_limit[] = "limit: 1..256";
+static const char k_help_before_after[] = "before/after: 0..256";
+static const char k_help_enter[] = "Enter to run";
+static const char k_help_access[] = "access:";
+
 static void fill_instruction(runtime_history_record *r, uint64_t epoch)
 {
     memset(r, 0, sizeof(*r));
@@ -143,19 +167,28 @@ static void test_parse(void)
 
     expect_true("info", forensics_view_parse_query("info", 0u, &p));
     expect_true("info verb", p.verb_code == 4);
+    expect_true("info extra", !forensics_view_parse_query("info foo", 0u, &p));
+    expect_streq("info extra err", p.error, "bad-args");
 
     expect_true(
-        "find bare",
-        forensics_view_parse_query("address=$2011 access=data-write", 0u, &p));
-    expect_true("find verb", p.verb_code == 1);
-    expect_true("find has addr", p.query.has_address);
-    expect_true("find addr", p.query.address_first == 0x2011u);
+        "implicit find rejected",
+        !forensics_view_parse_query("address=$2011 access=data-write", 0u, &p));
+    expect_streq("implicit find err", p.error, k_help_verbs);
+    expect_true("prefix f not find", !forensics_view_parse_query("f", 0u, &p));
+    expect_streq("prefix f err", p.error, k_help_verbs);
 
     expect_true(
         "find verb",
         forensics_view_parse_query("find pc=$FC00 limit=32", 0u, &p));
+    expect_true("find verb code", p.verb_code == 1);
     expect_true("find limit", p.limit == 32u);
     expect_true("find has pc", p.query.has_pc);
+    expect_true(
+        "find case",
+        forensics_view_parse_query("Find address=$2011", 0u, &p));
+    expect_true("find case addr", p.query.has_address && p.query.address_first == 0x2011u);
+    expect_true("find defaults", forensics_view_parse_query("find", 0u, &p));
+    expect_true("find defaults verb", p.verb_code == 1);
 
     expect_true("next needs cursor", !forensics_view_parse_query("next", 0u, &p));
     expect_true("next ok", forensics_view_parse_query("next limit=16", 99u, &p));
@@ -167,8 +200,21 @@ static void test_parse(void)
     expect_true("read id", p.read_id == 42u);
     expect_true("read before", p.before == 2u);
     expect_true("read after", p.after == 3u);
+    expect_true(
+        "read keys first",
+        forensics_view_parse_query("read before=2 42", 0u, &p));
+    expect_true("read keys first id", p.read_id == 42u && p.before == 2u);
+    expect_true(
+        "read needs id",
+        !forensics_view_parse_query("read before=", 0u, &p));
+    expect_streq("read needs id err", p.error, "bad-args (read needs id)");
+    expect_true(
+        "read empty value",
+        !forensics_view_parse_query("read 42 before=", 0u, &p));
+    expect_streq("read empty value err", p.error, "bad-args");
 
     expect_true("bad key", !forensics_view_parse_query("nope=1", 0u, &p));
+    expect_streq("bad key err", p.error, k_help_verbs);
 }
 
 static void test_format_golden(void)
@@ -260,20 +306,21 @@ static void test_apply_and_select(void)
     expect_streq("err running", state.status, "machine-running");
 
     {
-        snprintf(state.query, sizeof(state.query), "acc");
+        snprintf(state.query, sizeof(state.query), "find acc");
         expect_true("tab key", forensics_view_autocomplete(&state));
-        expect_streq("tab access", state.query, "access=");
+        expect_streq("tab access", state.query, "find access=");
         expect_true("tab rewrite", state.query_rewrite_pending);
-        snprintf(state.query, sizeof(state.query), "access=data-w");
+        expect_contains("tab access help", state.status, k_help_access);
+        snprintf(state.query, sizeof(state.query), "find access=data-w");
         expect_true("tab access val", forensics_view_autocomplete(&state));
-        expect_streq("tab data-write", state.query, "access=data-write");
-        /* LCP across address+access: "a" alone does not grow. */
-        snprintf(state.query, sizeof(state.query), "a");
+        expect_streq("tab data-write", state.query, "find access=data-write");
+        snprintf(state.query, sizeof(state.query), "find a");
         expect_true("tab ambiguous", !forensics_view_autocomplete(&state));
-        /* "ad" uniquely grows toward address. */
-        snprintf(state.query, sizeof(state.query), "ad");
-        expect_true("tab addr lcp", forensics_view_autocomplete(&state));
-        expect_streq("tab address", state.query, "address=");
+        expect_contains("tab ambiguous help", state.status, "find keys:");
+        snprintf(state.query, sizeof(state.query), "find ad");
+        expect_true("tab addr unique", forensics_view_autocomplete(&state));
+        expect_streq("tab address", state.query, "find address=");
+        expect_streq("tab address help", state.status, k_help_pc_addr);
     }
 
     forensics_view_clear_transcript(&state);
@@ -403,6 +450,126 @@ static float test_font_width(
     return (float)len * 7.0f;
 }
 
+static void tab_case(
+    const char *name,
+    const char *input,
+    const char *want_line,
+    const char *status_sub,
+    int want_rewrite)
+{
+    frontend_forensics_state state;
+    int rewrote;
+
+    forensics_view_init(&state);
+    snprintf(state.query, sizeof(state.query), "%s", input);
+    rewrote = forensics_view_autocomplete(&state) ? 1 : 0;
+    expect_streq(name, state.query, want_line);
+    if (want_rewrite) {
+        expect_true(name, rewrote == 1 && state.query_rewrite_pending);
+    } else {
+        expect_true(name, rewrote == 0 && !state.query_rewrite_pending);
+    }
+    expect_contains(name, state.status, status_sub);
+}
+
+static void test_query_guide(void)
+{
+    frontend_forensics_query_parsed p;
+
+    tab_case("empty", "", "", k_help_verbs, 0);
+    tab_case("f", "f", "find ", "find keys:", 1);
+    tab_case("n", "n", "next ", k_help_next, 1);
+    tab_case("r", "r", "read ", k_help_read, 1);
+    tab_case("i", "i", "info ", k_help_info, 1);
+    tab_case("re", "re", "read ", k_help_read, 1);
+    tab_case("xyz", "xyz", "xyz", k_help_verbs, 0);
+    tab_case(
+        "bare kv",
+        "address=$4000",
+        "address=$4000",
+        k_help_verbs,
+        0);
+    tab_case(
+        "f add=$4000",
+        "f add=$4000",
+        "find address=$4000",
+        "find keys:",
+        1);
+    tab_case("find add", "find add", "find address=", k_help_pc_addr, 1);
+    tab_case("find a", "find a", "find a", "find keys:", 0);
+    tab_case(
+        "whole line",
+        "find add=$4000 acc=re",
+        "find address=$4000 access=read",
+        "find keys:",
+        1);
+    tab_case(
+        "a not unique",
+        "find a=$4000 acc=re",
+        "find a=$4000 access=read",
+        "find keys:",
+        1);
+    tab_case(
+        "access r",
+        "find add=$4000 acc=r",
+        "find address=$4000 access=r",
+        k_help_access,
+        1);
+    tab_case("read bef", "read bef", "read before=", k_help_before_after, 1);
+    tab_case(
+        "read id space",
+        "read 12345 ",
+        "read 12345 ",
+        "read keys:",
+        0);
+    tab_case("info space", "info ", "info ", k_help_info, 0);
+    tab_case("info exact", "info", "info", k_help_enter, 0);
+    tab_case("next lim", "next lim", "next limit=", k_help_limit, 1);
+    tab_case(
+        "no lcp data",
+        "find access=da",
+        "find access=da",
+        k_help_access,
+        0);
+    tab_case(
+        "no lcp data exact",
+        "find access=data",
+        "find access=data",
+        k_help_access,
+        0);
+    tab_case("find add space", "find add ", "find address=", k_help_pc_addr, 1);
+
+    expect_true(
+        "enter implicit",
+        !forensics_view_parse_query("address=$4000", 0u, &p));
+    expect_streq("enter implicit err", p.error, k_help_verbs);
+    expect_true(
+        "enter read before=",
+        !forensics_view_parse_query("read before=", 0u, &p));
+    expect_streq("enter read before= err", p.error, "bad-args (read needs id)");
+    expect_true(
+        "enter read keys first",
+        forensics_view_parse_query("read before=2 42", 0u, &p));
+    expect_true("enter read keys first id", p.read_id == 42u && p.before == 2u);
+
+    {
+        frontend_forensics_state state;
+        forensics_view_init(&state);
+        snprintf(
+            state.query,
+            sizeof(state.query),
+            "find add=$4000 acc=re");
+        expect_true("omit used tab", forensics_view_autocomplete(&state));
+        expect_true(
+            "omit address=",
+            strstr(state.status, "address=") == NULL);
+        expect_true(
+            "omit access=",
+            strstr(state.status, "access=") == NULL);
+        expect_contains("keep pc=", state.status, "pc=");
+    }
+}
+
 /* Headless: Tab autocomplete must move the query caret to the new end. */
 static void test_tab_autocomplete_cursor(void)
 {
@@ -427,15 +594,15 @@ static void test_tab_autocomplete_cursor(void)
     forensics_view_render(&ctx, &state, 900, 600, &land);
     win = nk_window_find(&ctx, "Forensics");
     expect_true("forensics win", win != NULL);
-    /* Simulate caret after typing a key prefix. */
-    snprintf(state.query, sizeof(state.query), "ad");
-    win->edit.cursor = 2;
-    win->edit.sel_start = 2;
-    win->edit.sel_end = 2;
+    /* Simulate caret after typing a verb-first key prefix. */
+    snprintf(state.query, sizeof(state.query), "find ad");
+    win->edit.cursor = (int)strlen(state.query);
+    win->edit.sel_start = win->edit.cursor;
+    win->edit.sel_end = win->edit.cursor;
     nk_clear(&ctx);
 
     expect_true("tab complete", forensics_view_autocomplete(&state));
-    expect_streq("tab address", state.query, "address=");
+    expect_streq("tab address", state.query, "find address=");
     expect_true("tab rewrite pending", state.query_rewrite_pending);
 
     nk_input_begin(&ctx);
@@ -445,7 +612,7 @@ static void test_tab_autocomplete_cursor(void)
     expect_true("forensics win after tab", win != NULL);
     expect_true(
         "caret after address=",
-        win->edit.cursor == (int)strlen("address="));
+        win->edit.cursor == (int)strlen("find address="));
     expect_true("rewrite consumed", !state.query_rewrite_pending);
     nk_clear(&ctx);
 
@@ -461,6 +628,7 @@ int main(void)
     test_apply_and_select();
     test_token_at_offset();
     test_land_focus_status();
+    test_query_guide();
     test_tab_autocomplete_cursor();
     printf("ok\n");
     return 0;

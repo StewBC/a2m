@@ -4,7 +4,7 @@
 |-------|-------|
 | **Author** | swessels |
 | **Date** | 2026-08-24 |
-| **Status** | Landed (PR 9 addendum applied) |
+| **Status** | Landed |
 | **Canonical path** | [`design/forensics-ui.md`](forensics-ui.md) |
 
 ---
@@ -54,7 +54,7 @@ Film frames, Inspector focus, and HST1 records share **`machine_cycle`**. They a
 
 1. Full-window **Forensics** UI entered from Inspector (button + shortcut); leave restores the normal debugger layout.
 2. **Append-only transcript** of FIND / NEXT / READ results (≈500–2000 lines). v1 copy is **click-select line/block + Copy button** (not drag-select). Line shape north star: `Ctl.format_hst1_record(..., compact=True)` including markers.
-3. **Query line**: thin wrapper over `history-find` / `history-next` / `history-read` (+ status via `history-info`); up/down query history; Tab autocomplete of keys/values from the **shared parser’s public key table**.
+3. **Query line**: thin wrapper over `history-find` / `history-next` / `history-read` (+ status via `history-info`); **always verb-first** (PR 10); up/down query history; Tab is a left-to-right unique-complete / slot-help walker ([`forensics-query-guide.md`](forensics-query-guide.md)). Find keys/values still come from the **shared parser’s public key table**.
 4. **Status strip**: recording on/off, epoch, retained bytes / IDs, cursor/more, soft error (running, stale, unavailable).
 5. **Clear transcript** without clearing the recorder (`history-clear` is separate and destructive).
 6. One-shot **Land Inspector at cycle** from a selected hit. When live but `can_enter`, offer **Inspect & Land** confirm (enter Inspect, then land). Hard soft-fail only when no inspector window / cannot enter. Out-of-range cycles land and explain clamp/restore-live. **On successful land** (any post-land Inspect focus update, including clamp / live / quantized / partial exact): leave Forensics to the **debugger paused** and select **Misc → Inspector**. Cancel, soft-fail, or land not completed → stay in Forensics; Opt+R/Close leave rules unchanged.
@@ -227,15 +227,15 @@ Whitespace-separated `key=value` tokens. Unknown keys → parse failure. Default
 | `stack-read` / `stack-write` | stack bits |
 | `vector-read` | `VECTOR_READ` |
 
-**Shared test table** (PR 1 deliverable) is the source of truth for autocomplete: UI calls `runtime_history_find_option_keys()` / `_access_names()` and must not hardcode a parallel list. If PR 1 slips to docs-only stopgap, the public key table in the shared module still lists **only the six live keys** until expansion merges — UI cannot drift.
+**Shared test table** (PR 1 deliverable) is the source of truth for find **option** names: UI calls `runtime_history_find_option_keys()` / `_access_names()` and must not hardcode a parallel list. If PR 1 slips to docs-only stopgap, the public key table in the shared module still lists **only the six live keys** until expansion merges — UI cannot drift.
 
 ### Query line
 
-Verbs (user-facing prefixes, thin over `runtime_client_history_*`):
+Verbs (user-facing prefixes, thin over `runtime_client_history_*`). **Always verb-first (PR 10):** the first token must be a verb. Bare `key=value` is **not** FIND on this line (control-port `history-find` still accepts bare keys). Detail: [`forensics-query-guide.md`](forensics-query-guide.md).
 
 | User input | Maps to |
 |------------|---------|
-| `find [key=value ...]` or bare `key=value...` | parse → `HISTORY_FIND` intent |
+| `find [key=value ...]` | parse → `HISTORY_FIND` intent |
 | `next [limit=N]` | `HISTORY_NEXT` |
 | `read <id> [before=N] [after=N] [epoch=N]` | `HISTORY_READ` |
 | `info` | `HISTORY_INFO` → status strip (+ one transcript note) |
@@ -244,8 +244,10 @@ Verbs (user-facing prefixes, thin over `runtime_client_history_*`):
 Ergonomics:
 
 - **Up/Down**: query history (last 64 strings).
-- **Tab**: autocomplete from `runtime_history_find_option_keys()` / access-name table / `from=` / `direction=`. After a successful rewrite, the query caret must sit at the **end of the new buffer** (e.g. `ad`<Tab> → `address=` with caret after `=`). See PR 9 — Nuklear `NK_EDIT_GOTO_END_ON_ACTIVATE` via `nk_edit_focus` alone does **not** move the caret.
-- Parse in the frontend with the shared module **before** pushing an intent. On parse failure, set status strip (`bad-args`) and do not dispatch.
+- **Tab (PR 10):** left-to-right walker. Unique prefix of one expected terminal at a hole completes it (verb -> `verb `, key -> `key=`, enum value -> full name). Zero or 2+ matches: do not guess, do not list matches, do not grow LCP; print that hole's ASCII help. Open values (ids, hex, ranges, limits) are never completed. With caret at end, unique-expand **every** token (`find add=$4000 acc=re`<Tab> -> `find address=$4000 access=read`).
+- **Caret after rewrite (PR 9):** still required. Nuklear `NK_EDIT_GOTO_END_ON_ACTIVATE` via `nk_edit_focus` does **not** move the caret; set `edit.cursor` to the new length explicitly.
+- Parse in the frontend **before** pushing an intent. Find options go through the shared module. On parse failure, set the status strip and do not dispatch. Missing/non-exact first verb uses the same verb-help string as Tab; other failures stay `bad-args` (or `bad-args (read needs id)` / no-cursor).
+- Help / status copy is **ASCII-only** (`agents/frontend.md`).
 
 ### Data path (UI → worker)
 
@@ -533,7 +535,7 @@ Fuzz find-option strings in shared parse tests.
 
 - Status strip for RPC codes (same mapping as `control_dispatch` HISTORY deferred errors).
 - Quiet `logc` debug on FIND submit/error (token, status).
-- Tests: shared parse table; HST1 decode golden; existing `test_runtime_history_*` remain recorder oracle; inspector exact-land tests in PR 6; Forensics headless Tab-caret test in PR 9.
+- Tests: shared parse table; HST1 decode golden; existing `test_runtime_history_*` remain recorder oracle; inspector exact-land tests in PR 6; Forensics headless Tab-caret test in PR 9; query-guide Tab table in PR 10.
 
 ---
 
@@ -548,7 +550,8 @@ Fuzz find-option strings in shared parse tests.
 7. Manual/help + **token-aware copy** — PR 7.  
 8. Land success → debugger + Inspector tab — PR 8.  
 9. Tab autocomplete caret-to-end — PR 9.  
-10. Rollback: revert UI; parser expansions are additive.
+10. Verb-first query guide (Tab walker + whole-line unique-expand) — PR 10.  
+11. Rollback: revert UI; parser expansions are additive.
 
 ---
 
@@ -569,6 +572,7 @@ Fuzz find-option strings in shared parse tests.
 13. **v1 copy = click line/block + Copy button**, not drag-select; **PR 7 includes token-aware copy** (`id=` / `cyc=` / `pc=$…`).
 14. **History intents carry structured `runtime_history_query` (parse in frontend).**
 15. **Tab autocomplete places the query caret at the end of the rewritten buffer** (PR 9). Do not rely on Nuklear `nk_edit_focus(..., NK_EDIT_GOTO_END_ON_ACTIVATE)` alone — that flag only applies on inactive→active inside `nk_do_edit`; after an external buffer rewrite, set `edit.cursor` / selection to the new length explicitly.
+16. **Forensics query line is always verb-first** (PR 10). No implicit FIND from bare `key=value`. Tab is a grammar walker: unique complete or slot help; whole-line unique-expand when caret is at end. Detail: [`forensics-query-guide.md`](forensics-query-guide.md).
 
 ---
 
@@ -587,6 +591,9 @@ Fuzz find-option strings in shared parse tests.
 | After successful land | **Leave Forensics → debugger paused + Misc → Inspector** (PR 8). Cancel / fail stay in Forensics. Opt+R/Close unchanged. |
 | “Landed” for UI switch | Any successful Inspect focus update (clamp / live / quantized / partial exact), same cases that set the land status strip |
 | Tab autocomplete caret | **End of rewritten query** (PR 9). Explicit `edit.cursor` after rewrite; `GOTO_END_ON_ACTIVATE` via `nk_edit_focus` is insufficient |
+| Query line first token | **Always a verb** (PR 10). `find` / `next` / `read` / `info`. Bare `address=` + Enter -> verb help (same as Tab) |
+| Tab complete | **Unique terminal or slot help** (PR 10). Teach the new hole immediately. Whole-line unique-expand at end-of-line. No LCP. No match lists |
+| `read` Enter order | **Any order** (PR 10). Exactly one id; `read before=2 42` is valid |
 
 ---
 
@@ -607,6 +614,7 @@ Fuzz find-option strings in shared parse tests.
 
 ## References
 
+- [`forensics-query-guide.md`](forensics-query-guide.md) — PR 10 verb-first Tab walker (landed)
 - [`agents/timemachine.md`](../agents/timemachine.md) — Inspector vs HST1; land/reexecute; invariants
 - [`agents/control-tools.md`](../agents/control-tools.md) — control port / HST1 / sessions
 - [`agents/frontend.md`](../agents/frontend.md) — intents, Help overlay, Inspector tab
@@ -656,7 +664,7 @@ Fuzz find-option strings in shared parse tests.
 - **Checklist:**
   - [x] Structured history fields on `frontend_debugger_intent`
   - [x] Parse in frontend via `runtime_history_parse_find_options`
-  - [x] Autocomplete from `runtime_history_find_option_keys()` only
+  - [x] Autocomplete from `runtime_history_find_option_keys()` only *(last-token find keys; superseded by PR 10 walker)*
   - [x] Tab caret at end after rewrite *(initially missed; fixed in PR 9)*
   - [x] `main.c` pending-token RPC state; one in-flight Forensics history request
   - [x] Handle `RUNTIME_EVENT_HISTORY_RESULT_RESPONSE` / `HISTORY_STATUS_RESPONSE` when token matches
@@ -731,3 +739,26 @@ Fuzz find-option strings in shared parse tests.
   - [x] Headless test: type prefix (`ad`), Tab → `address=`, assert window edit cursor == end (reproduces pre-fix caret-on-`r` failure)
   - [x] Design notes for c64m reuse
 - **Description:** Post-ship fix for PR 4 Tab complete. Symptom: `find add`<Tab> produced `find address=` but left the caret over the `r` in `address` instead of after `=`. Root cause is Nuklear edit state retaining the pre-rewrite cursor offset when the buffer is mutated externally. c64m (or any Nuklear query line) must move the caret explicitly after autocomplete rewrites the buffer.
+
+### PR 10 — Verb-first query guide (Tab walker)
+
+- **Title:** `frontend: Forensics verb-first query guide`
+- **Files:** `forensics_view.*`, `tests/frontend/test_forensics_view.c`, `manual/manual.md` (+ help regen), `agents/frontend.md`, [`forensics-query-guide.md`](forensics-query-guide.md), `design/README.md`
+- **Dependencies:** PR 4 (query line + submit parse), PR 9 (caret at end after rewrite)
+- **Status:** implemented
+- **Checklist:**
+  - [x] Always verb-first; drop implicit FIND. Enter without an exact verb -> verb help (same string as Tab), not generic `bad-args`
+  - [x] Shared walker: Tab unique-complete / slot help; Enter strict parse of the same grammar (no unique-expand on Enter)
+  - [x] Unique prefix of one expected terminal completes; 0 or 2+ -> that slot's ASCII help (no match list, no LCP)
+  - [x] After unique-complete, immediately teach the **new** hole; always refresh status (never leave the previous strip)
+  - [x] Verbs: `find` / `next` / `read` / `info`. Unique verb prefix -> `verb ` (`f`/`n`/`r`/`i` are unique)
+  - [x] `read` keys `before=` / `after=` / `epoch=`; `next` `limit=`; `find` keys from `runtime_history_find_option_keys()`
+  - [x] Enter `read`: id and named keys in **any order**; exactly one id required (`read before=2 42` ok)
+  - [x] Open values never completed (id, hex, ranges, limits, opcodes)
+  - [x] First token unique verb: unique-expand **all** tokens (`f add=$4000` -> `find address=$4000`). Else verb help, no later-token expand
+  - [x] PR 9 caret-to-end on any rewrite; caret test is `find ad` -> `find address=` (bare `ad` no longer rewrites)
+  - [x] ASCII-only help strings; fit `FRONTEND_FR_STATUS_MAX`; `forensics_view_autocomplete` true iff the line rewrote
+  - [x] Tests: input / after-Tab / status table; implicit FIND rejected; `info foo` rejected
+  - [x] Manual + `agents/frontend.md`: verb-first; Tab is guided complete/help
+  - [x] Control-port `history-find` bare keys **unchanged**
+- **Description:** Post-ship refinement of the Forensics query line. PR 4 Tab only completed the last token against find keys, so verbs and `read` options were undiscoverable. PR 10 makes the line a tiny verb-first language with guided Tab. Full grammar, walker, help catalog, and worked examples: [`forensics-query-guide.md`](forensics-query-guide.md). Required when porting Forensics to c64m (same class as PR 8 / PR 9 addenda).

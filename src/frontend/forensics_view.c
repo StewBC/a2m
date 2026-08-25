@@ -305,27 +305,665 @@ static bool starts_with_ci(const char *text, const char *prefix)
     return true;
 }
 
-static char *forensics_next_token(char **cursor)
+enum {
+    FR_GUIDE_MAX_TOKENS = 48,
+    FR_GUIDE_MAX_FIND_KEYS = 32
+};
+
+static const char k_fr_help_verbs[] = "verbs: find | next | read | info";
+static const char k_fr_help_next[] = "next [limit=1..256]";
+static const char k_fr_help_read[] =
+    "read <id> [before=N] [after=N] [epoch=N]";
+static const char k_fr_help_info[] = "info takes no args";
+static const char k_fr_help_enter[] = "Enter to run";
+static const char k_fr_help_access[] =
+    "access: name (write, data-read, execute, ...); unique prefix completes";
+static const char k_fr_help_direction[] = "direction: forward | backward";
+static const char k_fr_help_from[] = "from: oldest | newest | id";
+static const char k_fr_help_pc_addr[] = "pc/address: u16 or lo-hi ($hex ok)";
+static const char k_fr_help_cycle[] = "cycle: u64 or lo-hi (decimal; 0x ok)";
+static const char k_fr_help_limit[] = "limit: 1..256";
+static const char k_fr_help_epoch[] = "epoch: u64 (decimal or 0x)";
+static const char k_fr_help_timeline[] = "timeline: u32";
+static const char k_fr_help_value[] =
+    "value: byte (dec, $NN, 0xNN; hex ? nibble)";
+static const char k_fr_help_opcodes[] = "opcodes: A9,??,8D (no $; ? nibble)";
+static const char k_fr_help_before_after[] = "before/after: 0..256";
+
+static const char *const k_fr_verbs[] = {"find", "next", "read", "info", NULL};
+static const char *const k_fr_next_keys[] = {"limit", NULL};
+static const char *const k_fr_read_keys[] = {"before", "after", "epoch", NULL};
+static const char *const k_fr_dirs[] = {"forward", "backward", NULL};
+static const char *const k_fr_from[] = {"oldest", "newest", NULL};
+
+typedef struct fr_guide_used {
+    bool find[FR_GUIDE_MAX_FIND_KEYS];
+    bool next_limit;
+    bool read_before;
+    bool read_after;
+    bool read_epoch;
+    bool read_has_id;
+} fr_guide_used;
+
+static unsigned fr_table_prefix_matches(
+    const char *const *table,
+    const char *prefix,
+    const char **out_one)
 {
-    char *start;
-    if (cursor == NULL || *cursor == NULL) {
+    unsigned n = 0u;
+    unsigned i;
+    const char *one = NULL;
+
+    if (out_one != NULL) {
+        *out_one = NULL;
+    }
+    if (table == NULL || prefix == NULL) {
+        return 0u;
+    }
+    for (i = 0u; table[i] != NULL; ++i) {
+        if (starts_with_ci(table[i], prefix)) {
+            one = table[i];
+            n++;
+        }
+    }
+    if (out_one != NULL && n == 1u) {
+        *out_one = one;
+    }
+    return n;
+}
+
+static bool fr_exact_in_table(
+    const char *const *table,
+    const char *name,
+    const char **out_canon)
+{
+    unsigned i;
+
+    if (out_canon != NULL) {
+        *out_canon = NULL;
+    }
+    if (table == NULL || name == NULL) {
+        return false;
+    }
+    for (i = 0u; table[i] != NULL; ++i) {
+        if (token_eq_ci(table[i], name)) {
+            if (out_canon != NULL) {
+                *out_canon = table[i];
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+static int fr_exact_verb(const char *tok)
+{
+    if (token_eq_ci(tok, "find")) {
+        return FR_VERB_FIND;
+    }
+    if (token_eq_ci(tok, "next")) {
+        return FR_VERB_NEXT;
+    }
+    if (token_eq_ci(tok, "read")) {
+        return FR_VERB_READ;
+    }
+    if (token_eq_ci(tok, "info")) {
+        return FR_VERB_INFO;
+    }
+    return 0;
+}
+
+static const char *const *fr_keys_for_verb(int verb)
+{
+    if (verb == FR_VERB_FIND) {
+        return runtime_history_find_option_keys();
+    }
+    if (verb == FR_VERB_NEXT) {
+        return k_fr_next_keys;
+    }
+    if (verb == FR_VERB_READ) {
+        return k_fr_read_keys;
+    }
+    return NULL;
+}
+
+static unsigned fr_split_tokens(
+    const char *text,
+    char tokens[][FRONTEND_FR_QUERY_MAX],
+    unsigned max_tokens,
+    bool *trailing_space)
+{
+    const char *p;
+    unsigned n = 0u;
+    bool any = false;
+
+    if (trailing_space != NULL) {
+        *trailing_space = false;
+    }
+    if (text == NULL) {
+        return 0u;
+    }
+    p = text;
+    while (*p != '\0') {
+        const char *start;
+        size_t len;
+        while (*p != '\0' && isspace((unsigned char)*p)) {
+            p++;
+        }
+        if (*p == '\0') {
+            break;
+        }
+        any = true;
+        start = p;
+        while (*p != '\0' && !isspace((unsigned char)*p)) {
+            p++;
+        }
+        len = (size_t)(p - start);
+        if (n < max_tokens) {
+            if (len >= FRONTEND_FR_QUERY_MAX) {
+                len = FRONTEND_FR_QUERY_MAX - 1u;
+            }
+            memcpy(tokens[n], start, len);
+            tokens[n][len] = '\0';
+            n++;
+        }
+    }
+    if (trailing_space != NULL && any) {
+        size_t last = strlen(text);
+        if (last > 0u) {
+            *trailing_space = isspace((unsigned char)text[last - 1u]) != 0;
+        }
+    }
+    return n;
+}
+
+static bool fr_is_empty_kv(const char *tok)
+{
+    const char *eq;
+    if (tok == NULL) {
+        return false;
+    }
+    eq = strchr(tok, '=');
+    return eq != NULL && eq[1] == '\0';
+}
+
+static bool fr_rebuild_query(
+    char *dst,
+    size_t cap,
+    char tokens[][FRONTEND_FR_QUERY_MAX],
+    unsigned n,
+    bool trailing_space)
+{
+    size_t off = 0u;
+    unsigned i;
+
+    if (dst == NULL || cap == 0u) {
+        return false;
+    }
+    dst[0] = '\0';
+    for (i = 0u; i < n; ++i) {
+        size_t tlen = strlen(tokens[i]);
+        size_t need = tlen + (i > 0u ? 1u : 0u);
+        if (off + need + 1u >= cap) {
+            return false;
+        }
+        if (i > 0u) {
+            dst[off++] = ' ';
+        }
+        memcpy(dst + off, tokens[i], tlen);
+        off += tlen;
+    }
+    if (trailing_space) {
+        if (off + 2u > cap) {
+            return false;
+        }
+        dst[off++] = ' ';
+    }
+    dst[off] = '\0';
+    return true;
+}
+
+static void fr_unique_expand_token(char *tok, size_t cap, int verb)
+{
+    char *eq;
+    const char *const *keys;
+    const char *canon = NULL;
+    char rebuilt[FRONTEND_FR_QUERY_MAX];
+
+    if (tok == NULL || tok[0] == '\0' || cap == 0u || verb <= 0) {
+        return;
+    }
+    keys = fr_keys_for_verb(verb);
+    if (keys == NULL) {
+        return;
+    }
+    eq = strchr(tok, '=');
+    if (eq != NULL) {
+        char key[64];
+        const char *value;
+        const char *new_val;
+        size_t key_len = (size_t)(eq - tok);
+        unsigned nmatch;
+
+        if (key_len == 0u || key_len >= sizeof(key)) {
+            return;
+        }
+        memcpy(key, tok, key_len);
+        key[key_len] = '\0';
+        value = eq + 1;
+        nmatch = fr_table_prefix_matches(keys, key, &canon);
+        if (nmatch != 1u && !fr_exact_in_table(keys, key, &canon)) {
+            return;
+        }
+        new_val = value;
+        if (value[0] != '\0') {
+            const char *one = NULL;
+            if (token_eq_ci(canon, "access")) {
+                if (fr_table_prefix_matches(
+                        runtime_history_find_access_names(), value, &one) ==
+                    1u) {
+                    new_val = one;
+                }
+            } else if (token_eq_ci(canon, "direction")) {
+                if (fr_table_prefix_matches(k_fr_dirs, value, &one) == 1u) {
+                    new_val = one;
+                }
+            } else if (token_eq_ci(canon, "from")) {
+                if (fr_table_prefix_matches(k_fr_from, value, &one) == 1u) {
+                    new_val = one;
+                }
+            }
+        }
+        if (snprintf(rebuilt, sizeof(rebuilt), "%s=%s", canon, new_val) >=
+            (int)sizeof(rebuilt)) {
+            return;
+        }
+        if (strlen(rebuilt) >= cap) {
+            return;
+        }
+        memcpy(tok, rebuilt, strlen(rebuilt) + 1u);
+        return;
+    }
+    if (fr_table_prefix_matches(keys, tok, &canon) != 1u) {
+        return;
+    }
+    if (snprintf(rebuilt, sizeof(rebuilt), "%s=", canon) >=
+        (int)sizeof(rebuilt)) {
+        return;
+    }
+    if (strlen(rebuilt) >= cap) {
+        return;
+    }
+    memcpy(tok, rebuilt, strlen(rebuilt) + 1u);
+}
+
+static int fr_find_key_index(const char *name)
+{
+    const char *const *keys = runtime_history_find_option_keys();
+    int i;
+
+    if (name == NULL || keys == NULL) {
+        return -1;
+    }
+    for (i = 0; keys[i] != NULL; ++i) {
+        if (token_eq_ci(keys[i], name)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static bool fr_resolve_named_key(int verb, const char *tok, const char **canon)
+{
+    const char *eq;
+    char key[64];
+    size_t key_len;
+    const char *const *keys;
+    unsigned nmatch;
+
+    if (canon != NULL) {
+        *canon = NULL;
+    }
+    if (tok == NULL) {
+        return false;
+    }
+    eq = strchr(tok, '=');
+    if (eq == NULL) {
+        return false;
+    }
+    key_len = (size_t)(eq - tok);
+    if (key_len == 0u || key_len >= sizeof(key)) {
+        return false;
+    }
+    memcpy(key, tok, key_len);
+    key[key_len] = '\0';
+    keys = fr_keys_for_verb(verb);
+    nmatch = fr_table_prefix_matches(keys, key, canon);
+    if (nmatch == 1u) {
+        return true;
+    }
+    return fr_exact_in_table(keys, key, canon);
+}
+
+static void fr_mark_canon_used(int verb, const char *canon, fr_guide_used *used)
+{
+    int idx;
+
+    if (canon == NULL || used == NULL) {
+        return;
+    }
+    if (verb == FR_VERB_FIND) {
+        idx = fr_find_key_index(canon);
+        if (idx >= 0 && idx < FR_GUIDE_MAX_FIND_KEYS) {
+            used->find[idx] = true;
+        }
+    } else if (verb == FR_VERB_NEXT) {
+        if (token_eq_ci(canon, "limit")) {
+            used->next_limit = true;
+        }
+    } else if (verb == FR_VERB_READ) {
+        if (token_eq_ci(canon, "before")) {
+            used->read_before = true;
+        } else if (token_eq_ci(canon, "after")) {
+            used->read_after = true;
+        } else if (token_eq_ci(canon, "epoch")) {
+            used->read_epoch = true;
+        }
+    }
+}
+
+static void fr_accumulate_token(int verb, const char *tok, fr_guide_used *used)
+{
+    const char *canon = NULL;
+    uint64_t id;
+
+    if (tok == NULL || used == NULL) {
+        return;
+    }
+    if (strchr(tok, '=') != NULL) {
+        if (fr_resolve_named_key(verb, tok, &canon)) {
+            fr_mark_canon_used(verb, canon, used);
+        }
+        return;
+    }
+    if (verb == FR_VERB_READ) {
+        if (parse_u64_token(tok, &id) && id >= 1u) {
+            used->read_has_id = true;
+        }
+    }
+}
+
+static bool fr_find_has_unused(const fr_guide_used *used)
+{
+    const char *const *keys = runtime_history_find_option_keys();
+    unsigned i;
+
+    if (keys == NULL) {
+        return false;
+    }
+    for (i = 0u; keys[i] != NULL; ++i) {
+        if (i >= FR_GUIDE_MAX_FIND_KEYS) {
+            return true;
+        }
+        if (used == NULL || !used->find[i]) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool fr_read_has_unused(const fr_guide_used *used)
+{
+    if (used == NULL) {
+        return true;
+    }
+    return !used->read_before || !used->read_after || !used->read_epoch;
+}
+
+static void fr_help_find_keys(char *dst, size_t cap, const fr_guide_used *used)
+{
+    const char *const *keys;
+    unsigned i;
+    size_t off;
+
+    if (dst == NULL || cap == 0u) {
+        return;
+    }
+    keys = runtime_history_find_option_keys();
+    snprintf(dst, cap, "find keys:");
+    off = strlen(dst);
+    for (i = 0u; keys != NULL && keys[i] != NULL; ++i) {
+        size_t klen;
+        size_t need;
+        if (used != NULL && i < FR_GUIDE_MAX_FIND_KEYS && used->find[i]) {
+            continue;
+        }
+        klen = strlen(keys[i]);
+        need = 1u + klen + 1u;
+        if (off + need + 4u >= cap) {
+            if (off + 4u <= cap) {
+                memcpy(dst + off, "...", 4u);
+            }
+            return;
+        }
+        dst[off++] = ' ';
+        memcpy(dst + off, keys[i], klen);
+        off += klen;
+        dst[off++] = '=';
+        dst[off] = '\0';
+    }
+}
+
+static void fr_help_read_keys(char *dst, size_t cap, const fr_guide_used *used)
+{
+    size_t off;
+
+    if (dst == NULL || cap == 0u) {
+        return;
+    }
+    snprintf(dst, cap, "read keys:");
+    off = strlen(dst);
+    if (used == NULL || !used->read_before) {
+        snprintf(dst + off, cap - off, " before=");
+        off = strlen(dst);
+    }
+    if (used == NULL || !used->read_after) {
+        snprintf(dst + off, cap - off, " after=");
+        off = strlen(dst);
+    }
+    if (used == NULL || !used->read_epoch) {
+        snprintf(dst + off, cap - off, " epoch=");
+    }
+}
+
+static const char *fr_value_help_for_key(const char *canon)
+{
+    if (canon == NULL) {
         return NULL;
     }
-    while (**cursor != '\0' && isspace((unsigned char)**cursor)) {
-        (*cursor)++;
+    if (token_eq_ci(canon, "access")) {
+        return k_fr_help_access;
     }
-    if (**cursor == '\0') {
-        return NULL;
+    if (token_eq_ci(canon, "direction")) {
+        return k_fr_help_direction;
     }
-    start = *cursor;
-    while (**cursor != '\0' && !isspace((unsigned char)**cursor)) {
-        (*cursor)++;
+    if (token_eq_ci(canon, "from")) {
+        return k_fr_help_from;
     }
-    if (**cursor != '\0') {
-        **cursor = '\0';
-        (*cursor)++;
+    if (token_eq_ci(canon, "pc") || token_eq_ci(canon, "address")) {
+        return k_fr_help_pc_addr;
     }
-    return start;
+    if (token_eq_ci(canon, "cycle")) {
+        return k_fr_help_cycle;
+    }
+    if (token_eq_ci(canon, "limit")) {
+        return k_fr_help_limit;
+    }
+    if (token_eq_ci(canon, "epoch")) {
+        return k_fr_help_epoch;
+    }
+    if (token_eq_ci(canon, "timeline")) {
+        return k_fr_help_timeline;
+    }
+    if (token_eq_ci(canon, "value")) {
+        return k_fr_help_value;
+    }
+    if (token_eq_ci(canon, "opcodes")) {
+        return k_fr_help_opcodes;
+    }
+    if (token_eq_ci(canon, "before") || token_eq_ci(canon, "after")) {
+        return k_fr_help_before_after;
+    }
+    return NULL;
+}
+
+static bool fr_enum_unresolved(const char *canon, const char *value)
+{
+    unsigned n;
+    const char *one = NULL;
+
+    if (canon == NULL || value == NULL || value[0] == '\0') {
+        return true;
+    }
+    if (token_eq_ci(canon, "access")) {
+        n = fr_table_prefix_matches(
+            runtime_history_find_access_names(), value, &one);
+        return n != 1u;
+    }
+    if (token_eq_ci(canon, "direction")) {
+        n = fr_table_prefix_matches(k_fr_dirs, value, &one);
+        return n != 1u;
+    }
+    if (token_eq_ci(canon, "from")) {
+        n = fr_table_prefix_matches(k_fr_from, value, &one);
+        return n >= 2u;
+    }
+    return false;
+}
+
+static void fr_status_after_complete(
+    frontend_forensics_state *state,
+    int verb,
+    const fr_guide_used *used)
+{
+    char help[FRONTEND_FR_STATUS_MAX];
+
+    if (verb == FR_VERB_FIND) {
+        if (fr_find_has_unused(used)) {
+            fr_help_find_keys(help, sizeof(help), used);
+            forensics_view_set_status(state, help);
+        } else {
+            forensics_view_set_status(state, k_fr_help_enter);
+        }
+        return;
+    }
+    if (verb == FR_VERB_NEXT) {
+        if (used == NULL || !used->next_limit) {
+            forensics_view_set_status(state, k_fr_help_next);
+        } else {
+            forensics_view_set_status(state, k_fr_help_enter);
+        }
+        return;
+    }
+    if (verb == FR_VERB_READ) {
+        if (used == NULL || !used->read_has_id) {
+            forensics_view_set_status(state, k_fr_help_read);
+        } else if (fr_read_has_unused(used)) {
+            fr_help_read_keys(help, sizeof(help), used);
+            forensics_view_set_status(state, help);
+        } else {
+            forensics_view_set_status(state, k_fr_help_enter);
+        }
+        return;
+    }
+    if (verb == FR_VERB_INFO) {
+        forensics_view_set_status(state, k_fr_help_enter);
+        return;
+    }
+    forensics_view_set_status(state, k_fr_help_verbs);
+}
+
+static void fr_guide_status(
+    frontend_forensics_state *state,
+    int verb,
+    char tokens[][FRONTEND_FR_QUERY_MAX],
+    unsigned n,
+    bool trailing)
+{
+    fr_guide_used used;
+    unsigned i;
+    unsigned complete_end;
+    const char *active;
+    const char *eq;
+    const char *canon = NULL;
+    const char *value_help;
+    uint64_t id;
+
+    memset(&used, 0, sizeof(used));
+    if (verb <= 0) {
+        forensics_view_set_status(state, k_fr_help_verbs);
+        return;
+    }
+    if (verb == FR_VERB_INFO) {
+        if (n > 1u || trailing) {
+            forensics_view_set_status(state, k_fr_help_info);
+        } else {
+            forensics_view_set_status(state, k_fr_help_enter);
+        }
+        return;
+    }
+
+    complete_end = trailing ? n : (n > 0u ? n - 1u : 0u);
+    for (i = 1u; i < complete_end; ++i) {
+        fr_accumulate_token(verb, tokens[i], &used);
+    }
+
+    if (n <= 1u && !trailing) {
+        fr_status_after_complete(state, verb, &used);
+        return;
+    }
+    if (trailing) {
+        fr_status_after_complete(state, verb, &used);
+        return;
+    }
+
+    active = tokens[n - 1u];
+    eq = strchr(active, '=');
+    if (eq != NULL) {
+        if (eq[1] == '\0') {
+            if (fr_resolve_named_key(verb, active, &canon)) {
+                value_help = fr_value_help_for_key(canon);
+                if (value_help != NULL) {
+                    forensics_view_set_status(state, value_help);
+                    return;
+                }
+            }
+            fr_status_after_complete(state, verb, &used);
+            return;
+        }
+        if (fr_resolve_named_key(verb, active, &canon) &&
+            fr_enum_unresolved(canon, eq + 1)) {
+            value_help = fr_value_help_for_key(canon);
+            if (value_help != NULL) {
+                forensics_view_set_status(state, value_help);
+                return;
+            }
+        }
+        fr_accumulate_token(verb, active, &used);
+        fr_status_after_complete(state, verb, &used);
+        return;
+    }
+
+    if (verb == FR_VERB_READ) {
+        if (!used.read_has_id && parse_u64_token(active, &id) && id >= 1u) {
+            used.read_has_id = true;
+            fr_status_after_complete(state, verb, &used);
+            return;
+        }
+        forensics_view_set_status(state, k_fr_help_read);
+        return;
+    }
+    fr_status_after_complete(state, verb, &used);
 }
 
 bool forensics_view_parse_query(
@@ -333,9 +971,12 @@ bool forensics_view_parse_query(
     uint64_t last_cursor,
     frontend_forensics_query_parsed *out)
 {
-    char buf[FRONTEND_FR_QUERY_MAX];
-    char *tok;
+    char tokens[FR_GUIDE_MAX_TOKENS][FRONTEND_FR_QUERY_MAX];
+    unsigned n;
+    int verb;
+    unsigned i;
     const char *p;
+    const char *rest;
 
     if (out == NULL) {
         return false;
@@ -349,23 +990,34 @@ bool forensics_view_parse_query(
         out->empty = true;
         return true;
     }
-    snprintf(buf, sizeof(buf), "%s", p);
     snprintf(out->label, sizeof(out->label), "%s", p);
+    n = fr_split_tokens(p, tokens, FR_GUIDE_MAX_TOKENS, NULL);
+    if (n == 0u) {
+        out->ok = true;
+        out->empty = true;
+        return true;
+    }
+    verb = fr_exact_verb(tokens[0]);
+    if (verb <= 0) {
+        snprintf(out->error, sizeof(out->error), "%s", k_fr_help_verbs);
+        return false;
+    }
 
-    if (starts_with_ci(buf, "info") &&
-        (buf[4] == '\0' || isspace((unsigned char)buf[4]))) {
+    if (verb == FR_VERB_INFO) {
+        if (n > 1u) {
+            snprintf(out->error, sizeof(out->error), "bad-args");
+            return false;
+        }
         out->ok = true;
         out->verb_code = FR_VERB_INFO;
         return true;
     }
 
-    if (starts_with_ci(buf, "next") &&
-        (buf[4] == '\0' || isspace((unsigned char)buf[4]))) {
+    if (verb == FR_VERB_NEXT) {
         uint16_t limit = 64u;
-        char *cursor = buf + 4;
-        while ((tok = forensics_next_token(&cursor)) != NULL) {
-            if (starts_with_ci(tok, "limit=")) {
-                if (!parse_u16_dec(tok + 6, &limit) || limit == 0u ||
+        for (i = 1u; i < n; ++i) {
+            if (starts_with_ci(tokens[i], "limit=")) {
+                if (!parse_u16_dec(tokens[i] + 6, &limit) || limit == 0u ||
                     limit > RUNTIME_HISTORY_MAX_QUERY_RECORDS) {
                     snprintf(out->error, sizeof(out->error), "bad-args");
                     return false;
@@ -379,7 +1031,7 @@ bool forensics_view_parse_query(
             snprintf(
                 out->error,
                 sizeof(out->error),
-                "bad-args (no cursor — run find first)");
+                "bad-args (no cursor - run find first)");
             return false;
         }
         out->ok = true;
@@ -388,46 +1040,58 @@ bool forensics_view_parse_query(
         return true;
     }
 
-    if (starts_with_ci(buf, "read") &&
-        (buf[4] == '\0' || isspace((unsigned char)buf[4]))) {
+    if (verb == FR_VERB_READ) {
         uint64_t id = 0u;
         uint16_t before = 0u;
         uint16_t after = 0u;
         uint64_t epoch = 0u;
         bool have_id = false;
-        char *cursor = buf + 4;
-        while ((tok = forensics_next_token(&cursor)) != NULL) {
-            if (starts_with_ci(tok, "before=")) {
-                if (!parse_u16_dec(tok + 7, &before) ||
+        for (i = 1u; i < n; ++i) {
+            if (strchr(tokens[i], '=') != NULL) {
+                continue;
+            }
+            if (have_id) {
+                snprintf(out->error, sizeof(out->error), "bad-args");
+                return false;
+            }
+            if (!parse_u64_token(tokens[i], &id) || id == 0u) {
+                snprintf(out->error, sizeof(out->error), "bad-args");
+                return false;
+            }
+            have_id = true;
+        }
+        if (!have_id) {
+            snprintf(
+                out->error, sizeof(out->error), "bad-args (read needs id)");
+            return false;
+        }
+        for (i = 1u; i < n; ++i) {
+            char *eq = strchr(tokens[i], '=');
+            if (eq == NULL) {
+                continue;
+            }
+            *eq = '\0';
+            if (token_eq_ci(tokens[i], "before")) {
+                if (!parse_u16_dec(eq + 1, &before) ||
                     before > RUNTIME_HISTORY_MAX_QUERY_RECORDS) {
                     snprintf(out->error, sizeof(out->error), "bad-args");
                     return false;
                 }
-            } else if (starts_with_ci(tok, "after=")) {
-                if (!parse_u16_dec(tok + 6, &after) ||
+            } else if (token_eq_ci(tokens[i], "after")) {
+                if (!parse_u16_dec(eq + 1, &after) ||
                     after > RUNTIME_HISTORY_MAX_QUERY_RECORDS) {
                     snprintf(out->error, sizeof(out->error), "bad-args");
                     return false;
                 }
-            } else if (starts_with_ci(tok, "epoch=")) {
-                if (!parse_u64_token(tok + 6, &epoch)) {
+            } else if (token_eq_ci(tokens[i], "epoch")) {
+                if (!parse_u64_token(eq + 1, &epoch)) {
                     snprintf(out->error, sizeof(out->error), "bad-args");
                     return false;
                 }
-            } else if (!have_id) {
-                if (!parse_u64_token(tok, &id) || id == 0u) {
-                    snprintf(out->error, sizeof(out->error), "bad-args");
-                    return false;
-                }
-                have_id = true;
             } else {
                 snprintf(out->error, sizeof(out->error), "bad-args");
                 return false;
             }
-        }
-        if (!have_id) {
-            snprintf(out->error, sizeof(out->error), "bad-args (read needs id)");
-            return false;
         }
         out->ok = true;
         out->verb_code = FR_VERB_READ;
@@ -438,197 +1102,80 @@ bool forensics_view_parse_query(
         return true;
     }
 
-    {
-        const char *options = buf;
-        if (starts_with_ci(buf, "find") &&
-            (buf[4] == '\0' || isspace((unsigned char)buf[4]))) {
-            options = skip_ws(buf + 4);
-        }
-        if (!runtime_history_parse_find_options(
-                options,
-                &out->query,
-                &out->from_kind,
-                &out->from_id,
-                &out->limit)) {
-            snprintf(out->error, sizeof(out->error), "bad-args");
-            return false;
-        }
-        out->ok = true;
-        out->verb_code = FR_VERB_FIND;
-        return true;
+    rest = p;
+    while (*rest != '\0' && !isspace((unsigned char)*rest)) {
+        rest++;
     }
-}
-
-/*
- * Complete from a NULL-terminated table.
- * One match → full string. Several → longest common prefix if it grows the
- * prefix (so "ac" → "access"); no progress → false.
- */
-static bool complete_from_table(
-    char *dst,
-    size_t dst_cap,
-    const char *prefix,
-    const char *const *table,
-    bool *out_unique)
-{
-    const char *matches[64];
-    size_t n = 0u;
-    size_t i;
-    size_t prefix_len;
-    size_t lcp;
-
-    if (out_unique != NULL) {
-        *out_unique = false;
-    }
-    if (dst == NULL || dst_cap == 0u || table == NULL || prefix == NULL) {
+    rest = skip_ws(rest);
+    if (!runtime_history_parse_find_options(
+            rest,
+            &out->query,
+            &out->from_kind,
+            &out->from_id,
+            &out->limit)) {
+        snprintf(out->error, sizeof(out->error), "bad-args");
         return false;
     }
-    prefix_len = strlen(prefix);
-    for (i = 0u; table[i] != NULL; ++i) {
-        if (starts_with_ci(table[i], prefix)) {
-            if (n < sizeof(matches) / sizeof(matches[0])) {
-                matches[n] = table[i];
-            }
-            ++n;
-        }
-    }
-    if (n == 0u || n > sizeof(matches) / sizeof(matches[0])) {
-        return false;
-    }
-    if (n == 1u) {
-        if (out_unique != NULL) {
-            *out_unique = true;
-        }
-        snprintf(dst, dst_cap, "%s", matches[0]);
-        return true;
-    }
-    lcp = strlen(matches[0]);
-    for (i = 1u; i < n; ++i) {
-        size_t j = 0u;
-        while (j < lcp && matches[0][j] != '\0' && matches[i][j] != '\0' &&
-               tolower((unsigned char)matches[0][j]) ==
-                   tolower((unsigned char)matches[i][j])) {
-            ++j;
-        }
-        lcp = j;
-    }
-    if (lcp <= prefix_len) {
-        return false;
-    }
-    if (lcp >= dst_cap) {
-        lcp = dst_cap - 1u;
-    }
-    memcpy(dst, matches[0], lcp);
-    dst[lcp] = '\0';
+    out->ok = true;
+    out->verb_code = FR_VERB_FIND;
     return true;
 }
 
 bool forensics_view_autocomplete(frontend_forensics_state *state)
 {
-    char *start;
-    char *eq;
-    char prefix[FRONTEND_FR_QUERY_MAX];
-    char completed[FRONTEND_FR_QUERY_MAX];
-    size_t prefix_len;
-    size_t head_len;
-    bool unique = false;
+    char tokens[FR_GUIDE_MAX_TOKENS][FRONTEND_FR_QUERY_MAX];
     char before[FRONTEND_FR_QUERY_MAX];
+    char rebuilt[FRONTEND_FR_QUERY_MAX];
+    unsigned n;
+    unsigned i;
+    bool trailing = false;
+    int verb;
+    const char *canon = NULL;
 
     if (state == NULL) {
         return false;
     }
     snprintf(before, sizeof(before), "%s", state->query);
-    start = state->query + (size_t)strlen(state->query);
-    while (start > state->query && !isspace((unsigned char)start[-1])) {
-        --start;
-    }
-    head_len = (size_t)(start - state->query);
-    snprintf(prefix, sizeof(prefix), "%s", start);
-    prefix_len = strlen(prefix);
-    if (prefix_len == 0u) {
-        forensics_view_set_status(
-            state, "Tab: type a key prefix (e.g. acc → access=)");
+    n = fr_split_tokens(state->query, tokens, FR_GUIDE_MAX_TOKENS, &trailing);
+    if (n == 0u) {
+        forensics_view_set_status(state, k_fr_help_verbs);
         return false;
     }
-    eq = strchr(prefix, '=');
-    if (eq != NULL) {
-        char key[64];
-        size_t key_len = (size_t)(eq - prefix);
-        const char *value = eq + 1;
-        if (key_len >= sizeof(key)) {
-            return false;
-        }
-        memcpy(key, prefix, key_len);
-        key[key_len] = '\0';
-        completed[0] = '\0';
-        if (token_eq_ci(key, "access")) {
-            if (!complete_from_table(
-                    completed,
-                    sizeof(completed),
-                    value,
-                    runtime_history_find_access_names(),
-                    &unique)) {
-                forensics_view_set_status(state, "Tab: no access-name match");
-                return false;
-            }
-        } else if (token_eq_ci(key, "direction")) {
-            static const char *const dirs[] = {"forward", "backward", NULL};
-            if (!complete_from_table(
-                    completed, sizeof(completed), value, dirs, &unique)) {
-                forensics_view_set_status(state, "Tab: no direction match");
-                return false;
-            }
-        } else if (token_eq_ci(key, "from")) {
-            static const char *const froms[] = {"oldest", "newest", NULL};
-            if (!complete_from_table(
-                    completed, sizeof(completed), value, froms, &unique)) {
-                forensics_view_set_status(state, "Tab: no from= match");
-                return false;
+
+    verb = fr_exact_verb(tokens[0]);
+    if (verb <= 0) {
+        if (tokens[0][0] != '\0' &&
+            fr_table_prefix_matches(k_fr_verbs, tokens[0], &canon) == 1u) {
+            snprintf(tokens[0], sizeof(tokens[0]), "%s", canon);
+            verb = fr_exact_verb(tokens[0]);
+            if (n == 1u) {
+                trailing = true;
             }
         } else {
-            forensics_view_set_status(
-                state, "Tab: value complete for access=/direction=/from=");
+            forensics_view_set_status(state, k_fr_help_verbs);
             return false;
-        }
-        if (head_len + key_len + 1u + strlen(completed) + 1u >=
-            sizeof(state->query)) {
-            return false;
-        }
-        snprintf(
-            state->query + head_len,
-            sizeof(state->query) - head_len,
-            "%s=%s",
-            key,
-            completed);
-    } else {
-        if (!complete_from_table(
-                completed,
-                sizeof(completed),
-                prefix,
-                runtime_history_find_option_keys(),
-                &unique)) {
-            forensics_view_set_status(
-                state, "Tab: no unique key (try acc, addr, lim, …)");
-            return false;
-        }
-        if (head_len + strlen(completed) + (unique ? 2u : 1u) >=
-            sizeof(state->query)) {
-            return false;
-        }
-        if (unique) {
-            snprintf(
-                state->query + head_len,
-                sizeof(state->query) - head_len,
-                "%s=",
-                completed);
-        } else {
-            snprintf(
-                state->query + head_len,
-                sizeof(state->query) - head_len,
-                "%s",
-                completed);
         }
     }
+
+    for (i = 1u; i < n; ++i) {
+        fr_unique_expand_token(tokens[i], FRONTEND_FR_QUERY_MAX, verb);
+    }
+    if (n > 0u && fr_is_empty_kv(tokens[n - 1u])) {
+        trailing = false;
+    }
+
+    if (!fr_rebuild_query(rebuilt, sizeof(rebuilt), tokens, n, trailing)) {
+        fr_guide_status(state, verb, tokens, n, trailing);
+        return false;
+    }
+    snprintf(state->query, sizeof(state->query), "%s", rebuilt);
+    n = fr_split_tokens(state->query, tokens, FR_GUIDE_MAX_TOKENS, &trailing);
+    if (n > 0u && fr_is_empty_kv(tokens[n - 1u])) {
+        trailing = false;
+    }
+    verb = (n > 0u) ? fr_exact_verb(tokens[0]) : 0;
+    fr_guide_status(state, verb, tokens, n, trailing);
+
     if (strcmp(before, state->query) == 0) {
         return false;
     }

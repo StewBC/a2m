@@ -361,14 +361,19 @@ FIND requires a paused machine and a recording window (turn **Record** on in
 Misc -> Inspector and run a bit before searching). **Clear view** clears the
 transcript only; it does not call `history-clear`.
 
-**Query line** (Enter to run). Up/Down browses recent queries. Tab completes
-unique find-option keys and some values (`access=`, `direction=`, `from=`).
+**Query line** (Enter to run). The first token must be a verb (`find`, `next`,
+`read`, `info`). Bare `key=value` is not FIND (control-port `history-find` still
+accepts bare keys). Up/Down browses recent queries. Tab unique-completes the next
+expected token or prints that hole's syntax on the status strip. With the caret
+at the end of the line, Tab unique-expands every token (`find add=$4000 acc=re`
+becomes `find address=$4000 access=read`). Open values (ids, hex, ranges,
+limits) are not completed.
 
 | Input | Meaning |
 |-------|---------|
-| `find [key=value ...]` or bare `key=value...` | FIND with the shared option grammar (same keys as `history-find`) |
+| `find [key=value ...]` | FIND with the shared option grammar (same keys as `history-find`) |
 | `next [limit=N]` | Continue the last FIND page |
-| `read <id> [before=N] [after=N] [epoch=N]` | Read one retained id with context |
+| `read <id> [before=N] [after=N] [epoch=N]` | Read one retained id with context (`id` and keys may be in any order) |
 | `info` | Refresh recorder status (also runs quietly when Forensics opens) |
 
 Click a transcript line to select it (or a `---` header to select the whole
