@@ -57,13 +57,14 @@ int hostfs_read_block(hostfs_volume *vol, uint32_t block, uint8_t *out);
 int hostfs_write_block(hostfs_volume *vol, uint32_t block, const uint8_t *data);
 
 /*
- * Phase 2: rate-limited host refresh on SmartPort touch (STATUS / READ / WRITE).
- * Wall-clock delta (~1s host time) so max turbo does not multiply rescans.
- * Skipped while guest write-through is active. Idle mounted volumes do nothing.
+ * Drain native filesystem invalidations on a SmartPort touch (STATUS / READ /
+ * WRITE) and reconcile only the affected file or immediate directory. When
+ * notifications are unavailable, falls back to the legacy rate-limited full
+ * rescan. Skipped while guest write-through or sealed replay is active.
  */
 void hostfs_maybe_refresh(hostfs_volume *vol);
 
-/* Force a host rescan now (ignores rate limit; still skips during guest write). */
+/* Force an unconditional recursive host rescan now (still skips during guest write). */
 int hostfs_rescan(hostfs_volume *vol);
 
 /* Compose host basename NAME#ttxxxx. If name is already NAPS-tagged (assembler),
@@ -86,3 +87,13 @@ bool hostfs_mangle_prodos_name(const char *stem, char *out, size_t out_size);
 /* Diagnostics fired on this volume since mount (see hostfs_warn). */
 int hostfs_warning_count(const hostfs_volume *vol);
 const char *hostfs_last_warning(const hostfs_volume *vol);
+/* Detach native notifications so injected events are deterministic. */
+void hostfs_test_use_synthetic_events(hostfs_volume *vol);
+bool hostfs_test_inject_event(
+    hostfs_volume *vol, uint32_t flags, const char *relative_path);
+void hostfs_test_require_full_rescan(hostfs_volume *vol);
+void hostfs_test_reset_refresh_counters(hostfs_volume *vol);
+int hostfs_test_targeted_file_stats(const hostfs_volume *vol);
+int hostfs_test_targeted_directory_scans(const hostfs_volume *vol);
+int hostfs_test_full_rescans(const hostfs_volume *vol);
+bool hostfs_test_using_periodic_refresh(const hostfs_volume *vol);

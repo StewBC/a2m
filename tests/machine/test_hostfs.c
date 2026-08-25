@@ -1,5 +1,6 @@
 /* HostFS unit tests — NAPS parse, ProDOS map, SmartPort mount/read/write. */
 #include "apple2.h"
+#include "fs_watch.h"
 #include "hostfs.h"
 #include "smrtprt.h"
 
@@ -12,11 +13,9 @@
 #include <direct.h>
 #include <windows.h>
 #define HOSTFS_MKDIR(path) _mkdir(path)
-#define HOSTFS_SLEEP_MS(ms) Sleep(ms)
 #else
 #include <unistd.h>
 #define HOSTFS_MKDIR(path) mkdir(path, 0755)
-#define HOSTFS_SLEEP_MS(ms) usleep((unsigned)(ms) * 1000u)
 #endif
 
 #ifndef A2M_FIXTURE_DIR
@@ -502,6 +501,8 @@ static void test_create_reconcile(void)
     if (vol == NULL) {
         fail("mount create dir");
     }
+    hostfs_test_use_synthetic_events(vol);
+    hostfs_test_reset_refresh_counters(vol);
 
     /* Allocate an orphan data block via write, then publish a dir entry for it. */
     new_key = 100;
@@ -540,6 +541,55 @@ static void test_create_reconcile(void)
     snprintf(path, sizeof(path), "%s/TEST#060800", dir);
     if (stat(path, &st) != 0) {
         fail("CREATE did not make NAPS host file");
+    }
+    /* The deferred internal invalidation and the watcher's later echo collapse
+       to one authoritative parent scan and must not duplicate the node. */
+    if (!hostfs_test_inject_event(vol, FS_WATCH_CREATE, "TEST#060800")) {
+        fail("inject guest create echo");
+    }
+    hostfs_maybe_refresh(vol);
+    if (hostfs_file_count(vol) != 2 ||
+        hostfs_test_targeted_directory_scans(vol) != 1 ||
+        hostfs_test_full_rescans(vol) != 0) {
+        fail("guest create echo must reconcile once without duplicating");
+    }
+
+    /* A guest block write extends the physical host file to a whole block, but
+       the ProDOS directory EOF remains authoritative. Its modify echo must not
+       turn the three-byte guest file into a 512-byte catalog entry. */
+    memset(data, 0xA7, sizeof(data));
+    if (hostfs_write_block(vol, new_key, data) != 0 ||
+        !hostfs_test_inject_event(vol, FS_WATCH_MODIFY, "TEST#060800")) {
+        fail("inject guest data-write echo");
+    }
+    hostfs_maybe_refresh(vol);
+    if (hostfs_read_block(vol, 2, dirblk) != 0) {
+        fail("read catalog after data-write echo");
+    }
+    for (i = 1; i < HOSTFS_ENTRIES_PER_BLOCK; ++i) {
+        const uint8_t *e = dirblk + 4 + i * HOSTFS_ENTRY_LENGTH;
+        uint8_t nl = (uint8_t)(e[0] & 0x0Fu);
+        char name[HOSTFS_NAME_MAX];
+        uint32_t eof;
+        if (e[0] == 0) {
+            continue;
+        }
+        memcpy(name, e + 1, nl);
+        name[nl] = '\0';
+        if (strcmp(name, "TEST") != 0) {
+            continue;
+        }
+        eof = (uint32_t)e[0x15] | ((uint32_t)e[0x16] << 8) |
+              ((uint32_t)e[0x17] << 16);
+        if (eof != 3u) {
+            fail("guest write echo changed directory-authoritative EOF");
+        }
+        break;
+    }
+    if (i == HOSTFS_ENTRIES_PER_BLOCK ||
+        hostfs_test_targeted_file_stats(vol) != 1 ||
+        hostfs_file_count(vol) != 2) {
+        fail("guest data-write echo was not idempotent");
     }
 
     hostfs_eject(vol);
@@ -1173,10 +1223,8 @@ static void test_dir_write_through(void)
     wipe_tree(dir);
 }
 
-/*
- * Access-triggered refresh: idle peripherals tick must not rescan; touches are
- * wall-clock rate-limited; force hostfs_rescan still works inside the window.
- */
+/* Healthy notification mode does no scan or stat work without an event. A
+   structural event is coalesced and reconciles only its immediate parent. */
 static void test_touch_refresh(void)
 {
     apple2_t m;
@@ -1200,6 +1248,8 @@ static void test_touch_refresh(void)
         fail("touch refresh vol");
     }
 
+    hostfs_test_use_synthetic_events(vol);
+    hostfs_test_reset_refresh_counters(vol);
     write_file("test_hostfs_touch_refresh/IDLE#060000", "i", 1);
 
     /* Advance plenty of emulated Φ0; peripherals must not refresh idle HostFS. */
@@ -1214,48 +1264,75 @@ static void test_touch_refresh(void)
         fail("idle peripherals must not rescan");
     }
 
-    /* Still within wall-clock delta of mount — touch serves the mount cache. */
+    /* A healthy touch with no event performs no readdir and no stat. */
     hostfs_maybe_refresh(vol);
     if (hostfs_read_block(vol, 2, block) != 0) {
         fail("read after early touch");
     }
     if (find_entry_in_dir_block(block, "IDLE", NULL, NULL, NULL)) {
-        fail("touch within delta must not rescan");
+        fail("touch without an event must not rescan");
+    }
+    if (hostfs_test_targeted_directory_scans(vol) != 0 ||
+        hostfs_test_targeted_file_stats(vol) != 0 ||
+        hostfs_test_full_rescans(vol) != 0) {
+        fail("idle notification mode performed refresh work");
     }
 
-    HOSTFS_SLEEP_MS(1100);
-
-    /* After delta, a SmartPort STATUS touch refreshes. */
+    if (!hostfs_test_inject_event(vol, FS_WATCH_CREATE, "IDLE#060000") ||
+        !hostfs_test_inject_event(vol, FS_WATCH_METADATA, "IDLE#060000")) {
+        fail("inject root create");
+    }
+    /* A SmartPort STATUS touch drains both duplicate path invalidations once. */
     m.sp_device[7].sp_buffer[1] = 0;
     sp_status(&m, 7);
     if (m.sp_device[7].sp_buffer[0] != SP_SUCCESS) {
         fail("status after delta");
     }
     if (hostfs_read_block(vol, 2, block) != 0) {
-        fail("read after status touch");
+        fail("read after event-driven status touch");
     }
     if (!find_entry_in_dir_block(block, "IDLE", NULL, NULL, NULL)) {
-        fail("STATUS touch after delta should refresh");
+        fail("STATUS touch should reconcile queued create");
+    }
+    if (hostfs_test_targeted_directory_scans(vol) != 1 ||
+        hostfs_test_targeted_file_stats(vol) != 0 ||
+        hostfs_test_full_rescans(vol) != 0) {
+        fail("root create should cost one immediate-directory scan");
     }
 
     write_file("test_hostfs_touch_refresh/NEXT#060000", "n", 1);
+    if (!hostfs_test_inject_event(vol, FS_WATCH_CREATE, "NEXT#060000")) {
+        fail("inject sealed create");
+    }
+    m.replay_sealed = true;
     hostfs_maybe_refresh(vol);
     if (hostfs_read_block(vol, 2, block) != 0) {
         fail("read after second early touch");
     }
     if (find_entry_in_dir_block(block, "NEXT", NULL, NULL, NULL)) {
-        fail("second touch within delta must not rescan");
+        fail("sealed replay must defer queued filesystem events");
+    }
+    m.replay_sealed = false;
+    hostfs_maybe_refresh(vol);
+    if (hostfs_read_block(vol, 2, block) != 0 ||
+        !find_entry_in_dir_block(block, "NEXT", NULL, NULL, NULL) ||
+        hostfs_test_targeted_directory_scans(vol) != 2) {
+        fail("deferred event must reconcile after sealed replay");
     }
 
-    /* Explicit force path still works inside the window. */
+    /* The public escape hatch remains an unconditional recursive rescan. */
+    write_file("test_hostfs_touch_refresh/FORCE#060000", "f", 1);
     if (hostfs_rescan(vol) != 0) {
         fail("force rescan");
     }
     if (hostfs_read_block(vol, 2, block) != 0) {
         fail("read after force");
     }
-    if (!find_entry_in_dir_block(block, "NEXT", NULL, NULL, NULL)) {
-        fail("force rescan should see NEXT");
+    if (!find_entry_in_dir_block(block, "FORCE", NULL, NULL, NULL)) {
+        fail("force rescan should see FORCE");
+    }
+    if (hostfs_test_full_rescans(vol) != 1) {
+        fail("explicit hostfs_rescan must count as one full scan");
     }
 
     if (apple2_smartport_eject(&m, 7, 0) != 0) {
@@ -1390,6 +1467,7 @@ static void test_root_entry_limit(void)
     hostfs_volume *vol;
     uint8_t blk[512];
     int count = 0;
+    int mount_warnings;
 
     wipe_tree(dir);
     HOSTFS_MKDIR(dir);
@@ -1399,9 +1477,10 @@ static void test_root_entry_limit(void)
     if (vol == NULL) {
         fail("root limit mount");
     }
+    mount_warnings = hostfs_test_using_periodic_refresh(vol) ? 1 : 0;
 
     /* One accumulated line for all nine drops, not one line each. */
-    if (hostfs_warning_count(vol) != 1) {
+    if (hostfs_warning_count(vol) != mount_warnings + 1) {
         fprintf(stderr, "warn_count=%d last=%s\n",
                 hostfs_warning_count(vol), hostfs_last_warning(vol));
         fail("expected exactly one root-overflow warning");
@@ -1468,6 +1547,7 @@ static void test_order_manifest_frozen_when_truncated(void)
     long n_before;
     long n_after;
     hostfs_volume *vol;
+    int mount_warnings;
 
     wipe_tree(dir);
     HOSTFS_MKDIR(dir);
@@ -1483,14 +1563,15 @@ static void test_order_manifest_frozen_when_truncated(void)
     if (vol == NULL) {
         fail("freeze mount");
     }
-    if (hostfs_warning_count(vol) != 1) {
+    mount_warnings = hostfs_test_using_periodic_refresh(vol) ? 1 : 0;
+    if (hostfs_warning_count(vol) != mount_warnings + 1) {
         fail("expected the root-overflow warning at mount");
     }
 
     swap_first_two_root_entries(vol);
 
     /* The freeze fired, rather than the "nothing changed" early return. */
-    if (hostfs_warning_count(vol) != 2 ||
+    if (hostfs_warning_count(vol) != mount_warnings + 2 ||
         strstr(hostfs_last_warning(vol), "left unchanged") == NULL) {
         fprintf(stderr, "warn_count=%d last=%s\n",
                 hostfs_warning_count(vol), hostfs_last_warning(vol));
@@ -1518,6 +1599,7 @@ static void test_order_manifest_frozen_after_mount(void)
     long n_after;
     hostfs_volume *vol;
     int count = 0;
+    int mount_warnings;
 
     wipe_tree(dir);
     HOSTFS_MKDIR(dir);
@@ -1533,7 +1615,8 @@ static void test_order_manifest_frozen_after_mount(void)
     if (vol == NULL) {
         fail("fill mount");
     }
-    if (hostfs_warning_count(vol) != 0) {
+    mount_warnings = hostfs_test_using_periodic_refresh(vol) ? 1 : 0;
+    if (hostfs_warning_count(vol) != mount_warnings) {
         fprintf(stderr, "last=%s\n", hostfs_last_warning(vol));
         fail("a root under the limit must mount clean");
     }
@@ -1548,7 +1631,7 @@ static void test_order_manifest_frozen_after_mount(void)
         fprintf(stderr, "root entries=%d\n", count);
         fail("rescan must stop at 51 entries");
     }
-    if (hostfs_warning_count(vol) != 2 ||
+    if (hostfs_warning_count(vol) != mount_warnings + 2 ||
         strstr(hostfs_last_warning(vol), "left unchanged") == NULL) {
         fprintf(stderr, "warn_count=%d last=%s\n",
                 hostfs_warning_count(vol), hostfs_last_warning(vol));
@@ -1574,6 +1657,7 @@ static void test_large_subdirectory_mount(void)
     uint8_t st = 0;
     uint8_t type = 0;
     int count = 0;
+    int mount_warnings;
 
     wipe_tree(dir);
     HOSTFS_MKDIR(dir);
@@ -1584,7 +1668,8 @@ static void test_large_subdirectory_mount(void)
     if (vol == NULL) {
         fail("large subdirectory mount");
     }
-    if (hostfs_warning_count(vol) != 0) {
+    mount_warnings = hostfs_test_using_periodic_refresh(vol) ? 1 : 0;
+    if (hostfs_warning_count(vol) != mount_warnings) {
         fprintf(stderr, "warn_count=%d last=%s\n",
                 hostfs_warning_count(vol), hostfs_last_warning(vol));
         fail("large legal subdirectory must mount without warning");
@@ -1709,6 +1794,281 @@ static void test_block_index_create_delete_churn(void)
     wipe_tree(dir);
 }
 
+static void test_targeted_deep_add_delete(void)
+{
+    const char *dir = "test_hostfs_targeted_deep";
+    hostfs_volume *vol;
+    uint8_t block[HOSTFS_BLOCK_SIZE];
+    uint16_t left_key = 0;
+    uint16_t deep_key = 0;
+    uint16_t right_key = 0;
+    int right_count = 0;
+
+    wipe_tree(dir);
+    HOSTFS_MKDIR(dir);
+    HOSTFS_MKDIR("test_hostfs_targeted_deep/LEFT");
+    HOSTFS_MKDIR("test_hostfs_targeted_deep/LEFT/DEEP");
+    HOSTFS_MKDIR("test_hostfs_targeted_deep/RIGHT");
+    write_file("test_hostfs_targeted_deep/RIGHT/KEEP#060000", "k", 1);
+
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL || hostfs_read_block(vol, 2, block) != 0 ||
+        !find_entry_in_dir_block(block, "LEFT", NULL, &left_key, NULL) ||
+        !find_entry_in_dir_block(block, "RIGHT", NULL, &right_key, NULL) ||
+        !subdir_catalog(vol, left_key, "DEEP", NULL, &deep_key)) {
+        fail("targeted deep fixture mount");
+    }
+    (void)subdir_catalog(vol, right_key, NULL, &right_count, NULL);
+    hostfs_test_use_synthetic_events(vol);
+    hostfs_test_reset_refresh_counters(vol);
+
+    write_file("test_hostfs_targeted_deep/LEFT/DEEP/NEW#060000", "new", 3);
+    if (!hostfs_test_inject_event(
+            vol, FS_WATCH_CREATE, "LEFT/DEEP/NEW#060000")) {
+        fail("inject deep add");
+    }
+    hostfs_maybe_refresh(vol);
+    if (!subdir_catalog(vol, deep_key, "NEW", NULL, NULL) ||
+        hostfs_test_targeted_directory_scans(vol) != 1 ||
+        hostfs_test_full_rescans(vol) != 0) {
+        fail("deep add must scan only its immediate parent");
+    }
+    {
+        int count = 0;
+        (void)subdir_catalog(vol, right_key, NULL, &count, NULL);
+        if (count != right_count) {
+            fail("deep add touched sibling catalog");
+        }
+    }
+
+    if (remove("test_hostfs_targeted_deep/LEFT/DEEP/NEW#060000") != 0 ||
+        !hostfs_test_inject_event(
+            vol, FS_WATCH_REMOVE, "LEFT/DEEP/NEW#060000")) {
+        fail("inject deep delete");
+    }
+    hostfs_maybe_refresh(vol);
+    if (subdir_catalog(vol, deep_key, "NEW", NULL, NULL) ||
+        hostfs_test_targeted_directory_scans(vol) != 2 ||
+        hostfs_test_full_rescans(vol) != 0) {
+        fail("deep delete must scan only its immediate parent");
+    }
+
+    /* A newly moved-in directory is different: watch it first, then materialize
+       the subtree that already exists inside it. Existing DEEP is not descended. */
+    HOSTFS_MKDIR("test_hostfs_targeted_deep/LEFT/ADDED");
+    HOSTFS_MKDIR("test_hostfs_targeted_deep/LEFT/ADDED/NEST");
+    write_file(
+        "test_hostfs_targeted_deep/LEFT/ADDED/NEST/LEAF#060000", "leaf", 4);
+    if (!hostfs_test_inject_event(
+            vol, FS_WATCH_CREATE | FS_WATCH_DIRECTORY, "LEFT/ADDED")) {
+        fail("inject moved-in directory");
+    }
+    hostfs_maybe_refresh(vol);
+    {
+        uint16_t added_key = 0;
+        uint16_t nest_key = 0;
+        if (!subdir_catalog(vol, left_key, "ADDED", NULL, &added_key) ||
+            !subdir_catalog(vol, added_key, "NEST", NULL, &nest_key) ||
+            !subdir_catalog(vol, nest_key, "LEAF", NULL, NULL) ||
+            hostfs_test_targeted_directory_scans(vol) != 5 ||
+            hostfs_test_full_rescans(vol) != 0) {
+            fail("new directory subtree was not recursively materialized");
+        }
+    }
+
+    hostfs_eject(vol);
+    wipe_tree(dir);
+}
+
+static void test_targeted_file_resize(void)
+{
+    const char *dir = "test_hostfs_targeted_resize";
+    hostfs_volume *vol;
+    uint8_t payload[700];
+    uint8_t root[HOSTFS_BLOCK_SIZE];
+    uint8_t index[HOSTFS_BLOCK_SIZE];
+    uint8_t data[HOSTFS_BLOCK_SIZE];
+    uint8_t storage = 0;
+    uint16_t key = 0;
+    uint16_t second_data;
+    int i;
+
+    for (i = 0; i < (int)sizeof(payload); ++i) {
+        payload[i] = (uint8_t)(i ^ 0x5Au);
+    }
+    wipe_tree(dir);
+    HOSTFS_MKDIR(dir);
+    write_file("test_hostfs_targeted_resize/DATA#060000", payload, 500);
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL) {
+        fail("targeted resize mount");
+    }
+    hostfs_test_use_synthetic_events(vol);
+    hostfs_test_reset_refresh_counters(vol);
+
+    write_file("test_hostfs_targeted_resize/DATA#060000", payload, sizeof(payload));
+    if (!hostfs_test_inject_event(vol, FS_WATCH_MODIFY, "DATA#060000")) {
+        fail("inject file resize");
+    }
+    hostfs_maybe_refresh(vol);
+    if (hostfs_read_block(vol, 2, root) != 0 ||
+        !find_entry_in_dir_block(root, "DATA", &storage, &key, NULL) ||
+        storage != 2u) {
+        fail("resize must update seedling to sapling catalog metadata");
+    }
+    if (hostfs_read_block(vol, key, index) != 0) {
+        fail("read resized sapling index");
+    }
+    second_data = (uint16_t)(index[1] | ((uint16_t)index[257] << 8));
+    if (second_data == 0u || hostfs_read_block(vol, second_data, data) != 0 ||
+        memcmp(data, payload + HOSTFS_BLOCK_SIZE,
+               sizeof(payload) - HOSTFS_BLOCK_SIZE) != 0) {
+        fail("resized sapling second block");
+    }
+    if (hostfs_test_targeted_file_stats(vol) != 1 ||
+        hostfs_test_targeted_directory_scans(vol) != 0 ||
+        hostfs_test_full_rescans(vol) != 0) {
+        fail("known modify must cost one stat and no directory scan");
+    }
+
+    hostfs_eject(vol);
+    wipe_tree(dir);
+}
+
+static void test_targeted_external_move(void)
+{
+    const char *dir = "test_hostfs_targeted_move";
+    hostfs_volume *vol;
+    uint8_t root[HOSTFS_BLOCK_SIZE];
+    uint8_t data[HOSTFS_BLOCK_SIZE];
+    uint16_t src_key = 0;
+    uint16_t dst_key = 0;
+    uint16_t file_key = 0;
+
+    wipe_tree(dir);
+    HOSTFS_MKDIR(dir);
+    HOSTFS_MKDIR("test_hostfs_targeted_move/SRC");
+    HOSTFS_MKDIR("test_hostfs_targeted_move/DST");
+    write_file("test_hostfs_targeted_move/SRC/OLD#060000", "move", 4);
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL || hostfs_read_block(vol, 2, root) != 0 ||
+        !find_entry_in_dir_block(root, "SRC", NULL, &src_key, NULL) ||
+        !find_entry_in_dir_block(root, "DST", NULL, &dst_key, NULL)) {
+        fail("targeted move fixture mount");
+    }
+    hostfs_test_use_synthetic_events(vol);
+    hostfs_test_reset_refresh_counters(vol);
+    if (rename("test_hostfs_targeted_move/SRC/OLD#060000",
+               "test_hostfs_targeted_move/DST/NEW#060000") != 0 ||
+        !hostfs_test_inject_event(vol, FS_WATCH_RENAME, "SRC/OLD#060000") ||
+        !hostfs_test_inject_event(vol, FS_WATCH_RENAME, "DST/NEW#060000")) {
+        fail("inject external move");
+    }
+    hostfs_maybe_refresh(vol);
+    if (subdir_catalog(vol, src_key, "OLD", NULL, NULL) ||
+        !subdir_catalog(vol, dst_key, "NEW", NULL, &file_key) ||
+        hostfs_read_block(vol, file_key, data) != 0 ||
+        memcmp(data, "move", 4) != 0) {
+        fail("external move did not reconcile old and new parents");
+    }
+    if (hostfs_test_targeted_directory_scans(vol) != 2 ||
+        hostfs_test_full_rescans(vol) != 0) {
+        fail("complete external move must scan exactly two parents");
+    }
+
+    hostfs_eject(vol);
+    wipe_tree(dir);
+}
+
+static void test_targeted_order_edit(void)
+{
+    const char *dir = "test_hostfs_targeted_order";
+    hostfs_volume *vol;
+    uint8_t root[HOSTFS_BLOCK_SIZE];
+    uint8_t block[HOSTFS_BLOCK_SIZE];
+    uint16_t a_key = 0;
+    uint16_t b_key = 0;
+    char name[HOSTFS_NAME_MAX];
+    uint8_t nl;
+    const char order[] = "TWO#060000\nONE#060000\n";
+
+    wipe_tree(dir);
+    HOSTFS_MKDIR(dir);
+    HOSTFS_MKDIR("test_hostfs_targeted_order/A");
+    HOSTFS_MKDIR("test_hostfs_targeted_order/B");
+    write_file("test_hostfs_targeted_order/A/ONE#060000", "1", 1);
+    write_file("test_hostfs_targeted_order/A/TWO#060000", "2", 1);
+    write_file("test_hostfs_targeted_order/B/ALPHA#060000", "a", 1);
+    write_file("test_hostfs_targeted_order/B/BETA#060000", "b", 1);
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL || hostfs_read_block(vol, 2, root) != 0 ||
+        !find_entry_in_dir_block(root, "A", NULL, &a_key, NULL) ||
+        !find_entry_in_dir_block(root, "B", NULL, &b_key, NULL)) {
+        fail("targeted order fixture mount");
+    }
+    hostfs_test_use_synthetic_events(vol);
+    hostfs_test_reset_refresh_counters(vol);
+    write_file("test_hostfs_targeted_order/A/hostfs.order", order, sizeof(order) - 1u);
+    if (!hostfs_test_inject_event(vol, FS_WATCH_MODIFY, "A/hostfs.order")) {
+        fail("inject order edit");
+    }
+    hostfs_maybe_refresh(vol);
+    if (hostfs_read_block(vol, a_key, block) != 0) {
+        fail("read reordered A");
+    }
+    nl = (uint8_t)(block[4 + HOSTFS_ENTRY_LENGTH] & 0x0Fu);
+    memcpy(name, block + 5 + HOSTFS_ENTRY_LENGTH, nl);
+    name[nl] = '\0';
+    if (strcmp(name, "TWO") != 0) {
+        fail("hostfs.order edit did not reorder its directory");
+    }
+    if (hostfs_read_block(vol, b_key, block) != 0) {
+        fail("read untouched B");
+    }
+    nl = (uint8_t)(block[4 + HOSTFS_ENTRY_LENGTH] & 0x0Fu);
+    memcpy(name, block + 5 + HOSTFS_ENTRY_LENGTH, nl);
+    name[nl] = '\0';
+    if (strcmp(name, "ALPHA") != 0 ||
+        hostfs_test_targeted_directory_scans(vol) != 1 ||
+        hostfs_test_full_rescans(vol) != 0) {
+        fail("order edit touched an unrelated directory");
+    }
+
+    hostfs_eject(vol);
+    wipe_tree(dir);
+}
+
+static void test_event_loss_full_rescan(void)
+{
+    const char *dir = "test_hostfs_event_loss";
+    hostfs_volume *vol;
+
+    wipe_tree(dir);
+    HOSTFS_MKDIR(dir);
+    write_file("test_hostfs_event_loss/SEED#060000", "s", 1);
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL) {
+        fail("event loss mount");
+    }
+    hostfs_test_use_synthetic_events(vol);
+    hostfs_test_reset_refresh_counters(vol);
+    write_file("test_hostfs_event_loss/FOUND#060000", "f", 1);
+    hostfs_test_require_full_rescan(vol);
+    hostfs_maybe_refresh(vol);
+    if (!root_catalog(vol, "FOUND", NULL) ||
+        hostfs_test_full_rescans(vol) != 1 ||
+        hostfs_test_targeted_directory_scans(vol) != 0) {
+        fail("event loss must widen once to a full authoritative rescan");
+    }
+    hostfs_maybe_refresh(vol);
+    if (hostfs_test_full_rescans(vol) != 1) {
+        fail("taken loss state triggered a second full rescan");
+    }
+
+    hostfs_eject(vol);
+    wipe_tree(dir);
+}
+
 #if !defined(_WIN32)
 /* A guest-side cross-directory move whose host rename fails must not cost the
    user the file. The node's parent has to follow the catalog even so: leaving
@@ -1740,6 +2100,8 @@ static void test_failed_move_keeps_host_file(void)
     if (vol == NULL) {
         fail("failed move mount");
     }
+    hostfs_test_use_synthetic_events(vol);
+    hostfs_test_reset_refresh_counters(vol);
     if (hostfs_read_block(vol, 2, rootblk) != 0 ||
         !find_entry_in_dir_block(rootblk, "SRC", &stype, &src_key, &ftype) ||
         !find_entry_in_dir_block(rootblk, "DST", &stype, &dst_key, &ftype)) {
@@ -1803,20 +2165,22 @@ static void test_failed_move_keeps_host_file(void)
         fail("failed move must not destroy the host file");
     }
 
-    /* With the obstruction gone, a rescan converges: the phantom entry under
-       DST goes away and the file is adopted back into SRC. */
+    /* With the obstruction gone, the deferred parent invalidations converge
+       on the next safe touch without an explicit full rescan. */
     if (chmod("test_hostfs_failed_move/DST", 0700) != 0) {
         fail("restore DST mode");
     }
-    if (hostfs_rescan(vol) != 0) {
-        fail("rescan after failed move");
-    }
+    hostfs_maybe_refresh(vol);
     if (hostfs_read_block(vol, dst_key, dstblk) != 0 ||
         find_entry_in_dir_block(dstblk, "DATA", &stype, &src_key, &ftype)) {
         fail("phantom DATA should be gone from DST");
     }
     if (stat("test_hostfs_failed_move/SRC/DATA#060000", &st) != 0) {
         fail("host file must survive the rescan");
+    }
+    if (hostfs_test_targeted_directory_scans(vol) != 2 ||
+        hostfs_test_full_rescans(vol) != 0) {
+        fail("failed move recovery must scan only SRC and DST");
     }
 
     hostfs_eject(vol);
@@ -1842,6 +2206,11 @@ int main(void)
     test_large_subdirectory_mount();
     test_large_subdirectory_rescan();
     test_block_index_create_delete_churn();
+    test_targeted_deep_add_delete();
+    test_targeted_file_resize();
+    test_targeted_external_move();
+    test_targeted_order_edit();
+    test_event_loss_full_rescan();
 #if !defined(_WIN32)
     test_failed_move_keeps_host_file();
 #endif

@@ -7,6 +7,7 @@
 #include "a2_status.h"
 #include "apple2.h"
 #include "apple2_file.h"
+#include "fs_watch.h"
 
 #include <assert.h>
 #include <limits.h>
@@ -105,6 +106,11 @@ typedef struct {
     char prodos_name[HOSTFS_NAME_MAX];
 } hostfs_node;
 
+typedef struct {
+    uint32_t flags;
+    char relative_path[FS_WATCH_PATH_MAX];
+} hostfs_refresh_event;
+
 struct hostfs_volume {
     char root_path[HOSTFS_PATH_MAX];
     char volume_name[HOSTFS_NAME_MAX];
@@ -132,6 +138,23 @@ struct hostfs_volume {
 
     uint8_t *bitmap;
     uint64_t last_refresh_ms; /* 0 = never stamped (mount sets after initial scan) */
+    fs_watch *watch;
+    bool periodic_refresh;
+    bool synthetic_refresh;
+    bool watch_coverage_failed;
+    bool watch_unavailable_warned;
+    bool refresh_rescan_required;
+    bool internal_full_rescan_required;
+    hostfs_refresh_event *synthetic_events;
+    int synthetic_event_count;
+    int synthetic_event_cap;
+    int *dirty_parents;
+    int dirty_parent_count;
+    int dirty_parent_cap;
+    bool dirty_root;
+    int targeted_file_stats;
+    int targeted_directory_scans;
+    int full_rescans;
     int guest_write_depth;
     struct apple2 *apple;
     int slot;
@@ -188,6 +211,131 @@ int hostfs_warning_count(const hostfs_volume *vol)
 const char *hostfs_last_warning(const hostfs_volume *vol)
 {
     return vol == NULL ? "" : vol->last_warning;
+}
+
+static void hostfs_enter_periodic_refresh(hostfs_volume *vol)
+{
+    if (vol == NULL || vol->synthetic_refresh) {
+        return;
+    }
+    fs_watch_destroy(vol->watch);
+    vol->watch = NULL;
+    vol->periodic_refresh = true;
+    vol->watch_coverage_failed = false;
+    if (!vol->watch_unavailable_warned) {
+        hostfs_warn(
+            vol, "%s: filesystem notifications unavailable; using periodic full refresh",
+            vol->root_path);
+        vol->watch_unavailable_warned = true;
+    }
+}
+
+static bool hostfs_refresh_path_valid(const char *relative_path)
+{
+    const char *part;
+
+    if (relative_path == NULL || relative_path[0] == '/' ||
+        relative_path[0] == '\\' || strlen(relative_path) >= FS_WATCH_PATH_MAX) {
+        return false;
+    }
+#if defined(_WIN32)
+    if (relative_path[0] != '\0' && relative_path[1] == ':') {
+        return false;
+    }
+#endif
+    part = relative_path;
+    while (*part != '\0') {
+        const char *end = strchr(part, '/');
+        size_t len = end != NULL ? (size_t)(end - part) : strlen(part);
+        if ((len == 1u && part[0] == '.') ||
+            (len == 2u && part[0] == '.' && part[1] == '.')) {
+            return false;
+        }
+        if (end == NULL) {
+            break;
+        }
+        part = end + 1;
+    }
+    return true;
+}
+
+void hostfs_test_use_synthetic_events(hostfs_volume *vol)
+{
+    if (vol == NULL) {
+        return;
+    }
+    fs_watch_destroy(vol->watch);
+    vol->watch = NULL;
+    vol->periodic_refresh = false;
+    vol->synthetic_refresh = true;
+    vol->watch_coverage_failed = false;
+}
+
+bool hostfs_test_inject_event(
+    hostfs_volume *vol, uint32_t flags, const char *relative_path)
+{
+    hostfs_refresh_event *grown;
+    int cap;
+
+    if (vol == NULL || !vol->synthetic_refresh || flags == 0u ||
+        !hostfs_refresh_path_valid(relative_path)) {
+        return false;
+    }
+    if (vol->synthetic_event_count >= vol->synthetic_event_cap) {
+        cap = vol->synthetic_event_cap < 16 ? 16 : vol->synthetic_event_cap * 2;
+        grown = (hostfs_refresh_event *)realloc(
+            vol->synthetic_events, (size_t)cap * sizeof(*grown));
+        if (grown == NULL) {
+            vol->refresh_rescan_required = true;
+            return false;
+        }
+        vol->synthetic_events = grown;
+        vol->synthetic_event_cap = cap;
+    }
+    vol->synthetic_events[vol->synthetic_event_count].flags = flags;
+    snprintf(
+        vol->synthetic_events[vol->synthetic_event_count].relative_path,
+        sizeof(vol->synthetic_events[vol->synthetic_event_count].relative_path), "%s",
+        relative_path);
+    vol->synthetic_event_count++;
+    return true;
+}
+
+void hostfs_test_require_full_rescan(hostfs_volume *vol)
+{
+    if (vol != NULL && vol->synthetic_refresh) {
+        vol->refresh_rescan_required = true;
+    }
+}
+
+void hostfs_test_reset_refresh_counters(hostfs_volume *vol)
+{
+    if (vol == NULL) {
+        return;
+    }
+    vol->targeted_file_stats = 0;
+    vol->targeted_directory_scans = 0;
+    vol->full_rescans = 0;
+}
+
+int hostfs_test_targeted_file_stats(const hostfs_volume *vol)
+{
+    return vol != NULL ? vol->targeted_file_stats : 0;
+}
+
+int hostfs_test_targeted_directory_scans(const hostfs_volume *vol)
+{
+    return vol != NULL ? vol->targeted_directory_scans : 0;
+}
+
+int hostfs_test_full_rescans(const hostfs_volume *vol)
+{
+    return vol != NULL ? vol->full_rescans : 0;
+}
+
+bool hostfs_test_using_periodic_refresh(const hostfs_volume *vol)
+{
+    return vol != NULL && vol->periodic_refresh;
 }
 
 /* ---- node table, name arena, node-indexed marks ---- */
@@ -335,6 +483,56 @@ static bool hostfs_marks_get(const hostfs_marks *m, int index)
         return false;
     }
     return m->bits[index] != 0u;
+}
+
+static bool hostfs_int_list_contains(const int *items, int count, int value)
+{
+    int i;
+    for (i = 0; i < count; ++i) {
+        if (items[i] == value) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool hostfs_int_list_add(
+    int **items, int *count, int *cap, int value)
+{
+    int *grown;
+    int new_cap;
+
+    if (hostfs_int_list_contains(*items, *count, value)) {
+        return true;
+    }
+    if (*count >= *cap) {
+        new_cap = *cap < 8 ? 8 : *cap * 2;
+        grown = (int *)realloc(*items, (size_t)new_cap * sizeof(*grown));
+        if (grown == NULL) {
+            return false;
+        }
+        *items = grown;
+        *cap = new_cap;
+    }
+    (*items)[(*count)++] = value;
+    return true;
+}
+
+static void hostfs_schedule_directory_refresh(hostfs_volume *vol, int parent_index)
+{
+
+    if (vol == NULL) {
+        return;
+    }
+    if (parent_index < 0) {
+        vol->dirty_root = true;
+        return;
+    }
+    if (!hostfs_int_list_add(
+            &vol->dirty_parents, &vol->dirty_parent_count,
+            &vol->dirty_parent_cap, parent_index)) {
+        vol->internal_full_rescan_required = true;
+    }
 }
 
 static uint64_t hostfs_now_ms(void)
@@ -577,6 +775,63 @@ static void hostfs_parent_host_path(
         !vol->nodes[parent_index].active ||
         hostfs_node_host_path(vol, parent_index, out, out_size) != A2_OK) {
         snprintf(out, out_size, "%s", vol->root_path);
+    }
+}
+
+static int hostfs_node_relative_path(
+    const hostfs_volume *vol, int index, char *out, size_t out_size)
+{
+    int chain[HOSTFS_MAX_DEPTH + 2];
+    int depth = 0;
+    int i;
+
+    if (vol == NULL || out == NULL || out_size == 0u || index < 0 ||
+        index >= vol->node_count) {
+        return A2_ERR;
+    }
+    while (index >= 0) {
+        if (depth >= (int)(sizeof(chain) / sizeof(chain[0])) ||
+            index >= vol->node_count) {
+            return A2_ERR;
+        }
+        chain[depth++] = index;
+        index = vol->nodes[index].parent_index;
+    }
+    out[0] = '\0';
+    for (i = depth - 1; i >= 0; --i) {
+        const char *basename = hostfs_node_basename(vol, chain[i]);
+        size_t used = strlen(out);
+        size_t len = strlen(basename);
+        if (used + (used > 0u ? 1u : 0u) + len >= out_size) {
+            return A2_ERR;
+        }
+        if (used > 0u) {
+            out[used++] = '/';
+            out[used] = '\0';
+        }
+        memcpy(out + used, basename, len + 1u);
+    }
+    return A2_OK;
+}
+
+/* Add the directory watch before its readdir. The recursive backends treat
+   this as an idempotent health check; Linux installs the per-directory watch. */
+static void hostfs_watch_scanned_directory(hostfs_volume *vol, int parent_index)
+{
+    char relative_path[FS_WATCH_PATH_MAX];
+
+    if (vol == NULL || vol->watch == NULL) {
+        return;
+    }
+    if (parent_index < 0) {
+        relative_path[0] = '\0';
+    } else if (hostfs_node_relative_path(
+                   vol, parent_index, relative_path, sizeof(relative_path)) != A2_OK) {
+        vol->watch_coverage_failed = true;
+        return;
+    }
+    if (!fs_watch_add_directory(vol->watch, relative_path)) {
+        vol->watch_coverage_failed = true;
     }
 }
 
@@ -907,6 +1162,75 @@ static int hostfs_find_by_basename(
         }
     }
     return -1;
+}
+
+static int hostfs_find_by_relative_path(
+    const hostfs_volume *vol, const char *relative_path)
+{
+    char copy[FS_WATCH_PATH_MAX];
+    char *part;
+    int parent_index = -1;
+
+    if (vol == NULL || !hostfs_refresh_path_valid(relative_path) ||
+        relative_path[0] == '\0') {
+        return -1;
+    }
+    snprintf(copy, sizeof(copy), "%s", relative_path);
+    part = copy;
+    while (part != NULL && part[0] != '\0') {
+        char *slash = strchr(part, '/');
+        int index;
+        if (slash != NULL) {
+            *slash = '\0';
+        }
+        index = hostfs_find_by_basename(vol, parent_index, part);
+        if (index < 0) {
+            return -1;
+        }
+        parent_index = index;
+        part = slash != NULL ? slash + 1 : NULL;
+    }
+    return parent_index;
+}
+
+static bool hostfs_parent_from_relative_path(
+    const hostfs_volume *vol, const char *relative_path, int *out_parent)
+{
+    char parent_path[FS_WATCH_PATH_MAX];
+    char *slash;
+    int index;
+
+    if (out_parent == NULL || !hostfs_refresh_path_valid(relative_path) ||
+        relative_path[0] == '\0') {
+        return false;
+    }
+    snprintf(parent_path, sizeof(parent_path), "%s", relative_path);
+    slash = strrchr(parent_path, '/');
+    if (slash == NULL) {
+        *out_parent = -1;
+        return true;
+    }
+    *slash = '\0';
+    index = hostfs_find_by_relative_path(vol, parent_path);
+    if (index < 0 || !vol->nodes[index].active ||
+        vol->nodes[index].kind != HOSTFS_KIND_DIR) {
+        return false;
+    }
+    *out_parent = index;
+    return true;
+}
+
+static int hostfs_parent_depth(const hostfs_volume *vol, int parent_index)
+{
+    int depth = 0;
+    while (parent_index >= 0 && depth <= HOSTFS_MAX_DEPTH + 1) {
+        if (parent_index >= vol->node_count) {
+            return HOSTFS_MAX_DEPTH + 1;
+        }
+        depth++;
+        parent_index = vol->nodes[parent_index].parent_index;
+    }
+    return depth;
 }
 
 static uint16_t hostfs_parent_key(const hostfs_volume *vol, int parent_index)
@@ -2247,6 +2571,7 @@ static int hostfs_scan_dir_recursive(
     if (depth > HOSTFS_MAX_DEPTH) {
         return A2_OK;
     }
+    hostfs_watch_scanned_directory(vol, parent_index);
     drop_list[0] = '\0';
 
     scans = NULL;
@@ -2374,6 +2699,8 @@ void hostfs_eject(hostfs_volume *vol)
     if (vol == NULL) {
         return;
     }
+    fs_watch_destroy(vol->watch);
+    vol->watch = NULL;
     (void)hostfs_flush(vol);
     for (i = 0; i < vol->map_count; ++i) {
         if (vol->map[i].kind == HOSTFS_MAP_RAM) {
@@ -2385,6 +2712,8 @@ void hostfs_eject(hostfs_volume *vol)
     free(vol->bitmap);
     free(vol->nodes);
     free(vol->names);
+    free(vol->synthetic_events);
+    free(vol->dirty_parents);
     free(vol);
 }
 
@@ -2430,10 +2759,19 @@ hostfs_volume *hostfs_mount(const char *root_path, const char *volume_name)
     }
     vol->volume_name_len = (uint8_t)strlen(vol->volume_name);
     vol->total_blocks = (uint16_t)HOSTFS_TOTAL_BLOCKS;
+    /* Arm notifications before the initial scan. Events queued while scanning
+       are deliberately retained and replayed on the first SmartPort touch. */
+    vol->watch = fs_watch_create(vol->root_path);
+    if (vol->watch == NULL) {
+        hostfs_enter_periodic_refresh(vol);
+    }
 
     if (hostfs_scan_into_files(vol) != A2_OK) {
         hostfs_eject(vol);
         return NULL;
+    }
+    if (vol->watch_coverage_failed) {
+        hostfs_enter_periodic_refresh(vol);
     }
 
     /* The ProDOS volume directory is always blocks 2-5 and cannot be extended, so
@@ -2926,9 +3264,12 @@ static int hostfs_reconcile_directory_at(hostfs_volume *vol, int parent_index)
                     continue;
                 }
                 hostfs_node_set_basename(vol, fi, hostfs_path_basename(made));
-                (void)hostfs_bind_storage_to_host(vol, fi);
-                if (de->eof > 0u) {
-                    (void)hostfs_host_truncate(vol, fi, de->eof);
+                if (hostfs_bind_storage_to_host(vol, fi) != A2_OK) {
+                    vol->internal_full_rescan_required = true;
+                }
+                if (de->eof > 0u &&
+                    hostfs_host_truncate(vol, fi, de->eof) != A2_OK) {
+                    vol->internal_full_rescan_required = true;
                 }
             }
             hostfs_marks_set(&seen, fi);
@@ -3028,13 +3369,17 @@ static int hostfs_reconcile_directory_at(hostfs_volume *vol, int parent_index)
                     file->aux_type = de->aux_type;
                 }
                 if (de->eof < file->eof) {
-                    (void)hostfs_host_truncate(vol, fi, de->eof);
+                    if (hostfs_host_truncate(vol, fi, de->eof) != A2_OK) {
+                        vol->internal_full_rescan_required = true;
+                    }
                 }
                 file->eof = de->eof;
                 file->storage_type = de->storage_type;
                 file->key_block = de->key_block;
                 file->blocks_used = de->blocks_used;
-                (void)hostfs_bind_storage_to_host(vol, fi);
+                if (hostfs_bind_storage_to_host(vol, fi) != A2_OK) {
+                    vol->internal_full_rescan_required = true;
+                }
             }
         }
     }
@@ -3133,9 +3478,13 @@ int hostfs_write_block(hostfs_volume *vol, uint32_t block, const uint8_t *data)
 
     idx = hostfs_map_find(vol, (uint16_t)block);
     if (idx >= 0 && vol->map[idx].kind == HOSTFS_MAP_HOST) {
+        int file_index = vol->map[idx].u.host.file_index;
         rc = hostfs_host_write(
-            vol, vol->map[idx].u.host.file_index, vol->map[idx].u.host.offset, data,
+            vol, file_index, vol->map[idx].u.host.offset, data,
             HOSTFS_BLOCK_SIZE);
+        if (rc != A2_OK && file_index >= 0 && file_index < vol->node_count) {
+            hostfs_schedule_directory_refresh(vol, vol->nodes[file_index].parent_index);
+        }
     } else {
         /* Meta, index, orphan, or newly allocated block — keep in RAM. */
         rc = hostfs_map_add_ram(vol, (uint16_t)block, data);
@@ -3155,6 +3504,11 @@ int hostfs_write_block(hostfs_volume *vol, uint32_t block, const uint8_t *data)
 
     if (rc == A2_OK && hostfs_find_dir_owner(vol, (uint16_t)block, &owner)) {
         rc = hostfs_reconcile_directory_at(vol, owner);
+        /* Successful guest operations will usually produce watcher echoes;
+           failed host operations may not. Scheduling the authoritative parent
+           makes both cases converge through the same idempotent owner-thread
+           reconciliation path after guest_write_depth unwinds. */
+        hostfs_schedule_directory_refresh(vol, owner);
     }
 
     vol->guest_write_depth--;
@@ -3432,20 +3786,167 @@ static int hostfs_add_node_from_scan(
     return A2_OK;
 }
 
-static int hostfs_rescan_dir(
-    hostfs_volume *vol, const char *host_dir_path, int parent_index, hostfs_marks *matched)
+static int hostfs_rebuild_directory_order(
+    hostfs_volume *vol,
+    int parent_index,
+    const hostfs_scan_ent *scans,
+    int scan_count,
+    bool snapshot_root_order)
 {
-    hostfs_scan_ent *scans;
-    char (*order_names)[HOSTFS_BASENAME_MAX];
-    int order_count;
-    int n;
+    hostfs_marks written;
+    int *order = NULL;
+    int order_count = 0;
+    int child_count = hostfs_child_count(vol, parent_index);
+    uint16_t blocks = hostfs_dir_block_count_of(vol, parent_index);
+    uint16_t d;
+    int i;
+
+    hostfs_marks_init(&written);
+    if (child_count > 0) {
+        order = (int *)malloc((size_t)child_count * sizeof(*order));
+        if (order == NULL) {
+            return A2_ERR;
+        }
+    }
+    for (i = 0; i < scan_count; ++i) {
+        int fi = hostfs_find_by_basename(vol, parent_index, scans[i].basename);
+        if (fi >= 0 && vol->nodes[fi].active && !hostfs_marks_get(&written, fi)) {
+            order[order_count++] = fi;
+            hostfs_marks_set(&written, fi);
+        }
+    }
+    /* Append any active child not already selected by basename. */
+    for (i = 0; i < vol->node_count; ++i) {
+        if (vol->nodes[i].active && vol->nodes[i].parent_index == parent_index &&
+            !hostfs_marks_get(&written, i)) {
+            order[order_count++] = i;
+            hostfs_marks_set(&written, i);
+        }
+    }
+
+    for (d = 0; d < blocks; ++d) {
+        uint16_t block = hostfs_dir_block_at(vol, parent_index, d);
+        uint8_t *dir = hostfs_map_ram_ptr(vol, block);
+        int slot;
+        int start = d == 0u ? 1 : 0;
+        if (dir == NULL) {
+            hostfs_marks_free(&written);
+            free(order);
+            return A2_ERR;
+        }
+        for (slot = start; slot < HOSTFS_ENTRIES_PER_BLOCK; ++slot) {
+            memset(dir + 4 + slot * HOSTFS_ENTRY_LENGTH, 0, HOSTFS_ENTRY_LENGTH);
+        }
+    }
+
+    i = 0;
+    for (d = 0; d < blocks && i < order_count; ++d) {
+        uint16_t block = hostfs_dir_block_at(vol, parent_index, d);
+        uint8_t *dir = hostfs_map_ram_ptr(vol, block);
+        int slot;
+        int start = d == 0u ? 1 : 0;
+        for (slot = start; slot < HOSTFS_ENTRIES_PER_BLOCK && i < order_count; ++slot) {
+            int fi = order[i++];
+            uint8_t *entry = dir + 4 + slot * HOSTFS_ENTRY_LENGTH;
+            hostfs_fill_file_entry(entry, &vol->nodes[fi], hostfs_parent_key(vol, parent_index));
+            hostfs_note_parent_entry(vol, fi, block, slot);
+            if (vol->nodes[fi].kind == HOSTFS_KIND_DIR) {
+                uint8_t *subdir = hostfs_map_ram_ptr(vol, vol->nodes[fi].key_block);
+                if (subdir != NULL) {
+                    hostfs_fill_subdir_header(
+                        subdir + 4, &vol->nodes[fi], block, (uint8_t)(slot + 1),
+                        (uint16_t)hostfs_child_count(vol, fi));
+                }
+            }
+        }
+    }
+    if (i != order_count) {
+        hostfs_marks_free(&written);
+        free(order);
+        return A2_ERR;
+    }
+    (void)hostfs_patch_dir_file_count(vol, parent_index);
+
+    if (parent_index < 0 && snapshot_root_order && !vol->root_truncated) {
+        vol->order_count = order_count < HOSTFS_ROOT_MAX_ENTRIES
+                               ? order_count
+                               : HOSTFS_ROOT_MAX_ENTRIES;
+        for (i = 0; i < vol->order_count; ++i) {
+            snprintf(
+                vol->order_basenames[i], HOSTFS_BASENAME_MAX, "%s",
+                hostfs_node_basename(vol, order[i]));
+        }
+    }
+    hostfs_marks_free(&written);
+    free(order);
+    return A2_OK;
+}
+
+static int hostfs_update_file_from_scan(
+    hostfs_volume *vol,
+    int file_index,
+    const hostfs_scan_ent *scan,
+    bool preserve_guest_eof)
+{
+    hostfs_node *file = &vol->nodes[file_index];
+    uint32_t new_eof =
+        scan->size > 0x00FFFFFFu ? 0x00FFFFFFu : (uint32_t)scan->size;
+    uint32_t new_host_size =
+        scan->size > 0xFFFFFFFFu ? 0xFFFFFFFFu : (uint32_t)scan->size;
+
+    snprintf(file->prodos_name, sizeof(file->prodos_name), "%s", scan->prodos);
+    file->name_len = (uint8_t)strlen(file->prodos_name);
+    file->file_type = scan->type;
+    file->aux_type = scan->aux;
+    file->host_mtime = (int64_t)scan->mtime;
+    /* A guest block write can extend the physical host file past the ProDOS
+       EOF while the directory remains authoritative. host_size records that
+       expected write-through size, so its watcher echo must not grow the
+       catalog. An external resize differs from host_size and is authoritative. */
+    if (!(preserve_guest_eof && new_host_size == file->host_size) &&
+        new_eof != file->eof &&
+        hostfs_grow_file_storage(vol, file_index, new_eof) != A2_OK) {
+        return A2_ERR;
+    }
+    file = &vol->nodes[file_index];
+    file->host_size = new_host_size;
+    return A2_OK;
+}
+
+/* Reconcile one authoritative host directory. Existing child directories are
+   descended into only for a public/full scan; a newly discovered directory is
+   always watched first and then materialized recursively. */
+static int hostfs_rescan_directory_at(
+    hostfs_volume *vol,
+    int parent_index,
+    int depth,
+    bool recursive,
+    bool targeted,
+    bool preserve_guest_eof)
+{
+    hostfs_scan_ent *scans = NULL;
+    char (*order_names)[HOSTFS_BASENAME_MAX] = NULL;
+    char host_dir_path[HOSTFS_PATH_MAX];
+    hostfs_marks matched;
+    int order_count = 0;
+    int n = 0;
     int i;
     int rc = A2_OK;
 
-    scans = NULL;
-    order_names = NULL;
-    n = 0;
-    order_count = 0;
+    if (depth > HOSTFS_MAX_DEPTH) {
+        return A2_OK;
+    }
+    if (parent_index >= 0 &&
+        (parent_index >= vol->node_count || !vol->nodes[parent_index].active ||
+         vol->nodes[parent_index].kind != HOSTFS_KIND_DIR)) {
+        return A2_ERR;
+    }
+    hostfs_parent_host_path(vol, parent_index, host_dir_path, sizeof(host_dir_path));
+    hostfs_watch_scanned_directory(vol, parent_index);
+    if (targeted) {
+        vol->targeted_directory_scans++;
+    }
+    hostfs_marks_init(&matched);
     if (hostfs_collect_scans_in(host_dir_path, &scans, &n) != A2_OK ||
         hostfs_load_order_file(host_dir_path, &order_names, &order_count) != A2_OK) {
         rc = A2_ERR;
@@ -3463,61 +3964,68 @@ static int hostfs_rescan_dir(
     for (i = 0; i < n; ++i) {
         char child_path[HOSTFS_PATH_MAX];
         int fi = hostfs_find_by_basename(vol, parent_index, scans[i].basename);
+        bool added = false;
+
         if (fi < 0) {
             fi = hostfs_find_by_name(vol, parent_index, scans[i].prodos);
         }
+        if (fi >= 0 && vol->nodes[fi].kind != scans[i].kind) {
+            hostfs_deactivate_node(vol, fi);
+            fi = -1;
+        }
         if (fi < 0) {
-            if (hostfs_add_node_from_scan(vol, parent_index, &scans[i]) == A2_OK) {
-                fi = hostfs_find_by_basename(vol, parent_index, scans[i].basename);
-                if (fi < 0) {
-                    fi = hostfs_find_by_name(vol, parent_index, scans[i].prodos);
-                }
-                if (fi >= 0) {
-                    hostfs_marks_set(matched, fi);
-                    if (vol->nodes[fi].kind == HOSTFS_KIND_DIR &&
-                        hostfs_node_host_path(vol, fi, child_path, sizeof(child_path)) ==
-                            A2_OK) {
-                        /* Derive into a local: the callee grows the node table. */
-                        (void)hostfs_rescan_dir(vol, child_path, fi, matched);
-                    }
-                }
+            if (hostfs_add_node_from_scan(vol, parent_index, &scans[i]) != A2_OK) {
+                continue;
             }
+            fi = hostfs_find_by_basename(vol, parent_index, scans[i].basename);
+            if (fi < 0) {
+                fi = hostfs_find_by_name(vol, parent_index, scans[i].prodos);
+            }
+            added = fi >= 0;
+        }
+        if (fi < 0) {
             continue;
         }
-        hostfs_marks_set(matched, fi);
-        if (vol->nodes[fi].parent_index != parent_index) {
-            vol->nodes[fi].parent_index = parent_index;
-        }
+        hostfs_marks_set(&matched, fi);
+        vol->nodes[fi].parent_index = parent_index;
         hostfs_node_set_basename(vol, fi, scans[i].basename);
-        if (scans[i].kind == HOSTFS_KIND_DIR || vol->nodes[fi].kind == HOSTFS_KIND_DIR) {
-            if (hostfs_node_host_path(vol, fi, child_path, sizeof(child_path)) == A2_OK) {
-                (void)hostfs_rescan_dir(vol, child_path, fi, matched);
+        vol->nodes[fi].host_mtime = (int64_t)scans[i].mtime;
+
+        if (scans[i].kind == HOSTFS_KIND_DIR) {
+            snprintf(
+                vol->nodes[fi].prodos_name, sizeof(vol->nodes[fi].prodos_name), "%s",
+                scans[i].prodos);
+            vol->nodes[fi].name_len = (uint8_t)strlen(vol->nodes[fi].prodos_name);
+            if ((recursive || added) && depth < HOSTFS_MAX_DEPTH &&
+                hostfs_node_host_path(vol, fi, child_path, sizeof(child_path)) == A2_OK &&
+                hostfs_rescan_directory_at(
+                    vol, fi, depth + 1, true, targeted && added,
+                    preserve_guest_eof) != A2_OK) {
+                rc = A2_ERR;
             }
-            continue;
-        }
-        {
-            hostfs_node *file = &vol->nodes[fi];
-            uint32_t new_eof =
-                scans[i].size > 0x00FFFFFFu ? 0x00FFFFFFu : (uint32_t)scans[i].size;
-            file->file_type = scans[i].type;
-            file->aux_type = scans[i].aux;
-            file->host_mtime = (int64_t)scans[i].mtime;
-            file->host_size =
-                scans[i].size > 0xFFFFFFFFu ? 0xFFFFFFFFu : (uint32_t)scans[i].size;
-            if (new_eof != file->eof) {
-                (void)hostfs_grow_file_storage(vol, fi, new_eof);
-            } else {
-                uint8_t *entry = hostfs_find_dir_entry_slot(
-                    vol, file->parent_index, file->prodos_name, NULL);
-                if (entry != NULL) {
-                    hostfs_fill_file_entry(
-                        entry, file, hostfs_parent_key(vol, file->parent_index));
-                }
-            }
+        } else if (hostfs_update_file_from_scan(
+                       vol, fi, &scans[i], preserve_guest_eof) != A2_OK) {
+            rc = A2_ERR;
         }
     }
 
+    /* Only direct children are candidates here. A removed directory cascades
+       through its descendants; untouched sibling subtrees are never scanned. */
+    for (i = 0; i < vol->node_count; ++i) {
+        if (vol->nodes[i].active && vol->nodes[i].parent_index == parent_index &&
+            !hostfs_marks_get(&matched, i)) {
+            hostfs_deactivate_node(vol, i);
+        }
+    }
+    if (hostfs_rebuild_directory_order(
+            vol, parent_index, scans, n, order_count > 0) != A2_OK) {
+        rc = A2_ERR;
+    }
+    (void)hostfs_sync_bitmap_to_map(vol);
+    hostfs_map_assert_consistent(vol);
+
 done:
+    hostfs_marks_free(&matched);
     free(scans);
     free(order_names);
     return rc;
@@ -3525,8 +4033,7 @@ done:
 
 int hostfs_rescan(hostfs_volume *vol)
 {
-    hostfs_marks matched;
-    int i;
+    int rc;
 
     if (vol == NULL) {
         return A2_ERR;
@@ -3535,35 +4042,22 @@ int hostfs_rescan(hostfs_volume *vol)
         return A2_OK;
     }
 
+    vol->internal_full_rescan_required = false;
+    vol->dirty_parent_count = 0;
+    vol->dirty_root = false;
     /* Stamp before the walk so a slow/failing rescan still rate-limits touches. */
     vol->last_refresh_ms = hostfs_now_ms();
-
-    hostfs_marks_init(&matched);
-    if (hostfs_rescan_dir(vol, vol->root_path, -1, &matched) != A2_OK) {
-        hostfs_marks_free(&matched);
-        return A2_ERR;
-    }
-
-    /* Remove nodes no longer present on the host (deepest first via cascade). */
-    for (i = 0; i < vol->node_count; ++i) {
-        if (!vol->nodes[i].active || hostfs_marks_get(&matched, i)) {
-            continue;
-        }
-        if (vol->nodes[i].parent_index != -1 &&
-            vol->nodes[i].parent_index < vol->node_count &&
-            vol->nodes[vol->nodes[i].parent_index].active &&
-            !hostfs_marks_get(&matched, vol->nodes[i].parent_index)) {
-            /* Parent will cascade-deactivate this child. */
-            continue;
-        }
-        hostfs_deactivate_node(vol, i);
-    }
-    hostfs_marks_free(&matched);
+    vol->full_rescans++;
+    vol->watch_coverage_failed = false;
+    rc = hostfs_rescan_directory_at(vol, -1, 0, true, false, false);
     (void)hostfs_patch_volume_file_count(vol);
     (void)hostfs_sync_bitmap_to_map(vol);
     (void)hostfs_persist_order_manifest(vol);
     hostfs_map_assert_consistent(vol);
-    return A2_OK;
+    if (vol->watch_coverage_failed) {
+        hostfs_enter_periodic_refresh(vol);
+    }
+    return rc;
 }
 
 void hostfs_bind_apple(hostfs_volume *vol, struct apple2 *m, int slot, int device)
@@ -3576,9 +4070,294 @@ void hostfs_bind_apple(hostfs_volume *vol, struct apple2 *m, int slot, int devic
     vol->device = device;
 }
 
+static bool hostfs_append_refresh_event(
+    hostfs_refresh_event **events,
+    int *count,
+    int *cap,
+    uint32_t flags,
+    const char *relative_path)
+{
+    hostfs_refresh_event *grown;
+    int i;
+    int new_cap;
+
+    if (!hostfs_refresh_path_valid(relative_path)) {
+        return false;
+    }
+    for (i = 0; i < *count; ++i) {
+        if (strcmp((*events)[i].relative_path, relative_path) == 0) {
+            (*events)[i].flags |= flags;
+            return true;
+        }
+    }
+    if (*count >= *cap) {
+        new_cap = *cap < 16 ? 16 : *cap * 2;
+        grown = (hostfs_refresh_event *)realloc(
+            *events, (size_t)new_cap * sizeof(*grown));
+        if (grown == NULL) {
+            return false;
+        }
+        *events = grown;
+        *cap = new_cap;
+    }
+    (*events)[*count].flags = flags;
+    snprintf(
+        (*events)[*count].relative_path,
+        sizeof((*events)[*count].relative_path), "%s", relative_path);
+    (*count)++;
+    return true;
+}
+
+static int hostfs_refresh_file_node(hostfs_volume *vol, int file_index)
+{
+    hostfs_scan_ent scan;
+    struct stat st;
+    char path[HOSTFS_PATH_MAX];
+    uint8_t *entry;
+
+    if (file_index < 0 || file_index >= vol->node_count ||
+        !vol->nodes[file_index].active ||
+        vol->nodes[file_index].kind != HOSTFS_KIND_FILE ||
+        hostfs_node_host_path(vol, file_index, path, sizeof(path)) != A2_OK) {
+        return A2_ERR;
+    }
+    vol->targeted_file_stats++;
+    if (stat(path, &st) != 0 || A2M_STAT_ISDIR(st.st_mode)) {
+        return A2_ERR;
+    }
+    memset(&scan, 0, sizeof(scan));
+    scan.kind = HOSTFS_KIND_FILE;
+    snprintf(scan.basename, sizeof(scan.basename), "%s", hostfs_node_basename(vol, file_index));
+    if (!hostfs_naps_parse_name(
+            scan.basename, scan.prodos, sizeof(scan.prodos), &scan.type, &scan.aux)) {
+        return A2_ERR;
+    }
+    scan.size = st.st_size < 0 ? 0u : (uint64_t)st.st_size;
+    scan.mtime = st.st_mtime;
+    if (hostfs_update_file_from_scan(vol, file_index, &scan, true) != A2_OK) {
+        return A2_ERR;
+    }
+    entry = hostfs_find_dir_entry_slot(
+        vol, vol->nodes[file_index].parent_index,
+        vol->nodes[file_index].prodos_name, NULL);
+    if (entry != NULL) {
+        hostfs_fill_file_entry(
+            entry, &vol->nodes[file_index],
+            hostfs_parent_key(vol, vol->nodes[file_index].parent_index));
+    }
+    (void)hostfs_sync_bitmap_to_map(vol);
+    hostfs_map_assert_consistent(vol);
+    return A2_OK;
+}
+
+static void hostfs_clear_scheduled_directories(hostfs_volume *vol)
+{
+    vol->dirty_parent_count = 0;
+    vol->dirty_root = false;
+}
+
+static int hostfs_recover_full_refresh(hostfs_volume *vol)
+{
+    int rc;
+
+    hostfs_warn(vol, "%s: filesystem events were lost; performing a full refresh",
+                vol->root_path);
+    if (!vol->synthetic_refresh) {
+        fs_watch_destroy(vol->watch);
+        vol->watch = fs_watch_create(vol->root_path);
+        vol->periodic_refresh = false;
+        if (vol->watch == NULL) {
+            hostfs_enter_periodic_refresh(vol);
+        }
+    }
+    vol->synthetic_event_count = 0;
+    hostfs_clear_scheduled_directories(vol);
+    rc = hostfs_rescan(vol);
+    return rc;
+}
+
+static int hostfs_process_refresh_events(hostfs_volume *vol, bool *out_did_work)
+{
+    hostfs_refresh_event *events = NULL;
+    int event_count = 0;
+    int event_cap = 0;
+    int *files = NULL;
+    int file_count = 0;
+    int *parents = NULL;
+    int parent_count = 0;
+    int parent_cap = 0;
+    bool root_dirty = false;
+    bool need_full = vol->refresh_rescan_required;
+    bool internal_full = vol->internal_full_rescan_required;
+    int rename_count = 0;
+    int i;
+    int rc = A2_OK;
+
+    *out_did_work = false;
+    vol->refresh_rescan_required = false;
+    vol->internal_full_rescan_required = false;
+    if (vol->watch != NULL && fs_watch_take_rescan_required(vol->watch)) {
+        need_full = true;
+    }
+    if (need_full) {
+        *out_did_work = true;
+        return hostfs_recover_full_refresh(vol);
+    }
+    if (internal_full) {
+        vol->synthetic_event_count = 0;
+        hostfs_clear_scheduled_directories(vol);
+        *out_did_work = true;
+        return hostfs_rescan(vol);
+    }
+
+    if (vol->watch != NULL) {
+        fs_watch_event event;
+        while (fs_watch_try_pop(vol->watch, &event)) {
+            if (!hostfs_append_refresh_event(
+                    &events, &event_count, &event_cap, event.flags,
+                    event.relative_path)) {
+                need_full = true;
+                break;
+            }
+        }
+    }
+    for (i = 0; !need_full && i < vol->synthetic_event_count; ++i) {
+        if (!hostfs_append_refresh_event(
+                &events, &event_count, &event_cap,
+                vol->synthetic_events[i].flags,
+                vol->synthetic_events[i].relative_path)) {
+            need_full = true;
+        }
+    }
+    vol->synthetic_event_count = 0;
+    if (need_full) {
+        free(events);
+        *out_did_work = true;
+        return hostfs_recover_full_refresh(vol);
+    }
+
+    root_dirty = vol->dirty_root;
+    for (i = 0; i < vol->dirty_parent_count; ++i) {
+        if (!hostfs_int_list_add(
+                &parents, &parent_count, &parent_cap,
+                vol->dirty_parents[i])) {
+            need_full = true;
+            break;
+        }
+    }
+    hostfs_clear_scheduled_directories(vol);
+
+    if (need_full) {
+        free(parents);
+        free(events);
+        *out_did_work = true;
+        return hostfs_recover_full_refresh(vol);
+    }
+
+    if (event_count > 0) {
+        files = (int *)malloc((size_t)event_count * sizeof(*files));
+        if (files == NULL) {
+            free(parents);
+            free(events);
+            *out_did_work = true;
+            return hostfs_recover_full_refresh(vol);
+        }
+    }
+    for (i = 0; i < event_count; ++i) {
+        uint32_t structural =
+            events[i].flags & (FS_WATCH_CREATE | FS_WATCH_REMOVE |
+                               FS_WATCH_RENAME | FS_WATCH_DIRECTORY);
+        int parent_index;
+        int file_index;
+
+        if ((events[i].flags & FS_WATCH_RENAME) != 0u) {
+            rename_count++;
+        }
+        file_index = hostfs_find_by_relative_path(vol, events[i].relative_path);
+        if (structural == 0u && file_index >= 0 &&
+            vol->nodes[file_index].kind == HOSTFS_KIND_FILE &&
+            hostfs_basename_cmp(
+                hostfs_node_basename(vol, file_index), HOSTFS_ORDER_FILENAME) != 0) {
+            files[file_count++] = file_index;
+            continue;
+        }
+        if (!hostfs_parent_from_relative_path(
+                vol, events[i].relative_path, &parent_index)) {
+            need_full = true;
+            break;
+        }
+        if (parent_index < 0) {
+            root_dirty = true;
+        } else if (!hostfs_int_list_add(
+                       &parents, &parent_count, &parent_cap, parent_index)) {
+            need_full = true;
+            break;
+        }
+    }
+    /* A lone rename path is not enough to prove that the old and new parents
+       were both invalidated. Native backends either provide both or set loss. */
+    if ((rename_count & 1) != 0) {
+        need_full = true;
+    }
+    if (need_full) {
+        free(parents);
+        free(files);
+        free(events);
+        *out_did_work = true;
+        return hostfs_recover_full_refresh(vol);
+    }
+
+    if (root_dirty &&
+        hostfs_rescan_directory_at(
+            vol, -1, 0, false, true, true) != A2_OK) {
+        rc = A2_ERR;
+    }
+    for (i = 0; i < parent_count; ++i) {
+        int parent_index = parents[i];
+        if (parent_index < 0 || parent_index >= vol->node_count ||
+            !vol->nodes[parent_index].active ||
+            vol->nodes[parent_index].kind != HOSTFS_KIND_DIR) {
+            rc = A2_ERR;
+            continue;
+        }
+        if (hostfs_rescan_directory_at(
+                vol, parent_index, hostfs_parent_depth(vol, parent_index), false, true,
+                true) !=
+            A2_OK) {
+            rc = A2_ERR;
+        }
+    }
+    for (i = 0; i < file_count; ++i) {
+        int fi = files[i];
+        int parent_index;
+        if (fi < 0 || fi >= vol->node_count || !vol->nodes[fi].active) {
+            continue;
+        }
+        parent_index = vol->nodes[fi].parent_index;
+        if ((parent_index < 0 && root_dirty) ||
+            (parent_index >= 0 &&
+             hostfs_int_list_contains(parents, parent_count, parent_index))) {
+            continue;
+        }
+        if (hostfs_refresh_file_node(vol, fi) != A2_OK) {
+            if (hostfs_rescan_directory_at(
+                    vol, parent_index, hostfs_parent_depth(vol, parent_index),
+                    false, true, true) != A2_OK) {
+                rc = A2_ERR;
+            }
+        }
+    }
+    *out_did_work = root_dirty || parent_count > 0 || file_count > 0;
+    free(parents);
+    free(files);
+    free(events);
+    return rc;
+}
+
 void hostfs_maybe_refresh(hostfs_volume *vol)
 {
     uint64_t now;
+    bool did_work = false;
 
     if (vol == NULL || vol->guest_write_depth > 0) {
         return;
@@ -3586,13 +4365,19 @@ void hostfs_maybe_refresh(hostfs_volume *vol)
     if (vol->apple != NULL && vol->apple->replay_sealed) {
         return;
     }
-    now = hostfs_now_ms();
-    if (vol->last_refresh_ms != 0u &&
-        now - vol->last_refresh_ms < (uint64_t)HOSTFS_REFRESH_PERIOD_MS) {
-        return;
+    (void)hostfs_process_refresh_events(vol, &did_work);
+    if (!did_work && vol->periodic_refresh) {
+        now = hostfs_now_ms();
+        if (vol->last_refresh_ms == 0u ||
+            now - vol->last_refresh_ms >= (uint64_t)HOSTFS_REFRESH_PERIOD_MS) {
+            (void)hostfs_rescan(vol);
+            did_work = true;
+        }
     }
-    (void)hostfs_rescan(vol);
-    if (vol->host_directory_changed) {
+    if (did_work) {
+        vol->host_directory_changed = 1;
+    }
+    if (vol->host_directory_changed != 0) {
         vol->host_directory_changed = 0;
         apple2_note_media_event(
             vol->apple,
