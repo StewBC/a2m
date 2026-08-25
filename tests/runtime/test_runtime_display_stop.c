@@ -283,7 +283,10 @@ int main(void)
         exit(1);
     }
 
-    /* Paused memory writes always dump video RAM onto the CRT. */
+    /* Paused memory writes always dump video RAM onto the CRT.
+     * Writes are async and each publishes a latest-wins frame; a memory
+     * round-trip after the last chunk guarantees all eight are processed
+     * before we sample (wait_frame alone can catch an early chunk). */
     {
         uint8_t chunk[RUNTIME_MEMORY_SNAPSHOT_MAX];
         uint16_t off = 0;
@@ -304,6 +307,13 @@ int main(void)
                     chunk));
             off = (uint16_t)(off + n);
         }
+        expect_true(
+            "sync after clear",
+            runtime_client_request_memory(
+                client, 0x2000, 1, RUNTIME_MEMORY_MODE_MAIN));
+        expect_true(
+            "MEMORY_RESPONSE after clear",
+            poll_event(client, &event, RUNTIME_EVENT_MEMORY_RESPONSE, 2000u));
         expect_true("memory-edit refresh frame", wait_frame(client, pixels, 2000u));
         /* Consume any earlier chunk frames; keep the latest. */
         {
