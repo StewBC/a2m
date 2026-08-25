@@ -739,6 +739,87 @@ static int find_entry_in_dir_block(
     return 0;
 }
 
+/* Walk a subdirectory's linked block chain. The first block reserves slot 0
+   for the subdirectory header; continuation blocks use every slot. */
+static int subdir_catalog(
+    hostfs_volume *vol,
+    uint16_t first_block,
+    const char *want,
+    int *out_count,
+    uint16_t *out_key)
+{
+    uint16_t block = first_block;
+    unsigned guard = 0;
+    int count = 0;
+    int found = 0;
+
+    while (block != 0u && guard++ < HOSTFS_MAX_NODES) {
+        uint8_t data[HOSTFS_BLOCK_SIZE];
+        uint16_t next;
+        int slot;
+        int start = block == first_block ? 1 : 0;
+
+        if (hostfs_read_block(vol, block, data) != 0) {
+            fail("read subdirectory chain");
+        }
+        next = (uint16_t)(data[2] | ((uint16_t)data[3] << 8));
+        for (slot = start; slot < HOSTFS_ENTRIES_PER_BLOCK; ++slot) {
+            const uint8_t *e = data + 4 + slot * HOSTFS_ENTRY_LENGTH;
+            uint8_t nl;
+            char name[HOSTFS_NAME_MAX];
+
+            if (e[0] == 0) {
+                continue;
+            }
+            nl = (uint8_t)(e[0] & 0x0Fu);
+            memcpy(name, e + 1, nl);
+            name[nl] = '\0';
+            count++;
+            if (want != NULL && strcmp(name, want) == 0) {
+                found = 1;
+                if (out_key != NULL) {
+                    *out_key = (uint16_t)(e[0x11] | ((uint16_t)e[0x12] << 8));
+                }
+            }
+        }
+        block = next;
+    }
+    if (block != 0u) {
+        fail("subdirectory chain cycle");
+    }
+    if (out_count != NULL) {
+        *out_count = count;
+    }
+    return found;
+}
+
+static void make_large_numbered_files(const char *dir, char prefix, int first, int last)
+{
+    int i;
+    for (i = first; i <= last; ++i) {
+        char path[512];
+        uint8_t payload[4];
+        snprintf(path, sizeof(path), "%s/%c%04d#060000", dir, prefix, i);
+        payload[0] = (uint8_t)prefix;
+        payload[1] = (uint8_t)(i & 0xFF);
+        payload[2] = (uint8_t)((i >> 8) & 0xFF);
+        payload[3] = (uint8_t)(prefix ^ i);
+        write_file(path, payload, sizeof(payload));
+    }
+}
+
+static void remove_large_numbered_files(const char *dir, char prefix, int first, int last)
+{
+    int i;
+    for (i = first; i <= last; ++i) {
+        char path[512];
+        snprintf(path, sizeof(path), "%s/%c%04d#060000", dir, prefix, i);
+        if (remove(path) != 0) {
+            fail("remove numbered HostFS file");
+        }
+    }
+}
+
 static void test_nested_directories(void)
 {
     char path[1024];
@@ -1483,41 +1564,147 @@ static void test_order_manifest_frozen_after_mount(void)
     wipe_tree(dir);
 }
 
-/* A directory holding more entries than the per-directory scan buffer must say
-   so. Delete this case when that buffer is sized from the real entry count. */
-static void test_directory_scan_truncation_warns(void)
+static void test_large_subdirectory_mount(void)
 {
-    const char *dir = "test_hostfs_scan_trunc";
+    const char *dir = "test_hostfs_large_mount";
     hostfs_volume *vol;
     uint8_t blk[512];
-    uint16_t key;
+    uint16_t dir_key = 0;
+    uint16_t file_key = 0;
     uint8_t st = 0;
     uint8_t type = 0;
-    int i;
+    int count = 0;
 
     wipe_tree(dir);
     HOSTFS_MKDIR(dir);
-    HOSTFS_MKDIR("test_hostfs_scan_trunc/BIG");
-    for (i = 0; i < 300; ++i) {
-        char path[512];
-        snprintf(path, sizeof(path), "%s/BIG/F%03d#060000", dir, i);
-        write_file(path, "x", 1);
-    }
+    HOSTFS_MKDIR("test_hostfs_large_mount/BIG");
+    make_large_numbered_files("test_hostfs_large_mount/BIG", 'F', 0, 999);
 
     vol = hostfs_mount(dir, "HOSTFS.S7D0");
     if (vol == NULL) {
-        fail("scan truncation mount");
+        fail("large subdirectory mount");
     }
-    if (hostfs_warning_count(vol) != 1 ||
-        strstr(hostfs_last_warning(vol), "more than 256 entries") == NULL) {
+    if (hostfs_warning_count(vol) != 0) {
         fprintf(stderr, "warn_count=%d last=%s\n",
                 hostfs_warning_count(vol), hostfs_last_warning(vol));
-        fail("over-full directory must warn, not drop silently");
+        fail("large legal subdirectory must mount without warning");
     }
     if (hostfs_read_block(vol, 2, blk) != 0 ||
-        !find_entry_in_dir_block(blk, "BIG", &st, &key, &type)) {
+        !find_entry_in_dir_block(blk, "BIG", &st, &dir_key, &type)) {
         fail("BIG missing from root");
     }
+    if (!subdir_catalog(vol, dir_key, "F0999", &count, &file_key) || count != 1000) {
+        fprintf(stderr, "large catalog count=%d\n", count);
+        fail("large subdirectory must enumerate all 1000 entries");
+    }
+    if (hostfs_read_block(vol, file_key, blk) != 0 ||
+        blk[0] != 'F' || blk[1] != 0xE7u || blk[2] != 0x03u) {
+        fail("read final file in large subdirectory");
+    }
+    if (hostfs_file_count(vol) != 1001) {
+        fprintf(stderr, "large file_count=%d\n", hostfs_file_count(vol));
+        fail("large subdirectory node count");
+    }
+    hostfs_eject(vol);
+    wipe_tree(dir);
+}
+
+static void test_large_subdirectory_rescan(void)
+{
+    const char *dir = "test_hostfs_large_rescan";
+    hostfs_volume *vol;
+    uint8_t blk[HOSTFS_BLOCK_SIZE];
+    uint16_t dir_key = 0;
+    uint16_t file_key = 0;
+    int count = 0;
+
+    wipe_tree(dir);
+    HOSTFS_MKDIR(dir);
+    HOSTFS_MKDIR("test_hostfs_large_rescan/BIG");
+    make_large_numbered_files("test_hostfs_large_rescan/BIG", 'F', 0, 999);
+
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL || hostfs_read_block(vol, 2, blk) != 0 ||
+        !find_entry_in_dir_block(blk, "BIG", NULL, &dir_key, NULL)) {
+        fail("large rescan fixture mount");
+    }
+    if (remove("test_hostfs_large_rescan/BIG/F0500#060000") != 0) {
+        fail("remove file before large rescan");
+    }
+    make_large_numbered_files("test_hostfs_large_rescan/BIG", 'F', 1000, 1000);
+    if (hostfs_rescan(vol) != 0) {
+        fail("rescan 1000-entry subdirectory");
+    }
+    if (subdir_catalog(vol, dir_key, "F0500", NULL, NULL)) {
+        fail("large rescan must remove missing entry");
+    }
+    if (!subdir_catalog(vol, dir_key, "F1000", &count, &file_key) || count != 1000) {
+        fprintf(stderr, "rescanned catalog count=%d\n", count);
+        fail("large rescan must retain 1000 entries");
+    }
+    if (hostfs_read_block(vol, file_key, blk) != 0 ||
+        blk[0] != 'F' || blk[1] != 0xE8u || blk[2] != 0x03u) {
+        fail("read file added by large rescan");
+    }
+    hostfs_eject(vol);
+    wipe_tree(dir);
+}
+
+static void test_block_index_create_delete_churn(void)
+{
+    const char *dir = "test_hostfs_block_index";
+    const char *subdir = "test_hostfs_block_index/CHURN";
+    hostfs_volume *vol;
+    uint8_t blk[HOSTFS_BLOCK_SIZE];
+    uint16_t dir_key = 0;
+    uint16_t target_key = 0;
+    uint16_t peer_key = 0;
+    char current = 'F';
+    int round;
+
+    wipe_tree(dir);
+    HOSTFS_MKDIR(dir);
+    HOSTFS_MKDIR(subdir);
+    make_large_numbered_files(subdir, current, 0, 119);
+
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL || hostfs_read_block(vol, 2, blk) != 0 ||
+        !find_entry_in_dir_block(blk, "CHURN", NULL, &dir_key, NULL)) {
+        fail("block index churn fixture mount");
+    }
+
+    for (round = 0; round < 3; ++round) {
+        char next = current == 'F' ? 'G' : 'F';
+        char final_name[HOSTFS_NAME_MAX];
+        remove_large_numbered_files(subdir, current, 0, 119);
+        make_large_numbered_files(subdir, next, 0, 119);
+        if (hostfs_rescan(vol) != 0) {
+            fail("block index churn rescan");
+        }
+        snprintf(final_name, sizeof(final_name), "%c0119", next);
+        if (!subdir_catalog(vol, dir_key, final_name, NULL, &target_key) ||
+            hostfs_read_block(vol, target_key, blk) != 0 ||
+            blk[0] != (uint8_t)next || blk[1] != 119u) {
+            fail("block index drift after create/delete churn");
+        }
+        current = next;
+    }
+
+    /* A wrong direct slot can corrupt writes as well as reads. Write one file,
+       then prove a peer still resolves to its own block and payload. */
+    memset(blk, 0xC7, sizeof(blk));
+    if (hostfs_write_block(vol, target_key, blk) != 0) {
+        fail("write through indexed block after churn");
+    }
+    if (!subdir_catalog(vol, dir_key, "G0042", NULL, &peer_key) ||
+        hostfs_read_block(vol, peer_key, blk) != 0 ||
+        blk[0] != 'G' || blk[1] != 42u) {
+        fail("indexed write must not redirect a peer block");
+    }
+    if (hostfs_read_block(vol, target_key, blk) != 0 || blk[0] != 0xC7u) {
+        fail("indexed write target payload");
+    }
+
     hostfs_eject(vol);
     wipe_tree(dir);
 }
@@ -1652,7 +1839,9 @@ int main(void)
     test_root_entry_limit();
     test_order_manifest_frozen_when_truncated();
     test_order_manifest_frozen_after_mount();
-    test_directory_scan_truncation_warns();
+    test_large_subdirectory_mount();
+    test_large_subdirectory_rescan();
+    test_block_index_create_delete_churn();
 #if !defined(_WIN32)
     test_failed_move_keeps_host_file();
 #endif
