@@ -85,9 +85,10 @@ config *config_load(const char *path)
 bool config_save(config *cfg, const char *path)
 {
     FILE *file;
-    const char *current_section;
+    int *section_first = NULL;
     int count;
     int i;
+    int s;
 
     if (cfg == NULL || path == NULL) {
         return false;
@@ -98,22 +99,40 @@ bool config_save(config *cfg, const char *path)
         return false;
     }
 
-    current_section = NULL;
+    /* Emit each section once, in first-seen order, even when in-memory
+       entries for the same section are non-contiguous. */
     count = arrlen(cfg->entries);
     for (i = 0; i < count; ++i) {
-        config_entry *entry = &cfg->entries[i];
+        const char *section = cfg->entries[i].section;
+        bool seen = false;
 
-        if (current_section == NULL || strcmp(current_section, entry->section) != 0) {
-            if (current_section != NULL) {
-                fputc('\n', file);
+        for (s = 0; s < arrlen(section_first); ++s) {
+            if (strcmp(cfg->entries[section_first[s]].section, section) == 0) {
+                seen = true;
+                break;
             }
-            fprintf(file, "[%s]\n", entry->section);
-            current_section = entry->section;
         }
-
-        fprintf(file, "%s=%s\n", entry->key, entry->value);
+        if (!seen) {
+            arrput(section_first, i);
+        }
     }
 
+    for (s = 0; s < arrlen(section_first); ++s) {
+        const char *section = cfg->entries[section_first[s]].section;
+
+        if (s > 0) {
+            fputc('\n', file);
+        }
+        fprintf(file, "[%s]\n", section);
+        for (i = 0; i < count; ++i) {
+            config_entry *entry = &cfg->entries[i];
+            if (strcmp(entry->section, section) == 0) {
+                fprintf(file, "%s=%s\n", entry->key, entry->value);
+            }
+        }
+    }
+
+    arrfree(section_first);
     return fclose(file) == 0;
 }
 
@@ -244,7 +263,24 @@ void config_set(config *cfg, const char *section, const char *key, const char *v
         return;
     }
 
-    arrput(cfg->entries, entry);
+    /* Keep keys for the same section contiguous so writers and iterators
+       see one block per section even when sets are interleaved. */
+    {
+        int insert_at = -1;
+        int count = arrlen(cfg->entries);
+        int i;
+
+        for (i = 0; i < count; ++i) {
+            if (strcmp(cfg->entries[i].section, section) == 0) {
+                insert_at = i + 1;
+            }
+        }
+        if (insert_at >= 0 && insert_at < count) {
+            arrins(cfg->entries, insert_at, entry);
+        } else {
+            arrput(cfg->entries, entry);
+        }
+    }
 }
 
 void config_set_int(config *cfg, const char *section, const char *key, int value)

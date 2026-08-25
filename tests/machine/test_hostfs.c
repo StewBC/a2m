@@ -16,6 +16,7 @@
 #define A2M_STAT_ISDIR(mode) (((mode) & _S_IFDIR) != 0)
 #define A2M_STAT_ISREG(mode) (((mode) & _S_IFREG) != 0)
 #else
+#include <dirent.h>
 #include <unistd.h>
 #define HOSTFS_MKDIR(path) mkdir(path, 0755)
 #define A2M_STAT_ISDIR(mode) S_ISDIR(mode)
@@ -2051,6 +2052,74 @@ static void test_node_ceiling_diagnostic(void)
     wipe_tree(dir);
 }
 
+/* Optional local sample under samples/hostfs/pt3plr (not tracked). Skip unless
+   the host tree looks complete — a partial checkout must not fail the gate. */
+static int pt3plr_host_sample_complete(const char *dir)
+{
+    char path[HOSTFS_PATH_MAX];
+    struct stat st;
+    int tune_files = 0;
+#if defined(_WIN32)
+    WIN32_FIND_DATAA data;
+    HANDLE find;
+    char search[HOSTFS_PATH_MAX];
+#else
+    DIR *d;
+    struct dirent *entry;
+#endif
+
+    snprintf(path, sizeof(path), "%s/PRODOS#FF0000", dir);
+    if (stat(path, &st) != 0 || !A2M_STAT_ISREG(st.st_mode)) {
+        snprintf(path, sizeof(path), "%s/PRODOS#ff0000", dir);
+        if (stat(path, &st) != 0 || !A2M_STAT_ISREG(st.st_mode)) {
+            return 0;
+        }
+    }
+    snprintf(path, sizeof(path), "%s/pt3plr.system#ff2000", dir);
+    if (stat(path, &st) != 0 || !A2M_STAT_ISREG(st.st_mode)) {
+        return 0;
+    }
+    snprintf(path, sizeof(path), "%s/PT3", dir);
+    if (stat(path, &st) != 0 || !A2M_STAT_ISDIR(st.st_mode)) {
+        return 0;
+    }
+    snprintf(path, sizeof(path), "%s/PT3/ECHO.PT3#000000", dir);
+    if (stat(path, &st) != 0 || !A2M_STAT_ISREG(st.st_mode)) {
+        return 0;
+    }
+
+#if defined(_WIN32)
+    snprintf(search, sizeof(search), "%s/PT3/*#*", dir);
+    find = FindFirstFileA(search, &data);
+    if (find == INVALID_HANDLE_VALUE) {
+        return 0;
+    }
+    do {
+        if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) {
+            tune_files++;
+        }
+    } while (FindNextFileA(find, &data));
+    FindClose(find);
+#else
+    snprintf(path, sizeof(path), "%s/PT3", dir);
+    d = opendir(path);
+    if (d == NULL) {
+        return 0;
+    }
+    while ((entry = readdir(d)) != NULL) {
+        const char *name = entry->d_name;
+        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
+            continue;
+        }
+        if (strchr(name, '#') != NULL) {
+            tune_files++;
+        }
+    }
+    closedir(d);
+#endif
+    return tune_files == 256;
+}
+
 static void test_pt3plr_sample_catalog(void)
 {
     char dir[HOSTFS_PATH_MAX];
@@ -2059,7 +2128,7 @@ static void test_pt3plr_sample_catalog(void)
     int tune_count = 0;
 
     snprintf(dir, sizeof(dir), "%s/samples/hostfs/pt3plr", A2M_SOURCE_DIR);
-    if (!hostfs_path_is_dir(dir)) {
+    if (!hostfs_path_is_dir(dir) || !pt3plr_host_sample_complete(dir)) {
         return;
     }
 

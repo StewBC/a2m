@@ -8,7 +8,7 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-Expect **67** green. Run from repo root.
+Expect **68** green. Run from repo root.
 
 ## Registered tests
 
@@ -16,6 +16,7 @@ Expect **67** green. Run from repo root.
 |------|------|
 | `audio_buffer` | util SPSC audio |
 | `message_queue` | util queues |
+| `config` | util INI load/save; section consolidation on write |
 | `fs_watch` | native filesystem notifications + bounded loss handling |
 | `apple_type_script` | BP TYPE script parser (OA/sticks/RESET) |
 | `apple2_file` | NAPS/AppleSingle/legacy detection + Applesoft codec |
@@ -83,6 +84,11 @@ A leftover `test_runtime_timemachine*` binary in `build/` is not in the gate.
 
 - `tests/fixtures/Apple DOS 3.3 January 1983.nib` — `diskii` + manual boot
 - `tests/fixtures/hostfs/` — NAPS-tagged files + `PRODOS#FF0000` for HostFS
+
+Gate tests must not require gitignored or untracked media. Optional local
+samples (`disks/`, `samples/hostfs/pt3plr`, …) may be exercised when a complete
+tree is present; otherwise those checks skip. Do not fail the gate on a partial
+local sample.
 
 ## Perf smoke
 

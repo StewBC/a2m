@@ -392,7 +392,9 @@ int main(void)
         expect_true("remove SP eject INI", remove(path) == 0);
     }
 
-    /* samples/golf.ini: ../disks/... is relative to the INI, not the process cwd. */
+    /* samples/golf.ini: ../disks/... is relative to the INI, not the process cwd.
+       disks/ is gitignored — path resolution is always checked; media existence
+       is optional and skipped when the local images are absent. */
     {
         const char *golf_paths[] = {
             "../samples/golf.ini",
@@ -416,17 +418,26 @@ int main(void)
             expect_true("golf side A resolved",
                 options.diskii[0].path != NULL &&
                     strstr(options.diskii[0].path,
-                           "World Class Leaderboard side A program disk.nib") != NULL &&
+                           "World Class Leader Board (1987)(Access)(Side A).do") != NULL &&
                     strstr(options.diskii[0].path, "../disks/") == NULL);
             expect_true("golf side B resolved",
                 options.diskii[1].path != NULL &&
                     strstr(options.diskii[1].path,
-                           "World Class Leaderboard side B course disk.nib") != NULL);
+                           "World Class Leader Board (1987)(Access)(Side B).do") != NULL &&
+                    strstr(options.diskii[1].path, "../disks/") == NULL);
             {
-                FILE *media = fopen(options.diskii[0].path, "rb");
-                expect_true("golf side A exists after resolve", media != NULL);
-                if (media != NULL) {
-                    expect_true("close golf side A", fclose(media) == 0);
+                FILE *media_a = fopen(options.diskii[0].path, "rb");
+                FILE *media_b = fopen(options.diskii[1].path, "rb");
+                if (media_a != NULL && media_b != NULL) {
+                    expect_true("close golf side A", fclose(media_a) == 0);
+                    expect_true("close golf side B", fclose(media_b) == 0);
+                } else {
+                    if (media_a != NULL) {
+                        fclose(media_a);
+                    }
+                    if (media_b != NULL) {
+                        fclose(media_b);
+                    }
                 }
             }
             app_options_destroy(&options);

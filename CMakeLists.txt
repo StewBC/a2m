@@ -91,6 +91,13 @@ target_compile_features(test_message_queue PRIVATE c_std_99)
 target_link_libraries(test_message_queue PRIVATE util SDL2::SDL2)
 add_test(NAME message_queue COMMAND test_message_queue)
 
+add_executable(test_config
+    tests/util/test_config.c
+)
+target_compile_features(test_config PRIVATE c_std_99)
+target_link_libraries(test_config PRIVATE util SDL2::SDL2)
+add_test(NAME config COMMAND test_config)
+
 add_executable(test_fs_watch
     tests/util/test_fs_watch.c
 )
