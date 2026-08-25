@@ -136,7 +136,7 @@ bool apple2_naps_make_path(
     if (base == NULL) return false;
     memcpy(base, path, base_length);
     base[base_length] = '\0';
-    written = snprintf(out, out_size, "%s#%02x%04x",
+    written = snprintf(out, out_size, "%s#%02X%04x",
         base, (unsigned)file_type, (unsigned)aux_type);
     free(base);
     return written >= 0 && (size_t)written < out_size;
