@@ -4,10 +4,11 @@ UI never holds a live `apple2_t *`. Keys: [`status.md`](status.md). User
 catalog: `manual/manual.md`.
 
 **UI strings are ASCII-only.** Labels, status strip, soft errors, button text,
-and other on-screen copy must stay in the ASCII subset the mono font actually
-draws. No Unicode arrows, ellipses, dashes, or similar — they render as `?` /
-missing glyphs (seen in Forensics Tab hints). Same spirit as
-`manual/HELP_MARKDOWN.md` for help text.
+dialogs, and other on-screen copy must stay in the ASCII subset the UI fonts
+actually bake (ProggyClean / C64 Pro Mono atlas range). Do not use Unicode
+punctuation: no `…` (use `...`), no `—`/`–` (use `-` or `--`), no `→` (use
+`->`), no `≤`/`≥` (use `<=` / `>=`). Missing glyphs render blank or as `?`.
+Same rule for `manual/manual.md` — see `manual/HELP_MARKDOWN.md`.
 
 ## Important files
 

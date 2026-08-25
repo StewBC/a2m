@@ -101,7 +101,7 @@ void forensics_view_open(
     state->land_requested_cycle = 0u;
     state->request_leave_debugger = false;
     state->query_history_index = 0u;
-    forensics_view_set_status(state, "paused — querying…");
+    forensics_view_set_status(state, "paused - querying...");
 }
 
 void forensics_view_close(frontend_forensics_state *state)
@@ -1824,14 +1824,14 @@ void forensics_view_apply_land_focus(
         snprintf(
             text,
             sizeof(text),
-            "landed focus_cycle=%llu (requested %llu → live)",
+            "landed focus_cycle=%llu (requested %llu -> live)",
             (unsigned long long)focus,
             (unsigned long long)requested);
     } else if (land->oldest_cycle > 0u && requested < land->oldest_cycle) {
         snprintf(
             text,
             sizeof(text),
-            "landed focus_cycle=%llu (requested %llu → clamped oldest)",
+            "landed focus_cycle=%llu (requested %llu -> clamped oldest)",
             (unsigned long long)focus,
             (unsigned long long)requested);
     } else if (exact) {
@@ -1863,7 +1863,7 @@ static void forensics_try_land_button(
         return;
     }
     if (land == NULL || !land->window_valid) {
-        forensics_view_set_status(state, "cannot land — no checkpoints");
+        forensics_view_set_status(state, "cannot land - no checkpoints");
         return;
     }
     state->pending_land_cycle = state->selected_cycle;
@@ -1873,14 +1873,14 @@ static void forensics_try_land_button(
         state->request_land_exact = exact;
         state->request_land_enter = false;
         forensics_view_set_status(
-            state, exact ? "landing exact…" : "landing before…");
+            state, exact ? "landing exact..." : "landing before...");
         return;
     }
     if (land->can_enter) {
         state->land_confirm_open = true;
         return;
     }
-    forensics_view_set_status(state, "cannot land — no checkpoints");
+    forensics_view_set_status(state, "cannot land - no checkpoints");
 }
 
 static void forensics_draw_land_confirm(
@@ -1898,7 +1898,7 @@ static void forensics_draw_land_confirm(
         line,
         sizeof(line),
         exact ? "Enter Inspect and land exactly at cycle %llu?" :
-                "Enter Inspect and land before cycle %llu (checkpoint ≤ N)?",
+                "Enter Inspect and land before cycle %llu (checkpoint <= N)?",
         (unsigned long long)state->pending_land_cycle);
     if (nk_popup_begin(
             ctx,
@@ -1916,8 +1916,8 @@ static void forensics_draw_land_confirm(
             state->request_land_enter = true;
             forensics_view_set_status(
                 state,
-                exact ? "entering Inspect & landing exact…" :
-                        "entering Inspect & landing before…");
+                exact ? "entering Inspect & landing exact..." :
+                        "entering Inspect & landing before...");
             nk_popup_close(ctx);
         }
         if (nk_button_label(ctx, "Cancel")) {

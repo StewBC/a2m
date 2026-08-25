@@ -1903,7 +1903,7 @@ static void frontend_forensics_flush_query_submit(frontend *ui)
         forensics_view_set_status(&ui->forensics, "history-request-active");
         return;
     }
-    forensics_view_set_status(&ui->forensics, "querying…");
+    forensics_view_set_status(&ui->forensics, "querying...");
     ui->forensics.query[0] = '\0';
     ui->forensics.query_history_index = 0u;
 }

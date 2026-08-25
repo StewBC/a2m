@@ -48,6 +48,8 @@ compiled into the in-emulator help overlay (`tools/gen_help.py` →
 `src/frontend/help_view.*`).
 
 Before editing `manual/manual.md`, read [`manual/HELP_MARKDOWN.md`](../manual/HELP_MARKDOWN.md)
-(ASCII-only subset; the help renderer is not full Markdown). If you add or
-change a user-facing feature, update `manual/manual.md` in the same change.
-Do not put agent notes or `agents/` links in the manual.
+(ASCII-only subset; the help renderer is not full Markdown). **On-screen UI
+copy is ASCII-only too** (no Unicode ellipses/dashes/arrows); see
+[`frontend.md`](frontend.md). If you add or change a user-facing feature,
+update `manual/manual.md` in the same change. Do not put agent notes or
+`agents/` links in the manual.

@@ -84,6 +84,10 @@ If a user-visible feature is added or changed, update `manual/manual.md` in
 the same change. Read `manual/HELP_MARKDOWN.md` first. Do not link the manual
 at `agents/`.
 
+**ASCII-only on screen:** UI labels/status/dialogs and the manual must not use
+Unicode punctuation (`...` not `…`, `-`/`--` not `—`, `->` not `→`, `<=` not
+`≤`). See [`frontend.md`](frontend.md).
+
 ## Build defaults
 
 ```bash
