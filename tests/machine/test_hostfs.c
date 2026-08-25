@@ -1383,6 +1383,189 @@ static int root_catalog(hostfs_volume *vol, const char *want, int *out_count)
     return found;
 }
 
+static int root_catalog_key(hostfs_volume *vol, const char *want, uint16_t *out_key)
+{
+    uint16_t b;
+
+    for (b = 2u; b < 2u + HOSTFS_ROOT_DIR_BLOCKS; ++b) {
+        uint8_t blk[HOSTFS_BLOCK_SIZE];
+        int slot;
+        int start = b == 2u ? 1 : 0;
+
+        if (hostfs_read_block(vol, b, blk) != 0) {
+            fail("read volume directory key");
+        }
+        for (slot = start; slot < HOSTFS_ENTRIES_PER_BLOCK; ++slot) {
+            const uint8_t *e = blk + 4 + slot * HOSTFS_ENTRY_LENGTH;
+            uint8_t nl = (uint8_t)(e[0] & 0x0Fu);
+            char name[HOSTFS_NAME_MAX];
+
+            if (e[0] == 0) {
+                continue;
+            }
+            memcpy(name, e + 1, nl);
+            name[nl] = '\0';
+            if (strcmp(name, want) == 0) {
+                if (out_key != NULL) {
+                    *out_key = (uint16_t)(e[0x11] | ((uint16_t)e[0x12] << 8));
+                }
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+static void expect_root_payload(
+    hostfs_volume *vol, const char *name, uint8_t expected)
+{
+    uint16_t key = 0;
+    uint8_t data[HOSTFS_BLOCK_SIZE] = {0};
+
+    if (!root_catalog_key(vol, name, &key) || key == 0u ||
+        hostfs_read_block(vol, key, data) != 0 || data[0] != expected) {
+        fprintf(stderr, "alias payload %s key=%u got=%u expected=%u\n",
+                name, (unsigned)key, (unsigned)data[0], (unsigned)expected);
+        fail("collision alias payload identity");
+    }
+}
+
+static void expect_collision_catalog(hostfs_volume *vol, bool inserted_earlier)
+{
+    int count = 0;
+
+    if (!root_catalog(vol, "ACADEMY.PT3", &count) ||
+        !root_catalog(vol, "ACADEMY001.PT3", NULL) ||
+        !root_catalog(vol, "ACADEMY002.PT3", NULL) ||
+        count != (inserted_earlier ? 4 : 3) ||
+        (inserted_earlier && !root_catalog(vol, "ACADEMY003.PT3", NULL))) {
+        fail("collision aliases missing from catalog");
+    }
+
+    if (inserted_earlier) {
+        expect_root_payload(vol, "ACADEMY.PT3", (uint8_t)'n');
+        expect_root_payload(vol, "ACADEMY001.PT3", (uint8_t)'0');
+        expect_root_payload(vol, "ACADEMY002.PT3", (uint8_t)'1');
+        expect_root_payload(vol, "ACADEMY003.PT3", (uint8_t)'2');
+    } else {
+        expect_root_payload(vol, "ACADEMY.PT3", (uint8_t)'0');
+        expect_root_payload(vol, "ACADEMY001.PT3", (uint8_t)'1');
+        expect_root_payload(vol, "ACADEMY002.PT3", (uint8_t)'2');
+    }
+}
+
+static void test_collision_aliases(void)
+{
+    const char *dir = "test_hostfs_collision_aliases";
+    hostfs_volume *vol;
+    int mount_warnings;
+    int warning_count;
+
+    wipe_tree(dir);
+    HOSTFS_MKDIR(dir);
+    write_file("test_hostfs_collision_aliases/academy.pt3#000000", "0", 1);
+    write_file("test_hostfs_collision_aliases/academy_.pt3#000000", "1", 1);
+    write_file("test_hostfs_collision_aliases/academy~.pt3#000000", "2", 1);
+
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL) {
+        fail("collision alias mount");
+    }
+    mount_warnings = hostfs_test_using_periodic_refresh(vol) ? 1 : 0;
+    if (hostfs_warning_count(vol) != mount_warnings + 2 ||
+        strstr(hostfs_last_warning(vol), "ACADEMY002.PT3") == NULL) {
+        fprintf(stderr, "warn_count=%d last=%s\n",
+                hostfs_warning_count(vol), hostfs_last_warning(vol));
+        fail("each collision alias must warn");
+    }
+    expect_collision_catalog(vol, false);
+
+    /* Inserting a collider earlier in deterministic scan order renumbers the
+       later aliases without losing their host-file identity. */
+    hostfs_test_use_synthetic_events(vol);
+    write_file("test_hostfs_collision_aliases/academy!.pt3#000000", "n", 1);
+    if (!hostfs_test_inject_event(
+            vol, FS_WATCH_CREATE, "academy!.pt3#000000")) {
+        fail("inject earlier collision");
+    }
+    hostfs_maybe_refresh(vol);
+    expect_collision_catalog(vol, true);
+
+    /* An unchanged full reconciliation keeps the same aliases and does not
+       repeat diagnostics for nodes that already carry those aliases. */
+    warning_count = hostfs_warning_count(vol);
+    if (hostfs_rescan(vol) != 0 || hostfs_warning_count(vol) != warning_count) {
+        fail("unchanged collision rescan must be stable");
+    }
+    hostfs_eject(vol);
+
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL) {
+        fail("collision alias remount");
+    }
+    expect_collision_catalog(vol, true);
+    hostfs_eject(vol);
+    wipe_tree(dir);
+}
+
+static void test_depth_limit_warning(void)
+{
+    const char *dir = "test_hostfs_depth_limit";
+    char path[HOSTFS_PATH_MAX];
+    hostfs_volume *vol;
+    uint8_t root[HOSTFS_BLOCK_SIZE];
+    uint16_t key = 0;
+    int mount_warnings;
+    int warning_count;
+    int i;
+
+    wipe_tree(dir);
+    HOSTFS_MKDIR(dir);
+    snprintf(path, sizeof(path), "%s", dir);
+    for (i = 0; i <= HOSTFS_MAX_DEPTH; ++i) {
+        size_t used = strlen(path);
+        snprintf(path + used, sizeof(path) - used, "/D%d", i);
+        HOSTFS_MKDIR(path);
+    }
+    {
+        char leaf[HOSTFS_PATH_MAX];
+        snprintf(leaf, sizeof(leaf), "%s/LEAF#060000", path);
+        write_file(leaf, "x", 1);
+    }
+
+    vol = hostfs_mount(dir, "HOSTFS.S7D0");
+    if (vol == NULL || hostfs_read_block(vol, 2, root) != 0 ||
+        !find_entry_in_dir_block(root, "D0", NULL, &key, NULL)) {
+        fail("depth-limit fixture mount");
+    }
+    mount_warnings = hostfs_test_using_periodic_refresh(vol) ? 1 : 0;
+    if (hostfs_warning_count(vol) != mount_warnings + 1 ||
+        strstr(hostfs_last_warning(vol), "depth limit 8") == NULL) {
+        fprintf(stderr, "warn_count=%d last=%s\n",
+                hostfs_warning_count(vol), hostfs_last_warning(vol));
+        fail("depth-limit subtree must warn");
+    }
+    for (i = 1; i <= HOSTFS_MAX_DEPTH; ++i) {
+        char name[HOSTFS_NAME_MAX];
+        uint16_t next = 0;
+        snprintf(name, sizeof(name), "D%d", i);
+        if (!subdir_catalog(vol, key, name, NULL, &next) || next == 0u) {
+            fail("depth-limit directory chain");
+        }
+        key = next;
+    }
+    if (subdir_catalog(vol, key, "LEAF", NULL, NULL)) {
+        fail("content below depth limit must stay invisible");
+    }
+
+    warning_count = hostfs_warning_count(vol);
+    if (hostfs_rescan(vol) != 0 || hostfs_warning_count(vol) != warning_count) {
+        fail("unchanged depth-limit rescan repeated warning");
+    }
+    hostfs_eject(vol);
+    wipe_tree(dir);
+}
+
 /* F00#060000 .. FNN#060000 — two digits so the case-insensitive scan order and
    the manifest order agree, and the 52nd entry is unambiguous. */
 static void make_numbered_files(const char *dir, int first, int last)
@@ -2211,6 +2394,8 @@ int main(void)
     test_targeted_external_move();
     test_targeted_order_edit();
     test_event_loss_full_rescan();
+    test_collision_aliases();
+    test_depth_limit_warning();
 #if !defined(_WIN32)
     test_failed_move_keeps_host_file();
 #endif

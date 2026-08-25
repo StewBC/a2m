@@ -2136,7 +2136,182 @@ static int hostfs_scan_ent_basename_cmp(const void *pa, const void *pb)
 {
     const hostfs_scan_ent *a = (const hostfs_scan_ent *)pa;
     const hostfs_scan_ent *b = (const hostfs_scan_ent *)pb;
-    return hostfs_basename_cmp(a->basename, b->basename);
+    int cmp = hostfs_basename_cmp(a->basename, b->basename);
+
+    /* A case-insensitive comparison alone is not a total order on hosts that
+       permit case-distinct basenames. The bytewise tie-break keeps collision
+       ordinals stable across readdir and qsort implementations. */
+    return cmp != 0 ? cmp : strcmp(a->basename, b->basename);
+}
+
+typedef struct {
+    char (*names)[HOSTFS_NAME_MAX];
+    size_t cap;
+} hostfs_scan_name_set;
+
+static uint32_t hostfs_scan_name_hash(const char *name)
+{
+    uint32_t hash = 2166136261u;
+    while (*name != '\0') {
+        hash ^= (uint8_t)*name++;
+        hash *= 16777619u;
+    }
+    return hash;
+}
+
+static bool hostfs_scan_name_set_contains(
+    const hostfs_scan_name_set *set, const char *name)
+{
+    size_t slot = (size_t)hostfs_scan_name_hash(name) & (set->cap - 1u);
+
+    while (set->names[slot][0] != '\0') {
+        if (strcmp(set->names[slot], name) == 0) {
+            return true;
+        }
+        slot = (slot + 1u) & (set->cap - 1u);
+    }
+    return false;
+}
+
+static void hostfs_scan_name_set_add(hostfs_scan_name_set *set, const char *name)
+{
+    size_t slot = (size_t)hostfs_scan_name_hash(name) & (set->cap - 1u);
+
+    while (set->names[slot][0] != '\0') {
+        if (strcmp(set->names[slot], name) == 0) {
+            return;
+        }
+        slot = (slot + 1u) & (set->cap - 1u);
+    }
+    snprintf(set->names[slot], HOSTFS_NAME_MAX, "%s", name);
+}
+
+static bool hostfs_scan_has_basename(
+    const hostfs_scan_ent *scans, int scan_count, const char *basename)
+{
+    int i;
+    for (i = 0; i < scan_count; ++i) {
+        if (strcmp(scans[i].basename, basename) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* Preserve the final extension and replace the right edge of the stem with a
+   three-digit ordinal. A stem character must remain so the ProDOS name still
+   starts with the letter guaranteed by hostfs_mangle_prodos_name(). */
+static bool hostfs_make_collision_alias(
+    const char *name, unsigned ordinal, char out[HOSTFS_NAME_MAX])
+{
+    const char *dot = strrchr(name, '.');
+    bool has_ext = dot != NULL && dot[1] != '\0';
+    size_t stem_len = dot != NULL ? (size_t)(dot - name) : strlen(name);
+    size_t ext_len = has_ext ? strlen(dot + 1) : 0u;
+    size_t suffix_len = 3u + (has_ext ? 1u + ext_len : 0u);
+    size_t keep;
+
+    if (ordinal == 0u || ordinal > 999u || suffix_len >= HOSTFS_NAME_MAX) {
+        return false;
+    }
+    keep = (HOSTFS_NAME_MAX - 1u) - suffix_len;
+    if (keep > stem_len) {
+        keep = stem_len;
+    }
+    if (keep == 0u) {
+        return false;
+    }
+    snprintf(
+        out, HOSTFS_NAME_MAX, "%.*s%03u%s%s", (int)keep, name, ordinal,
+        has_ext ? "." : "", has_ext ? dot + 1 : "");
+    return true;
+}
+
+/* Resolve mangling collisions after hostfs.order/case-insensitive ordering is
+   final. Matching by host basename later preserves node identity even when an
+   inserted earlier collider deterministically renumbers existing aliases. */
+static int hostfs_resolve_scan_collisions(
+    hostfs_volume *vol,
+    int parent_index,
+    const char *host_dir_path,
+    hostfs_scan_ent *scans,
+    int scan_count)
+{
+    hostfs_scan_name_set used;
+    int i;
+
+    used.names = NULL;
+    used.cap = 16u;
+    while (used.cap < (size_t)scan_count * 2u) {
+        used.cap *= 2u;
+    }
+    used.names = (char (*)[HOSTFS_NAME_MAX])calloc(used.cap, sizeof(*used.names));
+    if (used.names == NULL) {
+        return A2_ERR;
+    }
+
+    for (i = 0; i < scan_count; ++i) {
+        char original[HOSTFS_NAME_MAX];
+        char alias[HOSTFS_NAME_MAX];
+        unsigned ordinal;
+        int existing;
+
+        if (!hostfs_scan_name_set_contains(&used, scans[i].prodos)) {
+            hostfs_scan_name_set_add(&used, scans[i].prodos);
+            continue;
+        }
+        snprintf(original, sizeof(original), "%s", scans[i].prodos);
+        for (ordinal = 1u; ordinal <= 999u; ++ordinal) {
+            if (!hostfs_make_collision_alias(original, ordinal, alias)) {
+                break;
+            }
+            if (!hostfs_scan_name_set_contains(&used, alias)) {
+                break;
+            }
+        }
+        if (ordinal > 999u || !hostfs_make_collision_alias(original, ordinal, alias)) {
+            hostfs_warn(
+                vol,
+                "%s: '%s' has no available 3-digit ProDOS alias; entry ignored",
+                host_dir_path, scans[i].basename);
+            scans[i].prodos[0] = '\0';
+            continue;
+        }
+        snprintf(scans[i].prodos, sizeof(scans[i].prodos), "%s", alias);
+        hostfs_scan_name_set_add(&used, alias);
+
+        existing = hostfs_find_by_basename(vol, parent_index, scans[i].basename);
+        if (existing < 0 || strcmp(vol->nodes[existing].prodos_name, alias) != 0) {
+            hostfs_warn(
+                vol,
+                "%s: '%s' -> %s (renamed for ProDOS; host name unchanged, "
+                "will not survive copy to .po)",
+                host_dir_path, scans[i].basename, alias);
+        }
+    }
+    free(used.names);
+    return A2_OK;
+}
+
+static void hostfs_warn_new_depth_limit(
+    hostfs_volume *vol,
+    int parent_index,
+    int depth,
+    const hostfs_scan_ent *scan)
+{
+    int existing;
+
+    if (scan->prodos[0] == '\0' || scan->kind != HOSTFS_KIND_DIR ||
+        depth < HOSTFS_MAX_DEPTH) {
+        return;
+    }
+    existing = hostfs_find_by_basename(vol, parent_index, scan->basename);
+    if (existing >= 0 && vol->nodes[existing].kind == HOSTFS_KIND_DIR) {
+        return;
+    }
+    hostfs_warn(
+        vol, "%s: depth limit %d reached; subtree ignored",
+        scan->host_path, HOSTFS_MAX_DEPTH);
 }
 
 static bool hostfs_should_skip_basename(const char *name)
@@ -2591,12 +2766,19 @@ static int hostfs_scan_dir_recursive(
     } else if (n > 1) {
         qsort(scans, (size_t)n, sizeof(scans[0]), hostfs_scan_ent_basename_cmp);
     }
+    if (hostfs_resolve_scan_collisions(
+            vol, parent_index, host_dir_path, scans, n) != A2_OK) {
+        rc = A2_ERR;
+        goto done;
+    }
 
     for (i = 0; i < n; ++i) {
         int fi;
-        if (hostfs_active_name_exists(vol, parent_index, scans[i].prodos, -1)) {
+        if (scans[i].prodos[0] == '\0') {
             continue;
         }
+        hostfs_warn_new_depth_limit(vol, parent_index, depth, &scans[i]);
+        assert(!hostfs_active_name_exists(vol, parent_index, scans[i].prodos, -1));
         /* The volume directory cannot grow past its four blocks. Name the host
            basenames, not the ProDOS names: a dropped entry never enters the
            catalog, so its ProDOS name exists nowhere the user can look. */
@@ -3682,7 +3864,7 @@ static int hostfs_add_node_from_scan(
     uint16_t parent_key = hostfs_parent_key(vol, parent_index);
 
     if (hostfs_active_name_exists(vol, parent_index, sc->prodos, -1)) {
-        return A2_OK;
+        return A2_ERR;
     }
     entry = hostfs_first_free_dir_entry(vol, parent_index);
     if (entry == NULL && parent_index >= 0) {
@@ -3960,27 +4142,69 @@ static int hostfs_rescan_directory_at(
     } else if (n > 1) {
         qsort(scans, (size_t)n, sizeof(scans[0]), hostfs_scan_ent_basename_cmp);
     }
+    if (hostfs_resolve_scan_collisions(
+            vol, parent_index, host_dir_path, scans, n) != A2_OK) {
+        rc = A2_ERR;
+        goto done;
+    }
+
+    /* Apply resolved names to known host identities before additions. This
+       frees a natural name when inserting a collider earlier in scan order,
+       while the final catalog rebuild makes the temporary in-memory rename
+       atomic from the guest's perspective. */
+    for (i = 0; i < n; ++i) {
+        int fi;
+        if (scans[i].prodos[0] == '\0') {
+            continue;
+        }
+        fi = hostfs_find_by_basename(vol, parent_index, scans[i].basename);
+        if (fi >= 0) {
+            snprintf(
+                vol->nodes[fi].prodos_name, sizeof(vol->nodes[fi].prodos_name), "%s",
+                scans[i].prodos);
+            vol->nodes[fi].name_len = (uint8_t)strlen(vol->nodes[fi].prodos_name);
+        }
+    }
 
     for (i = 0; i < n; ++i) {
         char child_path[HOSTFS_PATH_MAX];
         int fi = hostfs_find_by_basename(vol, parent_index, scans[i].basename);
         bool added = false;
 
+        if (scans[i].prodos[0] == '\0') {
+            continue;
+        }
+        hostfs_warn_new_depth_limit(vol, parent_index, depth, &scans[i]);
         if (fi < 0) {
             fi = hostfs_find_by_name(vol, parent_index, scans[i].prodos);
+            /* Preserve identity for a host rename only when the old basename
+               is truly absent. If it appears elsewhere in this same scan, the
+               name match belongs to that entry and this is a new collider. */
+            if (fi >= 0 &&
+                (hostfs_marks_get(&matched, fi) ||
+                 hostfs_scan_has_basename(
+                     scans, n, hostfs_node_basename(vol, fi)))) {
+                fi = -1;
+            }
         }
         if (fi >= 0 && vol->nodes[fi].kind != scans[i].kind) {
             hostfs_deactivate_node(vol, fi);
             fi = -1;
         }
         if (fi < 0) {
+            int occupied = hostfs_find_by_name(
+                vol, parent_index, scans[i].prodos);
+            if (occupied >= 0) {
+                /* A scan entry reserved that host basename but could not be
+                   represented (for example alias exhaustion). Its diagnostic
+                   has already fired; remove the stale node so this unique,
+                   representable scan entry is not silently lost behind it. */
+                hostfs_deactivate_node(vol, occupied);
+            }
             if (hostfs_add_node_from_scan(vol, parent_index, &scans[i]) != A2_OK) {
                 continue;
             }
             fi = hostfs_find_by_basename(vol, parent_index, scans[i].basename);
-            if (fi < 0) {
-                fi = hostfs_find_by_name(vol, parent_index, scans[i].prodos);
-            }
             added = fi >= 0;
         }
         if (fi < 0) {
