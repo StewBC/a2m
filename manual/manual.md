@@ -14,7 +14,7 @@ System ROMs are embedded. No separate ROM files are required.
 Launch a2m from the command line or as a GUI application. Use `--help` or `-h` for the
 full command-line reference.
 
-Useful flags:
+Common flags (see `--help` for the full list):
 
 | Flag | Effect |
 |------|--------|
@@ -37,6 +37,7 @@ Useful flags:
 | `--headless` | No window; short smoke exit unless `--control-port` is set |
 | `--control-port N` | Listen on localhost TCP for A2M/13 remote control (`0`=off) |
 | `--inspector` / `--no-inspector` | Enable Inspector recording (default off) |
+| `--history-off-on-max` / `--no-history-off-on-max` | Pause only the CPU flight recorder at turbo `max` (default on) |
 | `--log-level <level>` | Host log policy: `all`, `warn` (default), `error`, or `none` |
 | `--audio-smoke` | Emit a 440 Hz test tone to verify audio output |
 | `--video-display <mode>` | Display decoder: `colour`/`color`, `white`, `green`, `amber`, or `colour,<mono>` |
@@ -243,7 +244,7 @@ even when Debug Mode is closed and no other indicator is visible:
 | Title | Meaning |
 |-------|---------|
 | `a2m - //e Enhanced - 1 MHz - Running` | //e Enhanced at real-time speed, executing normally |
-| `a2m - ][+ - max - Paused (reason)` | ][+ in max free-run; execution has stopped. `reason` is one of `breakpoint`, `BRK`, `step`, `reset`, `pause`, or `run complete` |
+| `a2m - ][+ - max - Paused (reason)` | ][+ in max free-run; execution has stopped. `reason` is one of `breakpoint`, `step`, `reset`, `pause`, or `run complete` |
 | `a2m - //e Enhanced - 8 MHz - Running` | Zip-class finite MHz, still live paint |
 | `a2m - //e Enhanced - 1 MHz - Error` | The runtime hit an error and stopped |
 
@@ -259,7 +260,7 @@ In Debug Mode, the window is divided into four main areas:
 | Upper right | CPU register view |
 | Right, below | Disassembly view |
 | Lower left | Memory view |
-| Lower right | Misc panel (Machine, Debugger, Breakpoints, Hardware, Assembler tabs) |
+| Lower right | Misc panel (Machine, Debugger, Breakpoints, Hardware, Assembler, Inspector tabs) |
 
 a2m tracks an active view for keyboard input. When no modal dialog is open, the active
 Apple 2 display, Disassembly, Misc, or Memory view has a neutral gray outline. Click a
@@ -270,22 +271,19 @@ themselves, so these view-cycling keys do not work while a dialog is open.
 ### Machine Display pixel address
 
 While the machine is **paused** (debugger stop or Inspector), hover the Apple picture in
-the Machine Display pane. The unused strip under the picture shows the soft-switch-locked
-RAM address that produced that host pixel, for example:
+the Machine Display pane. The strip under the picture shows the RAM address that produced
+that host pixel, for example:
 
 ```text
 bank: $2000 ofs: $0202 adr: $2202
 ```
 
-Auxiliary-sourced pixels (80-column, DHGR, DLORES half-columns, and 80STORE+PAGE2 pages)
-are marked with `aux` and a host address above `$10000` (for example `adr: $102202`).
-
-The decode uses soft switches frozen at pause. If Hardware **Override** is on, it uses the
-override display flags (what is painted) instead. MIXED bottom text rows are handled from
-those flags. Mid-frame mode changes elsewhere in the visible frame can disagree with the
-status line; that is accepted. True Aspect Ratio on or off is fine. CRT Curvature is
-accounted for; outside the curved glass shows no address. The probe is blank while the
-machine is running, and blank when the cursor is not over the picture.
+Auxiliary-sourced pixels (80-column, DHGR, double LORES, and 80STORE+PAGE2 pages) are
+marked with `aux` and a host address above `$10000` (for example `adr: $102202`). Soft
+switches are frozen at pause; if Hardware **Override** is on, the probe follows the
+override display flags instead. CRT Curvature is accounted for; outside the curved glass
+shows no address. The probe is blank while the machine is running, or when the cursor is
+not over the picture.
 
 ### Layout
 
@@ -321,8 +319,9 @@ cadence. Leaving `max` keeps the same Inspector window.
 
 ### Help
 
-Press **Opt+H** or **ESC** to open or close the in-emulator help overlay. The Apple 2
-pauses while the overlay is open and resumes when it is dismissed.
+Press **Opt+H** to open or close the in-emulator help overlay. **ESC** also closes it
+when it is open. The Apple 2 pauses while the overlay is open and resumes when it is
+dismissed.
 
 The overlay shows one section of the manual at a time in a scrollable content area. A
 navigation bar along the bottom of the overlay contains:
@@ -360,61 +359,58 @@ Keyboard shortcuts active while the help overlay is open:
 
 ### Forensics
 
-**Forensics** is a full-window debugger mode for searching the CPU flight
-recorder (HST1 FIND / NEXT / READ). It is not the Inspector slider: FIND answers
-"who wrote this?", then you can land Inspect at a hit's machine cycle.
+**Forensics** is a full-window mode for searching the CPU flight recorder. It is
+not the Inspector slider: FIND answers "who wrote this?", then you can land
+Inspect at a hit's machine cycle.
 
-Open from Misc -> Inspector (**Forensics...**) or **Opt+R** (works from the
-full-screen CRT or with F9 Debug Mode up). Forensics and Help cannot both be
-open.
+Open from Misc -> Inspector (**Forensics...**) or **Opt+R** (from the full-screen
+CRT or with Debug Mode up). Forensics and Help cannot both be open.
 
 | Transition | Behavior |
 |------------|----------|
 | Open Forensics | **Pauses** if the machine was running. Remembers whether you came from the CRT or the debugger. |
 | **Opt+R** / **Close** | Return to that entry surface. CRT entry resumes only if it was running when Forensics opened. Debugger entry stays paused. |
-| **F9** | Always open the debugger, paused (abandons any CRT resume latch). |
-| Successful **Land before** / **Land exact** | Same as **F9**: debugger, paused. Also selects Misc -> Inspector. Cancel or failed land stays in Forensics. |
-| **Esc** | Does **not** leave Forensics (Help still uses Esc). |
+| **F9** | Always open the debugger, paused. |
+| Successful **Land before** / **Land exact** | Same as **F9**: debugger, paused, on Misc -> Inspector. Cancel or failed land stays in Forensics. |
 
-FIND requires a paused machine and a recording window (turn **Record** on in
-Misc -> Inspector and run a bit before searching). **Clear view** clears the
-transcript only; it does not call `history-clear`.
+FIND needs a paused machine and a recording window (turn **Record** on in Misc ->
+Inspector and run a bit before searching). **Clear view** clears the on-screen
+transcript only; it does not clear the recorder.
 
 **Query line** (Enter to run). The first token must be a verb (`find`, `next`,
-`read`, `info`). Bare `key=value` is not FIND (control-port `history-find` still
-accepts bare keys). Up/Down browses recent queries. Tab unique-completes the next
-expected token or prints that hole's syntax on the status strip. With the caret
-at the end of the line, Tab unique-expands every token (`find add=$4000 acc=re`
-becomes `find address=$4000 access=read`). Open values (ids, hex, ranges,
-limits) are not completed.
+`read`, `info`). Bare `key=value` alone is not a FIND query (the control-port
+`history-find` command still accepts bare keys). Up/Down browses recent queries.
+Tab completes the next expected token, or prints that field's syntax on the status
+strip. With the caret at the end of the line, Tab expands every unique prefix
+(`find add=$4000 acc=re` becomes `find address=$4000 access=read`). Open values
+(ids, hex, ranges, limits) are not completed.
 
 | Input | Meaning |
 |-------|---------|
-| `find [key=value ...]` | FIND with the shared option grammar (same keys as `history-find`) |
+| `find [key=value ...]` | FIND (same option keys as control-port `history-find`) |
 | `next [limit=N]` | Continue the last FIND page |
 | `read <id> [before=N] [after=N] [epoch=N]` | Read one retained id with context (`id` and keys may be in any order) |
-| `info` | Refresh recorder status (also runs quietly when Forensics opens) |
+| `info` | Refresh recorder status (also runs when Forensics opens) |
 
 Click a transcript line to select it (or a `---` header to select the whole
-result block). **Copy** copies the full selected text. Double-click `id=`,
-`cyc=`, or `pc=$...` on a record line to copy that token alone.
+result block). **Copy** copies the selected text. Double-click `id=`, `cyc=`, or
+`pc=$...` on a record line to copy that token alone.
 
 With a record selected:
 
 | Button | Meaning |
 |--------|---------|
-| **Land before** | Inspect land at the nearest checkpoint at or before `cyc=` (often early so you can step into the hit) |
-| **Land exact** | Inspect land exactly at `cyc=` (checkpoint then re-execute to that cycle) |
+| **Land before** | Land Inspect at the nearest checkpoint at or before `cyc=` (often early enough to step into the hit) |
+| **Land exact** | Land Inspect exactly at `cyc=` |
 
 If you are not yet Inspecting but checkpoints exist, either land button asks to
-**Inspect & Land** first. Soft-fail if there is no Inspector window. Status
-reports the post-land `focus_cycle` versus the requested cycle (clamp, live, or
-quantized). After a successful land, Forensics closes and the debugger opens
-paused on the Inspector tab. Cancel or a failed land leaves you in Forensics.
-**Opt+R** / **Close** still return to the entry surface as above.
+**Inspect & Land** first. Landing needs an Inspector recording window. After a
+successful land, Forensics closes and the debugger opens paused on the Inspector
+tab. Cancel or a failed land leaves you in Forensics. **Opt+R** / **Close** still
+return to the entry surface as above.
 
-See **CPU Flight Recorder** for the wire grammar and **`[debug]`** for Record /
-budgets.
+See **CPU Flight Recorder** for the remote query grammar and **`[debug]`** for
+Record budgets.
 
 ## CPU View
 
@@ -881,17 +877,6 @@ breakpoint is present. **[New]** opens the Breakpoint Editor.
 | Execute | CPU fetches an instruction at the address |
 | Read | CPU reads from the address or range |
 | Write | CPU writes to the address or range |
-
-### BRK
-
-When **Pause on BRK** is enabled (Configure -> Machine, or `[config] pause_on_brk`),
-a `BRK` opcode (`$00`) pauses the emulator with no breakpoint needed. The CPU does
-not execute it; the instruction is intercepted before the stack is touched, and the
-window title ends with `Paused (BRK)`.
-
-This usually indicates that execution has reached uninitialized memory, passed the
-end of a program, or followed a corrupted jump vector. **Pause on BRK is off by
-default.** A single explicit step (**F11**) always executes a BRK normally.
 
 ### Breakpoint List Format
 
@@ -1447,6 +1432,41 @@ am65 -i demo.asm -o loader.bin -a $0800 -D VERSION=3 -s symbols.txt
 
 Sample sources live in `samples/`.
 
+## Inspector
+
+The Inspector tab (Misc -> Inspector) records machine checkpoints so you can scrub
+back through recent history. Recording is off by default; turn it on with the
+**Record** checkbox on that tab (or `--inspector` / `[debug] inspector=1`).
+
+Open Debug Mode (**F9**), select Misc -> Inspector, enable **Record**, run a bit,
+**Pause**, then **Inspect**. You start at the paused live NOW endpoint. The slider
+selects recorded snapshots only - never a point between them. Drag to preview the
+paired picture (or pink when that picture has been evicted). The Snapshot row shows
+landed and preview positions while dragging (for example `382 of 507/729`). Release
+lands the snapshot; the thumb stays put while that land completes. The far-right
+endpoint is live NOW. Leaving Inspector restores that NOW presentation and stays
+paused, so the CRT does not jump.
+
+**[-]** / **[+]** move to the adjacent snapshot. **F12** re-executes toward live and
+stops at a breakpoint or at live; you stay in Inspect. Leaving and immediately
+re-entering without a machine change reuses the same NOW endpoint. **Opt+Left**
+(set PC from the Disassembly cursor) is unbound while Inspecting.
+
+**Forensics...** (or **Opt+R**) opens the full-window FIND UI over the CPU flight
+recorder. Land before / Land exact jump Inspect to a FIND hit's cycle; they do not
+drive the scrubber. A successful land opens the debugger on the Inspector tab. See
+**Forensics**.
+
+Breakpoints are one list in live and time travel. **Opt+B** toggles execute at the
+Disassembly cursor. Memory and register pokes are rejected while Inspect is on.
+
+A guest disk write that succeeds drops earlier history: the scrubber's left edge
+becomes that write. Finite and `max` turbo keep one continuous Inspector window;
+`history_off_on_max` affects only the separate CPU flight recorder.
+
+Budgets for the checkpoint ring, CPU flight recorder, and frame ring are under
+**[debug]** (and the matching CLI flags).
+
 ## Configure
 
 The Configure dialog (opened from **[Configure...]** in **Misc -> Machine**) has three
@@ -1463,8 +1483,7 @@ below the tab body on every tab.
 | Swap fire keys | While the stick is on: Space is button 0 and Option is button 1 (WASD-friendly). Off when the stick is Off |
 | Turbo | Comma-separated ladder, e.g. `1,max` or `1,4,8,max` |
 | History off on max | Pause only the CPU flight recorder while turbo is `max` (faster free-run); Inspector Record continues |
-| Pause on BRK | Auto-pause free-run at the next `BRK` (`$00`); off by default |
-| Show disk LEDs | Draw green (read) and red (write) activity LEDs in the window corner |
+| Show disk LEDs | Draw green (Disk II motor-on) and red (write activity) LEDs in the window corner |
 
 The Keyboard Joystick stick selector matches the runtime **Shift+Opt+1** /
 **Shift+Opt+2** assignment; either place can change the active stick. Change the
@@ -1576,7 +1595,6 @@ Default layout: slot 4 Mockingboard, slot 6 Disk II, slot 7 SmartPort, others em
 | `scroll_wheel_lines` | Integer; lines scrolled per wheel click |
 | `original_del` | `true`/`false`; Backspace sends `$7F` instead of `$08` |
 | `symbol_files` | Comma-separated list of symbol file paths |
-| `pause_on_brk` | `true`/`false`; when true, free-run auto-pauses at the next `BRK` |
 | `disk_leds` | `true`/`false`; show disk activity LEDs (also written as `[disk] show_disk_leds`) |
 
 ### [Video]
@@ -1675,42 +1693,11 @@ Persists the Assembler tab state. See **Assembler INI persistence**.
 | `history_memory_mb` | CPU flight-recorder budget; `0` or `16..4096` (default `256`) |
 | `frame_ring_memory_mb` | Frame-ring budget; `0` or `8..4096` (default `128`) |
 
-Inspector is opt-in debug recording. Off is the play path. On arms the CPU
-history recorder, the frame ring, and the checkpoint ring
-(`inspector_memory_mb` or `--inspector-memory`, default 128 MiB). With
-defaults, Inspector on is 256 + 128 + 128 = 512 MB. A budget of `0` disables
-that recorder and leaves an empty tape; it is not overridden back to the default.
-
-Open F9 debugger, Misc -> Inspector. Enable recording, Pause, then Inspect.
-Inspect is **time travel**: one real snapshot is recorded for each finite beam
-frame or max block presentation, and you start at the paused live NOW endpoint.
-The slider selects those snapshots, never a point between them. Drag to preview
-the exact paired historical picture or pink when that picture has been evicted;
-the Snapshot row shows both the landed and preview positions while dragging
-(for example, `382 of 507/729`). Release lands the snapshot and reconstructs
-missing pixels when possible; the thumb stays at the requested position while
-the runtime completes the land. The far-right endpoint is live NOW; if its
-cached picture is unavailable while dragging, the CRT keeps the last picture
-shown instead of turning pink. Leaving Inspector preserves that NOW
-presentation, so the CRT does not jump as the live machine is restored.
-[-]/[+] select the immediately adjacent snapshot. F12 re-executes toward live
-and stops at a breakpoint or at live; you stay in Inspect. Leave Inspector
-restores live NOW and stays paused. Leaving and immediately re-entering without
-a machine change reuses the same NOW endpoint. F7 is unbound. Opt+Left is
-unbound in time travel.
-
-**Forensics...** (or **Opt+R**) opens the full-window FIND UI over the same
-recorder. Land before / Land exact jump Inspect to a FIND hit's cycle; they do
-not drive the scrubber. A successful land then opens the debugger on the
-Inspector tab. See **Forensics**.
-
-Breakpoints are **one list** in live and time travel. Opt+B toggles execute at
-the disassembly cursor. Pokes are rejected while Inspect is on.
-
-A guest disk write that succeeds drops earlier history: the scrubber's left
-edge is that write, not data loss. Saving to a writable disk mid-session will
-cut the window. Finite/max changes keep one continuous Inspector window;
-`history_off_on_max` affects only the separate CPU flight recorder.
+Inspector recording is opt-in. Off is the normal play path. On arms the CPU
+flight recorder, the frame ring, and the checkpoint ring. With the defaults that
+is about 512 MB total (`256 + 128 + 128`). A budget of `0` disables that
+recorder. How to use Inspect and Forensics is under **Inspector** and
+**Forensics**.
 
 ### [DEBUG]
 
@@ -1772,7 +1759,8 @@ macOS, **Opt** = Option/Alt.
 | Key | Action |
 |-----|--------|
 | **F9** | Toggle Debug Mode on/off |
-| **Opt+H** | Toggle in-emulator help on/off |
+| **Opt+H** | Toggle in-emulator help on/off (**ESC** also closes it) |
+| **Opt+R** | Toggle Forensics (CPU flight recorder FIND UI) |
 | **Shift+Opt+A** | Assemble the configured source file using the Assembler settings |
 | **Shift+Opt+M** | Toggle keyboard joystick mapping between Numpad and WASD |
 | **F10** | Live: step instruction (paused) or Pause (running). Time travel: sealed step (no-op at live) |
@@ -1871,10 +1859,9 @@ combine headless mode with `--sna`:
 ./a2m --headless --control-port 6510 --sna demos/midload.a2state
 ```
 
-The server always binds to `127.0.0.1`. It accepts one client at a time. The socket
-thread performs network I/O only; runtime commands and snapshot requests are dispatched
-by the main loop, so remote control follows the same thread-ownership rules as the GUI
-debugger. The current protocol name is `A2M/13`.
+The server always binds to `127.0.0.1` and accepts one client at a time. Network I/O
+runs on a socket thread; commands are handled by the main loop, the same path the GUI
+debugger uses. The protocol name is `A2M/13`.
 
 Python helpers:
 
@@ -1969,19 +1956,17 @@ The client should parse the byte count from the `data` header and then read exac
 many bytes before consuming the trailing newline. Do not treat binary payloads as
 newline-delimited text.
 
-Deferred responses use a multi-entry table. Token-matched commands such as `get-cpu`
-and `get-memory` may be outstanding together. Other deferred work is still exclusive.
-A second conflicting deferred command may return:
+Deferred work uses a single exclusive slot. A second deferred command while one is
+already active may return:
 
 ```text
 <id> error busy deferred-response-active
 <id> error busy wait already active
-<id> error busy deferred-table-full
 ```
 
-Clients may pipeline requests (send several without waiting); responses may complete
-out of send order - correlate by request id. Duplicate outstanding ids are rejected
-with `bad-id`.
+Clients may pipeline non-deferred requests (send several without waiting); responses
+may complete out of send order - correlate by request id. Duplicate outstanding ids
+are rejected with `bad-id`.
 
 Deferred commands time out with:
 
@@ -2064,8 +2049,8 @@ same engine for scripts.
 
 Find, next, and read require the machine to be paused. Searches run newest-first
 unless `direction=forward` is specified. Find options are whitespace-separated
-`key=value` tokens (shared parser in `runtime_history_query_parse`). Defaults:
-`direction=backward`, `limit=64`. Unknown keys are rejected.
+`key=value` tokens. Defaults: `direction=backward`, `limit=64`. Unknown keys are
+rejected.
 
 ```text
 pc address access direction limit from epoch timeline cycle value opcodes
@@ -2262,18 +2247,15 @@ published symbols yet, the reply is `error not-ready`.
 
 ## Details
 
-This section records implementation details that are not necessary for day-to-day use
-but are useful for understanding what the emulator actually does under the hood.
+This section covers how the emulator works internally. Skip it for day-to-day use.
 
 ### Architecture
 
-a2m uses a layered C99 architecture: Machine -> Runtime -> Frontend, with a shared
-Tools layer. The machine (CPU, banking, video, Disk II, SmartPort, Mockingboard)
-runs entirely on a dedicated runtime thread. The UI and renderer run on the main
-thread. No live machine pointers cross threads -- all inter-thread data travels as
-copied snapshots through a command/event queue. The snapshot rule is strictly
-enforced: the frontend may only read runtime-provided copies and must never access
-live machine state directly.
+a2m is layered C: Machine -> Runtime -> Frontend, with a shared Tools layer. The
+machine (CPU, banking, video, Disk II, SmartPort, Mockingboard) runs on a dedicated
+runtime thread. The UI and renderer run on the main thread. No live machine pointers
+cross threads - inter-thread data travels as copied snapshots through a command/event
+queue. The frontend reads only runtime-provided copies, never live machine state.
 
 ### CPU
 
@@ -2328,8 +2310,8 @@ stereo; at turbo `max` chip time advances without host PCM.
 ### Gameport
 
 Paddles, buttons, a keyboard stick, and SDL pads feed `$C061`/`$C062`/`$C064`/`$C065`.
-Open-Apple is button 0; Closed-Apple is button 1. Motor activity can light the disk
-LEDs.
+Open-Apple is button 0; Closed-Apple is button 1. Disk II motor-on lights the green
+LED; write activity lights the red LED.
 
 ### Joystick
 
@@ -2366,29 +2348,11 @@ correct geometry is one click away in either mode.
 
 ### Vendored third-party code
 
-- `stb/stb_ds.h`, `stb/stb_image.h`
-  - Upstream: https://github.com/nothings/stb
-  - License: public domain or MIT
-- `inih/ini.c`, `inih/ini.h`
-  - Upstream: https://github.com/benhoyt/inih
-  - License: BSD-3-Clause
-- `logc/log.c`, `logc/log.h`
-  - Upstream: https://github.com/rxi/log.c
-  - License: MIT
-- `argparse/argparse.c`, `argparse/argparse.h`
-  - Upstream: https://github.com/cofyc/argparse
-  - License: MIT
-- `whereami/whereami.c`, `whereami/whereami.h`
-  - Upstream: https://github.com/gpakosz/whereami
-  - License: MIT or WTFPL v2
-- `tiny-regex-c/re.c`, `tiny-regex-c/re.h`
-  - Upstream: https://github.com/kokke/tiny-regex-c
-  - License: The Unlicense (public domain)
-- Nuklear (`src/frontend/nuklear.h`)
-  - Immediate-mode debugger UI
-  - License: public domain / MIT (see the header)
+- `stb/stb_ds.h`, `stb/stb_image.h` - https://github.com/nothings/stb (public domain or MIT)
+- `inih/ini.c`, `inih/ini.h` - https://github.com/benhoyt/inih (BSD-3-Clause)
+- `logc/log.c`, `logc/log.h` - https://github.com/rxi/log.c (MIT)
+- `argparse/argparse.c`, `argparse/argparse.h` - https://github.com/cofyc/argparse (MIT)
+- `whereami/whereami.c`, `whereami/whereami.h` - https://github.com/gpakosz/whereami (MIT or WTFPL v2)
+- `tiny-regex-c/re.c`, `tiny-regex-c/re.h` - https://github.com/kokke/tiny-regex-c (The Unlicense)
+- Nuklear (`src/frontend/nuklear.h`) - immediate-mode debugger UI (public domain / MIT; see the header)
 
-## Versions
-
-15 July 2026
-:   V3.00_start - Updated all the code to be a closer match to c64m so the same muscle memory works in both.
