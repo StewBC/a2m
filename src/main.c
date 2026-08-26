@@ -6,6 +6,7 @@
  *   text-input sync → debugger intents → present
  */
 
+#include "a2m_log.h"
 #include "app_options.h"
 #include "apple2_snapshot.h"
 #include "audio_buffer.h"
@@ -42,6 +43,42 @@
 #include <unistd.h>
 #define A2M_STAT_ISREG(mode) S_ISREG(mode)
 #endif
+
+/* Mirror a2m_log_level onto SDL's logger so leftover SDL/nuklear lines obey
+   the same --log-level / [config] log_level policy. */
+static void sdl_log_discard(
+    void *userdata,
+    int category,
+    SDL_LogPriority priority,
+    const char *message)
+{
+    (void)userdata;
+    (void)category;
+    (void)priority;
+    (void)message;
+}
+
+static void apply_sdl_log_policy(a2m_log_level level)
+{
+    switch (level) {
+    case A2M_LOG_LEVEL_ALL:
+        SDL_LogSetOutputFunction(NULL, NULL);
+        SDL_LogSetAllPriority(SDL_LOG_PRIORITY_VERBOSE);
+        break;
+    case A2M_LOG_LEVEL_ERROR:
+        SDL_LogSetOutputFunction(NULL, NULL);
+        SDL_LogSetAllPriority(SDL_LOG_PRIORITY_ERROR);
+        break;
+    case A2M_LOG_LEVEL_NONE:
+        SDL_LogSetOutputFunction(sdl_log_discard, NULL);
+        break;
+    case A2M_LOG_LEVEL_WARN:
+    default:
+        SDL_LogSetOutputFunction(NULL, NULL);
+        SDL_LogSetAllPriority(SDL_LOG_PRIORITY_WARN);
+        break;
+    }
+}
 
 /* ---- Apple gameport host (2 sticks × analog X/Y + buttons) -------------- */
 
@@ -453,7 +490,7 @@ static void sdl_apple_controller_add(
         }
     }
     if (slot >= A2M_CONTROLLER_MAX) {
-        SDL_Log(
+        log_info(
             "ignoring extra controller: %s",
             SDL_GameControllerNameForIndex(device_index));
         return;
@@ -461,14 +498,14 @@ static void sdl_apple_controller_add(
 
     controller = SDL_GameControllerOpen(device_index);
     if (controller == NULL) {
-        SDL_Log("SDL_GameControllerOpen failed: %s", SDL_GetError());
+        log_error("SDL_GameControllerOpen failed: %s", SDL_GetError());
         return;
     }
 
     joystick = SDL_GameControllerGetJoystick(controller);
     instance_id = joystick != NULL ? SDL_JoystickInstanceID(joystick) : -1;
     if (instance_id < 0) {
-        SDL_Log("SDL_JoystickInstanceID failed: %s", SDL_GetError());
+        log_error("SDL_JoystickInstanceID failed: %s", SDL_GetError());
         SDL_GameControllerClose(controller);
         return;
     }
@@ -484,7 +521,7 @@ static void sdl_apple_controller_add(
         &state->controllers[slot].axis_x,
         &state->controllers[slot].axis_y,
         &state->controllers[slot].buttons);
-    SDL_Log("controller connected: %s", SDL_GameControllerName(controller));
+    log_info("controller connected: %s", SDL_GameControllerName(controller));
     sdl_apple_gameport_publish(state, client);
 }
 
@@ -500,7 +537,7 @@ static void sdl_apple_controller_remove(
         return;
     }
 
-    SDL_Log(
+    log_info(
         "controller disconnected: %s",
         SDL_GameControllerName(state->controllers[slot].controller));
     SDL_GameControllerClose(state->controllers[slot].controller);
@@ -580,10 +617,10 @@ static void sdl_apple_controller_switch_mapping(
     connected_count = sdl_apple_controller_count(state);
     if (connected_count >= 2) {
         state->swapped = !state->swapped;
-        SDL_Log("gamepad sticks swapped");
+        log_info("gamepad sticks swapped");
     } else {
         state->single_controller_port = stick;
-        SDL_Log("single gamepad mapped to stick %u", stick);
+        log_info("single gamepad mapped to stick %u", stick);
     }
     state->published = false;
     sdl_apple_gameport_publish(state, client);
@@ -1230,10 +1267,10 @@ static bool send_quicksave(
         frontend_get_browse_dir(ui, FRONTEND_BROWSE_SLOT_SNAPSHOT);
 
     if (!make_quicksave_path(options, snapshot_dir, path, sizeof(path))) {
-        SDL_Log("quicksave: failed to build snapshot path");
+        log_warn("quicksave: failed to build snapshot path");
         return false;
     }
-    SDL_Log("quicksave: %s", path);
+    log_info("quicksave: %s", path);
     return runtime_client_save_state(client, path);
 }
 
@@ -1247,10 +1284,10 @@ static bool send_quickload(
         frontend_get_browse_dir(ui, FRONTEND_BROWSE_SLOT_SNAPSHOT);
 
     if (!find_newest_state_file(options, snapshot_dir, path, sizeof(path))) {
-        SDL_Log("quickload: no .a2state files found");
+        log_warn("quickload: no .a2state files found");
         return false;
     }
-    SDL_Log("quickload: %s", path);
+    log_info("quickload: %s", path);
     return runtime_client_load_state(client, path);
 }
 
@@ -1398,12 +1435,12 @@ static void drop_floppy_image(
 {
     int disk_slot = find_diskii_slot_for_drop(debug, options);
     if (disk_slot < 1) {
-        SDL_Log(
+        log_warn(
             "Dropped floppy ignored (no Disk II card installed): %s", path);
         return;
     }
     host_disk_queue_add(client, ui, options, (uint8_t)disk_slot, 0u, path);
-    SDL_Log("Dropped floppy queued on Disk II s%dd0: %s", disk_slot, path);
+    log_info("Dropped floppy queued on Disk II s%dd0: %s", disk_slot, path);
 }
 
 static void drop_smartport_image(
@@ -1415,7 +1452,7 @@ static void drop_smartport_image(
     int sp_slot = find_smartport_slot_for_drop(debug, options);
     (void)options;
     if (sp_slot < 1) {
-        SDL_Log(
+        log_warn(
             "Dropped HD image ignored (no SmartPort card installed): %s", path);
         return;
     }
@@ -1425,14 +1462,14 @@ static void drop_smartport_image(
             0u,
             RUNTIME_SLOT_CARD_SMARTPORT,
             path)) {
-        SDL_Log(
+        log_error(
             "Dropped HD image insert failed (slot %d unit 0): %s",
             sp_slot,
             path);
         return;
     }
     /* Options/INI mounts update via MEDIA_CHANGED. */
-    SDL_Log("Dropped HD image inserted on SmartPort s%dd0: %s", sp_slot, path);
+    log_info("Dropped HD image inserted on SmartPort s%dd0: %s", sp_slot, path);
 }
 
 /* .po is overloaded: classic floppy size → Disk II; anything else → SmartPort. */
@@ -1474,7 +1511,7 @@ static void handle_drop_file(
             bool sized_ok = false;
             bool is_floppy = drop_po_is_floppy(path, &sized_ok);
             if (!sized_ok) {
-                SDL_Log("Dropped .po ignored (unreadable file): %s", path);
+                log_warn("Dropped .po ignored (unreadable file): %s", path);
             } else if (is_floppy) {
                 drop_floppy_image(client, ui, options, debug, path);
             } else {
@@ -1485,7 +1522,7 @@ static void handle_drop_file(
         } else if (path_has_extension(path, "hdv") || path_has_extension(path, "2mg")) {
             drop_smartport_image(client, options, debug, path);
         } else {
-            SDL_Log("Drop ignored (unsupported type): %s", path);
+            log_info("Drop ignored (unsupported type): %s", path);
         }
     }
     SDL_free(path);
@@ -1710,7 +1747,7 @@ static void apply_loaded_host_state(
     if (ui != NULL && options != NULL && !frontend_config_dialog_is_open(ui)) {
         frontend_set_config_state(ui, options);
     }
-    SDL_Log(
+    log_info(
         "loaded host keyboard joystick: port %u (%s)%s",
         (unsigned)host.port,
         frontend_joystick_layout_to_string(host.layout),
@@ -2271,7 +2308,7 @@ static void dispatch_intent(
                         &turbo_cfg, options->turbo_multipliers)) {
                     turbo_arg = &turbo_cfg;
                 } else if (options->turbo_multipliers != NULL) {
-                    SDL_Log(
+                    log_warn(
                         "Configure: invalid turbo ladder, leaving live list unchanged");
                 }
                 if (!runtime_client_apply_machine_config(
@@ -2283,7 +2320,7 @@ static void dispatch_intent(
                         intent->config_result.machine_changed,
                         false,
                         runtime_running)) {
-                    SDL_Log(
+                    log_warn(
                         intent->config_result.machine_changed ?
                             "Configure: could not queue machine power cycle" :
                             "Configure: could not queue turbo ladder");
@@ -2300,13 +2337,13 @@ static void dispatch_intent(
             }
             if (save_now || options->remember) {
                 if (options->no_save_ini) {
-                    SDL_Log("Save INI: disabled (--nosaveini)");
+                    log_info("Save INI: disabled (--nosaveini)");
                 } else if (!app_options_save_shutdown(options)) {
-                    SDL_Log(
+                    log_error(
                         "Save INI failed: %s",
                         options->ini_path != NULL ? options->ini_path : "(null)");
                 } else if (save_now) {
-                    SDL_Log(
+                    log_info(
                         "Save INI now: wrote %s",
                         options->ini_path != NULL ? options->ini_path : "(null)");
                 }
@@ -2333,9 +2370,9 @@ static void dispatch_intent(
                 app_options_set_string(&options->browse_dirs[slot], dir[0] ? dir : NULL);
             }
             if (!app_options_save_paths_only(options)) {
-                SDL_Log("Save Paths Only failed");
+                log_error("Save Paths Only failed");
             } else {
-                SDL_Log("Save Paths Only: wrote %s",
+                log_info("Save Paths Only: wrote %s",
                         options->ini_path != NULL ? options->ini_path : "(null)");
             }
         }
@@ -2665,9 +2702,13 @@ int main(int argc, char **argv)
     controllers.last_axis[2] = FRONTEND_JOYSTICK_APPLE_AXIS_MID;
     controllers.last_axis[3] = FRONTEND_JOYSTICK_APPLE_AXIS_MID;
 
+    a2m_log_init();
+
     if (!app_options_load_startup(&options, argc, argv)) {
         return EXIT_FAILURE;
     }
+    /* INI/CLI may override the WARN default; apply before further host work. */
+    a2m_log_apply(options.log_level);
     frontend_input_mapper_set_original_del(&input_mapper, options.original_del);
     if (options.show_version) {
         printf("%s %s\n", A2M_NAME, A2M_VERSION);
@@ -2690,6 +2731,8 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
+    apply_sdl_log_policy(options.log_level);
+
     (void)app_options_apply_convenience_paths(&options);
     if (!apply_options_to_runtime_config(&options, &rt_config)) {
         goto done;
@@ -2710,7 +2753,7 @@ int main(int argc, char **argv)
             audio_desc.buffer = audio_buf;
             host_audio = platform_audio_create(&audio_desc);
             if (host_audio == NULL) {
-                SDL_Log("audio: failed to open device, running without audio");
+                log_warn("audio: failed to open device, running without audio");
                 audio_buffer_destroy(audio_buf);
                 audio_buf = NULL;
             } else {
@@ -2721,7 +2764,7 @@ int main(int argc, char **argv)
                 }
             }
         } else {
-            SDL_Log("audio: failed to allocate buffer, running without audio");
+            log_warn("audio: failed to allocate buffer, running without audio");
         }
     }
 
@@ -2749,9 +2792,8 @@ int main(int argc, char **argv)
             control_active = true;
             /* Seed slot map for mount-disk / select-disk resolve defaults. */
             (void)runtime_client_request_machine_state(client);
-            fprintf(
-                stderr,
-                "a2m: control port %d (protocol %s)\n",
+            log_info(
+                "control port %d (protocol %s)",
                 options.control_port,
                 CONTROL_PROTOCOL_VERSION);
         }
@@ -2785,9 +2827,9 @@ int main(int argc, char **argv)
     /* After worker start + initial Disk II / SmartPort mounts from config. */
     if (options.sna_path != NULL && options.sna_path[0] != '\0') {
         if (!runtime_client_load_state(client, options.sna_path)) {
-            SDL_Log("snapshot: failed to queue load for --sna %s", options.sna_path);
+            log_warn("snapshot: failed to queue load for --sna %s", options.sna_path);
         } else {
-            SDL_Log("snapshot: loading --sna %s", options.sna_path);
+            log_info("snapshot: loading --sna %s", options.sna_path);
         }
     }
 
@@ -2827,11 +2869,11 @@ int main(int argc, char **argv)
                 if (revent.type == RUNTIME_EVENT_SAVE_STATE_COMPLETE) {
                     if (!append_host_state_chunk(
                             revent.data.state_file.path, &options, &kbd_joystick)) {
-                        SDL_Log(
+                        log_warn(
                             "save state host settings append failed: %s",
                             revent.data.state_file.path);
                     }
-                    SDL_Log("save state complete: %s", revent.data.state_file.path);
+                    log_info("save state complete: %s", revent.data.state_file.path);
                 } else if (revent.type == RUNTIME_EVENT_LOAD_STATE_COMPLETE) {
                     apply_loaded_host_state(
                         revent.data.state_file.path,
@@ -2840,7 +2882,7 @@ int main(int argc, char **argv)
                         client,
                         &controllers,
                         &kbd_joystick);
-                    SDL_Log("load state complete: %s", revent.data.state_file.path);
+                    log_info("load state complete: %s", revent.data.state_file.path);
                 } else if (revent.type == RUNTIME_EVENT_ERROR) {
                     fprintf(stderr, "a2m: runtime: %s\n", revent.data.error.message);
                 } else if (revent.type == RUNTIME_EVENT_STOPPED) {
@@ -2992,7 +3034,7 @@ int main(int argc, char **argv)
                     if (!frontend_config_dialog_is_open(ui)) {
                         frontend_set_config_state(ui, &options);
                     }
-                    SDL_Log(
+                    log_info(
                         "keyboard joystick layout: %s",
                         frontend_joystick_layout_to_string(next_layout));
                     send_event_to_frontend = false;
@@ -3016,9 +3058,9 @@ int main(int argc, char **argv)
                         frontend_set_config_state(ui, &options);
                     }
                     if (next == 0u) {
-                        SDL_Log("keyboard joystick disabled");
+                        log_info("keyboard joystick disabled");
                     } else {
-                        SDL_Log(
+                        log_info(
                             "keyboard joystick assigned to stick %u (%s)",
                             next,
                             frontend_joystick_layout_to_string(kbd_joystick.layout));
@@ -3052,7 +3094,7 @@ int main(int argc, char **argv)
                            key_is_quick_assemble_shortcut(&event.key)) {
                     if (!debug.inspecting) {
                         if (!frontend_trigger_assembler(ui)) {
-                            SDL_Log("quick assemble: not queued (configure an assembler source)");
+                            log_warn("quick assemble: not queued (configure an assembler source)");
                         }
                     }
                     send_event_to_frontend = false;
@@ -3247,11 +3289,11 @@ int main(int argc, char **argv)
             if (revent.type == RUNTIME_EVENT_SAVE_STATE_COMPLETE) {
                 if (!append_host_state_chunk(
                         revent.data.state_file.path, &options, &kbd_joystick)) {
-                    SDL_Log(
+                    log_warn(
                         "save state host settings append failed: %s",
                         revent.data.state_file.path);
                 }
-                SDL_Log("save state complete: %s", revent.data.state_file.path);
+                log_info("save state complete: %s", revent.data.state_file.path);
             }
             if (revent.type == RUNTIME_EVENT_LOAD_STATE_COMPLETE) {
                 apply_loaded_host_state(
@@ -3261,7 +3303,7 @@ int main(int argc, char **argv)
                     client,
                     &controllers,
                     &kbd_joystick);
-                SDL_Log("load state complete: %s", revent.data.state_file.path);
+                log_info("load state complete: %s", revent.data.state_file.path);
             }
             if (revent.type == RUNTIME_EVENT_ERROR) {
                 fprintf(
@@ -3595,7 +3637,7 @@ done:
         runtime_stop(rt);
         if ((options.save_ini || options.remember) && !options.no_save_ini) {
             if (!runtime_save_debug_ini(rt)) {
-                SDL_Log(
+                log_warn(
                     "failed to save debug ini (breakpoints): %s",
                     options.ini_path != NULL ? options.ini_path : "(null)");
             }

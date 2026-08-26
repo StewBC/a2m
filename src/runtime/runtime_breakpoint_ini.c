@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "a2m_log.h"
 
 enum {
     RUNTIME_BREAKPOINT_KEY_MAX = 64,
@@ -121,7 +122,7 @@ typedef struct runtime_ini_breakpoint_parse_state {
 } runtime_ini_breakpoint_parse_state;
 
 static void runtime_ini_warn(const char *key, const char *message) {
-    fprintf(stderr, "warning: breakpoint `%s`: %s\n", key, message);
+    log_warn("breakpoint `%s`: %s", key, message);
 }
 
 static void runtime_ini_strip_suffix(char *address) {

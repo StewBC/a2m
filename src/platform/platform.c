@@ -1,5 +1,7 @@
 #include "platform.h"
 
+#include "a2m_log.h"
+
 #include <SDL.h>
 
 #define A2M_STARTUP_WINDOW_WIDTH 1152
@@ -17,7 +19,7 @@ bool platform_init(void)
         SDL_INIT_AUDIO |
         SDL_INIT_JOYSTICK |
         SDL_INIT_GAMECONTROLLER) != 0) {
-        SDL_Log("SDL_Init failed: %s", SDL_GetError());
+        log_error("SDL_Init failed: %s", SDL_GetError());
         return false;
     }
 
@@ -27,7 +29,7 @@ bool platform_init(void)
 bool platform_init_headless(void)
 {
     if (SDL_Init(SDL_INIT_TIMER | SDL_INIT_EVENTS) != 0) {
-        SDL_Log("SDL_Init headless failed: %s", SDL_GetError());
+        log_error("SDL_Init headless failed: %s", SDL_GetError());
         return false;
     }
 
@@ -58,7 +60,7 @@ platform_window *platform_window_create(const platform_window_config *config)
 
     platform = (platform_window *)SDL_calloc(1, sizeof(*platform));
     if (platform == NULL) {
-        SDL_Log("platform window allocation failed");
+        log_error("platform window allocation failed");
         return NULL;
     }
 
@@ -70,7 +72,7 @@ platform_window *platform_window_create(const platform_window_config *config)
         window_height,
         SDL_WINDOW_RESIZABLE);
     if (platform->window == NULL) {
-        SDL_Log("SDL_CreateWindow failed: %s", SDL_GetError());
+        log_error("SDL_CreateWindow failed: %s", SDL_GetError());
         platform_window_destroy(platform);
         return NULL;
     }
@@ -80,7 +82,7 @@ platform_window *platform_window_create(const platform_window_config *config)
         -1,
         SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (platform->renderer == NULL) {
-        SDL_Log("SDL_CreateRenderer failed: %s", SDL_GetError());
+        log_error("SDL_CreateRenderer failed: %s", SDL_GetError());
         platform_window_destroy(platform);
         return NULL;
     }
@@ -111,12 +113,12 @@ bool platform_window_clear(platform_window *window)
     }
 
     if (SDL_SetRenderDrawColor(window->renderer, 0, 0, 0, 255) != 0) {
-        SDL_Log("SDL_SetRenderDrawColor failed: %s", SDL_GetError());
+        log_error("SDL_SetRenderDrawColor failed: %s", SDL_GetError());
         return false;
     }
 
     if (SDL_RenderClear(window->renderer) != 0) {
-        SDL_Log("SDL_RenderClear failed: %s", SDL_GetError());
+        log_error("SDL_RenderClear failed: %s", SDL_GetError());
         return false;
     }
 

@@ -8,6 +8,7 @@
 #include "apple2.h"
 #include "apple2_file.h"
 #include "fs_watch.h"
+#include "a2m_log.h"
 
 #include <assert.h>
 #include <limits.h>
@@ -185,8 +186,8 @@ struct hostfs_volume {
 static bool hostfs_should_skip_basename(const char *name);
 static const char *hostfs_path_basename(const char *path);
 
-/* Single seam for every HostFS diagnostic. Writes one "a2m: HostFS ..." line to
-   stderr and records it on the volume so tests can assert a warning fired without
+/* Single seam for every HostFS diagnostic. Emits log_warn("HostFS ...") and
+   records the text on the volume so tests can assert a warning fired without
    capturing stderr. Callers own suppression; this always reports. */
 static void hostfs_warn(hostfs_volume *vol, const char *fmt, ...)
 {
@@ -197,7 +198,7 @@ static void hostfs_warn(hostfs_volume *vol, const char *fmt, ...)
     vsnprintf(msg, sizeof(msg), fmt, ap);
     va_end(ap);
 
-    fprintf(stderr, "a2m: HostFS %s\n", msg);
+    log_warn("HostFS %s", msg);
     if (vol != NULL) {
         snprintf(vol->last_warning, sizeof(vol->last_warning), "%s", msg);
         vol->warn_count++;

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "a2m_log.h"
+
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -60,6 +62,9 @@ typedef struct app_options {
     bool defaults;
     bool no_save_ini;
     bool show_version;
+    /* Host log policy: all|warn|error|none (default warn). CLI --log-level /
+       INI [config] log_level. Does not mute argparse / startup fprintf errors. */
+    a2m_log_level log_level;
     int scroll_wheel_lines;
     bool original_del;
     char *ini_path;

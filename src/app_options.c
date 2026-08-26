@@ -1827,6 +1827,13 @@ static void apply_config(app_options *options, config *cfg)
     options->pause_on_brk = config_get_bool(cfg, "config", "pause_on_brk", options->pause_on_brk);
     options->history_off_on_max = config_get_bool(
         cfg, "config", "history_off_on_max", options->history_off_on_max);
+    value = config_get(cfg, "config", "log_level");
+    if (value != NULL && value[0] != '\0') {
+        a2m_log_level parsed_log = A2M_LOG_LEVEL_WARN;
+        if (a2m_log_level_from_string(value, &parsed_log)) {
+            options->log_level = parsed_log;
+        }
+    }
 
     /* Legacy single-path keys (also accept a comma-separated queue). */
     value = config_get(cfg, "disk", "path");
@@ -2192,6 +2199,7 @@ static bool parse_command_line_overrides(app_options *options, int argc, char **
     const char *hd_help = NULL;
     const char *kbdjoy_layout = NULL;
     const char *video_display_s = NULL;
+    const char *log_level_s = NULL;
     float audio_record_start = 0.0f;
     float audio_record_duration = 0.0f;
     int show_version = 0;
@@ -2230,6 +2238,8 @@ static bool parse_command_line_overrides(app_options *options, int argc, char **
         OPT_STRING('\0', "hd", &hd_help, "SmartPort mount: path or s7d0=path (repeatable; default s7d0)", NULL, 0, 0),
         OPT_STRING('\0', "smart", &hd_help, "alias for --hd", NULL, 0, 0),
         OPT_STRING('i', "inifile", &ini_path, "path to an .ini file (default a2m.ini)", NULL, 0, 0),
+        OPT_STRING('\0', "log-level", &log_level_s,
+                   "host log policy: all|warn|error|none (default warn)", NULL, 0, 0),
         OPT_BOOLEAN('n', "noini", &noini, "do not use an ini file", NULL, 0, OPT_NONEG),
         OPT_BOOLEAN('!', "nosaveini", &no_save_ini, "do not save the ini no matter what", NULL, 0, OPT_NONEG),
         OPT_STRING('\0', "sna", &sna_path, "load machine snapshot at startup", NULL, 0, 0),
@@ -2257,6 +2267,7 @@ static bool parse_command_line_overrides(app_options *options, int argc, char **
         "  Same drive twice (e.g. -d s6d0=a.nib -d s6d0=b.nib) builds a multi-image queue.\n"
         "Keyboard stick: --kbdjoy 0|1|2 and --kbdjoy-layout numpad|wasd.\n"
         "Display: --video-display colour|white|green|amber or colour,<mono>.\n"
+        "Logging: --log-level all|warn|error|none (default warn).\n"
         "INI: --noini / --saveini / --remember / --defaults.\n");
     argparse_parse(&argparse, argc, (const char **)argv);
     (void)disk_help;
@@ -2344,6 +2355,16 @@ static bool parse_command_line_overrides(app_options *options, int argc, char **
     if (video_display_s != NULL &&
         !app_options_apply_video_display_arg(options, video_display_s)) {
         return false;
+    }
+    if (log_level_s != NULL) {
+        a2m_log_level parsed_log = A2M_LOG_LEVEL_WARN;
+        if (!a2m_log_level_from_string(log_level_s, &parsed_log)) {
+            fprintf(
+                stderr,
+                "a2m: --log-level expects all, warn, error, or none\n");
+            return false;
+        }
+        options->log_level = parsed_log;
     }
 
     if (remember) {
@@ -2442,6 +2463,7 @@ void app_options_init(app_options *options)
     memset(options, 0, sizeof(*options));
     options->use_ini = true;
     replace_string(&options->ini_path, A2M_DEFAULT_INI);
+    options->log_level = A2M_LOG_LEVEL_WARN;
     options->scroll_wheel_lines = A2M_DEFAULT_SCROLL_WHEEL_LINES;
     options->original_del = false;
     replace_string(&options->video_standard, A2M_DEFAULT_VIDEO_STANDARD);
@@ -2527,6 +2549,7 @@ bool app_options_copy(app_options *dest, const app_options *src)
     dest->remember = src->remember;
     dest->defaults = src->defaults;
     dest->no_save_ini = src->no_save_ini;
+    dest->log_level = src->log_level;
     dest->autorun = src->autorun;
     dest->show_disk_leds = src->show_disk_leds;
     dest->pause_on_brk = src->pause_on_brk;
@@ -2756,6 +2779,8 @@ bool app_options_save_shutdown(const app_options *options)
     }
     config_set_int(cfg, "config", "scroll_wheel_lines", options->scroll_wheel_lines);
     config_set_bool(cfg, "config", "original_del", options->original_del);
+    /* Always persist so a non-default value (and an explicit warn) survives. */
+    config_set(cfg, "config", "log_level", a2m_log_level_name(options->log_level));
     config_set_int(cfg, "debug", "history_memory_mb", options->history_memory_mb);
     config_set_bool(cfg, "config", "history_off_on_max", options->history_off_on_max);
     config_set_int(cfg, "debug", "frame_ring_memory_mb", options->frame_ring_memory_mb);

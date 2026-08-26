@@ -7,15 +7,20 @@
 #include "runtime_internal.h"
 #include "video.h"
 
+#include "a2m_log.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 static void runtime_inspector_warn_zero_budget(const runtime *rt)
 {
+    char msg[256];
+    size_t used = 0;
     int history_zero;
     int frame_zero;
     int inspector_zero;
+    int need_and = 0;
 
     if (rt == NULL || !rt->inspector_enabled) {
         return;
@@ -26,23 +31,31 @@ static void runtime_inspector_warn_zero_budget(const runtime *rt)
     if (!history_zero && !frame_zero && !inspector_zero) {
         return;
     }
-    fprintf(stderr, "a2m: inspector=1 but");
-    if (history_zero) {
-        fprintf(stderr, " history_memory_mb=0");
+
+    used = (size_t)snprintf(msg, sizeof(msg), "inspector=1 but");
+    if (history_zero && used < sizeof(msg)) {
+        used += (size_t)snprintf(msg + used, sizeof(msg) - used, " history_memory_mb=0");
+        need_and = 1;
     }
-    if (history_zero && (frame_zero || inspector_zero)) {
-        fprintf(stderr, " and");
+    if (frame_zero && used < sizeof(msg)) {
+        used += (size_t)snprintf(
+            msg + used,
+            sizeof(msg) - used,
+            "%s frame_ring_memory_mb=0",
+            need_and ? " and" : "");
+        need_and = 1;
     }
-    if (frame_zero) {
-        fprintf(stderr, " frame_ring_memory_mb=0");
+    if (inspector_zero && used < sizeof(msg)) {
+        used += (size_t)snprintf(
+            msg + used,
+            sizeof(msg) - used,
+            "%s inspector_memory_mb=0",
+            need_and ? " and" : "");
     }
-    if ((history_zero || frame_zero) && inspector_zero) {
-        fprintf(stderr, " and");
+    if (used < sizeof(msg)) {
+        (void)snprintf(msg + used, sizeof(msg) - used, "; Inspector window will be empty");
     }
-    if (inspector_zero) {
-        fprintf(stderr, " inspector_memory_mb=0");
-    }
-    fprintf(stderr, "; Inspector window will be empty\n");
+    log_warn("%s", msg);
 }
 
 void runtime_inspector_set_enabled(runtime *rt, bool enabled)

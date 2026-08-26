@@ -37,6 +37,7 @@ Useful flags:
 | `--headless` | No window; short smoke exit unless `--control-port` is set |
 | `--control-port N` | Listen on localhost TCP for A2M/13 remote control (`0`=off) |
 | `--inspector` / `--no-inspector` | Enable Inspector recording (default off) |
+| `--log-level <level>` | Host log policy: `all`, `warn` (default), `error`, or `none` |
 | `--audio-smoke` | Emit a 440 Hz test tone to verify audio output |
 | `--video-display <mode>` | Display decoder: `colour`/`color`, `white`, `green`, `amber`, or `colour,<mono>` |
 
@@ -1571,6 +1572,7 @@ Default layout: slot 4 Mockingboard, slot 6 Disk II, slot 7 SmartPort, others em
 | `Save` | `yes` -- save INI on quit |
 | `turbo_speeds` | Comma-separated turbo ladder, e.g. `1,max` |
 | `history_off_on_max` | `true`/`false`; pause flight recorder on `max` (default true). With Inspector Record on, entering max wipes the tape and turns Record off; leaving max restores Record into a new window. |
+| `log_level` | `all`, `warn` (default), `error`, or `none`; host log policy (also `--log-level`). Does not mute CLI/usage errors on stderr. |
 | `scroll_wheel_lines` | Integer; lines scrolled per wheel click |
 | `original_del` | `true`/`false`; Backspace sends `$7F` instead of `$08` |
 | `symbol_files` | Comma-separated list of symbol file paths |

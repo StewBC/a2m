@@ -11,6 +11,7 @@ else()
 endif()
 
 add_library(util STATIC
+    a2m_log.c
     apple2_file.c
     apple_type_script.c
     audio_buffer.c
@@ -39,6 +40,8 @@ target_include_directories(util PUBLIC
 target_compile_features(util PUBLIC c_std_99)
 
 target_link_libraries(util
+    PUBLIC
+        a2m_logc
     PRIVATE
         SDL2::SDL2
         a2m_inih

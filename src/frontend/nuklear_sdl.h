@@ -74,7 +74,7 @@ nk_sdl_device_upload_atlas(const void *image, int width, int height)
 
     SDL_Texture *g_SDLFontTexture = SDL_CreateTexture(sdl.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, width, height);
     if (g_SDLFontTexture == NULL) {
-        SDL_Log("error creating texture");
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "error creating texture");
         return;
     }
     SDL_UpdateTexture(g_SDLFontTexture, NULL, image, 4 * width);

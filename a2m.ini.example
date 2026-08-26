@@ -30,6 +30,8 @@ slot7 = smartport
 turbo_speeds = 1,max
 ; Pause CPU flight-recorder while turbo is max (~25% free-run boost). Default true.
 history_off_on_max = true
+; Host log policy: all | warn (default) | error | none. CLI: --log-level.
+; log_level = warn
 ; Write this file on exit when true, or use --saveini / --remember
 save_ini = false
 remember = false
