@@ -1686,7 +1686,10 @@ Inspect is **time travel**: one real snapshot is recorded for each finite beam
 frame or max block presentation, and you start at the paused live NOW endpoint.
 The slider selects those snapshots, never a point between them. Drag to preview
 the exact paired historical picture or pink when that picture has been evicted;
-release lands the snapshot and reconstructs missing pixels when possible.
+the Snapshot row shows both the landed and preview positions while dragging
+(for example, `382 of 507/729`). Release lands the snapshot and reconstructs
+missing pixels when possible; the thumb stays at the requested position while
+the runtime completes the land.
 [-]/[+] select the immediately adjacent snapshot. F12 re-executes toward live
 and stops at a breakpoint or at live; you stay in Inspect. Leave Inspector
 restores live NOW and stays paused. Leaving and immediately re-entering without

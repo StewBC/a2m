@@ -262,7 +262,10 @@ typedef struct frontend_misc_view_state {
     uint32_t display_override_flags;
     int inspector_slider; /* sample-indexed; maximum min(N-1, 1000) */
     bool inspector_thumb_down;
+    bool inspector_land_pending;
     uint64_t inspector_preview_picture_id;
+    uint64_t inspector_preview_sample_id;
+    uint64_t inspector_preview_ordinal;
 } frontend_misc_view_state;
 
 typedef enum frontend_active_view {
@@ -7668,6 +7671,7 @@ static void frontend_draw_misc_inspector(
     nk_bool rec;
     bool inspecting;
     bool can_enter;
+    bool preview_active;
     int slider;
     uint64_t catalog_count;
 
@@ -7678,6 +7682,21 @@ static void frontend_draw_misc_inspector(
     inspecting = debug != NULL && debug->inspecting;
     catalog_count = debug != NULL ? debug->inspector_catalog.count : 0u;
     can_enter = debug != NULL && debug->inspector_enabled && debug->inspector_window_valid;
+
+    if (!inspecting) {
+        ui->misc.inspector_thumb_down = false;
+        ui->misc.inspector_land_pending = false;
+        ui->misc.inspector_preview_picture_id = 0u;
+        ui->misc.inspector_preview_sample_id = 0u;
+        ui->misc.inspector_preview_ordinal = 0u;
+    } else if (ui->misc.inspector_land_pending &&
+               debug->inspector_focus_is_sample &&
+               debug->inspector_focus_id ==
+                   ui->misc.inspector_preview_sample_id) {
+        ui->misc.inspector_land_pending = false;
+    }
+    preview_active = ui->misc.inspector_thumb_down ||
+        ui->misc.inspector_land_pending;
 
     if (!inspecting) {
         rec = (debug != NULL && debug->inspector_enabled) ? nk_true : nk_false;
@@ -7730,6 +7749,7 @@ static void frontend_draw_misc_inspector(
         bool can_previous = false;
         bool can_next = false;
         bool thumb = ui->misc.inspector_thumb_down;
+        bool busy = thumb || ui->misc.inspector_land_pending;
         int slider_max = catalog_count > 1u ?
             (int)((catalog_count - 1u) < 1000u ? catalog_count - 1u : 1000u) : 0;
 
@@ -7746,7 +7766,7 @@ static void frontend_draw_misc_inspector(
             }
         }
 
-        if (!thumb) {
+        if (!busy) {
             uint64_t focus_ordinal = debug->inspector_focus_ordinal;
             if (!debug->inspector_focus_is_sample) {
                 uint64_t i;
@@ -7767,7 +7787,7 @@ static void frontend_draw_misc_inspector(
         nk_layout_row_begin(ctx, NK_DYNAMIC, 22.0f, 3);
         nk_layout_row_push(ctx, 0.08f);
         if (frontend_nk_action_button(
-                ctx, "-", !thumb && can_previous)) {
+                ctx, "-", !busy && can_previous)) {
             frontend_push_inspector_intent(
                 ui, FRONTEND_DEBUGGER_INTENT_INSPECTOR_SAMPLE_STEP, false, 0u);
         }
@@ -7798,6 +7818,8 @@ static void frontend_draw_misc_inspector(
                     sample_id = debug->inspector_catalog.samples[ordinal].sample_id;
                     ui->misc.inspector_preview_picture_id =
                         debug->inspector_catalog.samples[ordinal].picture_id;
+                    ui->misc.inspector_preview_sample_id = sample_id;
+                    ui->misc.inspector_preview_ordinal = ordinal;
                 }
                 if (!down) {
                     frontend_push_inspector_intent(
@@ -7806,6 +7828,7 @@ static void frontend_draw_misc_inspector(
                         false,
                         sample_id);
                     ui->misc.inspector_thumb_down = false;
+                    ui->misc.inspector_land_pending = sample_id != 0u;
                 }
             } else if ((hovered || moved) && down) {
                 uint64_t ordinal = frontend_inspector_slider_to_ordinal(
@@ -7813,10 +7836,13 @@ static void frontend_draw_misc_inspector(
                 ui->misc.inspector_thumb_down = true;
                 ui->misc.inspector_preview_picture_id = ordinal < catalog_count ?
                     debug->inspector_catalog.samples[ordinal].picture_id : 0u;
+                ui->misc.inspector_preview_sample_id = ordinal < catalog_count ?
+                    debug->inspector_catalog.samples[ordinal].sample_id : 0u;
+                ui->misc.inspector_preview_ordinal = ordinal;
             }
         }
         nk_layout_row_push(ctx, 0.08f);
-        if (frontend_nk_action_button(ctx, "+", !thumb && can_next)) {
+        if (frontend_nk_action_button(ctx, "+", !busy && can_next)) {
             frontend_push_inspector_intent(
                 ui, FRONTEND_DEBUGGER_INTENT_INSPECTOR_SAMPLE_STEP, true, 0u);
         }
@@ -7828,7 +7854,21 @@ static void frontend_draw_misc_inspector(
     nk_layout_row_push(ctx, 0.48f);
     nk_label(ctx, "Snapshot:", NK_TEXT_LEFT);
     nk_layout_row_push(ctx, 0.52f);
-    if (debug->inspector_focus_is_sample) {
+    if (preview_active && catalog_count > 0u) {
+        uint64_t preview_number = ui->misc.inspector_preview_ordinal + 1u;
+        if (debug->inspector_focus_is_sample) {
+            snprintf(
+                line, sizeof(line), "%llu of %llu/%llu",
+                (unsigned long long)(debug->inspector_focus_ordinal + 1u),
+                (unsigned long long)preview_number,
+                (unsigned long long)catalog_count);
+        } else {
+            snprintf(
+                line, sizeof(line), "Exact to %llu/%llu",
+                (unsigned long long)preview_number,
+                (unsigned long long)catalog_count);
+        }
+    } else if (debug->inspector_focus_is_sample) {
         snprintf(
             line, sizeof(line), "%llu of %llu",
             (unsigned long long)(catalog_count > 0u ?
@@ -8723,7 +8763,8 @@ void frontend_end_input(frontend *ui)
 
 bool frontend_inspector_preview(const frontend *ui, uint64_t *out_picture_id)
 {
-    if (ui == NULL || !ui->misc.inspector_thumb_down) {
+    if (ui == NULL ||
+        (!ui->misc.inspector_thumb_down && !ui->misc.inspector_land_pending)) {
         return false;
     }
     if (out_picture_id != NULL) {
