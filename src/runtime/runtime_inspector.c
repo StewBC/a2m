@@ -293,7 +293,6 @@ void runtime_inspector_mark_presentation_changed(runtime *rt)
     rt->presentation_generation++;
     if (rt->presentation_generation == 0u) rt->presentation_generation = 1u;
     rt->inspector_has_presentation = false;
-    inspector_clear_now_picture(rt);
 }
 
 void runtime_inspector_destroy(runtime *rt)
@@ -405,6 +404,30 @@ static bool inspector_ensure_presentation(runtime *rt)
     return rt->presentation_scratch != NULL;
 }
 
+static bool inspector_restore_live_state(
+    runtime *rt, bool restore_presentation);
+
+static bool inspector_restore_now_presentation(runtime *rt)
+{
+    runtime_inspector_picture_slot *slot;
+    const size_t bytes =
+        (size_t)APPLE2_VIDEO_WIDTH * (size_t)APPLE2_VIDEO_HEIGHT * sizeof(uint32_t);
+    if (rt == NULL || !rt->inspector_now_valid ||
+        !inspector_ensure_presentation(rt)) return false;
+    slot = &rt->inspector_picture_slot;
+    if (slot->mutex == NULL) return false;
+    mutex_lock(slot->mutex);
+    if (!slot->valid || slot->picture_id != rt->inspector_now_endpoint_id ||
+        slot->argb == NULL) {
+        mutex_unlock(slot->mutex);
+        return false;
+    }
+    memcpy(rt->presentation_scratch, slot->argb, bytes);
+    mutex_unlock(slot->mutex);
+    rt->inspector_has_presentation = true;
+    return true;
+}
+
 static void inspector_select_sample_focus(
     runtime *rt,
     const runtime_inspector_sample_meta *meta,
@@ -479,7 +502,7 @@ static void inspector_prepare_now_presentation(runtime *rt)
         if (!rt->inspector_has_presentation &&
             runtime_inspector_reconstruct_sample_picture(
                 rt, newest.sample_id, rt->presentation_scratch, pixels)) {
-            (void)runtime_inspector_restore_live(rt);
+            (void)inspector_restore_live_state(rt, false);
             rt->inspector_has_presentation = true;
         }
     }
@@ -533,7 +556,8 @@ bool runtime_inspector_materialize_live(runtime *rt, uint64_t cycle)
     return ok;
 }
 
-bool runtime_inspector_restore_live(runtime *rt)
+static bool inspector_restore_live_state(
+    runtime *rt, bool restore_presentation)
 {
     if (rt == NULL || rt->inspector_now_blob == NULL || rt->inspector_now_size == 0u) {
         return false;
@@ -552,8 +576,15 @@ bool runtime_inspector_restore_live(runtime *rt)
         rt->inspector_now_execution_mode == RUNTIME_INSPECTOR_EXECUTION_FINITE;
     inspector_apply_live_seal(rt);
     runtime_inspector_sync_focus(rt);
-    rt->inspector_has_presentation = false;
+    if (restore_presentation) {
+        (void)inspector_restore_now_presentation(rt);
+    }
     return true;
+}
+
+bool runtime_inspector_restore_live(runtime *rt)
+{
+    return inspector_restore_live_state(rt, true);
 }
 
 bool runtime_inspector_land_sample(runtime *rt, uint64_t sample_id)
@@ -862,7 +893,6 @@ void runtime_inspector_leave(runtime *rt)
     }
     apple2_set_replay_sealed(&rt->machine, false);
     rt->inspecting = false;
-    rt->inspector_has_presentation = false;
     if (rt->inspector_enabled) {
         runtime_inspector_recorder_set_enabled(rt, true);
     }

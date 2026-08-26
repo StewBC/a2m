@@ -266,6 +266,7 @@ typedef struct frontend_misc_view_state {
     uint64_t inspector_preview_picture_id;
     uint64_t inspector_preview_sample_id;
     uint64_t inspector_preview_ordinal;
+    bool inspector_preview_keep_current;
 } frontend_misc_view_state;
 
 typedef enum frontend_active_view {
@@ -7689,6 +7690,7 @@ static void frontend_draw_misc_inspector(
         ui->misc.inspector_preview_picture_id = 0u;
         ui->misc.inspector_preview_sample_id = 0u;
         ui->misc.inspector_preview_ordinal = 0u;
+        ui->misc.inspector_preview_keep_current = false;
     } else if (ui->misc.inspector_land_pending &&
                debug->inspector_focus_is_sample &&
                debug->inspector_focus_id ==
@@ -7820,6 +7822,8 @@ static void frontend_draw_misc_inspector(
                         debug->inspector_catalog.samples[ordinal].picture_id;
                     ui->misc.inspector_preview_sample_id = sample_id;
                     ui->misc.inspector_preview_ordinal = ordinal;
+                    ui->misc.inspector_preview_keep_current =
+                        ordinal + 1u == catalog_count;
                 }
                 if (!down) {
                     frontend_push_inspector_intent(
@@ -7839,6 +7843,8 @@ static void frontend_draw_misc_inspector(
                 ui->misc.inspector_preview_sample_id = ordinal < catalog_count ?
                     debug->inspector_catalog.samples[ordinal].sample_id : 0u;
                 ui->misc.inspector_preview_ordinal = ordinal;
+                ui->misc.inspector_preview_keep_current =
+                    ordinal + 1u == catalog_count;
             }
         }
         nk_layout_row_push(ctx, 0.08f);
@@ -8761,14 +8767,23 @@ void frontend_end_input(frontend *ui)
     nk_input_end(ui->ctx);
 }
 
-bool frontend_inspector_preview(const frontend *ui, uint64_t *out_picture_id)
+bool frontend_inspector_preview(
+    const frontend *ui,
+    uint64_t *out_picture_id,
+    bool *out_keep_current_on_missing)
 {
-    if (ui == NULL ||
-        (!ui->misc.inspector_thumb_down && !ui->misc.inspector_land_pending)) {
+    /* After release the runtime owns presentation.  Keeping the pending
+       preview active here could paint pink over a just-reconstructed frame
+       before the next frontend render observes the completed land. */
+    if (ui == NULL || !ui->misc.inspector_thumb_down) {
         return false;
     }
     if (out_picture_id != NULL) {
         *out_picture_id = ui->misc.inspector_preview_picture_id;
+    }
+    if (out_keep_current_on_missing != NULL) {
+        *out_keep_current_on_missing =
+            ui->misc.inspector_preview_keep_current;
     }
     return true;
 }

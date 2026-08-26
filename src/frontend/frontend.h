@@ -303,7 +303,10 @@ bool frontend_submit_argb_frame(
     uint32_t height,
     uint64_t frame_number);
 /* True while the Inspector thumb is down (film/pink preview). */
-bool frontend_inspector_preview(const frontend *ui, uint64_t *out_picture_id);
+bool frontend_inspector_preview(
+    const frontend *ui,
+    uint64_t *out_picture_id,
+    bool *out_keep_current_on_missing);
 void frontend_render(frontend *ui, bool ui_visible, const frontend_debug_state *debug_state);
 /* Force disk activity LEDs off (e.g. machine reset). */
 void frontend_clear_disk_activity_leds(frontend *ui);

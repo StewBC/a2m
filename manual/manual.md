@@ -1689,7 +1689,10 @@ the exact paired historical picture or pink when that picture has been evicted;
 the Snapshot row shows both the landed and preview positions while dragging
 (for example, `382 of 507/729`). Release lands the snapshot and reconstructs
 missing pixels when possible; the thumb stays at the requested position while
-the runtime completes the land.
+the runtime completes the land. The far-right endpoint is live NOW; if its
+cached picture is unavailable while dragging, the CRT keeps the last picture
+shown instead of turning pink. Leaving Inspector preserves that NOW
+presentation, so the CRT does not jump as the live machine is restored.
 [-]/[+] select the immediately adjacent snapshot. F12 re-executes toward live
 and stops at a breakpoint or at live; you stay in Inspect. Leave Inspector
 restores live NOW and stays paused. Leaving and immediately re-entering without

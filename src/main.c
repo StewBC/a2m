@@ -3494,7 +3494,9 @@ int main(int argc, char **argv)
         }
         {
             uint64_t preview_picture_id = 0u;
-            if (frontend_inspector_preview(ui, &preview_picture_id)) {
+            bool keep_current_on_missing = false;
+            if (frontend_inspector_preview(
+                    ui, &preview_picture_id, &keep_current_on_missing)) {
                 static runtime_ring_frame film;
                 if (runtime_client_inspector_copy_picture(
                         client, preview_picture_id, &film)) {
@@ -3506,7 +3508,7 @@ int main(int argc, char **argv)
                         film.frame_number);
                     debug.has_frame = true;
                     debug.frame_number = film.frame_number;
-                } else {
+                } else if (!keep_current_on_missing) {
                     static uint32_t pink[
                         APPLE2_VIDEO_WIDTH * APPLE2_VIDEO_HEIGHT];
                     static int pink_init = 0;

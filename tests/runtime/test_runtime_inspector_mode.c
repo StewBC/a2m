@@ -249,6 +249,7 @@ int main(void)
     uint8_t motor_now;
     uint16_t via_t1_now;
     uint64_t framebuffer_now;
+    uint64_t now_display_hash = 0u;
     runtime_inspector_window window;
 
     if (SDL_Init(SDL_INIT_TIMER | SDL_INIT_EVENTS) != 0) {
@@ -593,6 +594,14 @@ int main(void)
         }
         expect_true("live cycle", apple2_cycles(&rt->machine) == cycles_now);
         expect_true("live pc", rt->machine.cpu.cpu.pc == pc_now);
+        mutex_lock(rt->frame_slot.mutex);
+        if (rt->frame_slot.argb != NULL) {
+            now_display_hash = framebuffer_hash(
+                rt->frame_slot.argb,
+                (size_t)APPLE2_VIDEO_WIDTH * (size_t)APPLE2_VIDEO_HEIGHT);
+        }
+        mutex_unlock(rt->frame_slot.mutex);
+        expect_true("NOW display captured", now_display_hash != 0u);
 
         /* F12 at live is a no-op (stay in time travel, paused). */
         expect_true("run at live", runtime_client_run(client));
@@ -647,6 +656,19 @@ int main(void)
             rt->machine.video.fb,
             (size_t)APPLE2_VIDEO_WIDTH * (size_t)APPLE2_VIDEO_HEIGHT) ==
             framebuffer_now);
+    {
+        uint64_t leave_display_hash = 0u;
+        mutex_lock(rt->frame_slot.mutex);
+        if (rt->frame_slot.argb != NULL) {
+            leave_display_hash = framebuffer_hash(
+                rt->frame_slot.argb,
+                (size_t)APPLE2_VIDEO_WIDTH * (size_t)APPLE2_VIDEO_HEIGHT);
+        }
+        mutex_unlock(rt->frame_slot.mutex);
+        expect_true(
+            "Leave preserves NOW presentation",
+            leave_display_hash == now_display_hash);
+    }
     expect_true("cpu after exit", wait_cpu(client, &cpu_now, 2.0));
     expect_true("cpu pc now", cpu_now.pc == pc_now);
 
