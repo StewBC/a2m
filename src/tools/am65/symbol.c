@@ -295,11 +295,13 @@ int symbol_delete_local(SCOPE *scope, const char *symbol_name, uint32_t symbol_n
             if(!force && sl->symbol_type == SYMBOL_ADDRESS) {
                 return 0;
             }
+            /* Swap-remove drops this slot; free the owned name first or it leaks. */
+            free((char *)sl->symbol_name);
+            sl->symbol_name = NULL;
             size_t last = bucket_array->items - 1;
             if(i != last) {
-                SYMBOL_LABEL *dst = AM65_ARRAY_GET(bucket_array, SYMBOL_LABEL, i);
                 SYMBOL_LABEL *src = AM65_ARRAY_GET(bucket_array, SYMBOL_LABEL, last);
-                *dst = *src;
+                *sl = *src;
             }
             bucket_array->items--;
             return 1;
