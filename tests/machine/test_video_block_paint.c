@@ -126,6 +126,41 @@ int main(void)
     expect_true("beam line preserved", m.video.line == 50);
     expect_true("beam h preserved", m.video.cycle_in_line == 12);
 
+    /* Explicit-destination presentation paint leaves canonical pixels and
+       every timing/latch field untouched. */
+    {
+        uint32_t *scratch = malloc(pixels * sizeof(*scratch));
+        uint32_t *canonical_copy = malloc(pixels * sizeof(*canonical_copy));
+        uint64_t frame_number = m.video.frame_number;
+        uint32_t frame_gen = m.video.frame_gen;
+        uint8_t last_video_byte = m.video.last_video_byte;
+        bool frame_ready = m.video.frame_ready;
+        bool paint_enabled = m.video.paint_enabled;
+
+        expect_true("scratch allocations", scratch != NULL && canonical_copy != NULL);
+        memcpy(canonical_copy, fb, pixels * sizeof(*canonical_copy));
+        memset(scratch, 0x5A, pixels * sizeof(*scratch));
+        expect_true(
+            "paint explicit destination",
+            apple2_video_paint_full_frame_to(&m, scratch, pixels));
+        expect_true("scratch got picture", count_nonblack(scratch, pixels) > 0);
+        expect_true(
+            "canonical pixels preserved",
+            memcmp(canonical_copy, fb, pixels * sizeof(*canonical_copy)) == 0);
+        expect_true("scratch beam line", m.video.line == 50);
+        expect_true("scratch beam h", m.video.cycle_in_line == 12);
+        expect_true("scratch frame number", m.video.frame_number == frame_number);
+        expect_true("scratch frame gen", m.video.frame_gen == frame_gen);
+        expect_true("scratch latch", m.video.last_video_byte == last_video_byte);
+        expect_true("scratch frame ready", m.video.frame_ready == frame_ready);
+        expect_true("scratch paint enabled", m.video.paint_enabled == paint_enabled);
+        expect_true(
+            "short destination rejected",
+            !apple2_video_paint_full_frame_to(&m, scratch, pixels - 1u));
+        free(canonical_copy);
+        free(scratch);
+    }
+
     /* Reseed from cycles: known position. */
     m.cpu.cpu.cycles = (uint64_t)APPLE2_VIDEO_CYCLES_PER_LINE * 10u + 7u;
     apple2_video_reseed_from_cycles(&m);

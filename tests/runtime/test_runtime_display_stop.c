@@ -270,15 +270,16 @@ int main(void)
         exit(1);
     }
 
-    /* Stop with Override off keeps the beam when video RAM is not rewritten. */
+    /* Override repaint is host-only.  The following stop exposes the sparse
+       canonical beam buffer rather than inheriting the full-RAM repaint. */
     drain_frames(client, pixels);
     step_nop(client);
     expect_true("beam stop frame", wait_frame(client, pixels, 2000u));
     nonblack = count_nonblack(pixels, FRAME_PIXELS);
-    if (nonblack < 1000) {
+    if (nonblack >= 1000) {
         fprintf(
             stderr,
-            "FAIL: beam stop should keep raster, nonblack=%d\n",
+            "FAIL: host-only repaint leaked into beam buffer, nonblack=%d\n",
             nonblack);
         exit(1);
     }

@@ -1088,6 +1088,26 @@ void apple2_video_paint_full_frame(apple2_t *m)
     }
 }
 
+bool apple2_video_paint_full_frame_to(
+    apple2_t *m,
+    uint32_t *dst,
+    size_t dst_pixels)
+{
+    uint32_t *canonical;
+    const size_t required =
+        (size_t)APPLE2_VIDEO_WIDTH * (size_t)APPLE2_VIDEO_HEIGHT;
+
+    if (m == NULL || dst == NULL || dst_pixels < required) {
+        return false;
+    }
+
+    canonical = m->video.fb;
+    m->video.fb = dst;
+    apple2_video_paint_full_frame(m);
+    m->video.fb = canonical;
+    return true;
+}
+
 void apple2_video_set_display_override(
     apple2_t *m,
     bool enabled,

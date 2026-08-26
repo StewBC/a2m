@@ -31,12 +31,12 @@ int main(void)
     expect_true(
         "push10",
         runtime_frame_ring_push(
-            &ring, 10, 1000, DISPLAY_FRAME_WIDTH, DISPLAY_FRAME_HEIGHT, pixels));
+            &ring, 101, 10, 1000, DISPLAY_FRAME_WIDTH, DISPLAY_FRAME_HEIGHT, pixels));
     pixels[0] = 0xFF0000FFu;
     expect_true(
         "push11",
         runtime_frame_ring_push(
-            &ring, 11, 2000, DISPLAY_FRAME_WIDTH, DISPLAY_FRAME_HEIGHT, pixels));
+            &ring, 102, 11, 2000, DISPLAY_FRAME_WIDTH, DISPLAY_FRAME_HEIGHT, pixels));
 
     expect_true("copy by frame 11", runtime_frame_ring_copy_by_frame(&ring, 11, &out));
     expect_true("frame num", out.frame_number == 11);
@@ -44,6 +44,13 @@ int main(void)
 
     expect_true("copy by cycle", runtime_frame_ring_copy_by_cycle(&ring, 1500, &out));
     expect_true("at-or-before", out.frame_number == 10);
+    expect_true(
+        "copy exact picture",
+        runtime_frame_ring_copy_by_picture_id(&ring, 102, &out));
+    expect_true("exact picture frame", out.frame_number == 11);
+    expect_true(
+        "missing picture does not fall back",
+        !runtime_frame_ring_copy_by_picture_id(&ring, 999, &out));
 
     expect_true("pre-window fails", !runtime_frame_ring_copy_by_frame(&ring, 1, &out));
 
@@ -56,7 +63,7 @@ int main(void)
     expect_true(
         "no push when off",
         !runtime_frame_ring_push(
-            &ring, 12, 3000, DISPLAY_FRAME_WIDTH, DISPLAY_FRAME_HEIGHT, pixels));
+            &ring, 103, 12, 3000, DISPLAY_FRAME_WIDTH, DISPLAY_FRAME_HEIGHT, pixels));
 
     runtime_frame_ring_clear(&ring);
     runtime_frame_ring_get_info(&ring, &info);
@@ -68,6 +75,7 @@ int main(void)
         pixels[0] = i;
         (void)runtime_frame_ring_push(
             &ring,
+            200u + i,
             100u + i,
             10000u + i,
             DISPLAY_FRAME_WIDTH,

@@ -30,6 +30,7 @@ typedef struct runtime_ring_frame {
     uint32_t pixel_format;
     uint64_t frame_number;
     uint64_t machine_cycle;
+    uint64_t inspector_picture_id; /* 0 for non-Inspector/general entries. */
     uint32_t pixels[RUNTIME_FRAME_RING_PIXELS];
 } runtime_ring_frame;
 
@@ -60,10 +61,14 @@ void runtime_frame_ring_destroy(runtime_frame_ring *ring);
 void runtime_frame_ring_clear(runtime_frame_ring *ring);
 void runtime_frame_ring_set_recording(runtime_frame_ring *ring, bool recording);
 void runtime_frame_ring_drop_older_than(runtime_frame_ring *ring, uint64_t cycle);
+void runtime_frame_ring_drop_before_picture_id(
+    runtime_frame_ring *ring,
+    uint64_t picture_id);
 
 /* Push one completed live frame. pixels must be width*height ARGB. */
 bool runtime_frame_ring_push(
     runtime_frame_ring *ring,
+    uint64_t inspector_picture_id,
     uint64_t frame_number,
     uint64_t machine_cycle,
     uint32_t width,
@@ -96,4 +101,10 @@ bool runtime_frame_ring_meta_at_index(
 bool runtime_frame_ring_copy_by_cycle(
     runtime_frame_ring *ring,
     uint64_t machine_cycle,
+    runtime_ring_frame *out_frame);
+
+/* Exact stable Inspector picture lookup; never falls back by cycle. */
+bool runtime_frame_ring_copy_by_picture_id(
+    runtime_frame_ring *ring,
+    uint64_t picture_id,
     runtime_ring_frame *out_frame);

@@ -19,7 +19,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void runtime_publish_argb_frame(runtime *rt);
+static void runtime_publish_argb_pixels(
+    runtime *rt,
+    const uint32_t *pixels,
+    runtime_frame_publish_kind kind,
+    uint64_t inspector_picture_id);
+static void runtime_publish_canonical_frame(
+    runtime *rt,
+    runtime_frame_publish_kind kind,
+    uint64_t inspector_picture_id);
 static void runtime_publish_presented_frame(runtime *rt);
 static void runtime_set_active_turbo(runtime *rt, uint32_t milli_mhz);
 
@@ -1320,8 +1328,8 @@ static void runtime_load_state(runtime *rt, const runtime_command *command)
     runtime_publish_cpu(rt, 0);
     runtime_publish_machine(rt);
     if (rt->machine.video.fb != NULL) {
-        apple2_video_paint_full_frame(&rt->machine);
-        runtime_publish_argb_frame(rt);
+        runtime_publish_canonical_frame(
+            rt, RUNTIME_FRAME_PUBLISH_HOST_ONLY, 0u);
     }
 }
 
@@ -2585,7 +2593,8 @@ static void runtime_set_active_turbo(runtime *rt, uint32_t milli_mhz)
     if (now_max && rt->machine_ready) {
         /* Immediate presentation frame so max is never blank. */
         apple2_video_paint_full_frame(&rt->machine);
-        runtime_publish_argb_frame(rt);
+        runtime_publish_canonical_frame(
+            rt, RUNTIME_FRAME_PUBLISH_TRANSITION_CANONICAL, 0u);
     }
 }
 
@@ -2669,7 +2678,8 @@ static void runtime_free_run_max_quantum(runtime *rt)
 
     /* Presentation paint ~60 Hz wall — not blank warp. */
     apple2_video_paint_full_frame(&rt->machine);
-    runtime_publish_argb_frame(rt);
+    runtime_publish_canonical_frame(
+        rt, RUNTIME_FRAME_PUBLISH_MAX_CADENCE_CANONICAL, 0u);
 }
 
 /* Speaker soft-square amplitude (pre-AC-couple). Modest so MB can share headroom. */
@@ -2925,9 +2935,12 @@ static void runtime_pace_after_frame(runtime *rt)
     }
 }
 
-static void runtime_publish_argb_frame(runtime *rt)
+static void runtime_publish_argb_pixels(
+    runtime *rt,
+    const uint32_t *pixels,
+    runtime_frame_publish_kind kind,
+    uint64_t inspector_picture_id)
 {
-    const uint32_t *fb = apple2_video_framebuffer(&rt->machine);
     uint32_t w = APPLE2_VIDEO_WIDTH;
     uint32_t h = APPLE2_VIDEO_HEIGHT;
     size_t nbytes = (size_t)w * (size_t)h * sizeof(uint32_t);
@@ -2935,7 +2948,7 @@ static void runtime_publish_argb_frame(runtime *rt)
     uint64_t frame_number;
     uint64_t machine_cycle;
 
-    if (fb == NULL) {
+    if (rt == NULL || pixels == NULL) {
         return;
     }
 
@@ -2950,7 +2963,7 @@ static void runtime_publish_argb_frame(runtime *rt)
         if (rt->frame_slot.has_frame) {
             rt->frame_slot.dropped_frames++;
         }
-        memcpy(rt->frame_slot.argb, fb, nbytes);
+        memcpy(rt->frame_slot.argb, pixels, nbytes);
         rt->frame_slot.width = w;
         rt->frame_slot.height = h;
         rt->frame_slot.frame_number = frame_number;
@@ -2961,9 +2974,17 @@ static void runtime_publish_argb_frame(runtime *rt)
 
     /* Rolling screen log (C2). Forensic publishes the live slot only — the
        ring is a recorder and must not grow while standing on the tape. */
-    if (!rt->inspecting) {
+    if (!rt->inspecting &&
+        (kind == RUNTIME_FRAME_PUBLISH_FINITE_CADENCE_CANONICAL ||
+         kind == RUNTIME_FRAME_PUBLISH_MAX_CADENCE_CANONICAL)) {
         (void)runtime_frame_ring_push(
-            &rt->frame_ring, frame_number, machine_cycle, w, h, fb);
+            &rt->frame_ring,
+            inspector_picture_id,
+            frame_number,
+            machine_cycle,
+            w,
+            h,
+            pixels);
     }
 
     memset(&event, 0, sizeof(event));
@@ -2986,6 +3007,37 @@ static void runtime_publish_argb_frame(runtime *rt)
     runtime_publish_event(rt, &event);
 }
 
+static void runtime_publish_canonical_frame(
+    runtime *rt,
+    runtime_frame_publish_kind kind,
+    uint64_t inspector_picture_id)
+{
+    const uint32_t *fb;
+
+    if (rt == NULL) {
+        return;
+    }
+    fb = apple2_video_framebuffer(&rt->machine);
+    runtime_publish_argb_pixels(rt, fb, kind, inspector_picture_id);
+}
+
+static bool runtime_paint_presentation_scratch(runtime *rt)
+{
+    const size_t pixels =
+        (size_t)APPLE2_VIDEO_WIDTH * (size_t)APPLE2_VIDEO_HEIGHT;
+
+    if (rt == NULL) {
+        return false;
+    }
+    if (rt->presentation_scratch == NULL) {
+        rt->presentation_scratch =
+            (uint32_t *)malloc(pixels * sizeof(*rt->presentation_scratch));
+    }
+    return rt->presentation_scratch != NULL &&
+        apple2_video_paint_full_frame_to(
+            &rt->machine, rt->presentation_scratch, pixels);
+}
+
 /*
  * Present the CRT after a stop (or on REQUEST_FRAME).
  * Override, max turbo, and paint-off (sealed run) have no trustworthy beam
@@ -3000,9 +3052,16 @@ static void runtime_publish_presented_frame(runtime *rt)
     if (rt->machine.video.display_override_enabled ||
         !rt->machine.video.paint_enabled ||
         runtime_turbo_is_free_run(rt)) {
-        apple2_video_paint_full_frame(&rt->machine);
+        if (runtime_paint_presentation_scratch(rt)) {
+            runtime_publish_argb_pixels(
+                rt,
+                rt->presentation_scratch,
+                RUNTIME_FRAME_PUBLISH_HOST_ONLY,
+                0u);
+            return;
+        }
     }
-    runtime_publish_argb_frame(rt);
+    runtime_publish_canonical_frame(rt, RUNTIME_FRAME_PUBLISH_HOST_ONLY, 0u);
 }
 
 static void runtime_maybe_frame(runtime *rt)
@@ -3014,7 +3073,8 @@ static void runtime_maybe_frame(runtime *rt)
         /* Max: live path is wall-paced block paint, not beam frame_ready. */
         return;
     }
-    runtime_publish_argb_frame(rt);
+    runtime_publish_canonical_frame(
+        rt, RUNTIME_FRAME_PUBLISH_FINITE_CADENCE_CANONICAL, 0u);
     runtime_pace_after_frame(rt);
 }
 
@@ -3035,8 +3095,13 @@ static void runtime_refresh_display_after_memory_edit(runtime *rt)
     if (rt == NULL || !rt->machine_ready || rt->machine.video.fb == NULL) {
         return;
     }
-    apple2_video_paint_full_frame(&rt->machine);
-    runtime_publish_argb_frame(rt);
+    if (runtime_paint_presentation_scratch(rt)) {
+        runtime_publish_argb_pixels(
+            rt,
+            rt->presentation_scratch,
+            RUNTIME_FRAME_PUBLISH_HOST_ONLY,
+            0u);
+    }
 }
 
 static void runtime_handle_request_memory(runtime *rt, const runtime_command *cmd)
@@ -3663,7 +3728,8 @@ static void runtime_inspector_publish_head(runtime *rt)
     runtime_publish_cpu(rt, 0u);
     runtime_publish_machine(rt);
     if (rt->machine.video.fb != NULL) {
-        runtime_publish_argb_frame(rt);
+        runtime_publish_canonical_frame(
+            rt, RUNTIME_FRAME_PUBLISH_HOST_ONLY, 0u);
     }
 }
 
@@ -4298,8 +4364,11 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
             &rt->machine,
             cmd->data.set_display_override.enabled != 0u,
             cmd->data.set_display_override.flags);
-        apple2_video_paint_full_frame(&rt->machine);
-        runtime_publish_argb_frame(rt);
+        if (runtime_paint_presentation_scratch(rt)) {
+            runtime_publish_argb_pixels(
+                rt, rt->presentation_scratch,
+                RUNTIME_FRAME_PUBLISH_HOST_ONLY, 0u);
+        }
         break;
     case RUNTIME_COMMAND_SET_VIDEO_DISPLAY:
         rt->config.video_colour = cmd->data.set_video_display.colour != 0u;
@@ -4308,8 +4377,11 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
             &rt->machine,
             rt->config.video_colour,
             (apple2_video_phosphor)rt->config.video_phosphor);
-        apple2_video_paint_full_frame(&rt->machine);
-        runtime_publish_argb_frame(rt);
+        if (runtime_paint_presentation_scratch(rt)) {
+            runtime_publish_argb_pixels(
+                rt, rt->presentation_scratch,
+                RUNTIME_FRAME_PUBLISH_HOST_ONLY, 0u);
+        }
         break;
 
     /* ---- History C4a: info / record on|off / clear ---- */

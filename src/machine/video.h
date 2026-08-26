@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 struct apple2;
@@ -86,6 +87,16 @@ bool apple2_video_take_frame_ready(struct apple2 *m);
  * Covers text40/80, lores, dlores, hgr, dhgr, mixed combos, page1/2.
  */
 void apple2_video_paint_full_frame(struct apple2 *m);
+
+/*
+ * Paint a coherent full frame into caller-owned storage without changing the
+ * canonical beam framebuffer or any video timing/latch state.  dst_pixels
+ * must hold at least APPLE2_VIDEO_WIDTH * APPLE2_VIDEO_HEIGHT entries.
+ */
+bool apple2_video_paint_full_frame_to(
+    struct apple2 *m,
+    uint32_t *dst,
+    size_t dst_pixels);
 
 /*
  * Debugger presentation override. This changes only which display mode/page

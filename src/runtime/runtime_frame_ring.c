@@ -115,8 +115,29 @@ void runtime_frame_ring_drop_older_than(runtime_frame_ring *ring, uint64_t cycle
     runtime_frame_ring_unlock(ring);
 }
 
+void runtime_frame_ring_drop_before_picture_id(
+    runtime_frame_ring *ring,
+    uint64_t picture_id)
+{
+    if (ring == NULL || !runtime_frame_ring_usable(ring) || picture_id == 0u) {
+        return;
+    }
+    runtime_frame_ring_lock(ring);
+    while (ring->count > 0u) {
+        const runtime_ring_frame *oldest = runtime_frame_ring_at(ring, 0u);
+        if (oldest->inspector_picture_id == 0u ||
+            oldest->inspector_picture_id >= picture_id) {
+            break;
+        }
+        ring->count--;
+        ring->dropped++;
+    }
+    runtime_frame_ring_unlock(ring);
+}
+
 bool runtime_frame_ring_push(
     runtime_frame_ring *ring,
+    uint64_t inspector_picture_id,
     uint64_t frame_number,
     uint64_t machine_cycle,
     uint32_t width,
@@ -147,6 +168,7 @@ bool runtime_frame_ring_push(
     slot->pixel_format = DISPLAY_FRAME_PIXEL_FORMAT_ARGB8888;
     slot->frame_number = frame_number;
     slot->machine_cycle = machine_cycle;
+    slot->inspector_picture_id = inspector_picture_id;
     n = (size_t)width * (size_t)height;
     memcpy(slot->pixels, pixels, n * sizeof(uint32_t));
 
@@ -319,4 +341,30 @@ bool runtime_frame_ring_copy_by_cycle(
     runtime_ring_frame *out_frame)
 {
     return runtime_frame_ring_copy(ring, machine_cycle, true, out_frame);
+}
+
+bool runtime_frame_ring_copy_by_picture_id(
+    runtime_frame_ring *ring,
+    uint64_t picture_id,
+    runtime_ring_frame *out_frame)
+{
+    uint32_t i;
+    bool ok = false;
+
+    if (ring == NULL || out_frame == NULL || picture_id == 0u) {
+        return false;
+    }
+    runtime_frame_ring_lock(ring);
+    if (runtime_frame_ring_usable(ring)) {
+        for (i = 0u; i < ring->count; i++) {
+            const runtime_ring_frame *entry = runtime_frame_ring_at(ring, i);
+            if (entry->inspector_picture_id == picture_id) {
+                *out_frame = *entry;
+                ok = true;
+                break;
+            }
+        }
+    }
+    runtime_frame_ring_unlock(ring);
+    return ok;
 }

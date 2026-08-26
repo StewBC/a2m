@@ -444,6 +444,7 @@ void runtime_destroy(runtime *rt)
     runtime_history_destroy(rt->history);
     rt->history = NULL;
     free(rt->frame_slot.argb);
+    free(rt->presentation_scratch);
     free(rt->ini_path);
     rt->ini_path = NULL;
     for (j = 0; j < rt->diskii_mount_count; j++) {

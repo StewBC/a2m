@@ -41,6 +41,13 @@ typedef enum runtime_exec_state {
     RUNTIME_EXEC_RUNNING
 } runtime_exec_state;
 
+typedef enum runtime_frame_publish_kind {
+    RUNTIME_FRAME_PUBLISH_HOST_ONLY = 0,
+    RUNTIME_FRAME_PUBLISH_FINITE_CADENCE_CANONICAL,
+    RUNTIME_FRAME_PUBLISH_MAX_CADENCE_CANONICAL,
+    RUNTIME_FRAME_PUBLISH_TRANSITION_CANONICAL
+} runtime_frame_publish_kind;
+
 typedef struct runtime_frame_slot {
     mutex *mutex;
     /* Latest ARGB frame for UI (Apple size). Also mirrored as display_frame meta. */
@@ -165,6 +172,8 @@ struct runtime {
     message_queue *event_queue;
     runtime_client client;
     runtime_frame_slot frame_slot;
+    /* Worker-owned full-frame destination for debugger/UI-only repaints. */
+    uint32_t *presentation_scratch;
     runtime_debug_memory_slot debug_memory_slot;
     runtime_breakpoint_slot breakpoint_slot;
     runtime_rpc_payload_pool rpc_payload_pool;
