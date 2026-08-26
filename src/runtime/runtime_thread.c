@@ -3810,9 +3810,8 @@ static void runtime_inspector_publish_head(runtime *rt)
             rt->presentation_scratch,
             RUNTIME_FRAME_PUBLISH_HOST_ONLY,
             0u);
-    } else if (rt->machine.video.fb != NULL) {
-        runtime_publish_canonical_frame(
-            rt, RUNTIME_FRAME_PUBLISH_HOST_ONLY, 0u);
+    } else {
+        runtime_publish_presented_frame(rt);
     }
 }
 

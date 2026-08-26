@@ -484,12 +484,17 @@ int main(void)
         /* Exact land: checkpoint ≤ mid then reexecute to mid. */
         {
             uint64_t mid = old + (live - old) / 2u;
+            uint64_t frames_before;
+            uint64_t displayed_hash = 0u;
             if (mid <= old) {
                 mid = old + 1u;
             }
             if (mid >= live) {
                 mid = live > old + 1u ? live - 1u : old;
             }
+            mutex_lock(rt->frame_slot.mutex);
+            frames_before = rt->frame_slot.published_frames;
+            mutex_unlock(rt->frame_slot.mutex);
             token = runtime_client_alloc_request_token(client);
             expect_true(
                 "land_to_cycle",
@@ -513,6 +518,30 @@ int main(void)
             }
             expect_true("exact cycle", apple2_cycles(&rt->machine) == mid);
             expect_true("sealed after exact", rt->machine.replay_sealed);
+            {
+                clock_t t0 = clock();
+                uint64_t published = frames_before;
+                while (published == frames_before &&
+                       (double)(clock() - t0) / (double)CLOCKS_PER_SEC < 2.0) {
+                    mutex_lock(rt->frame_slot.mutex);
+                    published = rt->frame_slot.published_frames;
+                    mutex_unlock(rt->frame_slot.mutex);
+                    SDL_Delay(1);
+                }
+                expect_true("exact land publishes display", published > frames_before);
+            }
+            mutex_lock(rt->frame_slot.mutex);
+            if (rt->frame_slot.argb != NULL) {
+                displayed_hash = framebuffer_hash(
+                    rt->frame_slot.argb,
+                    (size_t)APPLE2_VIDEO_WIDTH * (size_t)APPLE2_VIDEO_HEIGHT);
+            }
+            mutex_unlock(rt->frame_slot.mutex);
+            expect_true(
+                "exact land display matches focus",
+                displayed_hash == framebuffer_hash(
+                    rt->machine.video.fb,
+                    (size_t)APPLE2_VIDEO_WIDTH * (size_t)APPLE2_VIDEO_HEIGHT));
         }
 
         /* Step insn from the landed snapshot. */

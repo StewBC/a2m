@@ -379,6 +379,10 @@ void runtime_inspector_sync_focus(runtime *rt)
     if (rt == NULL || !rt->machine_ready) {
         return;
     }
+    /* A sealed CPU/cycle focus has no paired historical picture.  Callers
+       which select a catalog sample repopulate presentation_scratch after
+       synchronizing the machine focus. */
+    rt->inspector_has_presentation = false;
     memset(&rt->inspector_focus, 0, sizeof(rt->inspector_focus));
     rt->inspector_focus.valid = true;
     rt->inspector_focus.cycle = apple2_cycles(&rt->machine);
