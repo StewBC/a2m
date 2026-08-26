@@ -1816,10 +1816,34 @@ static void machine_config_from_options(
     }
 }
 
+/* Capture live host geometry into options before an INI write. Configure's
+   dialog copy does not track resize or splitter drags. */
+static void sync_window_and_layout_into_options(
+    app_options *options,
+    platform_window *window,
+    frontend *ui)
+{
+    if (options == NULL) {
+        return;
+    }
+    if (window != NULL) {
+        platform_window_get_size(
+            window, &options->window_width, &options->window_height);
+    }
+    if (ui != NULL) {
+        frontend_layout_state layout_state;
+        frontend_get_layout_state(ui, &layout_state);
+        options->layout_split_display_right = layout_state.split_display_right;
+        options->layout_split_top_bottom = layout_state.split_top_bottom;
+        options->layout_split_memory_misc = layout_state.split_memory_misc;
+    }
+}
+
 static void dispatch_intent(
     runtime_client *client,
     frontend *ui,
     app_options *options,
+    platform_window *window,
     frontend_joystick_input *kbd_joystick,
     sdl_apple_controller_state *controllers,
     bool runtime_running,
@@ -2333,6 +2357,11 @@ static void dispatch_intent(
                     app_options_set_string(&options->browse_dirs[slot], dir[0] ? dir : NULL);
                 }
                 sync_assembler_options_from_frontend(options, ui);
+            }
+            /* Dialog options omit live resize/splitters; refresh before write
+               and before folding options back into the open Configure dialog. */
+            sync_window_and_layout_into_options(options, window, ui);
+            if (ui != NULL) {
                 frontend_set_config_state(ui, options);
             }
             if (save_now || options->remember) {
@@ -3568,6 +3597,7 @@ int main(int argc, char **argv)
                 client,
                 ui,
                 &options,
+                window,
                 &kbd_joystick,
                 &controllers,
                 debug.runtime_state == FRONTEND_RUNTIME_STATE_RUNNING,
@@ -3591,16 +3621,9 @@ int main(int argc, char **argv)
     }
 
     if ((options.save_ini || options.remember) && !options.no_save_ini) {
-        if (window != NULL) {
-            platform_window_get_size(window, &options.window_width, &options.window_height);
-        }
+        sync_window_and_layout_into_options(&options, window, ui);
         if (ui != NULL) {
-            frontend_layout_state layout_state;
             int slot;
-            frontend_get_layout_state(ui, &layout_state);
-            options.layout_split_display_right = layout_state.split_display_right;
-            options.layout_split_top_bottom = layout_state.split_top_bottom;
-            options.layout_split_memory_misc = layout_state.split_memory_misc;
             for (slot = 0; slot < FRONTEND_BROWSE_SLOT_COUNT && slot < APP_BROWSE_DIR_COUNT;
                  ++slot) {
                 const char *dir = frontend_get_browse_dir(ui, (frontend_browse_slot)slot);
