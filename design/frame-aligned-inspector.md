@@ -4,7 +4,7 @@
 |-------|-------|
 | **Author** | Codex (Designer) |
 | **Date** | 2026-08-25 |
-| **Status** | Accepted (reviewer-approved final) |
+| **Status** | Landed |
 | **Canonical path** | [`design/frame-aligned-inspector.md`](frame-aligned-inspector.md) |
 
 ---

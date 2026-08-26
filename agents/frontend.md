@@ -127,8 +127,9 @@ stay in Forensics; Opt+R/Close entry-surface rules unchanged. Double-click `id=`
 Design (landed): [`design/forensics-ui.md`](../design/forensics-ui.md),
 [`design/forensics-query-guide.md`](../design/forensics-query-guide.md).
 
-Entering **max** remembers Record, wipes the tape, turns Record off (checkbox
-locked). Leaving max restores Record into an empty window.
+Entering **max** leaves Inspector Record available and keeps the same sample
+catalog. Max block presentations continue adding samples at approximately
+60 Hz. `history_off_on_max` pauses only the separate HST1 CPU recorder.
 
 ## Keyboard stick
 

@@ -1,4 +1,4 @@
-/* TM2: checkpoint ring, sealed materialize to scratch, media truncate. */
+/* Frame-aligned TimeMachine samples, sealed materialize, media cuts, max. */
 #include "apple2.h"
 #include "apple2_snapshot.h"
 #include "runtime.h"
@@ -105,14 +105,39 @@ int main(void)
 
     expect_true("TM on", runtime_inspector_enabled(rt));
     expect_true("has CP", runtime_inspector_checkpoint_count(rt) >= 1u);
+    {
+        uint64_t i;
+        uint64_t previous_id = 0u;
+        for (i = 0u; i < runtime_inspector_sample_count(rt); i++) {
+            runtime_inspector_sample_meta meta;
+            runtime_ring_frame picture;
+            expect_true("sample meta", runtime_inspector_sample_meta_at(rt, i, &meta));
+            expect_true("stable increasing id", meta.sample_id > previous_id);
+            expect_true("finite kind", meta.kind == RUNTIME_INSPECTOR_SAMPLE_FINITE_FRAME);
+            expect_true("snapshot follows frame", meta.snapshot_cycle >= meta.frame_cycle);
+            expect_true("paired picture id", meta.picture_id == meta.sample_id);
+            expect_true(
+                "exact paired picture",
+                runtime_client_inspector_copy_picture(client, meta.picture_id, &picture));
+            expect_true("picture captured at F", picture.machine_cycle == meta.frame_cycle);
+            previous_id = meta.sample_id;
+        }
+    }
+    {
+        uint64_t before = runtime_inspector_sample_count(rt);
+        expect_true("request frame", runtime_client_request_frame(client));
+        SDL_Delay(20);
+        drain(client);
+        expect_true(
+            "host-only request creates no sample",
+            runtime_inspector_sample_count(rt) == before);
+    }
     size_blob = (uint32_t)apple2_snapshot_size(&rt->machine);
     expect_true("snapshot size", size_blob > 100000u && size_blob < 400000u);
-    printf("tm2 snapshot_size=%u cadence=%u cps=%llu\n",
+    printf("tm snapshot_size=%u samples=%llu\n",
         size_blob,
-        (unsigned)RUNTIME_INSPECTOR_CHECKPOINT_CADENCE_CYCLES,
         (unsigned long long)runtime_inspector_checkpoint_count(rt));
 
-    (void)runtime_inspector_checkpoint_take(rt);
     runtime_inspector_window_info(rt, &window);
     expect_true("window valid", window.valid);
     mid = window.newest_cycle;
@@ -138,7 +163,7 @@ int main(void)
             (unsigned long long)st_after.record_count);
     }
     expect_true("seal HST1", st_before.record_count == st_after.record_count);
-    expect_true("scratch cycles", apple2_cycles(&scratch) >= mid - 20000u);
+    expect_true("scratch cycles", apple2_cycles(&scratch) == mid);
 
     pc1 = scratch.cpu.cpu.pc;
     ram0 = apple2_debug_read(&scratch, 0x0000);
@@ -165,7 +190,6 @@ int main(void)
 
     /* Off path: disable TM, CPs stop growing on further run. */
     {
-        uint64_t cps = runtime_inspector_checkpoint_count(rt);
         uint64_t token = runtime_client_alloc_request_token(client);
         expect_true("TM off", runtime_client_inspector_set_enabled(client, false, token));
         SDL_Delay(20);
@@ -174,13 +198,12 @@ int main(void)
         SDL_Delay(40);
         expect_true("pause off", runtime_client_pause(client));
         expect_true("paused off", wait_event(client, RUNTIME_EVENT_PAUSED, 2.0));
-        expect_true("no new CP while off", runtime_inspector_checkpoint_count(rt) == cps);
+        expect_true("window cleared while off", runtime_inspector_checkpoint_count(rt) == 0u);
     }
 
     /* Media truncate: marker retained as window left edge. */
     {
         uint64_t token;
-        runtime_history_record rec;
         uint64_t trunc_before = runtime_inspector_media_truncations(rt);
 
         token = runtime_client_alloc_request_token(client);
@@ -188,56 +211,56 @@ int main(void)
             "TM on again", runtime_client_inspector_set_enabled(client, true, token));
         SDL_Delay(20);
         drain(client);
-        (void)runtime_inspector_checkpoint_take(rt);
+        expect_true("run after re-enable", runtime_client_run(client));
+        SDL_Delay(60);
+        expect_true("pause after re-enable", runtime_client_pause(client));
+        expect_true("paused after re-enable", wait_event(client, RUNTIME_EVENT_PAUSED, 2.0));
+        expect_true("sample after re-enable", runtime_inspector_sample_count(rt) > 0u);
         runtime_inspector_on_media_event(
             rt, apple2_cycles(&rt->machine), 6, 0, APPLE2_MEDIA_EVENT_GUEST_WRITE);
         expect_true(
             "trunc count",
             runtime_inspector_media_truncations(rt) > trunc_before);
-        expect_true("first after cut", runtime_history_first(rt->history, &rec));
-        expect_true(
-            "MEDIA_CHANGED",
-            rec.kind == RUNTIME_HISTORY_RECORD_MARKER &&
-                rec.marker_kind == RUNTIME_HISTORY_MARKER_MEDIA_CHANGED);
-        expect_true(
-            "cause guest write",
-            rec.marker_arg0 == RUNTIME_HISTORY_MEDIA_CHANGE_GUEST_WRITE);
         runtime_inspector_window_info(rt, &window);
-        expect_true("window after cut", window.valid);
-        expect_true("window oldest id is marker", window.oldest_id == rec.id);
+        expect_true("window hidden while waiting", !window.valid);
+        expect_true("run through quiet cadences", runtime_client_run(client));
+        SDL_Delay(100);
+        expect_true("pause after media quiet", runtime_client_pause(client));
+        expect_true("paused after media quiet", wait_event(client, RUNTIME_EVENT_PAUSED, 2.0));
+        runtime_inspector_window_info(rt, &window);
+        expect_true("window after safe anchor", window.valid);
         expect_true("start kind", window.start_kind ==
             RUNTIME_HISTORY_MEDIA_CHANGE_GUEST_WRITE);
     }
 
-    /* Max turbo (TMA3): remember Record, wipe tape, Record off; leave restores. */
+    /* Max turbo: TimeMachine continues; default policy pauses HST1 only. */
     {
         uint64_t oldest = 0u;
         uint64_t live = 0u;
         uint64_t n = 0u;
 
-        expect_true("run max", runtime_client_run(client));
+        uint64_t before = runtime_inspector_sample_count(rt);
         expect_true(
             "set max",
             runtime_client_set_turbo_multiplier(client, RUNTIME_TURBO_MAX));
+        expect_true("run max", runtime_client_run(client));
+        SDL_Delay(80);
         expect_true("pause in max", runtime_client_pause(client));
         expect_true("paused in max", wait_event(client, RUNTIME_EVENT_PAUSED, 2.0));
         drain(client);
-        expect_true("Record off in max", !runtime_inspector_enabled(rt));
-        expect_true("tape wiped in max", runtime_inspector_checkpoint_count(rt) == 0u);
+        expect_true("Record stays on in max", runtime_inspector_enabled(rt));
+        expect_true("max adds samples", runtime_inspector_sample_count(rt) > before);
         runtime_inspector_timeline_bounds(rt, &oldest, &live, &n);
-        expect_true("no timeline in max", n == 0u);
+        expect_true("timeline remains in max", n > 0u);
 
         expect_true(
             "set 1MHz",
             runtime_client_set_turbo_multiplier(client, RUNTIME_TURBO_MHZ_1));
         SDL_Delay(20);
         drain(client);
-        expect_true("Record restored on leave max", runtime_inspector_enabled(rt));
-        expect_true(
-            "fresh tape after leave max",
-            runtime_inspector_checkpoint_count(rt) >= 1u);
+        expect_true("Record remains on after max", runtime_inspector_enabled(rt));
         runtime_inspector_timeline_bounds(rt, &oldest, &live, &n);
-        expect_true("timeline after leave max", n >= 1u);
+        expect_true("same timeline after leave max", n >= 1u);
 
         /* Record-off stays off across a max round-trip. */
         {
@@ -262,6 +285,47 @@ int main(void)
         }
     }
 
+    runtime_stop(rt);
+    runtime_destroy(rt);
+
+    /* A one-megabyte tape must evict blob-only samples without losing the
+       reconstructed resume framebuffer at its new hidden anchor. */
+    runtime_config_init(&config);
+    config.start_running = false;
+    config.inspector = true;
+    config.inspector_memory_mb = 1;
+    config.inspector_memory_mb_configured = true;
+    config.history_memory_mb = 4;
+    config.history_memory_mb_configured = true;
+    config.frame_ring_memory_mb = 2;
+    config.frame_ring_memory_mb_configured = true;
+    expect_true("small tape turbo 1", runtime_config_set_turbo_csv(&config, "1"));
+    rt = runtime_create(&config);
+    expect_true("small tape create", rt != NULL);
+    expect_true("small tape start", runtime_start(rt));
+    client = runtime_get_client(rt);
+    expect_true("small tape started", wait_event(client, RUNTIME_EVENT_STARTED, 2.0));
+    expect_true("small tape paused", wait_event(client, RUNTIME_EVENT_PAUSED, 2.0));
+    drain(client);
+    expect_true("small tape run", runtime_client_run(client));
+    expect_true("small tape running", wait_event(client, RUNTIME_EVENT_RUNNING, 2.0));
+    SDL_Delay(180);
+    expect_true("small tape pause", runtime_client_pause(client));
+    expect_true("small tape pause event", wait_event(client, RUNTIME_EVENT_PAUSED, 2.0));
+    expect_true("small tape evicted", runtime_inspector_checkpoints_dropped(rt) > 0u);
+    {
+        runtime_inspector_sample_meta oldest;
+        expect_true("small tape retained sample", runtime_inspector_sample_count(rt) > 0u);
+        expect_true("small tape oldest", runtime_inspector_sample_meta_at(rt, 0u, &oldest));
+        expect_true("small tape scratch", apple2_init(&scratch));
+        expect_true(
+            "small tape reconstruct",
+            runtime_inspector_materialize(rt, oldest.snapshot_cycle, &scratch));
+        expect_true(
+            "small tape exact cycle",
+            apple2_cycles(&scratch) == oldest.snapshot_cycle);
+        apple2_shutdown(&scratch);
+    }
     runtime_stop(rt);
     runtime_destroy(rt);
     SDL_Quit();

@@ -108,3 +108,6 @@ bool runtime_frame_ring_copy_by_picture_id(
     runtime_frame_ring *ring,
     uint64_t picture_id,
     runtime_ring_frame *out_frame);
+bool runtime_frame_ring_has_picture_id(
+    runtime_frame_ring *ring,
+    uint64_t picture_id);

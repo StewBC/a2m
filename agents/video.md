@@ -26,8 +26,10 @@
 
 1. **Beam** (finite turbo): each CPU Φ0 → `apple2_video_step` → paint cell →
    advance H → wrap V → frame ready.
-2. **Block** (max turbo, snapshot restore, stop-path with Override):
-   `apple2_video_paint_full_frame`. Does not advance the beam.
+2. **Block** (max turbo): `apple2_video_paint_full_frame`. Does not advance
+   the beam. Snapshot restore paint is repaired from Inspector resume pixels;
+   stop/request/Override block views paint into runtime presentation scratch
+   and do not replace the canonical beam framebuffer.
 
 **A-lite** (`apple2_video_advance_alite`): O(1) H/V/`$C019` with no paint and
 no scanner, so the max instruction loop stays flat-out. Leave max with
@@ -57,9 +59,9 @@ actual machine state. On debugger stop: Override on dumps that page and
 publishes; Override off publishes the **beam buffer** so a mid-frame mode
 switch stays visible.
 
-Paused **memory writes** (Memory view / control `write-memory`) always
-`paint_full_frame` + publish so the CRT tracks edited bytes. That replaces any
-mid-frame beam image — intentional for interactive poking.
+Paused **memory writes** (Memory view / control `write-memory`) paint a full
+frame into presentation scratch and publish it so the CRT tracks edited bytes.
+They do not replace the canonical mid-frame beam framebuffer.
 
 ## Pixel address probe
 

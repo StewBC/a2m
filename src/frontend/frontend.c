@@ -260,9 +260,9 @@ typedef struct frontend_misc_view_state {
     bool active;
     bool display_override_enabled;
     uint32_t display_override_flags;
-    int inspector_slider; /* 0..1000 over oldest snapshot -> live */
+    int inspector_slider; /* sample-indexed; maximum min(N-1, 1000) */
     bool inspector_thumb_down;
-    uint64_t inspector_preview_cycle;
+    uint64_t inspector_preview_picture_id;
 } frontend_misc_view_state;
 
 typedef enum frontend_active_view {
@@ -2454,7 +2454,7 @@ static void frontend_draw_config_machine_tab(frontend *ui, frontend_config_dialo
     nk_layout_row_dynamic(ctx, 22.0f, 1);
     frontend_checkbox_bool(
         ctx,
-        "History off on max (faster free-run; discards Inspector tape)",
+        "History off on max (pause CPU flight recorder only)",
         &dialog->edited.history_off_on_max);
 
     nk_layout_row_dynamic(ctx, 22.0f, 1);
@@ -7576,43 +7576,42 @@ static void frontend_format_inspector_window_reason(
     }
 }
 
-static int frontend_inspector_cycle_to_slider(
-    const frontend_debug_state *debug,
-    uint64_t cycle)
+static uint64_t frontend_inspector_slider_to_ordinal(uint64_t count, int tick)
 {
-    uint64_t span;
+    uint64_t width;
+    uint64_t maximum;
+    uint64_t q;
+    uint64_t r;
 
-    if (debug == NULL || !debug->inspector_window_valid ||
-        debug->inspector_newest_cycle <= debug->inspector_oldest_cycle) {
-        return 1000;
-    }
-    if (cycle <= debug->inspector_oldest_cycle) {
-        return 0;
-    }
-    if (cycle >= debug->inspector_newest_cycle) {
-        return 1000;
-    }
-    span = debug->inspector_newest_cycle - debug->inspector_oldest_cycle;
-    return (int)(((cycle - debug->inspector_oldest_cycle) * 1000ull) / span);
+    if (count <= 1u) return 0u;
+    width = count - 1u;
+    maximum = width < 1000u ? width : 1000u;
+    if (tick <= 0) return 0u;
+    if ((uint64_t)tick >= maximum) return width;
+    q = width / maximum;
+    r = width % maximum;
+    return (uint64_t)tick * q + ((uint64_t)tick * r) / maximum;
 }
 
-static uint64_t frontend_inspector_slider_to_cycle(
-    const frontend_debug_state *debug,
-    int slider)
+static int frontend_inspector_ordinal_to_slider(uint64_t count, uint64_t ordinal)
 {
-    uint64_t span;
+    uint64_t maximum;
+    uint64_t tick;
+    uint64_t best_tick = 0u;
+    uint64_t best_distance = UINT64_MAX;
 
-    if (debug == NULL || !debug->inspector_window_valid) {
-        return 0u;
+    if (count <= 1u) return 0;
+    if (ordinal >= count) ordinal = count - 1u;
+    maximum = count - 1u < 1000u ? count - 1u : 1000u;
+    for (tick = 0u; tick <= maximum; tick++) {
+        uint64_t mapped = frontend_inspector_slider_to_ordinal(count, (int)tick);
+        uint64_t distance = mapped > ordinal ? mapped - ordinal : ordinal - mapped;
+        if (distance <= best_distance) {
+            best_distance = distance;
+            best_tick = tick;
+        }
     }
-    if (slider <= 0) {
-        return debug->inspector_oldest_cycle;
-    }
-    if (slider >= 1000 || debug->inspector_newest_cycle <= debug->inspector_oldest_cycle) {
-        return debug->inspector_newest_cycle;
-    }
-    span = debug->inspector_newest_cycle - debug->inspector_oldest_cycle;
-    return debug->inspector_oldest_cycle + (span * (uint64_t)slider) / 1000ull;
+    return (int)best_tick;
 }
 
 static void frontend_draw_inspector_window_summary(
@@ -7670,31 +7669,27 @@ static void frontend_draw_misc_inspector(
     bool inspecting;
     bool can_enter;
     int slider;
+    uint64_t catalog_count;
 
     if (ui == NULL || ui->ctx == NULL) {
         return;
     }
     ctx = ui->ctx;
     inspecting = debug != NULL && debug->inspecting;
+    catalog_count = debug != NULL ? debug->inspector_catalog.count : 0u;
     can_enter = debug != NULL && debug->inspector_enabled && debug->inspector_window_valid;
 
     if (!inspecting) {
         rec = (debug != NULL && debug->inspector_enabled) ? nk_true : nk_false;
         nk_layout_row_dynamic(ctx, 22.0f, 1);
-        if (debug != NULL && debug->inspector_stopped_for_max) {
-            nk_widget_disable_begin(ctx);
-        }
         if (nk_checkbox_label(ctx, "Record", &rec)) {
             bool want = rec != nk_false;
             bool have = debug != NULL && debug->inspector_enabled;
             if (want != have &&
-                (debug == NULL || !debug->inspector_stopped_for_max)) {
+                debug != NULL) {
                 frontend_push_inspector_intent(
                     ui, FRONTEND_DEBUGGER_INTENT_INSPECTOR_SET_ENABLED, want, 0u);
             }
-        }
-        if (debug != NULL && debug->inspector_stopped_for_max) {
-            nk_widget_disable_end(ctx);
         }
     }
 
@@ -7732,27 +7727,63 @@ static void frontend_draw_misc_inspector(
     slider = ui->misc.inspector_slider;
     {
         bool down = nk_input_is_mouse_down(&ctx->input, NK_BUTTON_LEFT);
-        bool at_oldest = debug->inspector_focus_cycle <= debug->inspector_oldest_cycle;
-        bool at_live = debug->inspector_focus_cycle >= debug->inspector_newest_cycle;
+        bool can_previous = false;
+        bool can_next = false;
         bool thumb = ui->misc.inspector_thumb_down;
+        int slider_max = catalog_count > 1u ?
+            (int)((catalog_count - 1u) < 1000u ? catalog_count - 1u : 1000u) : 0;
+
+        if (debug->inspector_focus_is_sample) {
+            can_previous = debug->inspector_focus_ordinal > 0u;
+            can_next = debug->inspector_focus_ordinal + 1u < catalog_count;
+        } else {
+            uint64_t i;
+            for (i = 0u; i < catalog_count; i++) {
+                uint64_t cycle =
+                    debug->inspector_catalog.samples[i].snapshot_cycle;
+                if (cycle < debug->inspector_focus_cycle) can_previous = true;
+                if (cycle > debug->inspector_focus_cycle) can_next = true;
+            }
+        }
 
         if (!thumb) {
-            slider = frontend_inspector_cycle_to_slider(debug, debug->inspector_focus_cycle);
+            uint64_t focus_ordinal = debug->inspector_focus_ordinal;
+            if (!debug->inspector_focus_is_sample) {
+                uint64_t i;
+                focus_ordinal = 0u;
+                for (i = 0u; i < catalog_count; i++) {
+                    if (debug->inspector_catalog.samples[i].snapshot_cycle <=
+                        debug->inspector_focus_cycle) {
+                        focus_ordinal = i;
+                    } else {
+                        break;
+                    }
+                }
+            }
+            slider = frontend_inspector_ordinal_to_slider(
+                catalog_count, focus_ordinal);
         }
 
         nk_layout_row_begin(ctx, NK_DYNAMIC, 22.0f, 3);
         nk_layout_row_push(ctx, 0.08f);
         if (frontend_nk_action_button(
-                ctx, "-", !thumb && !at_oldest)) {
+                ctx, "-", !thumb && can_previous)) {
             frontend_push_inspector_intent(
-                ui, FRONTEND_DEBUGGER_INTENT_INSPECTOR_FRAME_STEP, false, 0u);
+                ui, FRONTEND_DEBUGGER_INTENT_INSPECTOR_SAMPLE_STEP, false, 0u);
         }
         nk_layout_row_push(ctx, 0.84f);
         {
             /* Peek this column before the slider consumes it. After
                nk_slider_int, nk_widget_bounds is the [+] slot. */
             struct nk_rect bounds = nk_widget_bounds(ctx);
-            nk_bool moved = nk_slider_int(ctx, 0, &slider, 1000, 1);
+            nk_bool moved;
+            if (slider_max == 0) {
+                nk_widget_disable_begin(ctx);
+            }
+            moved = nk_slider_int(ctx, 0, &slider, slider_max, 1);
+            if (slider_max == 0) {
+                nk_widget_disable_end(ctx);
+            }
             bool hovered =
                 nk_input_is_mouse_hovering_rect(&ctx->input, bounds);
 
@@ -7760,30 +7791,54 @@ static void frontend_draw_misc_inspector(
                 ui->misc.inspector_thumb_down = true;
             }
             if (ui->misc.inspector_thumb_down) {
-                uint64_t cycle = frontend_inspector_slider_to_cycle(debug, slider);
-                ui->misc.inspector_preview_cycle = cycle;
+                uint64_t ordinal = frontend_inspector_slider_to_ordinal(
+                    catalog_count, slider);
+                uint64_t sample_id = 0u;
+                if (ordinal < catalog_count) {
+                    sample_id = debug->inspector_catalog.samples[ordinal].sample_id;
+                    ui->misc.inspector_preview_picture_id =
+                        debug->inspector_catalog.samples[ordinal].picture_id;
+                }
                 if (!down) {
                     frontend_push_inspector_intent(
                         ui,
-                        FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND,
+                        FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND_SAMPLE,
                         false,
-                        cycle);
+                        sample_id);
                     ui->misc.inspector_thumb_down = false;
                 }
             } else if ((hovered || moved) && down) {
+                uint64_t ordinal = frontend_inspector_slider_to_ordinal(
+                    catalog_count, slider);
                 ui->misc.inspector_thumb_down = true;
-                ui->misc.inspector_preview_cycle =
-                    frontend_inspector_slider_to_cycle(debug, slider);
+                ui->misc.inspector_preview_picture_id = ordinal < catalog_count ?
+                    debug->inspector_catalog.samples[ordinal].picture_id : 0u;
             }
         }
         nk_layout_row_push(ctx, 0.08f);
-        if (frontend_nk_action_button(ctx, "+", !thumb && !at_live)) {
+        if (frontend_nk_action_button(ctx, "+", !thumb && can_next)) {
             frontend_push_inspector_intent(
-                ui, FRONTEND_DEBUGGER_INTENT_INSPECTOR_FRAME_STEP, true, 0u);
+                ui, FRONTEND_DEBUGGER_INTENT_INSPECTOR_SAMPLE_STEP, true, 0u);
         }
         nk_layout_row_end(ctx);
         ui->misc.inspector_slider = slider;
     }
+
+    nk_layout_row_begin(ctx, NK_DYNAMIC, 18.0f, 2);
+    nk_layout_row_push(ctx, 0.48f);
+    nk_label(ctx, "Snapshot:", NK_TEXT_LEFT);
+    nk_layout_row_push(ctx, 0.52f);
+    if (debug->inspector_focus_is_sample) {
+        snprintf(
+            line, sizeof(line), "%llu of %llu",
+            (unsigned long long)(catalog_count > 0u ?
+                debug->inspector_focus_ordinal + 1u : 0u),
+            (unsigned long long)catalog_count);
+    } else {
+        snprintf(line, sizeof(line), "Exact focus");
+    }
+    nk_label(ctx, line, NK_TEXT_LEFT);
+    nk_layout_row_end(ctx);
 
     nk_layout_row_begin(ctx, NK_DYNAMIC, 18.0f, 2);
     nk_layout_row_push(ctx, 0.48f);
@@ -7796,6 +7851,19 @@ static void frontend_draw_misc_inspector(
         (unsigned long long)debug->inspector_focus_cycle);
     nk_label(ctx, line, NK_TEXT_LEFT);
     nk_layout_row_end(ctx);
+    if (debug->inspector_focus_is_sample &&
+        debug->inspector_focus_ordinal < catalog_count) {
+        nk_layout_row_begin(ctx, NK_DYNAMIC, 18.0f, 2);
+        nk_layout_row_push(ctx, 0.48f);
+        nk_label(ctx, "Frame cycle:", NK_TEXT_LEFT);
+        nk_layout_row_push(ctx, 0.52f);
+        snprintf(
+            line, sizeof(line), "%llu",
+            (unsigned long long)debug->inspector_catalog
+                .samples[debug->inspector_focus_ordinal].frame_cycle);
+        nk_label(ctx, line, NK_TEXT_LEFT);
+        nk_layout_row_end(ctx);
+    }
     frontend_draw_inspector_window_summary(ctx, debug);
 }
 
@@ -8653,13 +8721,13 @@ void frontend_end_input(frontend *ui)
     nk_input_end(ui->ctx);
 }
 
-bool frontend_inspector_preview(const frontend *ui, uint64_t *out_cycle)
+bool frontend_inspector_preview(const frontend *ui, uint64_t *out_picture_id)
 {
     if (ui == NULL || !ui->misc.inspector_thumb_down) {
         return false;
     }
-    if (out_cycle != NULL) {
-        *out_cycle = ui->misc.inspector_preview_cycle;
+    if (out_picture_id != NULL) {
+        *out_picture_id = ui->misc.inspector_preview_picture_id;
     }
     return true;
 }

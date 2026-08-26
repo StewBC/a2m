@@ -60,6 +60,9 @@ typedef struct frontend_debug_state {
     uint64_t inspector_focus_id;
     uint64_t inspector_oldest_cycle;
     uint64_t inspector_newest_cycle;
+    uint64_t inspector_focus_ordinal;
+    bool inspector_focus_is_sample;
+    runtime_inspector_catalog inspector_catalog;
 } frontend_debug_state;
 
 const char *frontend_runtime_state_name(frontend_runtime_state state);
@@ -132,9 +135,10 @@ typedef enum frontend_debugger_intent_type {
     FRONTEND_DEBUGGER_INTENT_INSPECTOR_ENTER,
     FRONTEND_DEBUGGER_INTENT_INSPECTOR_LEAVE,
     FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND,
+    FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND_SAMPLE,
     FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND_TO_CYCLE,
     FRONTEND_DEBUGGER_INTENT_INSPECTOR_PAUSE,
-    FRONTEND_DEBUGGER_INTENT_INSPECTOR_FRAME_STEP,
+    FRONTEND_DEBUGGER_INTENT_INSPECTOR_SAMPLE_STEP,
     FRONTEND_DEBUGGER_INTENT_RUN,
     FRONTEND_DEBUGGER_INTENT_HISTORY_FIND,
     FRONTEND_DEBUGGER_INTENT_HISTORY_NEXT,
@@ -299,7 +303,7 @@ bool frontend_submit_argb_frame(
     uint32_t height,
     uint64_t frame_number);
 /* True while the Inspector thumb is down (film/pink preview). */
-bool frontend_inspector_preview(const frontend *ui, uint64_t *out_cycle);
+bool frontend_inspector_preview(const frontend *ui, uint64_t *out_picture_id);
 void frontend_render(frontend *ui, bool ui_visible, const frontend_debug_state *debug_state);
 /* Force disk activity LEDs off (e.g. machine reset). */
 void frontend_clear_disk_activity_leds(frontend *ui);

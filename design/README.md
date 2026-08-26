@@ -25,7 +25,7 @@ The agents index points here: [`agents/README.md`](../agents/README.md) → Desi
 
 | Design | Status | Last worked on | Path |
 |--------|--------|----------------|------|
-| Frame-aligned Inspector / TimeMachine | **active** (accepted design) | 2026-08-25 | [`frame-aligned-inspector.md`](frame-aligned-inspector.md) |
+| Frame-aligned Inspector / TimeMachine | **landed** | 2026-08-26 | [`frame-aligned-inspector.md`](frame-aligned-inspector.md) |
 | Forensics UI (flight recorder / HST1 FIND) | **landed** | 2026-08-24 | [`forensics-ui.md`](forensics-ui.md) |
 | Forensics query guide (verb-first Tab) | **landed** (PR 10 of Forensics UI) | 2026-08-24 | [`forensics-query-guide.md`](forensics-query-guide.md) |
 | Machine Display pixel address probe | **landed** | 2026-08-24 | [`machine-display-pixel-address.md`](machine-display-pixel-address.md) |

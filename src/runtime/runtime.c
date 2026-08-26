@@ -283,15 +283,20 @@ runtime *runtime_create(const runtime_config *config)
     rt->event_queue =
         message_queue_create(sizeof(runtime_event), RUNTIME_EVENT_QUEUE_CAPACITY);
     rt->frame_slot.mutex = mutex_create();
+    rt->inspector_picture_slot.mutex = mutex_create();
     rt->debug_memory_slot.mutex = mutex_create();
     rt->breakpoint_slot.mutex = mutex_create();
     rt->symbol_slot.mutex = mutex_create();
     rt->rpc_payload_pool.mutex = mutex_create();
+    rt->inspector_catalog_slot.mutex = mutex_create();
 
     if (rt->command_queue == NULL || rt->event_queue == NULL ||
-        rt->frame_slot.mutex == NULL || rt->debug_memory_slot.mutex == NULL ||
+        rt->frame_slot.mutex == NULL ||
+        rt->inspector_picture_slot.mutex == NULL ||
+        rt->debug_memory_slot.mutex == NULL ||
         rt->breakpoint_slot.mutex == NULL || rt->symbol_slot.mutex == NULL ||
-        rt->rpc_payload_pool.mutex == NULL) {
+        rt->rpc_payload_pool.mutex == NULL ||
+        rt->inspector_catalog_slot.mutex == NULL) {
         runtime_destroy(rt);
         return NULL;
     }
@@ -299,13 +304,18 @@ runtime *runtime_create(const runtime_config *config)
     rt->client.command_queue = rt->command_queue;
     rt->client.event_queue = rt->event_queue;
     rt->client.frame_slot = &rt->frame_slot;
+    rt->client.inspector_picture_slot = &rt->inspector_picture_slot;
     rt->client.debug_memory_slot = &rt->debug_memory_slot;
     rt->client.breakpoint_slot = &rt->breakpoint_slot;
     rt->client.symbol_slot = &rt->symbol_slot;
     rt->client.rpc_payload_pool = &rt->rpc_payload_pool;
     rt->client.frame_ring = &rt->frame_ring;
+    rt->client.inspector_catalog_slot = &rt->inspector_catalog_slot;
     rt->client.next_request_token = 0;
     rt->next_breakpoint_id = 1;
+    rt->apple_state_generation = 1u;
+    rt->presentation_generation = 1u;
+    rt->inspector_next_now_endpoint_id = UINT64_C(0x8000000000000000);
 
     /* Default session for omit-session_id commands (compat / single asker). */
     rt->next_session_id = 1u;
@@ -444,6 +454,7 @@ void runtime_destroy(runtime *rt)
     runtime_history_destroy(rt->history);
     rt->history = NULL;
     free(rt->frame_slot.argb);
+    free(rt->inspector_picture_slot.argb);
     free(rt->presentation_scratch);
     free(rt->ini_path);
     rt->ini_path = NULL;
@@ -463,10 +474,13 @@ void runtime_destroy(runtime *rt)
         mutex_unlock(rt->rpc_payload_pool.mutex);
     }
     mutex_destroy(rt->frame_slot.mutex);
+    mutex_destroy(rt->inspector_picture_slot.mutex);
     mutex_destroy(rt->debug_memory_slot.mutex);
     mutex_destroy(rt->breakpoint_slot.mutex);
     mutex_destroy(rt->symbol_slot.mutex);
     mutex_destroy(rt->rpc_payload_pool.mutex);
+    mutex_destroy(rt->inspector_catalog_slot.mutex);
+    free(rt->inspector_catalog_slot.samples);
     message_queue_destroy(rt->event_queue);
     message_queue_destroy(rt->command_queue);
     free(rt);

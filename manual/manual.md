@@ -314,10 +314,10 @@ peripherals, and Mockingboard stay in lock-step):
 | `max` or `-1` | `max` | Free-run as fast as the host allows, still full live paint |
 
 The first entry is the startup speed. Paste does not change turbo. By default
-entering `max` pauses the CPU flight recorder, turns Inspector Record off,
-and discards the tape (Configure -> Emulator, or `--history-off-on-max` /
-`--no-history-off-on-max`). Leaving `max` restores Record if it was on and
-starts a new window.
+entering `max` pauses only the dense CPU flight recorder (Configure -> Emulator,
+or `--history-off-on-max` / `--no-history-off-on-max`). Inspector Record stays
+on and continues taking snapshots at the approximately 60 Hz max presentation
+cadence. Leaving `max` keeps the same Inspector window.
 
 ### Help
 
@@ -1462,7 +1462,7 @@ below the tab body on every tab.
 | Keyboard Joystick | `Off`, `Stick 1`, or `Stick 2`, plus the `Numpad` or `WASD` key layout |
 | Swap fire keys | While the stick is on: Space is button 0 and Option is button 1 (WASD-friendly). Off when the stick is Off |
 | Turbo | Comma-separated ladder, e.g. `1,max` or `1,4,8,max` |
-| History off on max | Pause the CPU flight recorder while turbo is `max` (faster free-run); Inspector Record is wiped and restored when you leave `max` |
+| History off on max | Pause only the CPU flight recorder while turbo is `max` (faster free-run); Inspector Record continues |
 | Pause on BRK | Auto-pause free-run at the next `BRK` (`$00`); off by default |
 | Show disk LEDs | Draw green (read) and red (write) activity LEDs in the window corner |
 
@@ -1571,7 +1571,7 @@ Default layout: slot 4 Mockingboard, slot 6 Disk II, slot 7 SmartPort, others em
 |-----|-------|
 | `Save` | `yes` -- save INI on quit |
 | `turbo_speeds` | Comma-separated turbo ladder, e.g. `1,max` |
-| `history_off_on_max` | `true`/`false`; pause flight recorder on `max` (default true). With Inspector Record on, entering max wipes the tape and turns Record off; leaving max restores Record into a new window. |
+| `history_off_on_max` | `true`/`false`; pause only the CPU flight recorder on `max` (default true). Inspector Record continues across finite/max transitions. |
 | `log_level` | `all`, `warn` (default), `error`, or `none`; host log policy (also `--log-level`). Does not mute CLI/usage errors on stderr. |
 | `scroll_wheel_lines` | Integer; lines scrolled per wheel click |
 | `original_del` | `true`/`false`; Backspace sends `$7F` instead of `$08` |
@@ -1682,11 +1682,16 @@ defaults, Inspector on is 256 + 128 + 128 = 512 MB. A budget of `0` disables
 that recorder and leaves an empty tape; it is not overridden back to the default.
 
 Open F9 debugger, Misc -> Inspector. Enable recording, Pause, then Inspect.
-Inspect is **time travel**: you start at live (the paused NOW). Drag the
-slider to preview stored film or pink (no still); release lands a snapshot.
-[-]/[+] step one video frame. F12 re-executes toward live and stops at a
-breakpoint or at live; you stay in Inspect. Leave Inspector restores live NOW
-and stays paused. F7 is unbound. Opt+Left is unbound in time travel.
+Inspect is **time travel**: one real snapshot is recorded for each finite beam
+frame or max block presentation, and you start at the paused live NOW endpoint.
+The slider selects those snapshots, never a point between them. Drag to preview
+the exact paired historical picture or pink when that picture has been evicted;
+release lands the snapshot and reconstructs missing pixels when possible.
+[-]/[+] select the immediately adjacent snapshot. F12 re-executes toward live
+and stops at a breakpoint or at live; you stay in Inspect. Leave Inspector
+restores live NOW and stays paused. Leaving and immediately re-entering without
+a machine change reuses the same NOW endpoint. F7 is unbound. Opt+Left is
+unbound in time travel.
 
 **Forensics...** (or **Opt+R**) opens the full-window FIND UI over the same
 recorder. Land before / Land exact jump Inspect to a FIND hit's cycle; they do
@@ -1698,8 +1703,8 @@ the disassembly cursor. Pokes are rejected while Inspect is on.
 
 A guest disk write that succeeds drops earlier history: the scrubber's left
 edge is that write, not data loss. Saving to a writable disk mid-session will
-cut the window. Opt+T into max also discards the tape and turns Record off
-(`history_off_on_max`); leaving max restores Record if it was on.
+cut the window. Finite/max changes keep one continuous Inspector window;
+`history_off_on_max` affects only the separate CPU flight recorder.
 
 ### [DEBUG]
 

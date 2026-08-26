@@ -226,12 +226,21 @@ bool runtime_client_inspector_enter(
 bool runtime_client_inspector_leave(
     runtime_client *client,
     uint64_t request_token);
+bool runtime_client_inspector_catalog_copy(
+    runtime_client *client,
+    runtime_inspector_catalog *out_catalog);
+bool runtime_client_inspector_copy_picture(
+    runtime_client *client,
+    uint64_t picture_id,
+    runtime_ring_frame *out_frame);
+bool runtime_client_inspector_land_sample(
+    runtime_client *client, uint64_t sample_id, uint64_t request_token);
+bool runtime_client_inspector_step_sample(
+    runtime_client *client, int direction, uint64_t request_token);
 bool runtime_client_inspector_land(
     runtime_client *client, uint64_t cycle, uint64_t request_token);
 bool runtime_client_inspector_land_to_cycle(
     runtime_client *client, uint64_t cycle, uint64_t request_token);
-bool runtime_client_inspector_frame_step(
-    runtime_client *client, int direction, uint64_t request_token);
 bool runtime_client_history_clear(
     runtime_client *client,
     uint64_t request_token);

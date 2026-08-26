@@ -59,7 +59,7 @@ not latch BUTN0.
 
 | Area | Evidence |
 |------|----------|
-| Build / ctest | **64 green** — [`testing.md`](testing.md) |
+| Build / ctest | **68 green** - [`testing.md`](testing.md) |
 | Assembler | Misc → Assembler; `file=` HostFS; optional Auto-run; **MLI launch** gates auto-run on CPU-visible `$BF00 == $4C` (mutually exclusive with Reset). Sample: `samples/asm_mli_launch/` |
 | CLI / INI | model, mounts `sNdN` (multi-image queue), turbo MHz/`max`, `--video-display`, lifecycle, headless, `[DEBUG] break.*`, `--inspector` |
 | Turbo / step / reset | Opt+T (default ladder `1,max`); F10–F12 family; F8 / Opt+F8 |

@@ -28,6 +28,8 @@ static void runtime_publish_canonical_frame(
     runtime *rt,
     runtime_frame_publish_kind kind,
     uint64_t inspector_picture_id);
+static bool runtime_advance_live_finite_cycle(runtime *rt);
+static bool runtime_turbo_is_free_run(const runtime *rt);
 static void runtime_publish_presented_frame(runtime *rt);
 static void runtime_set_active_turbo(runtime *rt, uint32_t milli_mhz);
 
@@ -1227,7 +1229,13 @@ static bool runtime_at_instruction_boundary(const runtime *rt)
 static void runtime_finish_to_instruction_boundary(runtime *rt)
 {
     while (rt->machine.cpu.micro_active) {
-        (void)apple2_step_cycle(&rt->machine);
+        if (!rt->inspecting && !runtime_turbo_is_free_run(rt)) {
+            if (!runtime_advance_live_finite_cycle(rt)) {
+                break;
+            }
+        } else if (!apple2_step_cycle(&rt->machine)) {
+            break;
+        }
     }
 }
 
@@ -1240,7 +1248,9 @@ static bool runtime_finish_pending_state_snapshot_instruction(runtime *rt)
             runtime_publish_error(rt, "failed to reach snapshot instruction boundary");
             return false;
         }
-        if (!apple2_step_cycle(&rt->machine)) {
+        if (!rt->inspecting && !runtime_turbo_is_free_run(rt) ?
+                !runtime_advance_live_finite_cycle(rt) :
+                !apple2_step_cycle(&rt->machine)) {
             runtime_publish_error(rt, "step_cycle failed during snapshot boundary");
             return false;
         }
@@ -1305,6 +1315,7 @@ static void runtime_load_state(runtime *rt, const runtime_command *command)
         return;
     }
     free(bytes);
+    runtime_inspector_mark_live_mutated(rt);
 
     if (rt->history != NULL) {
         (void)runtime_history_clear_for_state_load(
@@ -1636,7 +1647,11 @@ static void runtime_publish_machine(runtime *rt)
         runtime_inspector_recorder_is_recording(rt) ? 1u : 0u;
     event.data.machine_state.inspector_focus_cycle =
         rt->machine_ready ? apple2_cycles(&rt->machine) : 0u;
-    event.data.machine_state.inspector_focus_id = 0u;
+    event.data.machine_state.inspector_focus_id = rt->inspector_focus.sample_id;
+    event.data.machine_state.inspector_focus_ordinal =
+        rt->inspector_focus.catalog_ordinal;
+    event.data.machine_state.inspector_focus_is_sample =
+        rt->inspector_focus.is_sample ? 1u : 0u;
     {
         uint64_t oldest = 0u;
         uint64_t live = 0u;
@@ -1651,8 +1666,25 @@ static void runtime_publish_machine(runtime *rt)
         event.data.machine_state.inspector_window_start_arg1 = extras.start_arg1;
         event.data.machine_state.inspector_oldest_cycle = oldest;
         event.data.machine_state.inspector_newest_cycle = live;
-        event.data.machine_state.inspector_oldest_id = 0u;
-        event.data.machine_state.inspector_newest_id = 0u;
+        {
+            runtime_inspector_sample_meta first;
+            runtime_inspector_sample_meta last;
+            uint64_t sample_count = runtime_inspector_sample_count(rt);
+            if (sample_count > 0u &&
+                runtime_inspector_sample_meta_at(rt, 0u, &first) &&
+                runtime_inspector_sample_meta_at(rt, sample_count - 1u, &last)) {
+                event.data.machine_state.inspector_oldest_id = first.sample_id;
+                event.data.machine_state.inspector_newest_id = last.sample_id;
+            }
+        }
+        event.data.machine_state.inspector_sample_count =
+            runtime_inspector_sample_count(rt);
+        event.data.machine_state.inspector_catalog_count =
+            runtime_inspector_sample_count(rt) +
+            ((rt->inspecting && rt->inspector_now_valid &&
+              !rt->inspector_now_aliases_sample) ? 1u : 0u);
+        event.data.machine_state.inspector_timeline_generation =
+            runtime_inspector_timeline_generation(rt);
     }
     for (slot = 1; slot <= 7; ++slot) {
         runtime_slot_snapshot *out = &event.data.machine_state.slots[slot];
@@ -2484,17 +2516,19 @@ static void runtime_apply_turbo_video_policy(runtime *rt, bool leaving_max)
         rt->block_paint_initialized = false;
     } else {
         if (leaving_max) {
+            while (apple2_video_take_frame_ready(&rt->machine)) {
+            }
             apple2_video_reseed_from_cycles(&rt->machine);
+            while (apple2_video_take_frame_ready(&rt->machine)) {
+            }
         }
         rt->machine.video.paint_enabled = true;
     }
 }
 
-static void runtime_inspector_reattach_live_hooks(runtime *rt);
+void runtime_inspector_reattach_live_hooks(runtime *rt);
 
-/* Pause/resume flight-recorder around max free-run (history_off_on_max policy).
-   TMA3: entering max remembers Record, wipes the TM tape, and turns Record
-   off. Leaving max restores Record (fresh tape) if it was on. */
+/* history_off_on_max is HST1-only. TimeMachine remains frame-cadenced in max. */
 static void runtime_history_apply_max_policy(runtime *rt, bool entering_max, bool leaving_max)
 {
     runtime_history_status st;
@@ -2506,11 +2540,6 @@ static void runtime_history_apply_max_policy(runtime *rt, bool entering_max, boo
     cycle = rt->machine_ready ? apple2_cycles(&rt->machine) : 0u;
 
     if (entering_max) {
-        if (rt->inspecting) {
-            runtime_inspector_leave(rt);
-            runtime_inspector_reattach_live_hooks(rt);
-        }
-        rt->inspector_enabled_saved_for_max = rt->inspector_enabled;
         if (rt->history != NULL) {
             runtime_history_get_status(rt->history, &st);
             if (st.available && st.recording) {
@@ -2519,22 +2548,11 @@ static void runtime_history_apply_max_policy(runtime *rt, bool entering_max, boo
                 runtime_history_sync_observer(rt);
             }
         }
-        runtime_inspector_recorder_set_enabled(rt, false);
-        runtime_inspector_on_history_invalidate(rt);
-        if (rt->inspector_enabled_saved_for_max) {
-            runtime_frame_ring_set_recording(&rt->frame_ring, false);
-            runtime_frame_ring_clear(&rt->frame_ring);
-        }
-        rt->inspector_enabled = false;
     } else if (leaving_max) {
         if (rt->history_paused_for_max && rt->history != NULL) {
             (void)runtime_history_resume(rt->history, cycle);
             rt->history_paused_for_max = false;
             runtime_history_sync_observer(rt);
-        }
-        if (rt->inspector_enabled_saved_for_max) {
-            rt->inspector_enabled_saved_for_max = false;
-            runtime_inspector_set_enabled(rt, true);
         }
     }
 }
@@ -2582,6 +2600,15 @@ static void runtime_set_active_turbo(runtime *rt, uint32_t milli_mhz)
     }
     was_max = runtime_turbo_is_max_value(rt->active_turbo_multiplier);
     now_max = runtime_turbo_is_max_value(milli_mhz);
+    if (now_max && !was_max && rt->machine_ready) {
+        runtime_finish_to_instruction_boundary(rt);
+        while (apple2_video_take_frame_ready(&rt->machine)) {
+        }
+    }
+    if (rt->machine_ready && was_max != now_max) {
+        runtime_inspector_on_execution_mode_transition(
+            rt, now_max && !was_max, !now_max && was_max);
+    }
     rt->active_turbo_multiplier = milli_mhz;
     rt->pace_initialized = false;
     runtime_apply_turbo_video_policy(rt, was_max && !now_max);
@@ -2649,7 +2676,6 @@ static void runtime_free_run_max_quantum(runtime *rt)
             }
 
             ran = apple2_step_instruction_max(&rt->machine);
-            runtime_inspector_after_step(rt);
             if (ran == 0u) {
                 rt->exec_state = RUNTIME_EXEC_PAUSED;
                 rt->last_stop_reason = RUNTIME_STOP_REASON_ERROR;
@@ -2657,6 +2683,8 @@ static void runtime_free_run_max_quantum(runtime *rt)
                 runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
                 return;
             }
+            runtime_inspector_mark_live_advanced(rt);
+            runtime_inspector_after_step(rt);
 
             if (type_active) {
                 runtime_type_script_tick(rt, (uint32_t)ran);
@@ -2678,8 +2706,16 @@ static void runtime_free_run_max_quantum(runtime *rt)
 
     /* Presentation paint ~60 Hz wall — not blank warp. */
     apple2_video_paint_full_frame(&rt->machine);
-    runtime_publish_canonical_frame(
-        rt, RUNTIME_FRAME_PUBLISH_MAX_CADENCE_CANONICAL, 0u);
+    {
+        const uint32_t *fb = apple2_video_framebuffer(&rt->machine);
+        uint64_t picture_id = runtime_inspector_on_max_cadence_frame(
+            rt,
+            apple2_cycles(&rt->machine),
+            rt->machine.video.frame_number,
+            fb);
+        runtime_publish_canonical_frame(
+            rt, RUNTIME_FRAME_PUBLISH_MAX_CADENCE_CANONICAL, picture_id);
+    }
 }
 
 /* Speaker soft-square amplitude (pre-AC-couple). Modest so MB can share headroom. */
@@ -2972,20 +3008,8 @@ static void runtime_publish_argb_pixels(
     }
     mutex_unlock(rt->frame_slot.mutex);
 
-    /* Rolling screen log (C2). Forensic publishes the live slot only — the
-       ring is a recorder and must not grow while standing on the tape. */
-    if (!rt->inspecting &&
-        (kind == RUNTIME_FRAME_PUBLISH_FINITE_CADENCE_CANONICAL ||
-         kind == RUNTIME_FRAME_PUBLISH_MAX_CADENCE_CANONICAL)) {
-        (void)runtime_frame_ring_push(
-            &rt->frame_ring,
-            inspector_picture_id,
-            frame_number,
-            machine_cycle,
-            w,
-            h,
-            pixels);
-    }
+    (void)kind;
+    (void)inspector_picture_id;
 
     memset(&event, 0, sizeof(event));
     event.type = RUNTIME_EVENT_FRAME_READY;
@@ -3076,6 +3100,42 @@ static void runtime_maybe_frame(runtime *rt)
     runtime_publish_canonical_frame(
         rt, RUNTIME_FRAME_PUBLISH_FINITE_CADENCE_CANONICAL, 0u);
     runtime_pace_after_frame(rt);
+}
+
+/* The only finite live execution primitive.  A completed beam frame is
+   consumed and copied before another Phi0 can paint over it, then the paired
+   snapshot is committed at the first following instruction boundary. */
+static bool runtime_advance_live_finite_cycle(runtime *rt)
+{
+    uint64_t picture_id = 0u;
+
+    if (rt == NULL || rt->inspecting || runtime_turbo_is_free_run(rt)) {
+        return false;
+    }
+    if (!apple2_step_cycle(&rt->machine)) {
+        return false;
+    }
+    runtime_inspector_mark_live_advanced(rt);
+    if (apple2_video_take_frame_ready(&rt->machine)) {
+        const uint32_t *fb = apple2_video_framebuffer(&rt->machine);
+        picture_id = runtime_inspector_on_finite_cadence_frame(
+            rt,
+            apple2_cycles(&rt->machine),
+            rt->machine.video.frame_number,
+            fb);
+        runtime_publish_argb_pixels(
+            rt,
+            fb,
+            RUNTIME_FRAME_PUBLISH_FINITE_CADENCE_CANONICAL,
+            picture_id);
+        runtime_pace_after_frame(rt);
+    }
+    runtime_produce_audio(rt, 1u);
+    runtime_type_script_tick(rt, 1u);
+    if (rt->machine.instruction_complete) {
+        runtime_inspector_on_instruction_boundary(rt);
+    }
+    return true;
 }
 
 static uint8_t runtime_read_byte(runtime *rt, uint16_t addr, runtime_memory_mode mode)
@@ -3247,19 +3307,35 @@ static bool runtime_exec_step_instruction(runtime *rt)
         return false;
     }
     c0 = apple2_cycles(&rt->machine);
-    if (!apple2_step_instruction(&rt->machine)) {
-        return false;
-    }
     if (rt->inspecting) {
-        runtime_inspector_apply_logged_inputs(
-            rt, &rt->machine, c0 + 1u, apple2_cycles(&rt->machine));
+        runtime_inspector_apply_logged_inputs(rt, &rt->machine, c0, c0);
+        if (!rt->machine.video.paint_enabled) {
+            if (apple2_step_instruction_max(&rt->machine) == 0u) {
+                return false;
+            }
+            runtime_inspector_apply_logged_inputs(
+                rt, &rt->machine, c0, apple2_cycles(&rt->machine));
+        } else {
+            do {
+                uint64_t before = apple2_cycles(&rt->machine);
+                runtime_inspector_apply_logged_inputs(
+                    rt, &rt->machine, before, before);
+                if (!apple2_step_cycle(&rt->machine)) {
+                    return false;
+                }
+            } while (rt->machine.cpu.micro_active);
+        }
         if (runtime_inspector_at_live(rt)) {
             (void)runtime_inspector_restore_live(rt);
         } else {
             runtime_inspector_sync_focus(rt);
         }
     } else {
-        runtime_inspector_after_step(rt);
+        do {
+            if (!runtime_advance_live_finite_cycle(rt)) {
+                return false;
+            }
+        } while (rt->machine.cpu.micro_active);
     }
     return true;
 }
@@ -3458,6 +3534,7 @@ static void runtime_set_register(runtime *rt, runtime_cpu_register reg, uint16_t
     default:
         break;
     }
+    runtime_inspector_mark_live_mutated(rt);
     runtime_publish_cpu(rt, 0u);
 }
 
@@ -3695,7 +3772,7 @@ static bool runtime_inspector_command_mutates_machine(runtime_command_type type)
     }
 }
 
-static void runtime_inspector_reattach_live_hooks(runtime *rt)
+void runtime_inspector_reattach_live_hooks(runtime *rt)
 {
     apple2_set_memory_access_callback(&rt->machine, runtime_on_memory_access, rt);
     runtime_history_sync_observer(rt);
@@ -3727,7 +3804,13 @@ static void runtime_inspector_publish_head(runtime *rt)
 {
     runtime_publish_cpu(rt, 0u);
     runtime_publish_machine(rt);
-    if (rt->machine.video.fb != NULL) {
+    if (rt->inspector_has_presentation && rt->presentation_scratch != NULL) {
+        runtime_publish_argb_pixels(
+            rt,
+            rt->presentation_scratch,
+            RUNTIME_FRAME_PUBLISH_HOST_ONLY,
+            0u);
+    } else if (rt->machine.video.fb != NULL) {
         runtime_publish_canonical_frame(
             rt, RUNTIME_FRAME_PUBLISH_HOST_ONLY, 0u);
     }
@@ -3788,6 +3871,7 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
             }
         }
         runtime_inspector_on_history_invalidate(rt);
+        runtime_inspector_mark_live_mutated(rt);
         rt->suppress_execute_bp = false;
         rt->temp_bp_active = false;
         rt->breakpoint_hit_pending = false;
@@ -3979,11 +4063,9 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
                 runtime_pause_for_breakpoint(rt);
                 return;
             }
-            if (!apple2_step_cycle(&rt->machine)) {
+            if (!runtime_advance_live_finite_cycle(rt)) {
                 break;
             }
-            runtime_produce_audio(rt, 1u);
-            runtime_maybe_frame(rt);
             if (runtime_pause_if_breakpoint_pending(rt)) {
                 return;
             }
@@ -4013,25 +4095,15 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         rt->exec_state = RUNTIME_EXEC_RUNNING;
         runtime_publish_simple(rt, RUNTIME_EVENT_RUNNING);
         for (i = 0; i < remaining; i++) {
-            uint64_t c0;
-            uint64_t c1;
-
             if (!rt->suppress_execute_bp &&
                 runtime_at_instruction_boundary(rt) &&
                 runtime_breakpoint_matches_pc(rt)) {
                 runtime_pause_for_breakpoint(rt);
                 return;
             }
-            c0 = rt->machine.cpu.cpu.cycles;
-            if (!apple2_step_instruction(&rt->machine)) {
+            if (!runtime_exec_step_instruction(rt)) {
                 break;
             }
-            runtime_inspector_after_step(rt);
-            c1 = rt->machine.cpu.cpu.cycles;
-            if (c1 > c0) {
-                runtime_produce_audio(rt, (uint32_t)(c1 - c0));
-            }
-            runtime_maybe_frame(rt);
             if (runtime_pause_if_breakpoint_pending(rt)) {
                 return;
             }
@@ -4069,8 +4141,12 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         break;
     case RUNTIME_COMMAND_STEP_CYCLE:
         if (rt->exec_state != RUNTIME_EXEC_RUNNING) {
-            (void)apple2_step_cycle(&rt->machine);
-            runtime_maybe_frame(rt);
+            if (rt->inspecting) {
+                (void)apple2_step_cycle(&rt->machine);
+                runtime_maybe_frame(rt);
+            } else {
+                (void)runtime_advance_live_finite_cycle(rt);
+            }
             if (rt->suppress_execute_bp && runtime_at_instruction_boundary(rt)) {
                 rt->suppress_execute_bp = false;
             }
@@ -4127,6 +4203,7 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
                 cmd->data.write_memory_byte.address,
                 cmd->data.write_memory_byte.value,
                 (runtime_memory_mode)cmd->data.write_memory_byte.mode);
+            runtime_inspector_mark_live_mutated(rt);
             runtime_refresh_display_after_memory_edit(rt);
         }
         break;
@@ -4139,6 +4216,9 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
                     (uint16_t)(cmd->data.write_memory.address + i),
                     cmd->data.write_memory.bytes[i],
                     (runtime_memory_mode)cmd->data.write_memory.mode);
+            }
+            if (cmd->data.write_memory.length > 0u) {
+                runtime_inspector_mark_live_mutated(rt);
             }
             runtime_refresh_display_after_memory_edit(rt);
         }
@@ -4175,10 +4255,12 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
             rt,
             cmd->data.keyboard_key.key,
             cmd->data.keyboard_key.pressed != 0);
+        runtime_inspector_mark_live_mutated(rt);
         break;
     case RUNTIME_COMMAND_SET_GAMEPORT:
         apple2_gameport_set_axes(&rt->machine, cmd->data.set_gameport.axis);
         apple2_gameport_set_buttons(&rt->machine, cmd->data.set_gameport.buttons);
+        runtime_inspector_mark_live_mutated(rt);
         break;
     case RUNTIME_COMMAND_PASTE_TEXT: {
         const char *text = cmd->data.paste_text.text;
@@ -4190,6 +4272,7 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
         if (!apple2_paste_begin(&rt->machine, text, length)) {
             break;
         }
+        runtime_inspector_mark_live_mutated(rt);
         /* Paste injects keys only — does not change turbo (zip policy). */
         rt->exec_state = RUNTIME_EXEC_RUNNING;
         rt->last_stop_reason = RUNTIME_STOP_REASON_NONE;
@@ -4364,6 +4447,7 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
             &rt->machine,
             cmd->data.set_display_override.enabled != 0u,
             cmd->data.set_display_override.flags);
+        runtime_inspector_mark_presentation_changed(rt);
         if (runtime_paint_presentation_scratch(rt)) {
             runtime_publish_argb_pixels(
                 rt, rt->presentation_scratch,
@@ -4377,6 +4461,7 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
             &rt->machine,
             rt->config.video_colour,
             (apple2_video_phosphor)rt->config.video_phosphor);
+        runtime_inspector_mark_presentation_changed(rt);
         if (runtime_paint_presentation_scratch(rt)) {
             runtime_publish_argb_pixels(
                 rt, rt->presentation_scratch,
@@ -4569,6 +4654,15 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
             }
         }
         break;
+
+    case RUNTIME_COMMAND_INSPECTOR_LAND_SAMPLE:
+        if (rt->inspecting && runtime_inspector_land_sample(
+                rt, cmd->data.inspector_land_sample.sample_id)) {
+            runtime_inspector_publish_head(rt);
+            runtime_publish_state_changed(
+                rt, RUNTIME_STATE_CHANGED_INSPECTOR_LAND, cmd->session_id);
+        }
+        break;
     case RUNTIME_COMMAND_INSPECTOR_LAND_TO_CYCLE:
         if (rt->inspecting) {
             /* Publish once after exact land even on partial (best-effort focus). */
@@ -4581,9 +4675,10 @@ static void runtime_process_command(runtime *rt, const runtime_command *cmd, boo
                 cmd->session_id);
         }
         break;
-    case RUNTIME_COMMAND_INSPECTOR_FRAME_STEP:
+    case RUNTIME_COMMAND_INSPECTOR_SAMPLE_STEP:
         if (rt->inspecting) {
-            if (runtime_inspector_frame_step(rt, (int)cmd->data.inspector_frame_step.direction)) {
+            if (runtime_inspector_step_sample(
+                    rt, (int)cmd->data.inspector_sample_step.direction)) {
                 runtime_inspector_publish_head(rt);
                 runtime_publish_state_changed(
                     rt,
@@ -4626,10 +4721,6 @@ static void runtime_free_run_batch(runtime *rt)
         return;
     }
 
-    if (rt->inspecting) {
-        rt->machine.video.paint_enabled = false;
-    }
-
     for (i = 0; i < RUNTIME_RUN_BATCH_CYCLES; i++) {
         uint64_t c0;
 
@@ -4650,12 +4741,32 @@ static void runtime_free_run_batch(runtime *rt)
             }
         }
         c0 = apple2_cycles(&rt->machine);
-        if (!apple2_step_cycle(&rt->machine)) {
-            rt->exec_state = RUNTIME_EXEC_PAUSED;
-            rt->last_stop_reason = RUNTIME_STOP_REASON_ERROR;
-            runtime_publish_error(rt, "step_cycle failed");
-            runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
-            return;
+        if (!rt->inspecting && !runtime_turbo_is_free_run(rt)) {
+            if (!runtime_advance_live_finite_cycle(rt)) {
+                rt->exec_state = RUNTIME_EXEC_PAUSED;
+                rt->last_stop_reason = RUNTIME_STOP_REASON_ERROR;
+                runtime_publish_error(rt, "step_cycle failed");
+                runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
+                return;
+            }
+        } else {
+            runtime_inspector_apply_logged_inputs(
+                rt, &rt->machine, c0, c0);
+            if (rt->machine.video.paint_enabled) {
+                if (!apple2_step_cycle(&rt->machine)) {
+                    rt->exec_state = RUNTIME_EXEC_PAUSED;
+                    rt->last_stop_reason = RUNTIME_STOP_REASON_ERROR;
+                    runtime_publish_error(rt, "step_cycle failed");
+                    runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
+                    return;
+                }
+            } else if (apple2_step_instruction_max(&rt->machine) == 0u) {
+                rt->exec_state = RUNTIME_EXEC_PAUSED;
+                rt->last_stop_reason = RUNTIME_STOP_REASON_ERROR;
+                runtime_publish_error(rt, "step_instruction_max failed");
+                runtime_publish_simple(rt, RUNTIME_EVENT_PAUSED);
+                return;
+            }
         }
         if (rt->inspecting) {
             runtime_inspector_apply_logged_inputs(
@@ -4666,20 +4777,12 @@ static void runtime_free_run_batch(runtime *rt)
                 return;
             }
             runtime_inspector_sync_focus(rt);
-        } else {
-            /* One cycle at a time so $C030 toggles land on the right samples. */
-            runtime_produce_audio(rt, 1u);
-            runtime_type_script_tick(rt, 1u);
         }
-        runtime_maybe_frame(rt);
         if (runtime_pause_if_breakpoint_pending(rt)) {
             return;
         }
         if (rt->suppress_execute_bp && runtime_at_instruction_boundary(rt)) {
             rt->suppress_execute_bp = false;
-        }
-        if (!rt->inspecting && rt->machine.instruction_complete) {
-            runtime_inspector_after_step(rt);
         }
     }
 }
@@ -4687,7 +4790,8 @@ static void runtime_free_run_batch(runtime *rt)
 static bool runtime_command_is_inspector_land(const runtime_command *cmd)
 {
     return cmd != NULL &&
-        (cmd->type == RUNTIME_COMMAND_INSPECTOR_LAND ||
+        (cmd->type == RUNTIME_COMMAND_INSPECTOR_LAND_SAMPLE ||
+         cmd->type == RUNTIME_COMMAND_INSPECTOR_LAND ||
          cmd->type == RUNTIME_COMMAND_INSPECTOR_LAND_TO_CYCLE);
 }
 

@@ -293,6 +293,11 @@ typedef struct runtime_machine_snapshot {
     uint64_t inspector_newest_cycle;
     uint64_t inspector_oldest_id;
     uint64_t inspector_newest_id;
+    uint64_t inspector_sample_count;
+    uint64_t inspector_catalog_count;
+    uint64_t inspector_timeline_generation;
+    uint64_t inspector_focus_ordinal;
+    uint8_t inspector_focus_is_sample;
 } runtime_machine_snapshot;
 
 typedef struct runtime_memory_snapshot {

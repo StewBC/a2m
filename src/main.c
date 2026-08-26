@@ -1950,6 +1950,12 @@ static void dispatch_intent(
         (void)runtime_client_inspector_land(client, intent->inspector_cycle, token);
         break;
     }
+    case FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND_SAMPLE: {
+        uint64_t token = runtime_client_alloc_request_token(client);
+        (void)runtime_client_inspector_land_sample(
+            client, intent->inspector_cycle, token);
+        break;
+    }
     case FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND_TO_CYCLE: {
         uint64_t token = runtime_client_alloc_request_token(client);
         (void)runtime_client_inspector_land_to_cycle(
@@ -1962,9 +1968,9 @@ static void dispatch_intent(
     case FRONTEND_DEBUGGER_INTENT_RUN:
         (void)runtime_client_run(client);
         break;
-    case FRONTEND_DEBUGGER_INTENT_INSPECTOR_FRAME_STEP: {
+    case FRONTEND_DEBUGGER_INTENT_INSPECTOR_SAMPLE_STEP: {
         uint64_t token = runtime_client_alloc_request_token(client);
-        (void)runtime_client_inspector_frame_step(
+        (void)runtime_client_inspector_step_sample(
             client, intent->enabled ? 1 : -1, token);
         break;
     }
@@ -2536,6 +2542,10 @@ static void apply_event_to_debug(
         debug->inspector_window_start_arg1 = event->data.machine_state.inspector_window_start_arg1;
         debug->inspector_focus_cycle = event->data.machine_state.inspector_focus_cycle;
         debug->inspector_focus_id = event->data.machine_state.inspector_focus_id;
+        debug->inspector_focus_ordinal =
+            event->data.machine_state.inspector_focus_ordinal;
+        debug->inspector_focus_is_sample =
+            event->data.machine_state.inspector_focus_is_sample != 0u;
         debug->inspector_oldest_cycle = event->data.machine_state.inspector_oldest_cycle;
         debug->inspector_newest_cycle = event->data.machine_state.inspector_newest_cycle;
         /* Always refresh the CPU snapshot from machine state (c64m). */
@@ -2688,7 +2698,7 @@ int main(int argc, char **argv)
     frontend *ui = NULL;
     platform_window *window = NULL;
     platform_window_config window_config;
-    frontend_debug_state debug;
+    frontend_debug_state debug = {0};
     frontend_input_mapper input_mapper;
     frontend_joystick_input kbd_joystick;
     sdl_apple_controller_state controllers;
@@ -3483,11 +3493,11 @@ int main(int argc, char **argv)
             debug.frame_number = fn;
         }
         {
-            uint64_t preview_cycle = 0u;
-            if (frontend_inspector_preview(ui, &preview_cycle)) {
+            uint64_t preview_picture_id = 0u;
+            if (frontend_inspector_preview(ui, &preview_picture_id)) {
                 static runtime_ring_frame film;
-                if (runtime_client_copy_frame_at(
-                        client, preview_cycle, true, &film)) {
+                if (runtime_client_inspector_copy_picture(
+                        client, preview_picture_id, &film)) {
                     (void)frontend_submit_argb_frame(
                         ui,
                         film.pixels,
@@ -3563,6 +3573,10 @@ int main(int argc, char **argv)
             running = false;
             break;
         }
+        if (debug.inspector_enabled) {
+            (void)runtime_client_inspector_catalog_copy(
+                client, &debug.inspector_catalog);
+        }
         frontend_render(ui, ui_visible, &debug);
         if (frontend_forensics_consume_pause_request(ui)) {
             if (debug.runtime_state == FRONTEND_RUNTIME_STATE_RUNNING) {
@@ -3636,6 +3650,7 @@ int main(int argc, char **argv)
     exit_code = EXIT_SUCCESS;
 
 done:
+    runtime_inspector_catalog_destroy(&debug.inspector_catalog);
     if (control_active) {
         control_dispatch_shutdown(&control_disp);
         control_active = false;

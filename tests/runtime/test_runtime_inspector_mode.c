@@ -35,6 +35,17 @@ static void expect_true(const char *name, int v)
     }
 }
 
+static uint64_t framebuffer_hash(const uint32_t *pixels, size_t count)
+{
+    uint64_t hash = 1469598103934665603ull;
+    size_t i;
+    for (i = 0u; i < count; i++) {
+        hash ^= pixels[i];
+        hash *= 1099511628211ull;
+    }
+    return hash;
+}
+
 static void drain_ignore_error(runtime_client *client)
 {
     runtime_event event;
@@ -237,6 +248,7 @@ int main(void)
     uint8_t ram_now;
     uint8_t motor_now;
     uint16_t via_t1_now;
+    uint64_t framebuffer_now;
     runtime_inspector_window window;
 
     if (SDL_Init(SDL_INIT_TIMER | SDL_INIT_EVENTS) != 0) {
@@ -281,6 +293,9 @@ int main(void)
     ram_now = apple2_debug_read(&rt->machine, 0x0000);
     motor_now = rt->machine.diskii_controller[6].diskii_drive[0].motor_on;
     via_t1_now = rt->machine.mockingboard[4].via[0].t1_counter;
+    framebuffer_now = framebuffer_hash(
+        rt->machine.video.fb,
+        (size_t)APPLE2_VIDEO_WIDTH * (size_t)APPLE2_VIDEO_HEIGHT);
 
     /* Empty enter: TM off. */
     {
@@ -302,7 +317,11 @@ int main(void)
         expect_true("tm on", runtime_client_inspector_set_enabled(client, true, tok));
         SDL_Delay(30);
         drain_ignore_error(client);
-        (void)runtime_inspector_checkpoint_take(rt);
+        expect_true("run new sample", runtime_client_run(client));
+        SDL_Delay(50);
+        expect_true("pause new sample", runtime_client_pause(client));
+        expect_true("paused new sample", wait_event_type(client, RUNTIME_EVENT_PAUSED, 2.0));
+        expect_true("new sample", runtime_inspector_sample_count(rt) > 0u);
     }
 
     /* HST1 off is not an Inspect gate (TMA0 A7). */
@@ -311,7 +330,6 @@ int main(void)
         expect_true("hist off", runtime_client_history_record(client, false, tok));
         SDL_Delay(30);
         drain_ignore_error(client);
-        (void)runtime_inspector_checkpoint_take(rt);
         tok = runtime_client_alloc_request_token(client);
         expect_true("enter hst1 off", runtime_client_inspector_enter(client, tok));
         expect_true(
@@ -328,17 +346,35 @@ int main(void)
             "leave hst1 off event",
             wait_inspector_mode(
                 client, tok, &ev, NULL, RUNTIME_STATE_CHANGED_INSPECTOR_LEAVE, 2.0));
+        {
+            uint64_t endpoint = rt->inspector_now_endpoint_id;
+            tok = runtime_client_alloc_request_token(client);
+            expect_true("re-enter unchanged", runtime_client_inspector_enter(client, tok));
+            expect_true(
+                "re-enter unchanged event",
+                wait_inspector_mode(
+                    client, tok, &ev, NULL,
+                    RUNTIME_STATE_CHANGED_INSPECTOR_ENTER, 2.0));
+            expect_true("NOW endpoint reused", rt->inspector_now_endpoint_id == endpoint);
+            tok = runtime_client_alloc_request_token(client);
+            expect_true("leave unchanged", runtime_client_inspector_leave(client, tok));
+            expect_true(
+                "leave unchanged event",
+                wait_inspector_mode(
+                    client, tok, &ev, NULL,
+                    RUNTIME_STATE_CHANGED_INSPECTOR_LEAVE, 2.0));
+        }
         tok = runtime_client_alloc_request_token(client);
         expect_true("hist on", runtime_client_history_record(client, true, tok));
         SDL_Delay(30);
         drain_ignore_error(client);
-        (void)runtime_inspector_checkpoint_take(rt);
     }
 
     /* Frame ring off is not an Inspect gate. */
     {
         uint64_t tok;
         runtime_frame_ring_set_recording(&rt->frame_ring, false);
+        runtime_frame_ring_clear(&rt->frame_ring);
         tok = runtime_client_alloc_request_token(client);
         expect_true("enter film off", runtime_client_inspector_enter(client, tok));
         expect_true(
@@ -348,6 +384,24 @@ int main(void)
         expect_true(
             "enter film off ok",
             ev.data.inspector_mode.status == RUNTIME_INSPECTOR_ENTER_OK);
+        {
+            runtime_inspector_catalog catalog = {0};
+            runtime_ring_frame *picture =
+                (runtime_ring_frame *)malloc(sizeof(*picture));
+            expect_true("NOW picture alloc", picture != NULL);
+            expect_true(
+                "NOW catalog copy",
+                runtime_client_inspector_catalog_copy(client, &catalog));
+            expect_true("NOW catalog nonempty", catalog.count > 0u);
+            expect_true(
+                "NOW provisional picture",
+                runtime_client_inspector_copy_picture(
+                    client,
+                    catalog.samples[catalog.count - 1u].picture_id,
+                    picture));
+            free(picture);
+            runtime_inspector_catalog_destroy(&catalog);
+        }
         tok = runtime_client_alloc_request_token(client);
         expect_true("leave film off", runtime_client_inspector_leave(client, tok));
         expect_true(
@@ -355,7 +409,6 @@ int main(void)
             wait_inspector_mode(
                 client, tok, &ev, NULL, RUNTIME_STATE_CHANGED_INSPECTOR_LEAVE, 2.0));
         runtime_frame_ring_set_recording(&rt->frame_ring, true);
-        (void)runtime_inspector_checkpoint_take(rt);
     }
 
     token = runtime_client_alloc_request_token(client);
@@ -382,6 +435,9 @@ int main(void)
     ram_now = apple2_debug_read(&rt->machine, 0x0000);
     motor_now = rt->machine.diskii_controller[6].diskii_drive[0].motor_on;
     via_t1_now = rt->machine.mockingboard[4].via[0].t1_counter;
+    framebuffer_now = framebuffer_hash(
+        rt->machine.video.fb,
+        (size_t)APPLE2_VIDEO_WIDTH * (size_t)APPLE2_VIDEO_HEIGHT);
     expect_true("enter at live", cycles_now > 0u);
 
     /* Read-only pokes; execute is allowed and clamped to live. */
@@ -556,6 +612,12 @@ int main(void)
     expect_true(
         "via t1 restored",
         rt->machine.mockingboard[4].via[0].t1_counter == via_t1_now);
+    expect_true(
+        "resume framebuffer restored",
+        framebuffer_hash(
+            rt->machine.video.fb,
+            (size_t)APPLE2_VIDEO_WIDTH * (size_t)APPLE2_VIDEO_HEIGHT) ==
+            framebuffer_now);
     expect_true("cpu after exit", wait_cpu(client, &cpu_now, 2.0));
     expect_true("cpu pc now", cpu_now.pc == pc_now);
 

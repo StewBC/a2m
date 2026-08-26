@@ -40,8 +40,9 @@ CLI `--turbo` / INI `turbo_speeds`. Opt+T cycles. Paste and TYPE do **not**
 change turbo. FAST → max; SLOW → 1 MHz. Control: `set-turbo` accepts MHz,
 `max`, or `-1` — not ladder indices.
 
-Default `history_off_on_max` (true): entering max wipes TimeMachine Record.
-See [`timemachine.md`](timemachine.md). Opt-out: `--no-history-off-on-max`.
+Default `history_off_on_max` (true) pauses only dense HST1 CPU recording in
+max. TimeMachine continues at the max block-presentation cadence. See
+[`timemachine.md`](timemachine.md). Opt-out: `--no-history-off-on-max`.
 
 ## Client surface
 
@@ -49,7 +50,7 @@ run / pause / warm+cold reset / quit · step family · run_cycles/instructions �
 registers · memory via VIEW_FLAGS · breakpoints · turbo · gameport · keyboard ·
 paste · media insert/eject/swap/boot · poll events/frames/debug memory ·
 **`save_state` / `load_state`** · machine-file load/save · assembler ·
-Inspector enter/leave/land/frame-step.
+Inspector enter/leave/sample-land/sample-step plus exact-cycle Forensics land.
 
 Machine-file parsing and all live-memory mutation run on the worker. Binary
 Auto uses AppleSingle magic first, then NAPS filename metadata, then a

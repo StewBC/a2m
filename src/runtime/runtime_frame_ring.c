@@ -368,3 +368,23 @@ bool runtime_frame_ring_copy_by_picture_id(
     runtime_frame_ring_unlock(ring);
     return ok;
 }
+
+bool runtime_frame_ring_has_picture_id(
+    runtime_frame_ring *ring,
+    uint64_t picture_id)
+{
+    uint32_t i;
+    bool found = false;
+    if (ring == NULL || picture_id == 0u) return false;
+    runtime_frame_ring_lock(ring);
+    if (runtime_frame_ring_usable(ring)) {
+        for (i = 0u; i < ring->count; i++) {
+            if (runtime_frame_ring_at(ring, i)->inspector_picture_id == picture_id) {
+                found = true;
+                break;
+            }
+        }
+    }
+    runtime_frame_ring_unlock(ring);
+    return found;
+}

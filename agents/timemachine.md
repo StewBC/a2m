@@ -18,31 +18,39 @@ Files: `src/runtime/runtime_inspector.*`, `runtime_inspector_recorder.c`,
 ## How it works
 
 **Record is opt-in.** `[debug] inspector=1` / `--inspector` / the Record
-checkbox. Default **off** (play Total Replay with no tape cost). On →
-checkpoints every **20000** cycles (`RUNTIME_INSPECTOR_CHECKPOINT_CADENCE_CYCLES`),
-input log, frame-ring film, HST1 as configured. Budget:
-`inspector_memory_mb` (default 128).
+checkbox. Default **off** (play Total Replay with no tape cost). On -> one
+navigable snapshot per finite completed beam frame or max block presentation,
+an ordered input/mode-barrier log, exact pictures in the frame ring, and HST1
+as configured. Snapshot budget: `inspector_memory_mb` (default 128).
 
-A checkpoint is `apple2_snapshot_save` into a ring slot. Reconstruct =
-load nearest checkpoint ≤ target, then **re-execute sealed** to that cycle.
-Backward is the same from an earlier checkpoint — **not** reverse-CPU.
+Finite samples pair picture cycle `F` with the first instruction-boundary
+snapshot `S >= F`. Max samples pair each approximately 60 Hz block picture
+with its boundary snapshot. Stable sample/picture IDs join the two. A hidden
+predecessor anchor owns the one retained resume framebuffer; ordinary samples
+own only their machine blob and metadata. Reconstruct = replay sealed from the
+anchor, then load the target blob and repair its framebuffer. Backward is
+reconstruction from an earlier state - **not** reverse-CPU.
 
 **Inspect** (enter): requires checkpoints. Film is optional. Starts at **live**
 (the NOW blob taken on enter). Machine becomes read-only. `get-memory` /
 `get-cpu` see THEN.
 
-**Land** (slider release): load last checkpoint ≤ that time and paint. Far
-right = restore the NOW blob, not the last cadence checkpoint. Thumb-down is
-**preview only** (film blit, or pink CRT if no still); the Apple does not move
-until release.
+**Land** (slider release): select and load that exact snapshot. Far right =
+restore the NOW blob when NOW is distinct. Thumb-down is **preview only**:
+copy the exact paired picture by ID, or show pink if it was evicted. The Apple
+does not move until release. Landing reconstructs an evicted picture and the
+target's exact resume framebuffer when possible.
 
-**`[-]` / `[+]`**: one guest video frame, clamped to oldest snapshot / live.
+**`[-]` / `[+]`**: immediately adjacent catalog snapshot, including distinct
+NOW. Exact Forensics/CPU focuses choose the nearest older/newer sample.
 
 **F10 / F11 / Shift+F10 / F12 / Shift+F12**: re-execute on the landed Apple.
 F12 runs until a **breakpoint** or **live**, then **stops**, still in Inspect.
 No-op at live. Opt+Left is unbound. Pokes reject (`read-only-inspector`).
 
-**Leave**: restore live NOW, still **paused**. Does not auto-resume.
+**Leave**: restore live NOW including its exact framebuffer and turbo policy,
+still **paused**. Does not auto-resume. Unchanged Leave -> Enter reuses the
+same provisional NOW endpoint.
 
 **One breakpoint list.** Opt+B and the Breakpoints tab always edit it. Time-travel
 F12 hits those breakpoints.
@@ -60,16 +68,14 @@ stays (`history-find` / `history-next` / `history-read`).
 
 ## Max turbo
 
-Default `history_off_on_max` (true):
+TimeMachine remains continuous across finite/max transitions. Enter-max,
+block-paint, and leave-max barriers share sequence order with input events so
+sealed replay reproduces execution mode and canonical framebuffer changes.
+Each max block presentation adds one sample at approximately 60 Hz wall time.
 
-1. Enter max — remember whether Record was on; leave Inspect if active.
-2. Wipe the tape (checkpoints + input log; film if Record was on) and turn
-   Record off. Checkbox locked.
-3. Leave max — restore the remembered Record state into an **empty** window.
-
-Finite MHz still records. `--no-history-off-on-max` keeps recording in max.
-A Record click while in max does not start a tape; enable is remembered for
-leave-max.
+Default `history_off_on_max` (true) pauses only the dense HST1 CPU observer.
+`--no-history-off-on-max` keeps HST1 recording too. Inspector Record remains
+available in max and changing turbo alone does not wipe its catalog.
 
 ## Media writes
 
@@ -89,16 +95,16 @@ CPU observer off, memory-access callback off, no frame push / publish, no
 never spans a write). A leaky seal corrupts the tape being stood on. Mockingboard
 chip state in the checkpoint is correct; host audio is muted during replay.
 
-Join key for film vs machine is **`machine_cycle`**. Frames and HST1 are not
-one lock-step stream. Index retained frames by **slot**, not by frame number
-(numbers have gaps). Under turbo, paints get rarer while history stays
-instruction-dense — do not synthesize fake frames to even out the scrubber.
+Join key for film vs machine is the stable **sample/picture ID**, never nearest
+cycle. Frame and snapshot cycles remain separate metadata (`F` and `S`). HST1
+is not lock-step with either. Missing picture IDs are honest: pink while
+scrubbing, deterministic reconstruction after landing.
 
 ## Do not re-open
 
-- A **write-delta** stream instead of checkpoints. Measured: a checkpoint is
-  ~160K; cadence 20k cycles bounds replay to well under a millisecond;
-  re-execute reproduces beam, Disk II mechanics, and VIA/AY for free.
+- A **write-delta** stream instead of snapshots. A blob is ~160K; frame cadence
+  plus the hidden anchor bounds deterministic replay and reproduces beam,
+  Disk II mechanics, and VIA/AY for free.
 - Reverse-execution of the 6502.
 - Driving the Inspector slider or time-travel F10 from **HST1**.
 - Dual NOW+THEN panels.

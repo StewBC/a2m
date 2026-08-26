@@ -1001,6 +1001,101 @@ bool runtime_client_inspector_leave(
         client, RUNTIME_COMMAND_INSPECTOR_LEAVE, request_token);
 }
 
+bool runtime_client_inspector_catalog_copy(
+    runtime_client *client,
+    runtime_inspector_catalog *out_catalog)
+{
+    runtime_inspector_catalog_slot *slot;
+    runtime_inspector_sample_meta *grown;
+
+    if (client == NULL || out_catalog == NULL ||
+        client->inspector_catalog_slot == NULL) {
+        return false;
+    }
+    slot = client->inspector_catalog_slot;
+    mutex_lock(slot->mutex);
+    if (out_catalog->capacity < slot->count) {
+        grown = (runtime_inspector_sample_meta *)realloc(
+            out_catalog->samples,
+            (size_t)slot->count * sizeof(*grown));
+        if (grown == NULL) {
+            mutex_unlock(slot->mutex);
+            return false;
+        }
+        out_catalog->samples = grown;
+        out_catalog->capacity = (size_t)slot->count;
+    }
+    if (slot->count > 0u) {
+        memcpy(
+            out_catalog->samples,
+            slot->samples,
+            (size_t)slot->count * sizeof(*out_catalog->samples));
+    }
+    out_catalog->count = slot->count;
+    out_catalog->timeline_generation = slot->timeline_generation;
+    mutex_unlock(slot->mutex);
+    return true;
+}
+
+bool runtime_client_inspector_copy_picture(
+    runtime_client *client,
+    uint64_t picture_id,
+    runtime_ring_frame *out_frame)
+{
+    runtime_inspector_picture_slot *slot;
+    if (client == NULL || out_frame == NULL) return false;
+    if (client->frame_ring != NULL && runtime_frame_ring_copy_by_picture_id(
+            client->frame_ring, picture_id, out_frame)) {
+        return true;
+    }
+    slot = client->inspector_picture_slot;
+    if (slot == NULL || slot->mutex == NULL) return false;
+    mutex_lock(slot->mutex);
+    if (!slot->valid || slot->picture_id != picture_id || slot->argb == NULL) {
+        mutex_unlock(slot->mutex);
+        return false;
+    }
+    memset(out_frame, 0, sizeof(*out_frame));
+    out_frame->inspector_picture_id = slot->picture_id;
+    out_frame->frame_number = slot->frame_number;
+    out_frame->width = DISPLAY_FRAME_WIDTH;
+    out_frame->height = DISPLAY_FRAME_HEIGHT;
+    out_frame->stride_bytes = DISPLAY_FRAME_WIDTH * 4u;
+    out_frame->pixel_format = DISPLAY_FRAME_PIXEL_FORMAT_ARGB8888;
+    memcpy(
+        out_frame->pixels, slot->argb,
+        (size_t)RUNTIME_FRAME_RING_PIXELS * sizeof(*slot->argb));
+    mutex_unlock(slot->mutex);
+    return true;
+}
+
+bool runtime_client_inspector_land_sample(
+    runtime_client *client, uint64_t sample_id, uint64_t request_token)
+{
+    runtime_command command = {
+        .type = RUNTIME_COMMAND_INSPECTOR_LAND_SAMPLE,
+        .request_token = request_token,
+    };
+    if (client == NULL || sample_id == 0u) return false;
+    command.data.inspector_land_sample.sample_id = sample_id;
+    return runtime_client_push(client, &command);
+}
+
+bool runtime_client_inspector_step_sample(
+    runtime_client *client, int direction, uint64_t request_token)
+{
+    runtime_command command = {
+        .type = RUNTIME_COMMAND_INSPECTOR_SAMPLE_STEP,
+        .request_token = request_token,
+    };
+    if (client == NULL) {
+        return false;
+    }
+    command.data.inspector_sample_step.direction =
+        direction < 0 ? (int8_t)-1 : (int8_t)1;
+    return runtime_client_push(client, &command);
+}
+
 bool runtime_client_inspector_land(
     runtime_client *client, uint64_t cycle, uint64_t request_token)
 {
@@ -1026,21 +1121,6 @@ bool runtime_client_inspector_land_to_cycle(
         return false;
     }
     command.data.inspector_land_to_cycle.cycle = cycle;
-    return runtime_client_push(client, &command);
-}
-
-bool runtime_client_inspector_frame_step(
-    runtime_client *client, int direction, uint64_t request_token)
-{
-    runtime_command command = {
-        .type = RUNTIME_COMMAND_INSPECTOR_FRAME_STEP,
-        .request_token = request_token,
-    };
-    if (client == NULL) {
-        return false;
-    }
-    command.data.inspector_frame_step.direction =
-        direction < 0 ? (int8_t)-1 : (int8_t)1;
     return runtime_client_push(client, &command);
 }
 

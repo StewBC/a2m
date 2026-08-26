@@ -60,7 +60,7 @@ Expect **68** green. Run from repo root.
 | `runtime_history_sessions` | Dual session FIND/NEXT isolation |
 | `runtime_state_changed` | state-changed inform + cursor stale |
 | `runtime_inspector` | master enable arms HST1 + frame ring; pin-3 no re-arm |
-| `runtime_inspector_replay` | checkpoint + sealed materialize; media truncate; max wipes window |
+| `runtime_inspector_replay` | frame samples + sealed materialize; anchor eviction; media truncate; max continuity |
 | `runtime_inspector_mode` | enter/exit NOW; land; read-only; sealed step |
 | `runtime_inspector_bp` | one BP list; time-travel run-until hits it or live |
 | `control_protocol` | A2M parse + format (`src/control`) |

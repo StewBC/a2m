@@ -61,6 +61,14 @@ typedef struct runtime_frame_slot {
     uint64_t dropped_frames;
 } runtime_frame_slot;
 
+typedef struct runtime_inspector_picture_slot {
+    mutex *mutex;
+    uint32_t *argb;
+    uint64_t picture_id;
+    uint64_t frame_number;
+    bool valid;
+} runtime_inspector_picture_slot;
+
 typedef struct runtime_debug_memory_slot {
     mutex *mutex;
     runtime_debug_memory_snapshot snapshot;
@@ -79,6 +87,14 @@ typedef struct runtime_symbol_slot {
     runtime_symbol_snapshot snapshot;
     bool has_symbols;
 } runtime_symbol_slot;
+
+typedef struct runtime_inspector_catalog_slot {
+    mutex *mutex;
+    runtime_inspector_sample_meta *samples;
+    size_t capacity;
+    uint64_t count;
+    uint64_t timeline_generation;
+} runtime_inspector_catalog_slot;
 
 typedef enum runtime_rpc_payload_kind {
     RUNTIME_RPC_PAYLOAD_NONE = 0,
@@ -138,6 +154,8 @@ struct runtime_client {
     runtime_breakpoint_slot *breakpoint_slot;
     runtime_rpc_payload_pool *rpc_payload_pool;
     runtime_frame_ring *frame_ring;
+    runtime_inspector_picture_slot *inspector_picture_slot;
+    runtime_inspector_catalog_slot *inspector_catalog_slot;
     uint64_t next_request_token;
     /* Stamped onto outgoing commands as source session (0 = unknown). */
     uint32_t command_session_id;
@@ -172,12 +190,15 @@ struct runtime {
     message_queue *event_queue;
     runtime_client client;
     runtime_frame_slot frame_slot;
+    runtime_inspector_picture_slot inspector_picture_slot;
     /* Worker-owned full-frame destination for debugger/UI-only repaints. */
     uint32_t *presentation_scratch;
+    bool inspector_has_presentation;
     runtime_debug_memory_slot debug_memory_slot;
     runtime_breakpoint_slot breakpoint_slot;
     runtime_rpc_payload_pool rpc_payload_pool;
     runtime_symbol_slot symbol_slot;
+    runtime_inspector_catalog_slot inspector_catalog_slot;
     symbol_table *symbols;
 
     apple2_t machine;
@@ -218,9 +239,21 @@ struct runtime {
     struct runtime_inspector_recorder *inspector_recorder;
     /* TM3/TMA1: time-travel mode replaces live apple2_t; NOW blob is live. */
     bool inspecting;
+    bool inspector_now_valid;
+    bool inspector_now_aliases_sample;
     uint8_t *inspector_now_blob;
     size_t inspector_now_size;
     uint64_t inspector_now_cycle;
+    uint32_t *inspector_now_resume_framebuffer;
+    uint64_t inspector_now_endpoint_id;
+    uint64_t inspector_now_aliased_sample_id;
+    uint64_t inspector_now_machine_generation;
+    uint64_t inspector_now_timeline_generation;
+    uint64_t inspector_next_now_endpoint_id;
+    uint64_t apple_state_generation;
+    uint64_t presentation_generation;
+    uint32_t inspector_now_live_turbo_value;
+    uint8_t inspector_now_execution_mode;
 
     /* TRON/TROFF instruction log (C5b) — file open while trace_enabled. */
     bool trace_enabled;
@@ -286,6 +319,8 @@ struct runtime {
 
 int runtime_thread_main(void *userdata);
 void runtime_rpc_pool_release_token(runtime_rpc_payload_pool *pool, uint64_t token);
+void runtime_inspector_reattach_live_hooks(runtime *rt);
+bool runtime_inspector_now_picture_available(runtime *rt, uint64_t picture_id);
 
 /* Map c64m memory mode enum to VIEW_FLAGS for Apple. */
 view_flags_t runtime_mode_to_view_flags(runtime_memory_mode mode);
