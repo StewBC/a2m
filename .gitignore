@@ -16,3 +16,7 @@ TODO.txt
 disks/
 symbols/USER.SYM
 samples/penetrator
+# Working HostFS mounts: ignore everything under here so remounts/builds do not
+# pollute status. Already-tracked files stay tracked; to lock in a new file:
+#   git add -f samples/hostfs/...
+samples/hostfs/
