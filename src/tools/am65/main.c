@@ -11,7 +11,6 @@
 #include "asm.h"
 #include "errorlog.h"
 
-#include <ctype.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,68 +37,6 @@ static char *dup_str(const char *s, int len) {
         out[len] = '\0';
     }
     return out;
-}
-
-static int path_is_absolute(const char *path) {
-    if(!path || !*path) {
-        return 0;
-    }
-#if defined(_WIN32)
-    if(path[0] == '/' || path[0] == '\\') {
-        return 1;
-    }
-    return isalpha((unsigned char)path[0]) && path[1] == ':' &&
-           (path[2] == '/' || path[2] == '\\' || path[2] == '\0');
-#else
-    return path[0] == '/';
-#endif
-}
-
-static const char *find_last_path_separator(const char *path) {
-    const char *slash = strrchr(path, '/');
-#if defined(_WIN32)
-    const char *backslash = strrchr(path, '\\');
-    if(!slash || (backslash && backslash > slash)) {
-        return backslash;
-    }
-#endif
-    return slash;
-}
-
-// Resolve in-source file= the same way the emulator host does: absolute paths
-// stay absolute; relative paths join against the directory of the -i source.
-// Bare -i names with no directory keep the relative string (fopen uses cwd).
-static char *resolve_scope_file_path(ASSEMBLER *as, const char *file, int file_len) {
-    char *name = dup_str(file, file_len);
-    if(!name) {
-        return NULL;
-    }
-    if(path_is_absolute(name)) {
-        return name;
-    }
-
-    const char *source =
-        (as && as->root_file) ? as->root_file->display_name : NULL;
-    if(!source || !*source) {
-        return name;
-    }
-
-    const char *sep = find_last_path_separator(source);
-    if(!sep) {
-        return name;
-    }
-
-    size_t dir_len = (size_t)(sep - source + 1);
-    size_t name_len = strlen(name);
-    char *combined = malloc(dir_len + name_len + 1);
-    if(!combined) {
-        free(name);
-        return NULL;
-    }
-    memcpy(combined, source, dir_len);
-    memcpy(combined + dir_len, name, name_len + 1);
-    free(name);
-    return combined;
 }
 
 static FILE_TARGET *file_target_new(const char *file, int file_len, FILE_TARGET *sink) {
@@ -161,18 +98,8 @@ static void *cli_target_open(void *user, const char *name, int name_len,
     (void)dest_len;
     // The standalone assembler interprets file= and deliberately ignores
     // dest=. A destination-only scope therefore inherits its parent's output
-    // image rather than silently discarding its bytes. Relative file= paths
-    // resolve against the -i source directory (same rule as the emulator host).
-    if(file_len > 0) {
-        char *resolved = resolve_scope_file_path(as, file, file_len);
-        if(!resolved) {
-            return NULL;
-        }
-        FILE_TARGET *ft = file_target_new(resolved, (int)strlen(resolved), NULL);
-        free(resolved);
-        return ft;
-    }
-    return file_target_new(NULL, 0, parent);
+    // image rather than silently discarding its bytes.
+    return file_target_new(file, file_len, file_len > 0 ? NULL : parent);
 }
 
 static void cli_target_release(void *user, void *target) {
@@ -368,7 +295,7 @@ static void usage(const char *program) {
     fprintf(stderr,
         "Usage: %s -i <infile> [-o <outfile>] [-a <addr>] [-s <symfile|->]\n"
         "               [-C <6502|65c02|rockwell|wdc>] [-D name[=value]]...\n"
-        "               [--auto-adjust-segments] [-v] [-h]\n"
+        "               [-I <dir>]... [--auto-adjust-segments] [-v] [-h]\n"
         "\n"
         "  -i <infile>        assembly source to assemble (required)\n"
         "  -o <outfile>       binary output for the default (unnamed) target\n"
@@ -378,6 +305,8 @@ static void usage(const char *program) {
         "  -C, --cpu <name>   initial CPU profile (default 6502); source may switch\n"
         "                     profiles with .6502, .65c02, .rockwell, or .wdc\n"
         "  -D name[=value]    predefine a text define (value defaults to \"1\"); repeatable\n"
+        "  -I <dir>           add an include/incbin search directory (cwd-relative);\n"
+        "                     repeatable; same list as .search, tried before .search\n"
         "  -A, --auto-adjust-segments\n"
         "                     retry overlapping segment layouts with suggested starts\n"
         "  -v                 verbose: hex-dump each target's output\n"
@@ -385,7 +314,6 @@ static void usage(const char *program) {
         "\n"
         "A named `.scope name file=\"path\"` inside the source assembles into its own\n"
         "output file, so one source can produce several binaries (loader, overlays...).\n"
-        "Relative file= paths resolve against the directory of -i; -o stays cwd-relative.\n"
         "The standalone tool accepts but ignores dest=; a dest=-only scope continues\n"
         "emitting into its parent output target.\n"
         "The define AM65 is predefined to 1 so source can detect the CLI build with\n"
@@ -432,6 +360,20 @@ static int inject_defines(ASSEMBLER *as, int argc, char **argv) {
                 fprintf(stderr, "Could not predefine %s\n", spec);
                 return 0;
             }
+        }
+    }
+    return 1;
+}
+
+static int inject_search_dirs(ASSEMBLER *as, int argc, char **argv) {
+    for(int i = 1; i < argc - 1; i++) {
+        if(0 != strcmp(argv[i], "-I")) {
+            continue;
+        }
+        const char *dir = argv[i + 1];
+        if(assembler_add_search_dir(as, dir) != ASM_OK) {
+            fprintf(stderr, "Could not add search directory: %s\n", dir);
+            return 0;
         }
     }
     return 1;
@@ -511,6 +453,13 @@ int main(int argc, char **argv) {
     assembler_predefine(&as, "AM65", "1");
     assembler_set_auto_adjust_segments(&as, auto_adjust_segments);
     if(!inject_defines(&as, argc, argv)) {
+        assembler_shutdown(&as);
+        file_target_free(default_target);
+        errlog_shutdown(&log);
+        return 1;
+    }
+    if(!inject_search_dirs(&as, argc, argv)) {
+        print_errors(&log);
         assembler_shutdown(&as);
         file_target_free(default_target);
         errlog_shutdown(&log);

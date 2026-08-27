@@ -173,6 +173,7 @@ static void reset_source_for_assemble(ASSEMBLER *as) {
     files_free(as);
     AM65_ARRAY_INIT(&as->files, ASM_FILE*);
     AM65_ARRAY_INIT(&as->file_stack, FILE_FRAME);
+    /* search_dirs is rebuilt from seed_search_dirs at the start of each pass 1. */
     as->root_file = NULL;
     as->current_file = NULL;
 }
@@ -546,6 +547,8 @@ static void assembler_program_state_destroy(ASSEMBLER *as) {
     macro_stack_clear(as);
     macro_definitions_clear(as);
     files_free(as);
+    file_search_dirs_clear(as);
+    am65_array_free(&as->search_dirs);
     as->root_file = NULL;
     as->current_file = NULL;
     as->current_file_name = NULL;
@@ -570,6 +573,8 @@ static void assembler_program_state_destroy(ASSEMBLER *as) {
 static int assembler_program_state_init(ASSEMBLER *as) {
     AM65_ARRAY_INIT(&as->files, ASM_FILE*);
     AM65_ARRAY_INIT(&as->file_stack, FILE_FRAME);
+    AM65_ARRAY_INIT(&as->search_dirs, char *);
+    /* seed_search_dirs is owned by assembler_init/shutdown, not program state. */
     AM65_ARRAY_INIT(&as->defines, DEFINE);
     AM65_ARRAY_INIT(&as->scope_stack, SCOPE*);
     AM65_ARRAY_INIT(&as->anon_symbols, uint16_t);
@@ -611,9 +616,38 @@ int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, CB_ASM_CTX *cb) {
     as->error_log_level = 0;
     as->default_cpu_profile = ASM_CPU_6502;
     AM65_ARRAY_INIT(&as->predefines, DEFINE);
+    AM65_ARRAY_INIT(&as->seed_search_dirs, char *);
     AM65_ARRAY_INIT(&as->segment_adjustments, SEGMENT_ADJUSTMENT);
     if(ASM_OK != assembler_program_state_init(as)) {
         assembler_shutdown(as);
+        return ASM_ERR;
+    }
+    return ASM_OK;
+}
+
+int assembler_add_search_dir(ASSEMBLER *as, const char *dir) {
+    if(!as || !dir) {
+        return ASM_ERR;
+    }
+    if(dir[0] == '\0') {
+        asm_err(as, ASM_ERR_DEFINE, "Warning: search path is empty");
+        return ASM_ERR;
+    }
+
+    /* No file on the stack yet: resolve relative paths against the process cwd. */
+    char *resolved = file_resolve_against_current(as, dir);
+    if(!resolved) {
+        asm_err(as, ASM_ERR_DEFINE, "Warning: unable to resolve search path: %s", dir);
+        return ASM_ERR;
+    }
+    if(!file_path_is_directory(resolved)) {
+        asm_err(as, ASM_ERR_DEFINE,
+                "Warning: search directory does not exist: %s", resolved);
+        free(resolved);
+        return ASM_ERR;
+    }
+    if(ASM_OK != file_seed_search_dir_add(as, resolved)) {
+        asm_err(as, ASM_ERR_FATAL, "Out of memory recording search directory");
         return ASM_ERR;
     }
     return ASM_OK;
@@ -671,6 +705,10 @@ static int assembler_run_pass(
     reset_pass_state(as);
 
     if(as->pass == 1) {
+        if(ASM_OK != file_search_dirs_reset_from_seed(as)) {
+            asm_err(as, ASM_ERR_FATAL, "Out of memory preparing search directories");
+            return ASM_ERR;
+        }
         if(ASM_OK != file_load(as, input_file)) {
             return ASM_ERR;
         }
@@ -903,5 +941,7 @@ void assembler_shutdown(ASSEMBLER *as) {
         free(d->to);
     }
     am65_array_free(&as->predefines);
+    file_seed_search_dirs_clear(as);
+    am65_array_free(&as->seed_search_dirs);
     segment_adjustments_clear(&as->segment_adjustments);
 }

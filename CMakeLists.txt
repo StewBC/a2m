@@ -571,6 +571,13 @@ target_compile_definitions(test_assembler_multifile PRIVATE
 target_link_libraries(test_assembler_multifile PRIVATE assembler)
 add_test(NAME assembler_multifile COMMAND test_assembler_multifile)
 
+add_executable(test_assembler_search
+    tests/tools/test_assembler_search.c
+)
+target_compile_features(test_assembler_search PRIVATE c_std_99)
+target_link_libraries(test_assembler_search PRIVATE assembler)
+add_test(NAME assembler_search COMMAND test_assembler_search)
+
 add_executable(test_runtime_assembler
     tests/runtime/test_runtime_assembler.c
 )
@@ -607,6 +614,20 @@ add_test(
         -i ${CMAKE_SOURCE_DIR}/tests/fixtures/am65_wdc.asm
 )
 set_tests_properties(am65_cli_rockwell_rejects_wdc PROPERTIES WILL_FAIL TRUE)
+add_test(
+    NAME am65_cli_search_I
+    COMMAND $<TARGET_FILE:am65>
+        -i ${CMAKE_SOURCE_DIR}/tests/fixtures/am65_search/root.asm
+        -I ${CMAKE_SOURCE_DIR}/tests/fixtures/am65_search/shared
+        -o ${CMAKE_BINARY_DIR}/am65_cli_search.bin
+)
+add_test(
+    NAME am65_cli_search_without_I_fails
+    COMMAND $<TARGET_FILE:am65>
+        -i ${CMAKE_SOURCE_DIR}/tests/fixtures/am65_search/root.asm
+        -o ${CMAKE_BINARY_DIR}/am65_cli_search_fail.bin
+)
+set_tests_properties(am65_cli_search_without_I_fails PROPERTIES WILL_FAIL TRUE)
 
 # frontend_help.c was replaced by help_view + generated content in the wholesale
 # shell; re-add a dedicated help unit test when the public help API stabilizes.

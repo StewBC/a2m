@@ -35,7 +35,7 @@
 #line 7 "gperf.gperf"
 struct OPCODEINFO;
 
-#define TOTAL_KEYWORDS 138
+#define TOTAL_KEYWORDS 139
 #define MIN_WORD_LENGTH 3
 #define MAX_WORD_LENGTH 10
 #define MIN_HASH_VALUE 8
@@ -106,10 +106,10 @@ hash (register const char *str, register unsigned int len)
       619, 619, 619, 619, 619, 619,   5, 619, 180, 165,
        25, 155,  95,  85,  10,   0, 619, 619, 619, 619,
       619, 619, 619, 619, 619,  60,  50,  20,  10,  10,
-        0,  90, 619, 175, 225,   0,  75, 105,  80,   0,
+        0,  90,  10, 175, 225,   0,  75, 105,  80,   0,
        85, 110,  25,   5,   0, 190,   0,   4,  85,   0,
       140,  15, 619, 619, 619, 619, 619,  60,  50,  20,
-       10,  10,   0,  90, 619, 175, 225,   0,  75, 105,
+       10,  10,   0,  90,  10, 175, 225,   0,  75, 105,
        80,   0,  85, 110,  25,   5,   0, 190,   0,   4,
        85,   0, 140,  15, 619, 619, 619, 619, 619, 619,
       619, 619, 619, 619, 619, 619, 619, 619, 619, 619,
@@ -135,14 +135,14 @@ in_word_set (register const char *str, register unsigned int len)
   static struct OPCODEINFO wordlist[] =
     {
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
-#line 129 "gperf.gperf"
+#line 130 "gperf.gperf"
       {"txs",        GPERF_OPCODE_TXS    , 0, 0, 0},
       {""}, {""},
 #line 25 "gperf.gperf"
       {".endif",     GPERF_DOT_ENDIF     , 0, 0, 0},
-#line 42 "gperf.gperf"
-      {".segdef",    GPERF_DOT_SEGDEF    , 0, 0, 0},
 #line 43 "gperf.gperf"
+      {".segdef",    GPERF_DOT_SEGDEF    , 0, 0, 0},
+#line 44 "gperf.gperf"
       {".segment",   GPERF_DOT_SEGMENT   , 0, 0, 0},
 #line 26 "gperf.gperf"
       {".endmacro",  GPERF_DOT_ENDMACRO  , 0, 0, 0},
@@ -154,16 +154,19 @@ in_word_set (register const char *str, register unsigned int len)
       {""},
 #line 41 "gperf.gperf"
       {".res",       GPERF_DOT_RES       , 0, 0, 0},
-      {""}, {""}, {""}, {""},
+      {""}, {""},
+#line 42 "gperf.gperf"
+      {".search",    GPERF_DOT_SEARCH    , 0, 0, 0},
+      {""},
 #line 30 "gperf.gperf"
       {".endscope",  GPERF_DOT_ENDSCOPE  , 0, 0, 0},
       {""}, {""}, {""},
-#line 108 "gperf.gperf"
+#line 109 "gperf.gperf"
       {"sed",        GPERF_OPCODE_SED    , 0, 0, 0},
 #line 19 "gperf.gperf"
       {".drow",      GPERF_DOT_DROW      , 0, 0, 0},
       {""},
-#line 44 "gperf.gperf"
+#line 45 "gperf.gperf"
       {".scope",     GPERF_DOT_SCOPE     , 0, 0, 0},
 #line 18 "gperf.gperf"
       {".define",    GPERF_DOT_DEFINE    , 0, 0, 0},
@@ -174,10 +177,10 @@ in_word_set (register const char *str, register unsigned int len)
       {".drowd",     GPERF_DOT_DROWD     , 0, 0, 0},
 #line 24 "gperf.gperf"
       {".endfor",    GPERF_DOT_ENDFOR    , 0, 0, 0},
-#line 107 "gperf.gperf"
+#line 108 "gperf.gperf"
       {"sec",        GPERF_OPCODE_SEC    , 0, 0, 0},
       {""}, {""}, {""}, {""},
-#line 70 "gperf.gperf"
+#line 71 "gperf.gperf"
       {"dec",        GPERF_OPCODE_DEC    , 8, 0, 0},
       {""},
 #line 10 "gperf.gperf"
@@ -186,40 +189,40 @@ in_word_set (register const char *str, register unsigned int len)
       {".65c02",     GPERF_DOT_65c02     , 0, 0, 0},
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
       {""}, {""},
-#line 106 "gperf.gperf"
+#line 107 "gperf.gperf"
       {"sbc",        GPERF_OPCODE_SBC    , 8, 0, 0},
       {""}, {""}, {""},
-#line 61 "gperf.gperf"
+#line 62 "gperf.gperf"
       {"bvs",        GPERF_OPCODE_BVS    , 1, 0, 0},
-#line 56 "gperf.gperf"
+#line 57 "gperf.gperf"
       {"bne",        GPERF_OPCODE_BNE    , 1, 0, 0},
       {""}, {""}, {""}, {""},
-#line 52 "gperf.gperf"
+#line 53 "gperf.gperf"
       {"bcs",        GPERF_OPCODE_BCS    , 1, 0, 0},
       {""}, {""}, {""}, {""},
-#line 126 "gperf.gperf"
+#line 127 "gperf.gperf"
       {"tsb",        GPERF_OPCODE_TSB    , 8, 0, 0},
-#line 147 "gperf.gperf"
+#line 148 "gperf.gperf"
       {"bbs7",       GPERF_OPCODE_BBS7   , 8, 0, 0},
       {""}, {""}, {""},
-#line 125 "gperf.gperf"
+#line 126 "gperf.gperf"
       {"trb",        GPERF_OPCODE_TRB    , 8, 0, 0},
-#line 139 "gperf.gperf"
+#line 140 "gperf.gperf"
       {"bbr7",       GPERF_OPCODE_BBR7   , 8, 0, 0},
       {""}, {""}, {""},
-#line 49 "gperf.gperf"
+#line 50 "gperf.gperf"
       {"and",        GPERF_OPCODE_AND    , 8, 0, 0},
-#line 146 "gperf.gperf"
+#line 147 "gperf.gperf"
       {"bbs6",       GPERF_OPCODE_BBS6   , 8, 0, 0},
       {""}, {""},
-#line 60 "gperf.gperf"
+#line 61 "gperf.gperf"
       {"bvc",        GPERF_OPCODE_BVC    , 1, 0, 0},
-#line 127 "gperf.gperf"
+#line 128 "gperf.gperf"
       {"tsx",        GPERF_OPCODE_TSX    , 0, 0, 0},
-#line 138 "gperf.gperf"
+#line 139 "gperf.gperf"
       {"bbr6",       GPERF_OPCODE_BBR6   , 8, 0, 0},
       {""}, {""}, {""},
-#line 51 "gperf.gperf"
+#line 52 "gperf.gperf"
       {"bcc",        GPERF_OPCODE_BCC    , 1, 0, 0},
       {""},
 #line 14 "gperf.gperf"
@@ -227,94 +230,94 @@ in_word_set (register const char *str, register unsigned int len)
       {""},
 #line 28 "gperf.gperf"
       {".endrep",    GPERF_DOT_ENDREPEAT , 0, 0, 0},
-#line 71 "gperf.gperf"
+#line 72 "gperf.gperf"
       {"dex",        GPERF_OPCODE_DEX    , 0, 0, 0},
-#line 142 "gperf.gperf"
+#line 143 "gperf.gperf"
       {"bbs2",       GPERF_OPCODE_BBS2   , 8, 0, 0},
       {""}, {""}, {""},
-#line 48 "gperf.gperf"
+#line 49 "gperf.gperf"
       {"adc",        GPERF_OPCODE_ADC    , 8, 0, 0},
-#line 134 "gperf.gperf"
+#line 135 "gperf.gperf"
       {"bbr2",       GPERF_OPCODE_BBR2   , 8, 0, 0},
       {""}, {""}, {""},
-#line 83 "gperf.gperf"
+#line 84 "gperf.gperf"
       {"lsr",        GPERF_OPCODE_LSR    , 8, 0, 0},
-#line 117 "gperf.gperf"
+#line 118 "gperf.gperf"
       {"smb7",       GPERF_OPCODE_SMB7   , 8, 0, 0},
       {""}, {""}, {""},
-#line 128 "gperf.gperf"
+#line 129 "gperf.gperf"
       {"txa",        GPERF_OPCODE_TXA    , 0, 0, 0},
       {""}, {""},
 #line 22 "gperf.gperf"
       {".dword",     GPERF_DOT_DWORD     , 0, 0, 0},
       {""},
-#line 85 "gperf.gperf"
+#line 86 "gperf.gperf"
       {"ora",        GPERF_OPCODE_ORA    , 8, 0, 0},
-#line 116 "gperf.gperf"
+#line 117 "gperf.gperf"
       {"smb6",       GPERF_OPCODE_SMB6   , 8, 0, 0},
       {""}, {""}, {""},
-#line 69 "gperf.gperf"
+#line 70 "gperf.gperf"
       {"dea",        GPERF_OPCODE_DEA    , 0, 0, 0},
 #line 13 "gperf.gperf"
       {".wdc",       GPERF_DOT_WDC       , 0, 0, 0},
 #line 23 "gperf.gperf"
       {".else",      GPERF_DOT_ELSE      , 0, 0, 0},
       {""}, {""},
-#line 73 "gperf.gperf"
+#line 74 "gperf.gperf"
       {"eor",        GPERF_OPCODE_EOR    , 8, 0, 0},
-#line 101 "gperf.gperf"
+#line 102 "gperf.gperf"
       {"rmb7",       GPERF_OPCODE_RMB7   , 8, 0, 0},
       {""},
 #line 39 "gperf.gperf"
       {".qword",     GPERF_DOT_QWORD     , 0, 0, 0},
-#line 65 "gperf.gperf"
+#line 66 "gperf.gperf"
       {"clv",        GPERF_OPCODE_CLV    , 0, 0, 0},
-#line 59 "gperf.gperf"
+#line 60 "gperf.gperf"
       {"brk",        GPERF_OPCODE_BRK    , 0, 0, 0},
-#line 112 "gperf.gperf"
+#line 113 "gperf.gperf"
       {"smb2",       GPERF_OPCODE_SMB2   , 8, 0, 0},
       {""},
 #line 21 "gperf.gperf"
       {".drowq",     GPERF_DOT_DROWQ     , 0, 0, 0},
       {""},
-#line 123 "gperf.gperf"
+#line 124 "gperf.gperf"
       {"tax",        GPERF_OPCODE_TAX    , 0, 0, 0},
-#line 100 "gperf.gperf"
+#line 101 "gperf.gperf"
       {"rmb6",       GPERF_OPCODE_RMB6   , 8, 0, 0},
       {""},
 #line 36 "gperf.gperf"
       {".macro",     GPERF_DOT_MACRO     , 0, 0, 0},
       {""},
-#line 103 "gperf.gperf"
+#line 104 "gperf.gperf"
       {"ror",        GPERF_OPCODE_ROR    , 8, 0, 0},
       {""},
 #line 38 "gperf.gperf"
       {".proc",      GPERF_DOT_PROC      , 0, 0, 0},
       {""}, {""},
-#line 63 "gperf.gperf"
+#line 64 "gperf.gperf"
       {"cld",        GPERF_OPCODE_CLD    , 0, 0, 0},
       {""}, {""}, {""}, {""},
-#line 72 "gperf.gperf"
+#line 73 "gperf.gperf"
       {"dey",        GPERF_OPCODE_DEY    , 0, 0, 0},
-#line 96 "gperf.gperf"
+#line 97 "gperf.gperf"
       {"rmb2",       GPERF_OPCODE_RMB2   , 8, 0, 0},
       {""}, {""}, {""},
-#line 62 "gperf.gperf"
+#line 63 "gperf.gperf"
       {"clc",        GPERF_OPCODE_CLC    , 0, 0, 0},
-#line 145 "gperf.gperf"
+#line 146 "gperf.gperf"
       {"bbs5",       GPERF_OPCODE_BBS5   , 8, 0, 0},
       {""}, {""}, {""}, {""},
-#line 137 "gperf.gperf"
+#line 138 "gperf.gperf"
       {"bbr5",       GPERF_OPCODE_BBR5   , 8, 0, 0},
       {""}, {""}, {""},
-#line 58 "gperf.gperf"
+#line 59 "gperf.gperf"
       {"bra",        GPERF_OPCODE_BRA    , 1, 0, 0},
-#line 144 "gperf.gperf"
+#line 145 "gperf.gperf"
       {"bbs4",       GPERF_OPCODE_BBS4   , 8, 0, 0},
       {""}, {""}, {""},
-#line 81 "gperf.gperf"
+#line 82 "gperf.gperf"
       {"ldx",        GPERF_OPCODE_LDX    , 8, 0, 0},
-#line 136 "gperf.gperf"
+#line 137 "gperf.gperf"
       {"bbr4",       GPERF_OPCODE_BBR4   , 8, 0, 0},
       {""}, {""}, {""}, {""},
 #line 12 "gperf.gperf"
@@ -322,59 +325,59 @@ in_word_set (register const char *str, register unsigned int len)
 #line 17 "gperf.gperf"
       {".byte",      GPERF_DOT_BYTE      , 0, 0, 0},
       {""}, {""}, {""}, {""}, {""}, {""}, {""},
-#line 53 "gperf.gperf"
+#line 54 "gperf.gperf"
       {"beq",        GPERF_OPCODE_BEQ    , 1, 0, 0},
 #line 37 "gperf.gperf"
       {".org",       GPERF_DOT_ORG       , 0, 0, 0},
-#line 47 "gperf.gperf"
+#line 48 "gperf.gperf"
       {".word",      GPERF_DOT_WORD      , 0, 0, 0},
       {""}, {""},
-#line 124 "gperf.gperf"
+#line 125 "gperf.gperf"
       {"tay",        GPERF_OPCODE_TAY    , 0, 0, 0},
-#line 115 "gperf.gperf"
+#line 116 "gperf.gperf"
       {"smb5",       GPERF_OPCODE_SMB5   , 8, 0, 0},
       {""}, {""}, {""},
-#line 80 "gperf.gperf"
+#line 81 "gperf.gperf"
       {"lda",        GPERF_OPCODE_LDA    , 8, 0, 0},
       {""}, {""}, {""},
 #line 16 "gperf.gperf"
       {".asciiz",    GPERF_DOT_ASCIIZ    , 0, 0, 0},
       {""},
-#line 114 "gperf.gperf"
+#line 115 "gperf.gperf"
       {"smb4",       GPERF_OPCODE_SMB4   , 8, 0, 0},
       {""}, {""}, {""},
-#line 75 "gperf.gperf"
+#line 76 "gperf.gperf"
       {"inc",        GPERF_OPCODE_INC    , 8, 0, 0},
 #line 31 "gperf.gperf"
       {".for",       GPERF_DOT_FOR       , 0, 0, 0},
       {""}, {""}, {""},
-#line 45 "gperf.gperf"
+#line 46 "gperf.gperf"
       {".strcode",   GPERF_DOT_STRCODE   , 0, 0, 0},
-#line 99 "gperf.gperf"
+#line 100 "gperf.gperf"
       {"rmb5",       GPERF_OPCODE_RMB5   , 8, 0, 0},
       {""}, {""}, {""},
-#line 67 "gperf.gperf"
+#line 68 "gperf.gperf"
       {"cpx",        GPERF_OPCODE_CPX    , 8, 0, 0},
       {""}, {""}, {""}, {""},
-#line 105 "gperf.gperf"
+#line 106 "gperf.gperf"
       {"rts",        GPERF_OPCODE_RTS    , 0, 0, 0},
-#line 98 "gperf.gperf"
+#line 99 "gperf.gperf"
       {"rmb4",       GPERF_OPCODE_RMB4   , 8, 0, 0},
       {""}, {""}, {""},
-#line 82 "gperf.gperf"
+#line 83 "gperf.gperf"
       {"ldy",        GPERF_OPCODE_LDY    , 8, 0, 0},
-#line 143 "gperf.gperf"
+#line 144 "gperf.gperf"
       {"bbs3",       GPERF_OPCODE_BBS3   , 8, 0, 0},
       {""}, {""}, {""}, {""},
-#line 135 "gperf.gperf"
+#line 136 "gperf.gperf"
       {"bbr3",       GPERF_OPCODE_BBR3   , 8, 0, 0},
       {""}, {""}, {""}, {""},
-#line 141 "gperf.gperf"
+#line 142 "gperf.gperf"
       {"bbs1",       GPERF_OPCODE_BBS1   , 8, 0, 0},
       {""}, {""}, {""},
-#line 50 "gperf.gperf"
+#line 51 "gperf.gperf"
       {"asl",        GPERF_OPCODE_ASL    , 8, 0, 0},
-#line 133 "gperf.gperf"
+#line 134 "gperf.gperf"
       {"bbr1",       GPERF_OPCODE_BBR1   , 8, 0, 0},
       {""},
 #line 15 "gperf.gperf"
@@ -383,100 +386,100 @@ in_word_set (register const char *str, register unsigned int len)
 #line 34 "gperf.gperf"
       {".include",   GPERF_DOT_INCLUDE   , 0, 0, 0},
       {""}, {""}, {""}, {""},
-#line 130 "gperf.gperf"
+#line 131 "gperf.gperf"
       {"tya",        GPERF_OPCODE_TYA    , 0, 0, 0},
-#line 140 "gperf.gperf"
+#line 141 "gperf.gperf"
       {"bbs0",       GPERF_OPCODE_BBS0   , 8, 0, 0},
       {""}, {""}, {""},
-#line 79 "gperf.gperf"
+#line 80 "gperf.gperf"
       {"jsr",        GPERF_OPCODE_JSR    ,16, 0, 0},
-#line 132 "gperf.gperf"
+#line 133 "gperf.gperf"
       {"bbr0",       GPERF_OPCODE_BBR0   , 8, 0, 0},
       {""}, {""}, {""},
-#line 76 "gperf.gperf"
+#line 77 "gperf.gperf"
       {"inx",        GPERF_OPCODE_INX    , 0, 0, 0},
-#line 113 "gperf.gperf"
+#line 114 "gperf.gperf"
       {"smb3",       GPERF_OPCODE_SMB3   , 8, 0, 0},
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
-#line 68 "gperf.gperf"
+#line 69 "gperf.gperf"
       {"cpy",        GPERF_OPCODE_CPY    , 8, 0, 0},
-#line 111 "gperf.gperf"
+#line 112 "gperf.gperf"
       {"smb1",       GPERF_OPCODE_SMB1   , 8, 0, 0},
       {""},
 #line 35 "gperf.gperf"
       {".local",     GPERF_DOT_LOCAL     , 0, 0, 0},
       {""},
-#line 92 "gperf.gperf"
+#line 93 "gperf.gperf"
       {"plx",        GPERF_OPCODE_PLX    , 0, 0, 0},
       {""}, {""}, {""}, {""},
-#line 120 "gperf.gperf"
+#line 121 "gperf.gperf"
       {"stx",        GPERF_OPCODE_STX    , 8, 0, 0},
-#line 97 "gperf.gperf"
+#line 98 "gperf.gperf"
       {"rmb3",       GPERF_OPCODE_RMB3   , 8, 0, 0},
       {""}, {""}, {""},
-#line 74 "gperf.gperf"
+#line 75 "gperf.gperf"
       {"ina",        GPERF_OPCODE_INA    , 0, 0, 0},
-#line 110 "gperf.gperf"
+#line 111 "gperf.gperf"
       {"smb0",       GPERF_OPCODE_SMB0   , 8, 0, 0},
       {""}, {""},
-#line 46 "gperf.gperf"
+#line 47 "gperf.gperf"
       {".string",    GPERF_DOT_STRING    , 0, 0, 0},
-#line 102 "gperf.gperf"
+#line 103 "gperf.gperf"
       {"rol",        GPERF_OPCODE_ROL    , 8, 0, 0},
-#line 95 "gperf.gperf"
+#line 96 "gperf.gperf"
       {"rmb1",       GPERF_OPCODE_RMB1   , 8, 0, 0},
       {""}, {""}, {""},
-#line 66 "gperf.gperf"
+#line 67 "gperf.gperf"
       {"cmp",        GPERF_OPCODE_CMP    , 8, 0, 0},
       {""}, {""}, {""}, {""},
-#line 90 "gperf.gperf"
+#line 91 "gperf.gperf"
       {"pla",        GPERF_OPCODE_PLA    , 0, 0, 0},
       {""}, {""}, {""}, {""},
-#line 118 "gperf.gperf"
+#line 119 "gperf.gperf"
       {"sta",        GPERF_OPCODE_STA    , 8, 0, 0},
-#line 94 "gperf.gperf"
+#line 95 "gperf.gperf"
       {"rmb0",       GPERF_OPCODE_RMB0   , 8, 0, 0},
       {""}, {""}, {""}, {""}, {""}, {""}, {""},
 #line 33 "gperf.gperf"
       {".incbin",    GPERF_DOT_INCBIN    , 0, 0, 0},
-#line 77 "gperf.gperf"
+#line 78 "gperf.gperf"
       {"iny",        GPERF_OPCODE_INY    , 0, 0, 0},
       {""}, {""}, {""}, {""},
 #line 32 "gperf.gperf"
       {".if",        GPERF_DOT_IF        , 0, 0, 0},
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
-#line 93 "gperf.gperf"
+#line 94 "gperf.gperf"
       {"ply",        GPERF_OPCODE_PLY    , 0, 0, 0},
       {""}, {""}, {""}, {""},
-#line 121 "gperf.gperf"
+#line 122 "gperf.gperf"
       {"sty",        GPERF_OPCODE_STY    , 8, 0, 0},
       {""}, {""}, {""}, {""},
-#line 57 "gperf.gperf"
+#line 58 "gperf.gperf"
       {"bpl",        GPERF_OPCODE_BPL    , 1, 0, 0},
       {""}, {""}, {""}, {""},
-#line 88 "gperf.gperf"
+#line 89 "gperf.gperf"
       {"phx",        GPERF_OPCODE_PHX    , 0, 0, 0},
       {""}, {""}, {""}, {""},
-#line 122 "gperf.gperf"
+#line 123 "gperf.gperf"
       {"stz",        GPERF_OPCODE_STZ    , 8, 0, 0},
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
-#line 84 "gperf.gperf"
+#line 85 "gperf.gperf"
       {"nop",        GPERF_OPCODE_NOP    , 0, 0, 0},
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
-#line 86 "gperf.gperf"
+#line 87 "gperf.gperf"
       {"pha",        GPERF_OPCODE_PHA    , 0, 0, 0},
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
       {""}, {""}, {""}, {""}, {""},
-#line 91 "gperf.gperf"
+#line 92 "gperf.gperf"
       {"plp",        GPERF_OPCODE_PLP    , 0, 0, 0},
       {""}, {""}, {""}, {""},
-#line 119 "gperf.gperf"
+#line 120 "gperf.gperf"
       {"stp",        GPERF_OPCODE_STP    , 0, 0, 0},
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
-#line 89 "gperf.gperf"
+#line 90 "gperf.gperf"
       {"phy",        GPERF_OPCODE_PHY    , 0, 0, 0},
       {""}, {""}, {""}, {""},
-#line 109 "gperf.gperf"
+#line 110 "gperf.gperf"
       {"sei",        GPERF_OPCODE_SEI    , 0, 0, 0},
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
@@ -484,26 +487,26 @@ in_word_set (register const char *str, register unsigned int len)
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
       {""}, {""}, {""},
-#line 131 "gperf.gperf"
+#line 132 "gperf.gperf"
       {"wai",        GPERF_OPCODE_WAI    , 0, 0, 0},
-#line 87 "gperf.gperf"
+#line 88 "gperf.gperf"
       {"php",        GPERF_OPCODE_PHP    , 0, 0, 0},
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
-#line 54 "gperf.gperf"
+#line 55 "gperf.gperf"
       {"bit",        GPERF_OPCODE_BIT    , 8, 0, 0},
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
       {""}, {""}, {""}, {""}, {""}, {""}, {""},
-#line 78 "gperf.gperf"
+#line 79 "gperf.gperf"
       {"jmp",        GPERF_OPCODE_JMP    ,16, 0, 0},
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
       {""}, {""}, {""}, {""}, {""}, {""},
-#line 64 "gperf.gperf"
+#line 65 "gperf.gperf"
       {"cli",        GPERF_OPCODE_CLI    , 0, 0, 0},
       {""}, {""}, {""}, {""},
-#line 55 "gperf.gperf"
+#line 56 "gperf.gperf"
       {"bmi",        GPERF_OPCODE_BMI    , 1, 0, 0},
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
@@ -515,7 +518,7 @@ in_word_set (register const char *str, register unsigned int len)
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
       {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""}, {""},
       {""}, {""}, {""},
-#line 104 "gperf.gperf"
+#line 105 "gperf.gperf"
       {"rti",        GPERF_OPCODE_RTI    , 0, 0, 0}
     };
 
@@ -533,5 +536,5 @@ in_word_set (register const char *str, register unsigned int len)
     }
   return 0;
 }
-#line 148 "gperf.gperf"
+#line 149 "gperf.gperf"
 

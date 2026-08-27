@@ -5,9 +5,13 @@
 #include "asm_lib.h"
 
 #include <limits.h>
+#include <sys/stat.h>
 #if defined(_WIN32)
 #include <ctype.h>
 #include <stdlib.h>
+#ifndef S_ISDIR
+#define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
+#endif
 #endif
 
 #ifndef PATH_MAX
@@ -58,6 +62,219 @@ static char *canonicalize_path(const char *path) {
     return asm_strdup(path);
 }
 
+static int path_is_openable_file(const char *path) {
+    FILE *fp = fopen(path, "rb");
+    if(!fp) {
+        return 0;
+    }
+    fclose(fp);
+    return 1;
+}
+
+int file_path_is_directory(const char *path) {
+    struct stat st;
+    if(!path || !*path || stat(path, &st) != 0) {
+        return 0;
+    }
+    return S_ISDIR(st.st_mode);
+}
+
+/* Join directory + relative path, inserting a separator when needed. */
+static char *join_dir_path(const char *dir, const char *path) {
+    size_t dir_len = strlen(dir);
+    size_t path_len = strlen(path);
+    int need_sep = 0;
+    if(dir_len > 0) {
+        char last = dir[dir_len - 1];
+        need_sep = !(last == '/' || last == '\\');
+    }
+    char *combined = malloc(dir_len + (size_t)need_sep + path_len + 1);
+    if(!combined) {
+        return NULL;
+    }
+    memcpy(combined, dir, dir_len);
+    if(need_sep) {
+        combined[dir_len] = '/';
+        memcpy(combined + dir_len + 1, path, path_len + 1);
+    } else {
+        memcpy(combined + dir_len, path, path_len + 1);
+    }
+    return combined;
+}
+
+static char *join_current_dir_path(ASSEMBLER *as, const char *path) {
+    FILE_FRAME *top = file_stack_top(as);
+    if(!top || !top->file || !top->file->display_name) {
+        return canonicalize_path(path);
+    }
+
+    const char *base = top->file->display_name;
+    const char *slash = find_last_path_separator(base);
+    if(!slash) {
+        return canonicalize_path(path);
+    }
+
+    size_t dir_len = (size_t)(slash - base);
+    char *dir = malloc(dir_len + 1);
+    if(!dir) {
+        return NULL;
+    }
+    memcpy(dir, base, dir_len);
+    dir[dir_len] = '\0';
+
+    char *combined = join_dir_path(dir, path);
+    free(dir);
+    if(!combined) {
+        return NULL;
+    }
+    char *canonical = canonicalize_path(combined);
+    free(combined);
+    return canonical;
+}
+
+char *file_resolve_against_current(ASSEMBLER *as, const char *path) {
+    if(!path || !*path) {
+        return NULL;
+    }
+    if(is_absolute_path(path) || !file_stack_top(as)) {
+        return canonicalize_path(path);
+    }
+    return join_current_dir_path(as, path);
+}
+
+void file_search_dirs_clear(ASSEMBLER *as) {
+    if(!as) {
+        return;
+    }
+    for(size_t i = 0; i < as->search_dirs.items; i++) {
+        free(*AM65_ARRAY_GET(&as->search_dirs, char *, i));
+    }
+    as->search_dirs.items = 0;
+}
+
+int file_search_dir_add(ASSEMBLER *as, char *resolved_dir) {
+    if(!as || !resolved_dir) {
+        return ASM_ERR;
+    }
+    for(size_t i = 0; i < as->search_dirs.items; i++) {
+        char *existing = *AM65_ARRAY_GET(&as->search_dirs, char *, i);
+        if(existing && strcmp(existing, resolved_dir) == 0) {
+            free(resolved_dir);
+            return ASM_OK;
+        }
+    }
+    if(ASM_OK != AM65_ARRAY_ADD(&as->search_dirs, resolved_dir)) {
+        free(resolved_dir);
+        return ASM_ERR;
+    }
+    return ASM_OK;
+}
+
+void file_seed_search_dirs_clear(ASSEMBLER *as) {
+    if(!as) {
+        return;
+    }
+    for(size_t i = 0; i < as->seed_search_dirs.items; i++) {
+        free(*AM65_ARRAY_GET(&as->seed_search_dirs, char *, i));
+    }
+    as->seed_search_dirs.items = 0;
+}
+
+int file_seed_search_dir_add(ASSEMBLER *as, char *resolved_dir) {
+    if(!as || !resolved_dir) {
+        return ASM_ERR;
+    }
+    for(size_t i = 0; i < as->seed_search_dirs.items; i++) {
+        char *existing = *AM65_ARRAY_GET(&as->seed_search_dirs, char *, i);
+        if(existing && strcmp(existing, resolved_dir) == 0) {
+            free(resolved_dir);
+            return ASM_OK;
+        }
+    }
+    if(ASM_OK != AM65_ARRAY_ADD(&as->seed_search_dirs, resolved_dir)) {
+        free(resolved_dir);
+        return ASM_ERR;
+    }
+    return ASM_OK;
+}
+
+int file_search_dirs_reset_from_seed(ASSEMBLER *as) {
+    if(!as) {
+        return ASM_ERR;
+    }
+    file_search_dirs_clear(as);
+    for(size_t i = 0; i < as->seed_search_dirs.items; i++) {
+        char *seed = *AM65_ARRAY_GET(&as->seed_search_dirs, char *, i);
+        if(!seed) {
+            continue;
+        }
+        char *copy = asm_strdup(seed);
+        if(!copy || ASM_OK != file_search_dir_add(as, copy)) {
+            free(copy);
+            return ASM_ERR;
+        }
+    }
+    return ASM_OK;
+}
+
+char *file_format_open_miss(ASSEMBLER *as, const char *kind, const char *path) {
+    char buf[ASM_ERR_MAX_STR_LEN];
+    size_t used = 0;
+    int n = snprintf(buf, sizeof(buf), "Unable to open %s file: %s", kind, path);
+    if(n < 0) {
+        return asm_strdup("Unable to open file");
+    }
+    used = (size_t)n;
+    if(used >= sizeof(buf)) {
+        used = sizeof(buf) - 1;
+    }
+
+    if(as && as->search_dirs.items > 0 && used + 9 < sizeof(buf)) {
+        memcpy(buf + used, " (tried:", 8);
+        used += 8;
+        buf[used] = '\0';
+
+        char *primary = file_resolve_against_current(as, path);
+        if(primary && used + 1 + strlen(primary) + 1 < sizeof(buf)) {
+            buf[used++] = ' ';
+            memcpy(buf + used, primary, strlen(primary) + 1);
+            used += strlen(primary);
+        }
+        free(primary);
+
+        for(size_t i = 0; i < as->search_dirs.items; i++) {
+            char *dir = *AM65_ARRAY_GET(&as->search_dirs, char *, i);
+            if(!dir) {
+                continue;
+            }
+            char *candidate = join_dir_path(dir, path);
+            if(!candidate) {
+                continue;
+            }
+            char *canonical = canonicalize_path(candidate);
+            free(candidate);
+            if(!canonical) {
+                continue;
+            }
+            size_t clen = strlen(canonical);
+            if(used + 2 + clen + 1 >= sizeof(buf)) {
+                free(canonical);
+                break;
+            }
+            buf[used++] = ',';
+            buf[used++] = ' ';
+            memcpy(buf + used, canonical, clen + 1);
+            used += clen;
+            free(canonical);
+        }
+        if(used + 1 < sizeof(buf)) {
+            buf[used++] = ')';
+            buf[used] = '\0';
+        }
+    }
+    return asm_strdup(buf);
+}
+
 char *file_resolve_path(ASSEMBLER *as, const char *path) {
     if(!path || !*path) {
         return NULL;
@@ -67,24 +284,39 @@ char *file_resolve_path(ASSEMBLER *as, const char *path) {
         return canonicalize_path(path);
     }
 
-    const char *base = file_stack_top(as)->file->display_name;
-    const char *slash = find_last_path_separator(base);
-    if(!slash) {
-        return canonicalize_path(path);
-    }
-
-    size_t dir_len = (size_t)(slash - base + 1);
-    size_t path_len = strlen(path);
-    char *combined = malloc(dir_len + path_len + 1);
-    if(!combined) {
+    char *primary = join_current_dir_path(as, path);
+    if(!primary) {
         return NULL;
     }
-    memcpy(combined, base, dir_len);
-    memcpy(combined + dir_len, path, path_len + 1);
+    if(path_is_openable_file(primary)) {
+        return primary;
+    }
 
-    char *canonical = canonicalize_path(combined);
-    free(combined);
-    return canonical;
+    for(size_t i = 0; i < as->search_dirs.items; i++) {
+        char *dir = *AM65_ARRAY_GET(&as->search_dirs, char *, i);
+        if(!dir) {
+            continue;
+        }
+        char *combined = join_dir_path(dir, path);
+        if(!combined) {
+            free(primary);
+            return NULL;
+        }
+        char *canonical = canonicalize_path(combined);
+        free(combined);
+        if(!canonical) {
+            free(primary);
+            return NULL;
+        }
+        if(path_is_openable_file(canonical)) {
+            free(primary);
+            return canonical;
+        }
+        free(canonical);
+    }
+
+    free(primary);
+    return NULL;
 }
 
 static ASM_FILE *find_loaded_file(ASSEMBLER *as, const char *display_name) {
@@ -185,7 +417,16 @@ int file_load(ASSEMBLER *as, const char *path) {
 
     char *display_name = file_resolve_path(as, path);
     if(!display_name) {
-        asm_err(as, ASM_ERR_FATAL, "Unable to resolve path: %s", path);
+        /* Pass 1 records the miss; pass 2 would only duplicate the message. */
+        if(as->pass == 1) {
+            char *detail = file_format_open_miss(as, "include", path);
+            if(detail) {
+                asm_err(as, ASM_ERR_FATAL, "%s", detail);
+                free(detail);
+            } else {
+                asm_err(as, ASM_ERR_FATAL, "Unable to open include file: %s", path);
+            }
+        }
         return ASM_ERR;
     }
 

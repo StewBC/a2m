@@ -1167,6 +1167,7 @@ The ternary form is `condition ? true-expr : false-expr`.
 | `.strcode e` | Set a per-character mapping expression using `_`; see below |
 | `.include "f"` | Include and assemble another source file |
 | `.incbin "f"` | Include a binary file verbatim |
+| `.search "dir"` | Append a directory to the include/incbin search list (see Paths) |
 | `.define name text` | Text substitution on word boundaries, skipping string literals |
 | `.if cond` | Conditional assembly; condition uses `.lt .le .gt .ge .eq .ne .defined` |
 | `.else` | Alternate branch of `.if` |
@@ -1190,8 +1191,24 @@ The ternary form is `condition ? true-expr : false-expr`.
 | `.rockwell` | Allow 65C02 plus Rockwell RMB/SMB and BBR/BBS operations |
 | `.wdc` | Allow the Rockwell profile plus WDC WAI and STP |
 
-**Paths:** `.include` and `.incbin` resolve relative to the directory of the including
-file.
+**Paths:** `.include` and `.incbin` resolve relative to the directory of the
+**including** file first. If that miss fails, they try each directory on the search
+list, using the include string as written (no basename strip). Search directories come
+from:
+
+1. Host / CLI seeds: `am65 -I <dir>` (repeatable; paths are relative to the process
+   working directory), or the same API used by an emulator host
+2. In-source `.search "dir"` (resolved relative to the file that contains it)
+
+`-I` entries are applied first; `.search` appends after them. Duplicate resolved
+directories are ignored. `.search` only affects `.include` / `.incbin` that appear
+**after** it. Empty or missing search directories produce a warning.
+
+```
+.search "../shared"
+.include "local.s"     ; beside this file if present
+.include "shared.s"    ; else ../shared/shared.s
+```
 
 **`.byte` and strings:** `.byte` accepts strings as well as numeric expressions.
 `.strcode` is not applied to string arguments of `.byte`.
@@ -1406,7 +1423,7 @@ It writes raw binary files rather than poking live memory.
 ```
 am65 -i <infile> [-o <outfile>] [-a <addr>] [-s <symfile|->]
      [-C <6502|65c02|rockwell|wdc>] [-D name[=value]]...
-     [--auto-adjust-segments] [-v] [-h]
+     [-I <dir>]... [--auto-adjust-segments] [-v] [-h]
 ```
 
 | Switch | Effect |
@@ -1417,18 +1434,20 @@ am65 -i <infile> [-o <outfile>] [-a <addr>] [-s <symfile|->]
 | `-s <symfile\|->` | Write a symbol + segment listing; `-` sends it to stdout |
 | `-C`, `--cpu <name>` | Select the initial CPU profile (default `6502`) |
 | `-D name[=value]` | Predefine a text define (value defaults to `1`); repeatable |
+| `-I <dir>` | Add an include/incbin search directory (cwd-relative); repeatable; same list as `.search`, tried before `.search` |
 | `-A`, `--auto-adjust-segments` | Retry overlapping pass-1 layouts up to three times using suggested starts |
 | `-v` | Verbose: hex-dump each target's emitted bytes |
 | `-h` | Show usage |
 
 Each output file contains exactly the range of addresses the source emitted into.
 Named `.scope file="..."` targets are written to their own files. Relative `file=`
-paths resolve against the directory of the `-i` source (same rule as the emulator
-Assembler tab); absolute paths are unchanged. The CLI `-o` path is still relative to
-the current working directory. `dest=` is accepted but ignored. `AM65` is predefined
-to `1`; no emulator machine symbol is predefined.
+and `-o` paths are relative to the current working directory; absolute paths are
+unchanged. (In the emulator Assembler tab, relative `file=` still resolves beside
+the assembled source — see above.) `dest=` is accepted but ignored. `AM65` is
+predefined to `1`; no emulator machine symbol is predefined.
 
 ```
+am65 -i alt/root.asm -I shared -o out.bin
 am65 -i demo.asm -o loader.bin -a $0800 -D VERSION=3 -s symbols.txt
 ```
 

@@ -39,6 +39,7 @@ struct OPCODEINFO
 .qword,     GPERF_DOT_QWORD     , 0, 0, 0
 .repeat,    GPERF_DOT_REPEAT    , 0, 0, 0
 .res,       GPERF_DOT_RES       , 0, 0, 0
+.search,    GPERF_DOT_SEARCH    , 0, 0, 0
 .segdef,    GPERF_DOT_SEGDEF    , 0, 0, 0
 .segment,   GPERF_DOT_SEGMENT   , 0, 0, 0
 .scope,     GPERF_DOT_SCOPE     , 0, 0, 0

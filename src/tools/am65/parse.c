@@ -553,6 +553,43 @@ static void dot_include(ASSEMBLER *as) {
     free(path);
 }
 
+static void dot_search(ASSEMBLER *as) {
+    next_token(as);
+    char *path = copy_token_string(as);
+    if(!path) {
+        return;
+    }
+
+    if(path[0] == '\0') {
+        asm_err(as, ASM_ERR_DEFINE, "Warning: .search path is empty");
+        free(path);
+        return;
+    }
+
+    if(as->pass != 1) {
+        free(path);
+        return;
+    }
+
+    char *resolved = file_resolve_against_current(as, path);
+    free(path);
+    if(!resolved) {
+        asm_err(as, ASM_ERR_DEFINE, "Warning: unable to resolve .search path");
+        return;
+    }
+
+    if(!file_path_is_directory(resolved)) {
+        asm_err(as, ASM_ERR_DEFINE,
+                "Warning: .search directory does not exist: %s", resolved);
+        free(resolved);
+        return;
+    }
+
+    if(ASM_OK != file_search_dir_add(as, resolved)) {
+        asm_err(as, ASM_ERR_FATAL, "Out of memory recording .search directory");
+    }
+}
+
 static void dot_incbin(ASSEMBLER *as) {
     next_token(as);
     char *path = copy_token_string(as);
@@ -561,11 +598,20 @@ static void dot_incbin(ASSEMBLER *as) {
     }
 
     char *full_path = file_resolve_path(as, path);
-    free(path);
     if(!full_path) {
-        asm_err(as, ASM_ERR_FATAL, "Unable to resolve .incbin path");
+        if(as->pass == 1) {
+            char *detail = file_format_open_miss(as, ".incbin", path);
+            if(detail) {
+                asm_err(as, ASM_ERR_FATAL, "%s", detail);
+                free(detail);
+            } else {
+                asm_err(as, ASM_ERR_FATAL, "Unable to open .incbin file: %s", path);
+            }
+        }
+        free(path);
         return;
     }
+    free(path);
 
     FILE *fp = fopen(full_path, "rb");
     if(!fp) {
@@ -1777,6 +1823,9 @@ void parse_dot_command(ASSEMBLER *as) {
         break;
     case GPERF_DOT_INCLUDE:
         dot_include(as);
+        break;
+    case GPERF_DOT_SEARCH:
+        dot_search(as);
         break;
     case GPERF_DOT_LOCAL:
         dot_local(as);

@@ -74,6 +74,10 @@ struct ASSEMBLER {
 
     AM65_DYNARRAY files;
     AM65_DYNARRAY file_stack;
+    /* Canonical directories from .search / -I; tried after the including file's dir. */
+    AM65_DYNARRAY search_dirs;
+    /* Host/CLI seeds (e.g. -I); copied into search_dirs at the start of each pass 1. */
+    AM65_DYNARRAY seed_search_dirs;
     ASM_FILE *root_file;
     ASM_FILE *current_file;
 
@@ -131,6 +135,10 @@ int assembler_init(ASSEMBLER *as, ERRORLOG *errorlog, CB_ASM_CTX *cb);
 // Seed a text define that survives both passes (e.g. a build flag). Call after
 // assembler_init and before assembler_assemble. `value` may be "" but not NULL.
 int assembler_predefine(ASSEMBLER *as, const char *name, const char *value);
+// Append a directory to the include/incbin search list seed (same list .search
+// extends). Relative paths resolve against the process cwd. Call after init and
+// before assemble. Empty or missing directories warn and return ASM_ERR.
+int assembler_add_search_dir(ASSEMBLER *as, const char *dir);
 /* Select the accepted instruction set. The default is the documented NMOS
    6502 set; source directives may change the profile while assembling. */
 void assembler_set_cpu_profile(ASSEMBLER *as, assembler_cpu_profile profile);
