@@ -44,7 +44,9 @@ A named scope becomes a separate output target when it has `file=` or `dest=`:
 ```
 
 The assembler core passes both attributes to its host. Standalone `am65` uses
-`file=` to create a binary and accepts but ignores `dest=`. Emulator hosts
+`file=` to create a binary and accepts but ignores `dest=`. Relative `file=`
+paths resolve against the directory of the `-i` source (absolute paths unchanged);
+CLI `-o` remains relative to the current working directory. Emulator hosts
 advertise and validate their own destination names. In a2m the attributes are
 orthogonal: `dest=` writes machine memory, `file=` writes a host file beside the
 source, and both together do both. A `file=`-only scope does not poke memory.

@@ -1422,9 +1422,11 @@ am65 -i <infile> [-o <outfile>] [-a <addr>] [-s <symfile|->]
 | `-h` | Show usage |
 
 Each output file contains exactly the range of addresses the source emitted into.
-Named `.scope file="..."` targets are written to their own files (resolved relative to
-the current directory). `dest=` is accepted but ignored. `AM65` is predefined to `1`;
-no emulator machine symbol is predefined.
+Named `.scope file="..."` targets are written to their own files. Relative `file=`
+paths resolve against the directory of the `-i` source (same rule as the emulator
+Assembler tab); absolute paths are unchanged. The CLI `-o` path is still relative to
+the current working directory. `dest=` is accepted but ignored. `AM65` is predefined
+to `1`; no emulator machine symbol is predefined.
 
 ```
 am65 -i demo.asm -o loader.bin -a $0800 -D VERSION=3 -s symbols.txt

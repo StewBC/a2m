@@ -11,6 +11,7 @@
 #include "asm.h"
 #include "errorlog.h"
 
+#include <ctype.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,6 +38,68 @@ static char *dup_str(const char *s, int len) {
         out[len] = '\0';
     }
     return out;
+}
+
+static int path_is_absolute(const char *path) {
+    if(!path || !*path) {
+        return 0;
+    }
+#if defined(_WIN32)
+    if(path[0] == '/' || path[0] == '\\') {
+        return 1;
+    }
+    return isalpha((unsigned char)path[0]) && path[1] == ':' &&
+           (path[2] == '/' || path[2] == '\\' || path[2] == '\0');
+#else
+    return path[0] == '/';
+#endif
+}
+
+static const char *find_last_path_separator(const char *path) {
+    const char *slash = strrchr(path, '/');
+#if defined(_WIN32)
+    const char *backslash = strrchr(path, '\\');
+    if(!slash || (backslash && backslash > slash)) {
+        return backslash;
+    }
+#endif
+    return slash;
+}
+
+// Resolve in-source file= the same way the emulator host does: absolute paths
+// stay absolute; relative paths join against the directory of the -i source.
+// Bare -i names with no directory keep the relative string (fopen uses cwd).
+static char *resolve_scope_file_path(ASSEMBLER *as, const char *file, int file_len) {
+    char *name = dup_str(file, file_len);
+    if(!name) {
+        return NULL;
+    }
+    if(path_is_absolute(name)) {
+        return name;
+    }
+
+    const char *source =
+        (as && as->root_file) ? as->root_file->display_name : NULL;
+    if(!source || !*source) {
+        return name;
+    }
+
+    const char *sep = find_last_path_separator(source);
+    if(!sep) {
+        return name;
+    }
+
+    size_t dir_len = (size_t)(sep - source + 1);
+    size_t name_len = strlen(name);
+    char *combined = malloc(dir_len + name_len + 1);
+    if(!combined) {
+        free(name);
+        return NULL;
+    }
+    memcpy(combined, source, dir_len);
+    memcpy(combined + dir_len, name, name_len + 1);
+    free(name);
+    return combined;
 }
 
 static FILE_TARGET *file_target_new(const char *file, int file_len, FILE_TARGET *sink) {
@@ -98,8 +161,18 @@ static void *cli_target_open(void *user, const char *name, int name_len,
     (void)dest_len;
     // The standalone assembler interprets file= and deliberately ignores
     // dest=. A destination-only scope therefore inherits its parent's output
-    // image rather than silently discarding its bytes.
-    return file_target_new(file, file_len, file_len > 0 ? NULL : parent);
+    // image rather than silently discarding its bytes. Relative file= paths
+    // resolve against the -i source directory (same rule as the emulator host).
+    if(file_len > 0) {
+        char *resolved = resolve_scope_file_path(as, file, file_len);
+        if(!resolved) {
+            return NULL;
+        }
+        FILE_TARGET *ft = file_target_new(resolved, (int)strlen(resolved), NULL);
+        free(resolved);
+        return ft;
+    }
+    return file_target_new(NULL, 0, parent);
 }
 
 static void cli_target_release(void *user, void *target) {
@@ -312,6 +385,7 @@ static void usage(const char *program) {
         "\n"
         "A named `.scope name file=\"path\"` inside the source assembles into its own\n"
         "output file, so one source can produce several binaries (loader, overlays...).\n"
+        "Relative file= paths resolve against the directory of -i; -o stays cwd-relative.\n"
         "The standalone tool accepts but ignores dest=; a dest=-only scope continues\n"
         "emitting into its parent output target.\n"
         "The define AM65 is predefined to 1 so source can detect the CLI build with\n"
