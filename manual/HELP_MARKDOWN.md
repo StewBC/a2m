@@ -15,5 +15,11 @@ Pipe tables are flattened into aligned text columns for the emulator. Avoid
 Markdown constructs such as HTML, images, blockquotes, and nested lists when the
 content must appear correctly in-emulator.
 
-Use only ASCII characters. Unicode characters such as '→' and Em dash '—' 
-(Unicode: U+2014) or En dash '–' (Unicode: U+2013), for example, are not allowed.
+Inside table cells, escape a literal `|` as `\|` so Markdown does not treat it
+as a column separator (e.g. `` `enh\|plus` ``). `tools/gen_help.py` strips that
+backslash when compiling in-emulator help.
+
+Use only ASCII characters. Unicode characters such as '→', ellipsis '…', Em
+dash '—' (U+2014), or En dash '–' (U+2013) are not allowed.
+`tools/gen_help.py` fails the build if it finds any non-ASCII character in
+`manual.md`.

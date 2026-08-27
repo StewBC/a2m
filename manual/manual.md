@@ -1443,7 +1443,7 @@ Each output file contains exactly the range of addresses the source emitted into
 Named `.scope file="..."` targets are written to their own files. Relative `file=`
 and `-o` paths are relative to the current working directory; absolute paths are
 unchanged. (In the emulator Assembler tab, relative `file=` still resolves beside
-the assembled source — see above.) `dest=` is accepted but ignored. `AM65` is
+the assembled source -- see above.) `dest=` is accepted but ignored. `AM65` is
 predefined to `1`; no emulator machine symbol is predefined.
 
 ```

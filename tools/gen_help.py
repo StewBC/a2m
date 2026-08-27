@@ -14,6 +14,26 @@ def fail(message):
     raise SystemExit(f"gen_help.py: {message}")
 
 
+def require_ascii(path, lines):
+    """Reject non-ASCII source. Emulator help is ASCII-only (HELP_MARKDOWN.md)."""
+    bad = []
+    for line_no, raw in enumerate(lines, 1):
+        for col, ch in enumerate(raw, 1):
+            code = ord(ch)
+            if code > 127:
+                bad.append((line_no, col, code))
+    if not bad:
+        return
+    msgs = []
+    for line_no, col, code in bad[:20]:
+        msgs.append(f"  line {line_no} col {col}: U+{code:04X}")
+    extra = "" if len(bad) <= 20 else f"\n  ... and {len(bad) - 20} more"
+    fail(
+        f"{path}: non-ASCII characters are not allowed "
+        f"(see manual/HELP_MARKDOWN.md):\n" + "\n".join(msgs) + extra
+    )
+
+
 def c_string(value):
     out = []
     for ch in value:
@@ -83,21 +103,31 @@ def is_table_separator(cells):
 
 
 def split_table_row(line):
+    """Split a GFM table row on unescaped '|'. '\\|' is a literal pipe."""
     text = line.strip()
     cells = []
     cell = []
     in_code = False
+    i = 0
 
-    for i, ch in enumerate(text):
+    while i < len(text):
+        ch = text[i]
         if ch == "`":
             in_code = not in_code
             cell.append(ch)
+            i += 1
+        elif ch == "\\" and i + 1 < len(text) and text[i + 1] == "|":
+            # Markdown table escape: keep '|', drop the backslash.
+            cell.append("|")
+            i += 2
         elif ch == "|" and not in_code:
             if i != 0:
                 cells.append("".join(cell).strip())
             cell = []
+            i += 1
         else:
             cell.append(ch)
+            i += 1
 
     if cell or not text.endswith("|"):
         cells.append("".join(cell).strip())
@@ -135,6 +165,7 @@ def flush_table(sections, table_lines):
 
 def parse_manual(path, section_level=2):
     lines = path.read_text(encoding="utf-8").splitlines()
+    require_ascii(path, lines)
     heading = None
     sections = []
     in_code = False
