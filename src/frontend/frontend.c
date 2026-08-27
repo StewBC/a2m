@@ -263,6 +263,9 @@ typedef struct frontend_misc_view_state {
     int inspector_slider; /* sample-indexed; maximum min(N-1, 1000) */
     bool inspector_thumb_down;
     bool inspector_land_pending;
+    /* Worker land currently in flight (0 = none). Desired dest may move ahead
+       via [+]/[-] into preview_*; on completion we chase once to that dest. */
+    uint64_t inspector_land_inflight_sample_id;
     uint64_t inspector_preview_picture_id;
     uint64_t inspector_preview_sample_id;
     uint64_t inspector_preview_ordinal;
@@ -7433,6 +7436,14 @@ static void frontend_draw_misc_assembler(frontend *ui)
     }
 }
 
+static bool frontend_inspector_intent_is_coalescable_land(
+    frontend_debugger_intent_type type)
+{
+    return type == FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND ||
+        type == FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND_SAMPLE ||
+        type == FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND_TO_CYCLE;
+}
+
 static void frontend_push_inspector_intent_ex(
     frontend *ui,
     frontend_debugger_intent_type type,
@@ -7446,16 +7457,13 @@ static void frontend_push_inspector_intent_ex(
     if (ui == NULL) {
         return;
     }
-    if (coalesce_land &&
-        (type == FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND ||
-         type == FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND_TO_CYCLE)) {
+    if (coalesce_land && frontend_inspector_intent_is_coalescable_land(type)) {
         i = ui->intent_read;
         while (i != ui->intent_write) {
-            if (ui->intents[i].type == FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND ||
-                ui->intents[i].type ==
-                    FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND_TO_CYCLE) {
+            if (frontend_inspector_intent_is_coalescable_land(ui->intents[i].type)) {
                 /* Latest land wins; keep the requested land flavor. */
                 ui->intents[i].type = type;
+                ui->intents[i].enabled = enabled;
                 ui->intents[i].inspector_cycle = cycle;
                 return;
             }
@@ -7618,6 +7626,132 @@ static int frontend_inspector_ordinal_to_slider(uint64_t count, uint64_t ordinal
     return (int)best_tick;
 }
 
+static uint64_t frontend_inspector_focus_ordinal(
+    const frontend_debug_state *debug,
+    uint64_t catalog_count)
+{
+    uint64_t i;
+    uint64_t focus_ordinal = 0u;
+
+    if (debug == NULL || catalog_count == 0u) {
+        return 0u;
+    }
+    if (debug->inspector_focus_is_sample) {
+        focus_ordinal = debug->inspector_focus_ordinal;
+        if (focus_ordinal >= catalog_count) {
+            focus_ordinal = catalog_count - 1u;
+        }
+        return focus_ordinal;
+    }
+    for (i = 0u; i < catalog_count; i++) {
+        if (debug->inspector_catalog.samples[i].snapshot_cycle <=
+            debug->inspector_focus_cycle) {
+            focus_ordinal = i;
+        } else {
+            break;
+        }
+    }
+    return focus_ordinal;
+}
+
+static void frontend_inspector_set_preview_ordinal(
+    frontend *ui,
+    const frontend_debug_state *debug,
+    uint64_t catalog_count,
+    uint64_t ordinal)
+{
+    const runtime_inspector_sample_meta *sample;
+
+    if (ui == NULL || debug == NULL || catalog_count == 0u) {
+        return;
+    }
+    if (ordinal >= catalog_count) {
+        ordinal = catalog_count - 1u;
+    }
+    sample = &debug->inspector_catalog.samples[ordinal];
+    ui->misc.inspector_preview_ordinal = ordinal;
+    ui->misc.inspector_preview_sample_id = sample->sample_id;
+    ui->misc.inspector_preview_picture_id = sample->picture_id;
+    ui->misc.inspector_preview_keep_current = ordinal + 1u == catalog_count;
+}
+
+static void frontend_inspector_dispatch_land_sample(
+    frontend *ui,
+    uint64_t sample_id)
+{
+    if (ui == NULL || sample_id == 0u) {
+        return;
+    }
+    frontend_push_inspector_intent(
+        ui,
+        FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND_SAMPLE,
+        false,
+        sample_id);
+    ui->misc.inspector_land_pending = true;
+    ui->misc.inspector_land_inflight_sample_id = sample_id;
+}
+
+/* Length-1 [+]/[-] buffer: update desired dest; dispatch only if idle. */
+static void frontend_inspector_step_toward(
+    frontend *ui,
+    const frontend_debug_state *debug,
+    uint64_t catalog_count,
+    int direction)
+{
+    uint64_t base;
+    uint64_t dest;
+
+    if (ui == NULL || debug == NULL || catalog_count == 0u || direction == 0) {
+        return;
+    }
+    if (ui->misc.inspector_land_pending) {
+        base = ui->misc.inspector_preview_ordinal;
+        if (base >= catalog_count) {
+            base = catalog_count - 1u;
+        }
+    } else {
+        base = frontend_inspector_focus_ordinal(debug, catalog_count);
+    }
+    if (direction < 0) {
+        if (base == 0u) {
+            return;
+        }
+        dest = base - 1u;
+    } else {
+        if (base + 1u >= catalog_count) {
+            return;
+        }
+        dest = base + 1u;
+    }
+    frontend_inspector_set_preview_ordinal(ui, debug, catalog_count, dest);
+    if (!ui->misc.inspector_land_pending) {
+        frontend_inspector_dispatch_land_sample(
+            ui, ui->misc.inspector_preview_sample_id);
+    }
+}
+
+static void frontend_inspector_chase_pending_land(
+    frontend *ui,
+    const frontend_debug_state *debug)
+{
+    if (ui == NULL || debug == NULL || !ui->misc.inspector_land_pending) {
+        return;
+    }
+    if (!debug->inspector_focus_is_sample ||
+        ui->misc.inspector_land_inflight_sample_id == 0u ||
+        debug->inspector_focus_id != ui->misc.inspector_land_inflight_sample_id) {
+        return;
+    }
+    if (ui->misc.inspector_preview_sample_id != 0u &&
+        ui->misc.inspector_preview_sample_id != debug->inspector_focus_id) {
+        frontend_inspector_dispatch_land_sample(
+            ui, ui->misc.inspector_preview_sample_id);
+        return;
+    }
+    ui->misc.inspector_land_pending = false;
+    ui->misc.inspector_land_inflight_sample_id = 0u;
+}
+
 static void frontend_draw_inspector_window_summary(
     struct nk_context *ctx,
     const frontend_debug_state *debug)
@@ -7687,15 +7821,13 @@ static void frontend_draw_misc_inspector(
     if (!inspecting) {
         ui->misc.inspector_thumb_down = false;
         ui->misc.inspector_land_pending = false;
+        ui->misc.inspector_land_inflight_sample_id = 0u;
         ui->misc.inspector_preview_picture_id = 0u;
         ui->misc.inspector_preview_sample_id = 0u;
         ui->misc.inspector_preview_ordinal = 0u;
         ui->misc.inspector_preview_keep_current = false;
-    } else if (ui->misc.inspector_land_pending &&
-               debug->inspector_focus_is_sample &&
-               debug->inspector_focus_id ==
-                   ui->misc.inspector_preview_sample_id) {
-        ui->misc.inspector_land_pending = false;
+    } else {
+        frontend_inspector_chase_pending_land(ui, debug);
     }
     preview_active = ui->misc.inspector_thumb_down ||
         ui->misc.inspector_land_pending;
@@ -7741,6 +7873,9 @@ static void frontend_draw_misc_inspector(
 
     nk_layout_row_dynamic(ctx, 24.0f, 1);
     if (nk_button_label(ctx, "Leave Inspector")) {
+        ui->misc.inspector_thumb_down = false;
+        ui->misc.inspector_land_pending = false;
+        ui->misc.inspector_land_inflight_sample_id = 0u;
         frontend_push_inspector_intent(
             ui, FRONTEND_DEBUGGER_INTENT_INSPECTOR_LEAVE, false, 0u);
     }
@@ -7751,47 +7886,37 @@ static void frontend_draw_misc_inspector(
         bool can_previous = false;
         bool can_next = false;
         bool thumb = ui->misc.inspector_thumb_down;
-        bool busy = thumb || ui->misc.inspector_land_pending;
+        bool slider_busy = thumb || ui->misc.inspector_land_pending;
+        uint64_t step_ordinal;
         int slider_max = catalog_count > 1u ?
             (int)((catalog_count - 1u) < 1000u ? catalog_count - 1u : 1000u) : 0;
 
-        if (debug->inspector_focus_is_sample) {
-            can_previous = debug->inspector_focus_ordinal > 0u;
-            can_next = debug->inspector_focus_ordinal + 1u < catalog_count;
+        /* [+]/[-] stay clickable while a land is in flight so hammered presses
+           update the length-1 destination; only scrub thumb blocks them. */
+        if (ui->misc.inspector_land_pending) {
+            step_ordinal = ui->misc.inspector_preview_ordinal;
+            if (catalog_count > 0u && step_ordinal >= catalog_count) {
+                step_ordinal = catalog_count - 1u;
+            }
         } else {
-            uint64_t i;
-            for (i = 0u; i < catalog_count; i++) {
-                uint64_t cycle =
-                    debug->inspector_catalog.samples[i].snapshot_cycle;
-                if (cycle < debug->inspector_focus_cycle) can_previous = true;
-                if (cycle > debug->inspector_focus_cycle) can_next = true;
-            }
+            step_ordinal = frontend_inspector_focus_ordinal(debug, catalog_count);
         }
+        can_previous = catalog_count > 0u && step_ordinal > 0u;
+        can_next = catalog_count > 0u && step_ordinal + 1u < catalog_count;
 
-        if (!busy) {
-            uint64_t focus_ordinal = debug->inspector_focus_ordinal;
-            if (!debug->inspector_focus_is_sample) {
-                uint64_t i;
-                focus_ordinal = 0u;
-                for (i = 0u; i < catalog_count; i++) {
-                    if (debug->inspector_catalog.samples[i].snapshot_cycle <=
-                        debug->inspector_focus_cycle) {
-                        focus_ordinal = i;
-                    } else {
-                        break;
-                    }
-                }
-            }
+        if (!slider_busy) {
             slider = frontend_inspector_ordinal_to_slider(
-                catalog_count, focus_ordinal);
+                catalog_count,
+                frontend_inspector_focus_ordinal(debug, catalog_count));
+        } else if (ui->misc.inspector_land_pending && !thumb) {
+            slider = frontend_inspector_ordinal_to_slider(
+                catalog_count, ui->misc.inspector_preview_ordinal);
         }
 
         nk_layout_row_begin(ctx, NK_DYNAMIC, 22.0f, 3);
         nk_layout_row_push(ctx, 0.08f);
-        if (frontend_nk_action_button(
-                ctx, "-", !busy && can_previous)) {
-            frontend_push_inspector_intent(
-                ui, FRONTEND_DEBUGGER_INTENT_INSPECTOR_SAMPLE_STEP, false, 0u);
+        if (frontend_nk_action_button(ctx, "-", !thumb && can_previous)) {
+            frontend_inspector_step_toward(ui, debug, catalog_count, -1);
         }
         nk_layout_row_push(ctx, 0.84f);
         {
@@ -7817,40 +7942,30 @@ static void frontend_draw_misc_inspector(
                     catalog_count, slider);
                 uint64_t sample_id = 0u;
                 if (ordinal < catalog_count) {
-                    sample_id = debug->inspector_catalog.samples[ordinal].sample_id;
-                    ui->misc.inspector_preview_picture_id =
-                        debug->inspector_catalog.samples[ordinal].picture_id;
-                    ui->misc.inspector_preview_sample_id = sample_id;
-                    ui->misc.inspector_preview_ordinal = ordinal;
-                    ui->misc.inspector_preview_keep_current =
-                        ordinal + 1u == catalog_count;
+                    sample_id =
+                        debug->inspector_catalog.samples[ordinal].sample_id;
+                    frontend_inspector_set_preview_ordinal(
+                        ui, debug, catalog_count, ordinal);
                 }
                 if (!down) {
-                    frontend_push_inspector_intent(
-                        ui,
-                        FRONTEND_DEBUGGER_INTENT_INSPECTOR_LAND_SAMPLE,
-                        false,
-                        sample_id);
                     ui->misc.inspector_thumb_down = false;
-                    ui->misc.inspector_land_pending = sample_id != 0u;
+                    if (sample_id != 0u) {
+                        frontend_inspector_dispatch_land_sample(ui, sample_id);
+                    }
                 }
             } else if ((hovered || moved) && down) {
                 uint64_t ordinal = frontend_inspector_slider_to_ordinal(
                     catalog_count, slider);
                 ui->misc.inspector_thumb_down = true;
-                ui->misc.inspector_preview_picture_id = ordinal < catalog_count ?
-                    debug->inspector_catalog.samples[ordinal].picture_id : 0u;
-                ui->misc.inspector_preview_sample_id = ordinal < catalog_count ?
-                    debug->inspector_catalog.samples[ordinal].sample_id : 0u;
-                ui->misc.inspector_preview_ordinal = ordinal;
-                ui->misc.inspector_preview_keep_current =
-                    ordinal + 1u == catalog_count;
+                if (ordinal < catalog_count) {
+                    frontend_inspector_set_preview_ordinal(
+                        ui, debug, catalog_count, ordinal);
+                }
             }
         }
         nk_layout_row_push(ctx, 0.08f);
-        if (frontend_nk_action_button(ctx, "+", !busy && can_next)) {
-            frontend_push_inspector_intent(
-                ui, FRONTEND_DEBUGGER_INTENT_INSPECTOR_SAMPLE_STEP, true, 0u);
+        if (frontend_nk_action_button(ctx, "+", !thumb && can_next)) {
+            frontend_inspector_step_toward(ui, debug, catalog_count, 1);
         }
         nk_layout_row_end(ctx);
         ui->misc.inspector_slider = slider;
