@@ -24,7 +24,7 @@ target_include_directories(am65lib PUBLIC
 
 target_compile_features(am65lib PUBLIC c_std_99)
 
-# Keep the consumer-facing target stable while a2m and c64m adopt the subtree.
+# Keep the consumer-facing target name stable across a2m and c64m.
 add_library(assembler ALIAS am65lib)
 
 add_executable(am65 main.c)

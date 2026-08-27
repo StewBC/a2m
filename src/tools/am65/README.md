@@ -1,9 +1,10 @@
 # am65
 
-`am65` is the assembler used by a2m and by the standalone `am65` command-line
-program. It is designed to become the shared source of truth for c64m as well.
-The directory is self-contained so it can be maintained as a Git subtree in
-each consumer.
+`am65` is the assembler used by a2m, c64m, and the standalone `am65`
+command-line program. Apps keep a plain vendored copy under `src/tools/am65`
+so a normal `git clone` of either app is enough to build. Assembler history
+and merges live in the am65 hub repo (https://github.com/StewBC/am65); see
+`HUB.md` there for the sync/get workflow.
 
 The initial CPU profile is NMOS 6502. It can be selected through the library
 API (`assembler_set_cpu_profile`), with `am65 --cpu`, or changed within source:
