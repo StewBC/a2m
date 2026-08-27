@@ -2,8 +2,8 @@
 
 a2m is an Apple ][+ and Apple //e Enhanced emulator. It runs on Windows, Linux, and
 macOS. It boots Disk II floppy images and SmartPort block devices (including a host
-folder as a ProDOS volume), can save and restore full machine snapshots
-(`.a2state`), and includes a debugger and assembler for Apple II development.
+folder as a ProDOS volume), can save and restore full machine snapshots, and
+includes a debugger and assembler for Apple II development.
 
 System ROMs are embedded. No separate ROM files are required.
 
@@ -122,9 +122,9 @@ writes a diagnostic to stderr instead of silently dropping it.
 
 Different host names can reduce to the same 15-character ProDOS name. HostFS keeps
 the first name and gives later collisions deterministic aliases ending in `001`
-through `999`. The final extension is preserved when possible, so colliding tune
-names still end in `.PT3`. The alias exists only in the ProDOS catalog; the host
-basename is unchanged. Each alias is reported on stderr.
+through `999`. The final extension is preserved when possible, so colliding file
+names still end in their own extensions. The alias exists only in the ProDOS catalog;
+the host basename is unchanged. Each alias is reported on stderr.
 
 HostFS is read/write: ProDOS data writes update the host files, and create / delete /
 rename in the catalog create, remove, or rename NAPS files in the folder. External
@@ -295,7 +295,7 @@ Two splitters divide the debug layout:
 Drag the splitters to resize the panes. A **corner handle** at the bottom-right of the
 Apple 2 display region moves both splitters together; clicking it without dragging snaps
 the display region to the true aspect (see **Display and Scaling**). The window size and
-splitter positions are saved to the INI file on quit.
+splitter positions are saved to the INI file on quit if `Save on Quit` is enabled (`-v|-r`).
 
 ### Turbo Mode
 
@@ -311,11 +311,11 @@ peripherals, and Mockingboard stay in lock-step):
 | `4`, `8`, ... | `4 MHz`, `8 MHz`, ... | Zip-class finite MHz (best-effort), live paint |
 | `max` or `-1` | `max` | Free-run as fast as the host allows, still full live paint |
 
-The first entry is the startup speed. Paste does not change turbo. By default
-entering `max` pauses only the dense CPU flight recorder (Configure -> Emulator,
-or `--history-off-on-max` / `--no-history-off-on-max`). Inspector Record stays
-on and continues taking snapshots at the approximately 60 Hz max presentation
-cadence. Leaving `max` keeps the same Inspector window.
+The first entry is the startup speed. By default entering `max` pauses only the dense
+CPU flight recorder (Configure -> Emulator, or `--history-off-on-max` /
+`--no-history-off-on-max`). Inspector Record stays on and continues taking snapshots
+at the approximately 60 Hz max presentation cadence. Leaving `max` keeps the same
+Inspector window.
 
 ### Help
 
@@ -378,12 +378,11 @@ Inspector and run a bit before searching). **Clear view** clears the on-screen
 transcript only; it does not clear the recorder.
 
 **Query line** (Enter to run). The first token must be a verb (`find`, `next`,
-`read`, `info`). Bare `key=value` alone is not a FIND query (the control-port
-`history-find` command still accepts bare keys). Up/Down browses recent queries.
-Tab completes the next expected token, or prints that field's syntax on the status
-strip. With the caret at the end of the line, Tab expands every unique prefix
-(`find add=$4000 acc=re` becomes `find address=$4000 access=read`). Open values
-(ids, hex, ranges, limits) are not completed.
+`read`, `info`). Up/Down browses recent queries. Tab completes the next expected
+token, or prints that field's syntax on the status strip. With the caret at the
+end of the line, Tab expands every unique prefix (`find add=$4000 acc=re` becomes
+`find address=$4000 access=read`). Open values (ids, hex, ranges, limits) are not
+completed.
 
 | Input | Meaning |
 |-------|---------|
@@ -521,6 +520,7 @@ of jump as entering the writer PC with `Opt+A`.
 | `Opt+M` | Cycle source mode: Map -> ROM -> Main -> Map |
 | `Opt+S` | Open the Symbol Lookup dialog |
 | `Opt+Left` | Set PC to cursor address (paused, live only; unbound in time travel) |
+| `Opt+Right` | Set cursor address to PC |
 | `Up` / `Down` | Move cursor one instruction |
 | `PgUp` / `PgDn` | Scroll one page |
 | `Home` / `End` | Jump to first or last line of the current view |
@@ -693,8 +693,8 @@ active split Memory view and wraps around the 64K address space.
 | `Opt+G` | Find next |
 | `Opt+Shift+G` | Find previous |
 | `Opt+X` | Toggle between hex and ASCII edit modes |
-| `Opt+V` | Split active view at cursor |
-| `Shift+Opt+V` | Split active view at the start of the cursor row |
+| `Opt+V` | Split active view at the cursor row & $FFF0 |
+| `Shift+Opt+V` | Split active view at cursor |
 | `Opt+J` | Dissolve active view (no-op when only one view exists) |
 | `Opt+Up` | Switch focus to the view above |
 | `Opt+Down` | Switch focus to the view below |
