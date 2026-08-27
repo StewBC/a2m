@@ -29,11 +29,8 @@ Always `STA $C006` before disk MLI calls (slot CXROM).
 
 ## mminer worked example
 
-Copy `samples/asm_mli_launch/mli_launch.s` and
-`samples/asm_mli_launch/mminer-a2m.asm` into `samples/mminer`, replacing the
-existing `samples/mminer/mminer-a2m.asm`.
-
-The sample will assemble its output into `samples/hostfs/mminer`.
+The sample will use ../mminer's code files and assemble its output
+into `samples/hostfs/mminer`.
 
 With `samples/hostfs` mounted as SmartPort `S7D0`, set `Auto-run at` to
 `$3000` and enable `MLI launch`.
