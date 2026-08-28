@@ -1,3 +1,14 @@
+# a2m — RETIRED (development moved to machines)
+
+**This repository is frozen.** a2m development continues in the `machines`
+monorepo (a2m + c64m share a debugger shell, not silicon).
+
+- Last frozen SHA: `d863ad98487639445db16134d260221839cb72e9`
+- Tag: `frozen-for-machines-d863ad98487639445db16134d260221839cb72e9`
+- Do not open feature PRs here. Do not push further work here.
+
+---
+
 # a2m — Apple ][+ and //e Enhanced emulator
 
 a2m is an Apple II emulator written in C99. It is aimed at people who enjoy
